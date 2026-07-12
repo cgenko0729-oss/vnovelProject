@@ -41,8 +41,13 @@ namespace VNEffects
         [Tooltip("转场时轮换的背景图")]
         public Sprite[] backgroundVariants;
 
+        [Header("星尘/热浪/轮廓光（feature/breathing-rim-stardust-haze）")]
+        public VNMouseStardust stardust;
+        public VNHeatHaze heatHaze;
+
         int _transitionIndex = -1;
         int _bgIndex;
+        int _rimIndex; // 0 关 / 1 夕阳橙 / 2 月夜蓝
 
         VNEntrancePreset _preset = VNEntrancePreset.DissolveGlow;
         bool _hueDemo;
@@ -128,6 +133,12 @@ namespace VNEffects
             if (kb.tKey.wasPressedThisFrame && transition != null && !transition.IsPlaying)
                 PlayNextTransition();
 
+            if (kb.cKey.wasPressedThisFrame && stardust != null) stardust.Toggle();
+
+            if (kb.zKey.wasPressedThisFrame && heatHaze != null) heatHaze.Toggle();
+
+            if (kb.rKey.wasPressedThisFrame && characterFx != null) CycleRimLight();
+
             // 情绪演出动作
             if (emotes != null)
             {
@@ -141,6 +152,25 @@ namespace VNEffects
                 }
                 if (kb.digit0Key.wasPressedThisFrame) emotes.Nod();
                 if (kb.nKey.wasPressedThisFrame) emotes.HeadShake();
+            }
+        }
+
+        void CycleRimLight()
+        {
+            _rimIndex = (_rimIndex + 1) % 3;
+            switch (_rimIndex)
+            {
+                case 0:
+                    characterFx.DORimAmount(0f, 0.6f);
+                    break;
+                case 1: // 夕阳：右上方橙色轮廓光
+                    characterFx.SetRimLight(new Color(2.2f, 1.05f, 0.4f), 0f, 0.022f, 40f);
+                    characterFx.DORimAmount(1.2f, 0.8f);
+                    break;
+                case 2: // 月夜：左上方冷蓝轮廓光
+                    characterFx.SetRimLight(new Color(0.75f, 1.05f, 2.3f), 0f, 0.022f, 140f);
+                    characterFx.DORimAmount(1.2f, 0.8f);
+                    break;
             }
         }
 
@@ -208,7 +238,8 @@ namespace VNEffects
                 $"色调: <b>{moodName}</b>  转场: <b>{transName}</b>\n" +
                 "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光 | P 粒子 | H 彩虹\n" +
                 "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调 | T 转场换背景\n" +
-                "6 惊讶 | 7 生气 | 8 害羞 | 9 沮丧/恢复 | 0 点头 | N 摇头";
+                "6 惊讶 | 7 生气 | 8 害羞 | 9 沮丧/恢复 | 0 点头 | N 摇头\n" +
+                "R 轮廓光(夕阳/月夜) | Z 热浪+蒸汽 | C 鼠标星尘";
         }
     }
 }

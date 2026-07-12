@@ -22,6 +22,7 @@ namespace VNEffects
             Rain,      // 雨：细长拉伸快速下落 + 底部溅落
             Snow,      // 雪：慢速飘落 + 噪声横移
             Fireflies, // 萤火虫：夜里缓慢游走、忽明忽暗
+            Mist,      // 雾气/蒸汽：大团柔雾从下方缓缓升起（温泉/热浪配套）
         }
 
         [Tooltip("粒子风格预设")]
@@ -349,6 +350,36 @@ namespace VNEffects
                     // 忽明忽暗：复用星光的闪烁曲线
                     sol.enabled = true;
                     sol.size = new ParticleSystem.MinMaxCurve(1f, TwinkleCurve());
+
+                    renderer.material = ResolveMaterial(VNProceduralTextures.SoftCircle);
+                    break;
+                }
+                case Preset.Mist:
+                {
+                    main.startLifetime = new ParticleSystem.MinMaxCurve(9f, 15f);
+                    main.startSize = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+                    main.startColor = new ParticleSystem.MinMaxGradient(
+                        new Color(hdrTint.r, hdrTint.g, hdrTint.b, 0.045f),
+                        new Color(hdrTint.r, hdrTint.g, hdrTint.b, 0.1f));
+                    em.rateOverTime = 3.5f * rateMultiplier;
+
+                    // 从画面下方一条带生成，缓缓升起
+                    shape.scale = new Vector3(area.x + 2f, 1f, 0.1f);
+                    shape.position = new Vector3(0f, -area.y * 0.5f - 0.5f, 0f);
+
+                    vel.enabled = true;
+                    vel.space = ParticleSystemSimulationSpace.Local;
+                    vel.x = new ParticleSystem.MinMaxCurve(-0.12f, 0.12f);
+                    vel.y = new ParticleSystem.MinMaxCurve(0.18f, 0.4f);
+                    vel.z = new ParticleSystem.MinMaxCurve(0f, 0f);
+
+                    noise.enabled = true;
+                    noise.strength = 0.2f;
+                    noise.frequency = 0.1f;
+                    noise.scrollSpeed = 0.05f;
+
+                    rol.enabled = true;
+                    rol.z = new ParticleSystem.MinMaxCurve(-0.15f, 0.15f); // 缓慢翻滚
 
                     renderer.material = ResolveMaterial(VNProceduralTextures.SoftCircle);
                     break;

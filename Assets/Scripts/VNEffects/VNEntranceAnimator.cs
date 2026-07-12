@@ -206,13 +206,14 @@ namespace VNEffects
             return _current;
         }
 
-        /// <summary>出场完成后开启常驻的"活图"效果（呼吸发光 + 悬浮 + 周期扫光）</summary>
+        /// <summary>出场完成后开启常驻的"活图"效果（呼吸发光 + 悬浮 + 呼吸动作 + 周期扫光）</summary>
         public void StartIdleEffects(
             Color? glowColor = null, float glowAmount = 0.12f,
             float floatAmplitude = 6f, float shineInterval = 7f)
         {
             _fx.StartBreathingGlow(glowColor ?? new Color(1f, 0.9f, 0.7f, 1f), glowAmount, 3.2f);
             _fx.StartFloating(floatAmplitude, 4.5f);
+            _fx.StartBreathingMotion(); // 呼吸感立绘：横向缩放呼吸 + 微倾斜
             if (shineInterval > 0f) _fx.StartShineLoop(shineInterval, 0.8f);
         }
     }

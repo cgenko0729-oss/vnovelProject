@@ -29,6 +29,10 @@ namespace VNEffects
         static readonly int IdSaturation = Shader.PropertyToID("_Saturation");
         static readonly int IdBrightness = Shader.PropertyToID("_Brightness");
         static readonly int IdWaveAmount = Shader.PropertyToID("_WaveAmount");
+        static readonly int IdRimColor = Shader.PropertyToID("_RimColor");
+        static readonly int IdRimAmount = Shader.PropertyToID("_RimAmount");
+        static readonly int IdRimWidth = Shader.PropertyToID("_RimWidth");
+        static readonly int IdRimAngle = Shader.PropertyToID("_RimAngle");
 
         const string ShaderName = "VN/ImageEffect";
 
@@ -242,6 +246,25 @@ namespace VNEffects
         }
 
         // ------------------------------------------------------------------
+        // 轮廓光（Rim Light）：让立绘外缘染上环境光色，与背景光照统一
+        // ------------------------------------------------------------------
+
+        /// <summary>设置轮廓光（angleDeg：光源方向，0=右 90=上 180=左）</summary>
+        public void SetRimLight(Color hdrColor, float amount, float width = 0.02f, float angleDeg = 45f)
+        {
+            Mat.SetColor(IdRimColor, hdrColor);
+            Mat.SetFloat(IdRimWidth, width);
+            Mat.SetFloat(IdRimAngle, angleDeg);
+            Mat.SetFloat(IdRimAmount, amount);
+        }
+
+        /// <summary>补间轮廓光强度（渐亮/渐灭）</summary>
+        public Tween DORimAmount(float to, float duration) =>
+            Mat.DOFloat(to, IdRimAmount, duration).SetTarget(this).SetLink(gameObject);
+
+        public void ClearRimLight() => Mat.SetFloat(IdRimAmount, 0f);
+
+        // ------------------------------------------------------------------
         // 悬浮飘动（RectTransform 上下缓慢浮动，让立绘"活"起来）
         // ------------------------------------------------------------------
 
@@ -272,12 +295,90 @@ namespace VNEffects
                 Rect.anchoredPosition = new Vector2(Rect.anchoredPosition.x, _floatBaseY);
         }
 
+        // ------------------------------------------------------------------
+        // 呼吸感立绘（Pseudo-Live2D）：横向缩放呼吸 + 轻微倾斜摆动
+        // 与悬浮飘动三个正弦叠加，立绘"活着"的感觉翻倍
+        // ------------------------------------------------------------------
+
+        Tween _breathScaleX;
+        Tween _breathScaleY;
+        Tween _tiltTween;
+        Vector3 _breathBaseScale;
+        bool _hasBreathBase;
+        float _lastBreathAmp = 0.013f, _lastBreathPeriod = 3.6f;
+        float _lastTiltDeg = 0.7f, _lastTiltPeriod = 7f;
+
+        /// <summary>当前是否在呼吸动作中</summary>
+        public bool IsBreathingMotion => _breathScaleX != null;
+
+        /// <summary>用上次的参数恢复呼吸（情绪动作结束后调用）</summary>
+        public void ResumeBreathingMotion() =>
+            StartBreathingMotion(_lastBreathAmp, _lastBreathPeriod, _lastTiltDeg, _lastTiltPeriod);
+
+        /// <summary>
+        /// 开启呼吸动作：横向缩放 scaleAmplitude（约 1~2%）模拟胸腔起伏，
+        /// 纵向带 40% 的同步微伸展；叠加 ±tiltDegrees 的极缓倾斜摆动。
+        /// </summary>
+        public void StartBreathingMotion(float scaleAmplitude = 0.013f, float period = 3.6f,
+            float tiltDegrees = 0.7f, float tiltPeriod = 7f)
+        {
+            StopBreathingMotion();
+            _lastBreathAmp = scaleAmplitude;
+            _lastBreathPeriod = period;
+            _lastTiltDeg = tiltDegrees;
+            _lastTiltPeriod = tiltPeriod;
+
+            var t = Rect;
+            if (!_hasBreathBase)
+            {
+                _breathBaseScale = t.localScale;
+                _hasBreathBase = true;
+            }
+            t.localScale = _breathBaseScale;
+
+            _breathScaleX = t.DOScaleX(_breathBaseScale.x * (1f + scaleAmplitude), period * 0.5f)
+                             .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
+                             .SetLink(gameObject);
+            _breathScaleY = t.DOScaleY(_breathBaseScale.y * (1f + scaleAmplitude * 0.4f), period * 0.5f)
+                             .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
+                             .SetLink(gameObject);
+
+            if (tiltDegrees > 0.01f)
+            {
+                // 先缓慢摆到一侧，再在两侧之间往复 —— 起步不跳变
+                _tiltTween = t.DOLocalRotate(new Vector3(0f, 0f, tiltDegrees), tiltPeriod * 0.5f)
+                              .SetEase(Ease.InOutSine)
+                              .SetLink(gameObject)
+                              .OnComplete(() =>
+                              {
+                                  _tiltTween = t.DOLocalRotate(new Vector3(0f, 0f, -tiltDegrees), tiltPeriod)
+                                                .SetEase(Ease.InOutSine)
+                                                .SetLoops(-1, LoopType.Yoyo)
+                                                .SetLink(gameObject);
+                              });
+            }
+        }
+
+        public void StopBreathingMotion()
+        {
+            _breathScaleX?.Kill();
+            _breathScaleY?.Kill();
+            _tiltTween?.Kill();
+            _breathScaleX = _breathScaleY = _tiltTween = null;
+            if (_hasBreathBase)
+            {
+                Rect.localScale = _breathBaseScale;
+                Rect.localRotation = Quaternion.identity;
+            }
+        }
+
         /// <summary>停止所有常驻循环效果</summary>
         public void StopAllLoops()
         {
             StopShineLoop();
             StopBreathingGlow();
             StopFloating();
+            StopBreathingMotion();
         }
     }
 }

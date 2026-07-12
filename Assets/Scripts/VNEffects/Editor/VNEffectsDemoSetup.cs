@@ -148,7 +148,7 @@ namespace VNEffects.EditorTools
             hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 180f);
+            hintRect.sizeDelta = new Vector2(-60f, 210f);
             hint = hintGo.GetComponent<Text>();
             hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             hint.fontSize = 26;
@@ -185,6 +185,18 @@ namespace VNEffects.EditorTools
             var screenTransition = transitionGo.AddComponent<VNScreenTransition>();
             AssignSourceMaterial(screenTransition, transitionMat);
 
+            // ---------- 9.10 鼠标轨迹星尘 ----------
+            var stardustGo = new GameObject("MouseStardust", typeof(ParticleSystem));
+            var stardust = stardustGo.AddComponent<VNMouseStardust>();
+            AssignSourceMaterial(stardust, additiveMat);
+
+            // ---------- 9.11 热浪/空气扭曲（默认关闭，Z 键开启）----------
+            var hazeGo = new GameObject("HeatHaze");
+            var heatHaze = hazeGo.AddComponent<VNHeatHaze>();
+            heatHaze.targets = bgFx != null
+                ? new[] { bgFx } : new VNImageEffectController[0];
+            heatHaze.additiveMaterial = additiveMat;
+
             // ---------- 10. 演示驱动 ----------
             var demoGo = new GameObject("VNEffectsDemo");
             var demo = demoGo.AddComponent<VNEffectsDemo>();
@@ -201,6 +213,8 @@ namespace VNEffects.EditorTools
             demo.transition = screenTransition;
             demo.emotes = charEmotes;
             demo.backgroundVariants = allSprites.ToArray();
+            demo.stardust = stardust;
+            demo.heatHaze = heatHaze;
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
