@@ -34,6 +34,16 @@ namespace VNEffects
         public VNEdgeGlow edgeGlow;
         public VNWeatherController weather;
 
+        [Header("色调/动作/转场（feature/mood-emotes-transitions）")]
+        public VNMoodGrading mood;
+        public VNScreenTransition transition;
+        public VNCharacterEmotes emotes;
+        [Tooltip("转场时轮换的背景图")]
+        public Sprite[] backgroundVariants;
+
+        int _transitionIndex = -1;
+        int _bgIndex;
+
         VNEntrancePreset _preset = VNEntrancePreset.DissolveGlow;
         bool _hueDemo;
         Tween _hueTween;
@@ -108,6 +118,55 @@ namespace VNEffects
                 weather.CycleNext();
                 UpdateHint();
             }
+
+            if (kb.mKey.wasPressedThisFrame && mood != null)
+            {
+                mood.CycleNext();
+                UpdateHint();
+            }
+
+            if (kb.tKey.wasPressedThisFrame && transition != null && !transition.IsPlaying)
+                PlayNextTransition();
+
+            // 情绪演出动作
+            if (emotes != null)
+            {
+                if (kb.digit6Key.wasPressedThisFrame) emotes.Surprise();
+                if (kb.digit7Key.wasPressedThisFrame) emotes.Angry();
+                if (kb.digit8Key.wasPressedThisFrame) emotes.Shy();
+                if (kb.digit9Key.wasPressedThisFrame)
+                {
+                    if (emotes.IsDejected) emotes.Recover();
+                    else emotes.Dejected();
+                }
+                if (kb.digit0Key.wasPressedThisFrame) emotes.Nod();
+                if (kb.nKey.wasPressedThisFrame) emotes.HeadShake();
+            }
+        }
+
+        void PlayNextTransition()
+        {
+            var types = (VNTransition[])System.Enum.GetValues(typeof(VNTransition));
+            _transitionIndex = (_transitionIndex + 1) % types.Length;
+            var type = types[_transitionIndex];
+
+            // 圆形扩散/水墨从立绘位置扩散，其余居中
+            if ((type == VNTransition.CircleWipe || type == VNTransition.InkSpread)
+                && characterFx != null)
+                transition.PlayFrom(type, characterFx.Rect, SwapBackground);
+            else
+                transition.Play(type, SwapBackground);
+            UpdateHint();
+        }
+
+        void SwapBackground()
+        {
+            if (backgroundFx == null || backgroundVariants == null || backgroundVariants.Length == 0)
+                return;
+            var img = backgroundFx.GetComponent<Image>();
+            if (img == null) return;
+            _bgIndex = (_bgIndex + 1) % backgroundVariants.Length;
+            img.sprite = backgroundVariants[_bgIndex];
         }
 
         void SetPreset(VNEntrancePreset preset)
@@ -141,11 +200,15 @@ namespace VNEffects
             if (hintText == null) return;
             string emotion = edgeGlow != null ? edgeGlow.Current.ToString() : "-";
             string weatherName = weather != null ? weather.Current.ToString() : "-";
+            string moodName = mood != null ? mood.Current.ToString() : "-";
+            string transName = _transitionIndex >= 0
+                ? ((VNTransition)_transitionIndex).ToString() : "-";
             hintText.text =
-                $"出场预设: <b>{_preset}</b>   情绪泛光: <b>{emotion}</b>   天气: <b>{weatherName}</b>\n" +
-                "1 溶解辉光  2 滑入淡现  3 弹性弹出  4 扫光揭示  5 爆闪登场\n" +
-                "Space 重播 | X 退场 | S 扫光 | B 星光爆发 | P 粒子 | H 彩虹\n" +
-                "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气";
+                $"出场: <b>{_preset}</b>  泛光: <b>{emotion}</b>  天气: <b>{weatherName}</b>  " +
+                $"色调: <b>{moodName}</b>  转场: <b>{transName}</b>\n" +
+                "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光 | P 粒子 | H 彩虹\n" +
+                "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调 | T 转场换背景\n" +
+                "6 惊讶 | 7 生气 | 8 害羞 | 9 沮丧/恢复 | 0 点头 | N 摇头";
         }
     }
 }

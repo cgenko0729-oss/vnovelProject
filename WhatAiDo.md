@@ -311,7 +311,62 @@ animator.PlayExitDissolve();
   VignetteFocus（挂 Volume 上）、WeatherController（moodTargets 自动指向背景+立绘）。
 - **需要重新执行一次 Tools → VN Effects → Create Demo Scene** 让新物体进入场景。
 
-## 十、问题修复记录
+## 十、第三批功能：色调预设 / 情绪动作 / 全屏转场（2026-07-12，分支 `feature/mood-emotes-transitions`）
+
+### 10.1 场景色调预设系统 — `VNMoodGrading.cs`
+
+- **双 Volume 交叉过渡架构**：运行时创建两个全局 Volume（A/B），每个挂
+  ColorAdjustments + WhiteBalance + LiftGammaGain + FilmGrain + Vignette（profile 为运行时
+  实例，不落盘）。切换情绪时把预设写入闲置的 Volume，然后 DOTween 交叉补间两者的 weight
+  —— 画面像电影调色一样平滑过渡，且**任意两种情绪之间都能直接切**（不必先回中性）。
+- **priority 递增技巧**：每次启用的新层 priority +1，保证新层永远叠在正在淡出的旧层之上，
+  交叉期间不打架。
+- 七种预设：`Neutral` 原始 / `Morning` 清晨（冷青偏亮）/ `Sunset` 黄昏（橙金暖高光）/
+  `Night` 夜晚（深蓝低饱和压暗）/ `Memory` 回忆（褪色暖黄 + 胶片颗粒 + 暗角）/
+  `Tension` 紧张（高对比偏绿）/ `Horror` 恐怖（重度去饱和 + 强颗粒 + 深暗角）。
+- 细节：颗粒/暗角组件按预设用 `active` 开关，避免 0 值覆盖基础 Volume 的暗角；
+  Memory/Horror 的暗角会盖过 VNVignetteFocus（优先级更高），属已知取舍。
+- API：`SetMood(VNMood.Sunset, 2f)` 一行切换。
+
+### 10.2 情绪演出动作库 — `VNCharacterEmotes.cs`
+
+一行代码调用的立绘小动作，全部返回 Sequence 可加入剧情编排：
+
+| 方法 | 演出 |
+|---|---|
+| `Surprise()` | 快速上跳 34px + 微放大，OutBounce 落地回弹 |
+| `Angry()` | 横向 DOShakeAnchorPos 快速抖动 + 红色 PulseEmission 发光脉冲 |
+| `Shy()` | 缩小到 0.97 + 下沉 7px + 粉色光晕，停顿后缓慢恢复 |
+| `Dejected()` | 下沉 24px + 亮度 0.72 + 饱和 0.68（**持续状态**，直到 `Recover()`） |
+| `Nod()` | 两次快速下沉回弹（第二次幅度更小，更自然） |
+| `HeadShake()` | ±2.6° 小幅左右旋转摆动后归正 |
+
+- **与悬浮飘动的冲突处理**：动作会移动 anchoredPosition，与常驻悬浮 tween 打架。
+  方案：`Begin()` 时自动 `StopFloating()`（会顺带重置到基准位），动作完成后
+  `ResumeFloating()` 恢复（为此给控制器加了 `IsFloating` 属性和记住上次参数的
+  `ResumeFloating()`）。动作互相打断安全（每次 Begin 杀掉上一个并重置姿态）。
+
+### 10.3 花式全屏转场库 — `VNScreenTransition.shader` + `VNScreenTransition.cs`
+
+- 新 Shader 一个 Pass 内含 6 种图案（`_Mode` 切换）：噪声溶解（复用 fbm，带 HDR 辉光
+  边缘）、百叶窗、瓦片翻转（随机顺序 + 对角线推进，瓦片中心取整保证整块一起翻）、
+  圆形扩散（宽高比校正保证正圆）、水墨晕染（圆扩散 + 强噪声扰动边界）、纯色全覆盖。
+- 组件流程：`Play(type, onCovered)` → 覆盖率 0→1（转出）→ 回调里切换背景/场景内容 →
+  1→0（转入）。嵌套 Canvas 排序 100 盖住一切，转场期间 RawImage 拦截点击。
+- 七种转场（每种有推荐时长）：`NoiseDissolve` / `Blinds` / `Tiles` / `CircleWipe`（配
+  `PlayFrom(type, 角色)` 从说话者位置扩散）/ `InkSpread` / `WhiteFlash`（HDR 白 ×2.2 配
+  Bloom 爆亮一瞬间，0.22s 快出 0.75s 慢收）/ `BokehOrbs`（大光斑粒子涌满屏幕 + 柔暖光罩，
+  进入回忆专用，复用 Orbs 预设 rate×14）。
+
+### 10.4 演示与场景生成器更新
+
+- 新按键：`M` 色调循环、`T` 转场循环（每次转场自动换一张背景图，正好演示"同一立绘
+  不同背景不同情绪"）、`6` 惊讶、`7` 生气、`8` 害羞、`9` 沮丧/恢复、`0` 点头、`N` 摇头。
+- 场景生成器：新增 VNScreenTransition.mat 材质资产、MoodGrading/ScreenTransition 物体、
+  立绘自动挂 VNCharacterEmotes；把 Assets/Assets 里除立绘外的所有图收集为转场轮换背景。
+- **需要重新执行 Tools → VN Effects → Create Demo Scene**。
+
+## 十一、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
