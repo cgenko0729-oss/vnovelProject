@@ -506,7 +506,55 @@ Canvas
 鼠标左键点击任意处 = 涟漪+星光。
 **需要重新执行 Tools → VN Effects → Create Demo Scene**。
 
-## 十四、问题修复记录
+## 十四、第七批功能：镜头语言 / 心跳演出 / 樱吹雪（2026-07-12，分支 `feature/camera-heartbeat-sakura`）
+
+### 14.1 容器层级再加一层
+
+```
+SceneRoot(震动·位置 + 心跳·缩放)
+└─ ZoomRoot(镜头缩放/平移)      ← 新增
+   └─ TiltRoot(荷兰角·旋转)
+      └─ LayerBack/Mid/Front(视差)
+```
+每种整屏运动独占一个变换维度/容器：震动动 SceneRoot 位置、心跳脉动 SceneRoot 缩放、
+运镜动 ZoomRoot、荷兰角动 TiltRoot、视差动三个 Layer —— 全部可同时叠加。
+
+### 14.2 镜头运动语言库 — `VNCamera.cs`
+
+| 方法 | 电影语言 | 实现 |
+|---|---|---|
+| `PushIn(1.06, 5s, 焦点)` | 缓推：重要台词的压迫感 | ZoomRoot 缓慢放大 + 焦点补偿平移 |
+| `SnapZoom(1.12, 0.16s, 焦点, 震动器)` | 急推：惊愕瞬间 | 快速放大，到位瞬间联动轻震 |
+| `Pan(目标点, 0.6)` | 平移：视线引导 | 向目标点反向平移（centering 可调居中程度） |
+| `DollyZoom(1.3, 3s)` | 眩晕镜头：名场面 | 背景放大 + 立绘 `DOScaleMultiplier(1/zoom)` 反向补偿保持大小 → 空间被拉扯 |
+| `ResetCamera()` | 复位 | 缩放/平移/立绘补偿全还原 |
+
+- **焦点补偿**：绕中心放大后平移 `-焦点×(zoom-1)`，让焦点保持在原屏幕位置 →
+  视觉上"镜头推向那个点"。立绘的 anchoredPosition 可直接当焦点用。
+- DollyZoom 的立绘补偿复用了说话者高亮的缩放倍率机制，与呼吸动作依然兼容。
+  已知取舍：DollyZoom/Reset 会覆盖说话者高亮的缩放倍率。
+
+### 14.3 心跳演出 — `VNHeartbeat.cs`
+
+- SceneRoot 缩放按"咚-咚——停"节奏脉动（1.4% 幅度，节奏与 VNEdgeGlow 的
+  HeartBeat 泛光图案完全一致：0.1/0.16/0.1/0.42+0.38s），并自动开启粉色边缘泛光。
+- `StartBeat()/StopBeat()/Toggle()`。告白、紧张、暧昧场景一行开启。
+
+### 14.4 樱吹雪爆发 — `VNSakuraBurst.cs`
+
+- 纯组合技：创建一个 **10 倍速率**的花瓣系统并调成"暴风参数"（生命周期缩短到 4~7s、
+  强风向左 -3.2~-1.6、生成带右移加宽保证覆盖全屏）→ 花瓣被风横扫涌过画面 3 秒，
+  同时自动开启心跳演出、延后 2 秒关闭；爆发结束后余瓣自然飘落殆尽。
+- `sakura.Play()` 一行触发告白名场面。
+
+### 14.5 演示新按键
+
+`Q` 运镜循环（缓推→急推→平移→眩晕→复位，提示栏显示当前运镜名）、
+`A` 心跳演出开关、`D` 樱吹雪告白。
+推荐组合：D 樱吹雪 + Q 缓推 + M 黄昏色调 = 完整告白演出。
+**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+
+## 十五、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

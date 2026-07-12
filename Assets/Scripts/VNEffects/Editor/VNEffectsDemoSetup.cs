@@ -75,9 +75,11 @@ namespace VNEffects.EditorTools
             scaler.matchWidthOrHeight = 0.5f;
 
             // ---------- 5.5 画面容器层级 ----------
-            // SceneRoot(屏幕震动) > TiltRoot(荷兰角) > LayerBack/Mid/Front(视差三层)
+            // SceneRoot(震动+心跳脉动) > ZoomRoot(镜头缩放/平移) > TiltRoot(荷兰角)
+            //   > LayerBack/Mid/Front(视差三层)
             var sceneRoot = CreateStretchRect("SceneRoot", canvasGo.transform);
-            var tiltRoot = CreateStretchRect("TiltRoot", sceneRoot);
+            var zoomRoot = CreateStretchRect("ZoomRoot", sceneRoot);
+            var tiltRoot = CreateStretchRect("TiltRoot", zoomRoot);
             var layerBack = CreateStretchRect("LayerBack", tiltRoot);
             var layerMid = CreateStretchRect("LayerMid", tiltRoot);
             var layerFront = CreateStretchRect("LayerFront", tiltRoot);
@@ -153,7 +155,7 @@ namespace VNEffects.EditorTools
             hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 250f);
+            hintRect.sizeDelta = new Vector2(-60f, 285f);
             hint = hintGo.GetComponent<Text>();
             hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             hint.fontSize = 26;
@@ -212,6 +214,25 @@ namespace VNEffects.EditorTools
             var clickRipple = rippleGo.AddComponent<VNClickRipple>();
             AssignSourceMaterial(clickRipple, additiveMat);
 
+            // ---------- 9.18 镜头运动语言库（作用于 ZoomRoot）----------
+            var cameraGo = new GameObject("VNCamera");
+            var vnCamera = cameraGo.AddComponent<VNCamera>();
+            vnCamera.target = zoomRoot;
+            if (charFx != null) vnCamera.dollyCharacters.Add(charFx);
+            if (charFxB != null) vnCamera.dollyCharacters.Add(charFxB);
+
+            // ---------- 9.19 心跳演出（脉动 SceneRoot + 粉色泛光）----------
+            var heartbeatGo = new GameObject("Heartbeat");
+            var heartbeat = heartbeatGo.AddComponent<VNHeartbeat>();
+            heartbeat.target = sceneRoot;
+            heartbeat.edgeGlow = edgeGlow;
+
+            // ---------- 9.20 樱吹雪爆发 ----------
+            var sakuraGo = new GameObject("SakuraBurst");
+            var sakura = sakuraGo.AddComponent<VNSakuraBurst>();
+            sakura.additiveMaterial = additiveMat;
+            sakura.heartbeat = heartbeat;
+
             // ---------- 9.13 说话者高亮 ----------
             var speakerGo = new GameObject("SpeakerHighlight");
             var speakerHighlight = speakerGo.AddComponent<VNSpeakerHighlight>();
@@ -266,6 +287,9 @@ namespace VNEffects.EditorTools
             demo.dialogue = dialogueBox;
             demo.parallax = parallax;
             demo.dutchAngle = dutchAngle;
+            demo.vnCamera = vnCamera;
+            demo.heartbeat = heartbeat;
+            demo.sakura = sakura;
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
