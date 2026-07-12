@@ -44,6 +44,11 @@ namespace VNEffects
         Tween _floatTween;
         float _floatBaseY;
         bool _hasFloatBase;
+        float _lastFloatAmplitude = 8f;
+        float _lastFloatPeriod = 4f;
+
+        /// <summary>当前是否在悬浮飘动（情绪动作库用来暂停/恢复）</summary>
+        public bool IsFloating => _floatTween != null;
 
         /// <summary>材质实例（懒初始化，可在 Awake 前被外部访问）</summary>
         public Material Mat
@@ -240,8 +245,13 @@ namespace VNEffects
         // 悬浮飘动（RectTransform 上下缓慢浮动，让立绘"活"起来）
         // ------------------------------------------------------------------
 
+        /// <summary>用上次的参数恢复悬浮（情绪动作结束后调用）</summary>
+        public void ResumeFloating() => StartFloating(_lastFloatAmplitude, _lastFloatPeriod);
+
         public void StartFloating(float amplitude = 8f, float period = 4f)
         {
+            _lastFloatAmplitude = amplitude;
+            _lastFloatPeriod = period;
             StopFloating();
             if (!_hasFloatBase)
             {

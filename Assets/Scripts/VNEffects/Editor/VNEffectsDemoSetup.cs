@@ -27,14 +27,15 @@ namespace VNEffects.EditorTools
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
 
-            // ---------- 1. 找到并正确导入两张演示图 ----------
-            var (charSprite, bgSprite) = PrepareSprites();
+            // ---------- 1. 找到并正确导入演示图 ----------
+            var (charSprite, bgSprite, allSprites) = PrepareSprites();
 
             // ---------- 2. 材质资产 ----------
             EnsureFolder("Assets/VNEffects");
             EnsureFolder(MaterialsDir);
             var imageMat = EnsureMaterial($"{MaterialsDir}/VNImageEffect.mat", "VN/ImageEffect");
             var additiveMat = EnsureMaterial($"{MaterialsDir}/VNAdditive.mat", "VN/Additive");
+            var transitionMat = EnsureMaterial($"{MaterialsDir}/VNScreenTransition.mat", "VN/ScreenTransition");
 
             // ---------- 3. 后处理 Volume Profile（Bloom + Vignette）----------
             var profile = EnsureVolumeProfile();
@@ -102,6 +103,7 @@ namespace VNEffects.EditorTools
             // ---------- 7. 立绘 ----------
             VNEntranceAnimator charAnim = null;
             VNImageEffectController charFx = null;
+            VNCharacterEmotes charEmotes = null;
             if (charSprite != null)
             {
                 var charGo = CreateUIImage("Character", canvasGo.transform, charSprite);
@@ -122,6 +124,7 @@ namespace VNEffects.EditorTools
                 AssignSourceMaterial(backdrop, additiveMat);
 
                 charAnim = charGo.AddComponent<VNEntranceAnimator>();
+                charEmotes = charGo.AddComponent<VNCharacterEmotes>();
             }
 
             // ---------- 8. 悬浮氛围粒子（尘埃 + 星光 + 光斑）----------
@@ -145,7 +148,7 @@ namespace VNEffects.EditorTools
             hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 150f);
+            hintRect.sizeDelta = new Vector2(-60f, 180f);
             hint = hintGo.GetComponent<Text>();
             hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             hint.fontSize = 26;
@@ -172,6 +175,16 @@ namespace VNEffects.EditorTools
                 ? new[] { bgFx, charFx }
                 : (bgFx != null ? new[] { bgFx } : new VNImageEffectController[0]);
 
+            // ---------- 9.8 色调情绪预设系统 ----------
+            var moodGo = new GameObject("MoodGrading");
+            var moodGrading = moodGo.AddComponent<VNMoodGrading>();
+
+            // ---------- 9.9 全屏转场（Canvas 最后子物体，嵌套 Canvas 排序 100 盖住一切）----------
+            var transitionGo = new GameObject("ScreenTransition", typeof(RectTransform));
+            transitionGo.transform.SetParent(canvasGo.transform, false);
+            var screenTransition = transitionGo.AddComponent<VNScreenTransition>();
+            AssignSourceMaterial(screenTransition, transitionMat);
+
             // ---------- 10. 演示驱动 ----------
             var demoGo = new GameObject("VNEffectsDemo");
             var demo = demoGo.AddComponent<VNEffectsDemo>();
@@ -184,6 +197,10 @@ namespace VNEffects.EditorTools
             demo.vignetteFocus = vignetteFocus;
             demo.edgeGlow = edgeGlow;
             demo.weather = weatherCtrl;
+            demo.mood = moodGrading;
+            demo.transition = screenTransition;
+            demo.emotes = charEmotes;
+            demo.backgroundVariants = allSprites.ToArray();
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -192,22 +209,24 @@ namespace VNEffects.EditorTools
             EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath));
             Debug.Log($"[VNEffects] 演示场景已生成并保存到 {ScenePath}。直接点 Play 体验：" +
                       "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光爆发 | P 粒子 | H 彩虹 | " +
-                      "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气循环。");
+                      "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调情绪 | T 转场换背景 | " +
+                      "6 惊讶 7 生气 8 害羞 9 沮丧/恢复 0 点头 N 摇头。");
         }
 
         // ------------------------------------------------------------------
 
-        static (Sprite character, Sprite background) PrepareSprites()
+        static (Sprite character, Sprite background, System.Collections.Generic.List<Sprite> all) PrepareSprites()
         {
             var guids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Assets" });
             var paths = guids.Select(AssetDatabase.GUIDToAssetPath)
                              .Where(p => p.EndsWith(".png") || p.EndsWith(".jpg"))
                              .OrderBy(p => p)
                              .ToList();
+            var all = new System.Collections.Generic.List<Sprite>();
             if (paths.Count == 0)
             {
                 Debug.LogWarning("[VNEffects] Assets/Assets 下没有找到图片，场景将不含背景/立绘。");
-                return (null, null);
+                return (null, null, all);
             }
 
             foreach (var p in paths) EnsureSpriteImport(p);
@@ -216,8 +235,17 @@ namespace VNEffects.EditorTools
             string charPath = paths.FirstOrDefault(p => p.ToLower().Contains("solo")) ?? paths[0];
             string bgPath = paths.FirstOrDefault(p => p != charPath) ?? charPath;
 
+            // 除立绘外的所有图都作为转场轮换背景
+            foreach (var p in paths)
+            {
+                if (p == charPath) continue;
+                var s = AssetDatabase.LoadAssetAtPath<Sprite>(p);
+                if (s != null) all.Add(s);
+            }
+
             return (AssetDatabase.LoadAssetAtPath<Sprite>(charPath),
-                    AssetDatabase.LoadAssetAtPath<Sprite>(bgPath));
+                    AssetDatabase.LoadAssetAtPath<Sprite>(bgPath),
+                    all);
         }
 
         static void EnsureSpriteImport(string path)
