@@ -56,6 +56,15 @@ namespace VNEffects
         public VNParallax parallax;
         public VNDutchAngle dutchAngle;
 
+        [Header("镜头/心跳/樱吹雪（feature/camera-heartbeat-sakura）")]
+        public VNCamera vnCamera;
+        public VNHeartbeat heartbeat;
+        public VNSakuraBurst sakura;
+
+        int _cameraIndex = -1;
+        static readonly string[] CameraMoveNames =
+            { "缓推(PushIn)", "急推(SnapZoom)", "平移(Pan)", "眩晕(DollyZoom)", "复位(Reset)" };
+
         int _speakerIndex = -1; // -1 无 / 0 角色A / 1 角色B
         bool _shimmerOn;
         int _lineIndex = -1;
@@ -202,6 +211,12 @@ namespace VNEffects
             if (kb.fKey.wasPressedThisFrame && transition != null && !transition.IsPlaying)
                 transition.Play(VNTransition.Eyelid, SwapBackground);
 
+            if (kb.qKey.wasPressedThisFrame && vnCamera != null) CycleCameraMove();
+
+            if (kb.aKey.wasPressedThisFrame && heartbeat != null) heartbeat.Toggle();
+
+            if (kb.dKey.wasPressedThisFrame && sakura != null) sakura.Play();
+
             // 情绪演出动作
             if (emotes != null)
             {
@@ -250,6 +265,27 @@ namespace VNEffects
                 var fx = line.who == 1 && characterBFx != null ? characterBFx : characterFx;
                 speakerHighlight.SetSpeaker(fx);
             }
+        }
+
+        void CycleCameraMove()
+        {
+            _cameraIndex = (_cameraIndex + 1) % 5;
+            Vector2? focus = characterFx != null
+                ? characterFx.Rect.anchoredPosition : (Vector2?)null;
+            switch (_cameraIndex)
+            {
+                case 0: vnCamera.PushIn(1.06f, 4f, focus); break;
+                case 1: vnCamera.SnapZoom(1.12f, 0.16f, focus, screenShake); break;
+                case 2:
+                    Vector2 panTarget = characterBFx != null
+                        ? characterBFx.Rect.anchoredPosition
+                        : new Vector2(380f, 0f);
+                    vnCamera.Pan(panTarget, 0.6f, 1.2f);
+                    break;
+                case 3: vnCamera.DollyZoom(1.3f, 3f); break;
+                default: vnCamera.ResetCamera(1f); break;
+            }
+            UpdateHint();
         }
 
         void CycleRimLight()
@@ -337,7 +373,9 @@ namespace VNEffects
                 "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调 | T 转场换背景\n" +
                 "6 惊讶 | 7 生气 | 8 害羞 | 9 沮丧/恢复 | 0 点头 | N 摇头\n" +
                 "R 轮廓光 | Z 热浪 | C 星尘 | Y 说话者 | U 水面波光\n" +
-                "J/K/L 震动 | Enter 对话 | O 视差 | I 荷兰角 | F 眨眼转场 | 点击=涟漪";
+                "J/K/L 震动 | Enter 对话 | O 视差 | I 荷兰角 | F 眨眼转场 | 点击=涟漪\n" +
+                $"Q 运镜循环({(_cameraIndex >= 0 ? CameraMoveNames[_cameraIndex] : "-")}) | " +
+                "A 心跳演出 | D 樱吹雪告白";
         }
     }
 }
