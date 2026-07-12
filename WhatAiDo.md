@@ -366,7 +366,50 @@ animator.PlayExitDissolve();
   立绘自动挂 VNCharacterEmotes；把 Assets/Assets 里除立绘外的所有图收集为转场轮换背景。
 - **需要重新执行 Tools → VN Effects → Create Demo Scene**。
 
-## 十一、问题修复记录
+## 十一、第四批功能：呼吸立绘 / 轮廓光 / 鼠标星尘 / 热浪（2026-07-12，分支 `feature/breathing-rim-stardust-haze`）
+
+### 11.1 呼吸感立绘（Pseudo-Live2D）— 控制器新增 `StartBreathingMotion()`
+
+- 三个正弦叠加让立绘"活着"：已有的**上下悬浮** + 新增的**横向缩放呼吸**
+  （X 轴 ±1.3% 模拟胸腔起伏，Y 轴带 40% 同步微伸展）+ **极缓倾斜摆动**
+  （±0.7°，周期 7s，先缓慢摆到一侧再往复，起步不跳变）。
+- `StartIdleEffects()` 已自动包含，出场后立绘自动开始呼吸，零调用成本。
+- 与情绪动作库联动：动作 `Begin()` 时自动暂停呼吸（重置缩放/旋转），
+  结束后 `ResumeBreathingMotion()` 恢复（控制器记住上次参数）。
+
+### 11.2 立绘轮廓光（Rim Light）— Shader 升级 + 控制器 API
+
+- `VNImageEffect.shader` 新增：朝光源方向（`_RimAngle`）偏移采样两次 alpha
+  （1×和 2× `_RimWidth`），偏移处透明说明该像素位于受光一侧的外缘 →
+  叠加 HDR `_RimColor` 描边。配合 Bloom 形成发光轮廓。
+- API：`SetRimLight(颜色, 强度, 宽度, 光源角度)` / `DORimAmount()` 渐亮渐灭 /
+  `ClearRimLight()`。夕阳场景橙色轮廓光（角度 40°）、月夜蓝色（140°），
+  立绘与背景光照氛围立刻统一。
+- 注意：采样邻域 alpha 依赖 Clamp 寻址 + FullRect 单图（本项目均满足）；
+  若日后使用 SpriteAtlas 图集需关闭该效果（邻域会采到别的图）。
+
+### 11.3 鼠标轨迹星尘 — `VNMouseStardust.cs`
+
+- 按**移动距离**手动 `Emit()`（每单位距离 7 颗，带余数累加器保证低速也均匀），
+  单帧上限 30 颗防止瞬移狂喷；世界空间模拟让星尘留在原地形成拖尾。
+- 星尘用四芒星贴图 + HDR×2 泛光，轻微下坠 + 随机漂移 + 缩小消隐 + 缓慢旋转。
+- `Toggle()` / `enabled` 开关；用新版 Input System 的 `Mouse.current` 读鼠标。
+
+### 11.4 热浪/空气扭曲 — `VNHeatHaze.cs` + 新粒子预设 `Mist`
+
+- 复用 shader 已有的 `_WaveAmount` 波浪扭曲：开启时把目标图片（默认只有背景，
+  避免立绘脸部扭曲）的波浪调到 0.006/速度 3.5/频率 24 → 热浪升腾的空气感。
+- 配套新 `Mist` 雾气粒子预设：1.2~2.6 世界单位的大团柔雾（透明度仅 4%~10%）
+  从画面下方缓缓升起 + 低频噪声翻滚。温泉/夏日柏油路/篝火场景一键成套。
+
+### 11.5 演示与场景生成器更新
+
+- 新按键：`R` 轮廓光循环（关→夕阳橙→月夜蓝）、`Z` 热浪+蒸汽开关、`C` 鼠标星尘开关；
+  呼吸感立绘无需按键，出场后自动生效。
+- 生成器新增 MouseStardust、HeatHaze 物体并连线。
+- **需要重新执行 Tools → VN Effects → Create Demo Scene**。
+
+## 十二、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

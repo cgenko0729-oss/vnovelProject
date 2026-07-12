@@ -35,6 +35,12 @@ Shader "VN/ImageEffect"
         [HDR] _EmissionColor ("Emission Color", Color) = (1,0.85,0.6,1)
         _EmissionAmount ("Emission Amount", Range(0,3)) = 0
 
+        [Header(Rim Light)]
+        [HDR] _RimColor ("Rim Color", Color) = (1.5,1.0,0.5,1)
+        _RimAmount ("Rim Amount", Range(0,3)) = 0
+        _RimWidth ("Rim Width (uv)", Range(0.001,0.08)) = 0.02
+        _RimAngle ("Rim Light Angle (deg)", Range(0,360)) = 45
+
         [Header(Color Grading)]
         _HueShift ("Hue Shift", Range(-0.5,0.5)) = 0
         _Saturation ("Saturation", Range(0,2)) = 1
@@ -133,6 +139,11 @@ Shader "VN/ImageEffect"
             half4 _EmissionColor;
             float _EmissionAmount;
 
+            half4 _RimColor;
+            float _RimAmount;
+            float _RimWidth;
+            float _RimAngle;
+
             float _HueShift;
             float _Saturation;
             float _Brightness;
@@ -228,6 +239,18 @@ Shader "VN/ImageEffect"
 
                 // 4. HDR 自发光（呼吸发光）
                 color.rgb += _EmissionColor.rgb * _EmissionAmount;
+
+                // 4.5 轮廓光（Rim Light）：朝光源方向偏移采样 alpha，
+                //     若偏移处透明说明此像素在受光一侧的外缘 → 点亮 HDR 描边
+                if (_RimAmount > 0.001)
+                {
+                    float rimRad = radians(_RimAngle);
+                    float2 rdir = float2(cos(rimRad), sin(rimRad));
+                    float a1 = tex2D(_MainTex, uv + rdir * _RimWidth).a;
+                    float a2 = tex2D(_MainTex, uv + rdir * _RimWidth * 2.0).a;
+                    float litEdge = saturate(1.0 - (a1 * 0.6 + a2 * 0.4));
+                    color.rgb += _RimColor.rgb * (litEdge * color.a * _RimAmount);
+                }
 
                 // 5. 噪声溶解 + 辉光边缘
                 float n = fbm(IN.texcoord * _DissolveScale);

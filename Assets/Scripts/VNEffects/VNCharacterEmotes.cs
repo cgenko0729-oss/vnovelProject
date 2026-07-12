@@ -25,6 +25,7 @@ namespace VNEffects
         Vector3 _baseScale;
         bool _cached;
         bool _wasFloating;
+        bool _wasBreathing;
         bool _dejected;
 
         public bool IsDejected => _dejected;
@@ -35,11 +36,15 @@ namespace VNEffects
             _rect = _fx.Rect;
         }
 
-        /// <summary>动作开始前的统一准备：暂停悬浮、打断上个动作、回到基准姿态</summary>
+        /// <summary>动作开始前的统一准备：暂停悬浮/呼吸、打断上个动作、回到基准姿态</summary>
         void Begin()
         {
-            _wasFloating = _fx.IsFloating || _wasFloating && _seq != null && _seq.IsActive();
-            _fx.StopFloating(); // 会把位置重置回悬浮基准
+            bool interrupted = _wasFloating && _seq != null && _seq.IsActive();
+            _wasFloating = _fx.IsFloating || interrupted;
+            _wasBreathing = _fx.IsBreathingMotion ||
+                            (_wasBreathing && _seq != null && _seq.IsActive());
+            _fx.StopFloating();        // 会把位置重置回悬浮基准
+            _fx.StopBreathingMotion(); // 会把缩放/旋转重置回基准
 
             _seq?.Kill();
             _seq = null;
@@ -56,12 +61,13 @@ namespace VNEffects
             if (!_dejected) _rect.anchoredPosition = _basePos;
         }
 
-        /// <summary>动作收尾：恢复悬浮（沮丧状态除外）</summary>
+        /// <summary>动作收尾：恢复悬浮与呼吸（沮丧状态除外）</summary>
         Sequence End(Sequence seq)
         {
             seq.OnComplete(() =>
             {
                 if (_wasFloating && !_dejected) _fx.ResumeFloating();
+                if (_wasBreathing && !_dejected) _fx.ResumeBreathingMotion();
             });
             seq.SetLink(gameObject);
             _seq = seq;
