@@ -14,6 +14,10 @@ namespace VNEffects
     ///   B    —— 星光爆发（在立绘位置）
     ///   P    —— 开关悬浮氛围粒子
     ///   H    —— 色相偏移彩虹演示（再按恢复）
+    ///   G    —— 开关 God Rays 斜射光束
+    ///   V    —— 聚焦渐晕：暗角对准立绘加深/恢复
+    ///   E    —— 循环切换情绪边缘泛光（心动→危险→悲伤→温馨→关）
+    ///   W    —— 循环切换天气（花瓣→雨→雪→萤火虫→无）
     /// </summary>
     public class VNEffectsDemo : MonoBehaviour
     {
@@ -23,6 +27,12 @@ namespace VNEffects
         public VNImageEffectController backgroundFx;
         public VNAmbientParticles[] ambientParticles;
         public Text hintText;
+
+        [Header("氛围特效（feature/atmosphere-effects）")]
+        public VNGodRays godRays;
+        public VNVignetteFocus vignetteFocus;
+        public VNEdgeGlow edgeGlow;
+        public VNWeatherController weather;
 
         VNEntrancePreset _preset = VNEntrancePreset.DissolveGlow;
         bool _hueDemo;
@@ -78,6 +88,26 @@ namespace VNEffects
             }
 
             if (kb.hKey.wasPressedThisFrame && characterFx != null) ToggleHueDemo();
+
+            if (kb.gKey.wasPressedThisFrame && godRays != null) godRays.Toggle();
+
+            if (kb.vKey.wasPressedThisFrame && vignetteFocus != null && characterFx != null)
+            {
+                if (vignetteFocus.IsFocused) vignetteFocus.ClearFocus();
+                else vignetteFocus.FocusOn(characterFx.Rect);
+            }
+
+            if (kb.eKey.wasPressedThisFrame && edgeGlow != null)
+            {
+                edgeGlow.CycleNext();
+                UpdateHint();
+            }
+
+            if (kb.wKey.wasPressedThisFrame && weather != null)
+            {
+                weather.CycleNext();
+                UpdateHint();
+            }
         }
 
         void SetPreset(VNEntrancePreset preset)
@@ -109,10 +139,13 @@ namespace VNEffects
         void UpdateHint()
         {
             if (hintText == null) return;
+            string emotion = edgeGlow != null ? edgeGlow.Current.ToString() : "-";
+            string weatherName = weather != null ? weather.Current.ToString() : "-";
             hintText.text =
-                $"当前出场预设: <b>{_preset}</b>\n" +
+                $"出场预设: <b>{_preset}</b>   情绪泛光: <b>{emotion}</b>   天气: <b>{weatherName}</b>\n" +
                 "1 溶解辉光  2 滑入淡现  3 弹性弹出  4 扫光揭示  5 爆闪登场\n" +
-                "Space 重播 | X 溶解退场 | S 扫光 | B 星光爆发 | P 粒子开关 | H 彩虹色相";
+                "Space 重播 | X 退场 | S 扫光 | B 星光爆发 | P 粒子 | H 彩虹\n" +
+                "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气";
         }
     }
 }

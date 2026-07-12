@@ -88,6 +88,17 @@ namespace VNEffects.EditorTools
                 AssignSourceMaterial(bgFx, imageMat);
             }
 
+            // ---------- 6.5 God Rays 斜射光束（渲染在背景之后、立绘之前）----------
+            var godRaysGo = new GameObject("GodRays", typeof(RectTransform));
+            var godRaysRect = (RectTransform)godRaysGo.transform;
+            godRaysRect.SetParent(canvasGo.transform, false);
+            godRaysRect.anchorMin = Vector2.zero;
+            godRaysRect.anchorMax = Vector2.one;
+            godRaysRect.offsetMin = Vector2.zero;
+            godRaysRect.offsetMax = Vector2.zero;
+            var godRays = godRaysGo.AddComponent<VNGodRays>();
+            AssignSourceMaterial(godRays, additiveMat);
+
             // ---------- 7. 立绘 ----------
             VNEntranceAnimator charAnim = null;
             VNImageEffectController charFx = null;
@@ -134,7 +145,7 @@ namespace VNEffects.EditorTools
             hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 110f);
+            hintRect.sizeDelta = new Vector2(-60f, 150f);
             hint = hintGo.GetComponent<Text>();
             hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             hint.fontSize = 26;
@@ -142,6 +153,24 @@ namespace VNEffects.EditorTools
             hint.color = new Color(1f, 1f, 1f, 0.85f);
             hint.supportRichText = true;
             hint.raycastTarget = false;
+
+            // ---------- 9.5 边缘情绪泛光（Canvas 最后一个子物体，嵌套 Canvas 排序最高）----------
+            var edgeGlowGo = new GameObject("EdgeGlow", typeof(RectTransform));
+            edgeGlowGo.transform.SetParent(canvasGo.transform, false);
+            var edgeGlow = edgeGlowGo.AddComponent<VNEdgeGlow>();
+            AssignSourceMaterial(edgeGlow, additiveMat);
+
+            // ---------- 9.6 聚焦渐晕（挂在 Volume 上）----------
+            var vignetteFocus = volGo.AddComponent<VNVignetteFocus>();
+            vignetteFocus.volume = vol;
+
+            // ---------- 9.7 天气控制器 ----------
+            var weatherGo = new GameObject("WeatherController");
+            var weatherCtrl = weatherGo.AddComponent<VNWeatherController>();
+            weatherCtrl.additiveMaterial = additiveMat;
+            weatherCtrl.moodTargets = (bgFx != null && charFx != null)
+                ? new[] { bgFx, charFx }
+                : (bgFx != null ? new[] { bgFx } : new VNImageEffectController[0]);
 
             // ---------- 10. 演示驱动 ----------
             var demoGo = new GameObject("VNEffectsDemo");
@@ -151,14 +180,19 @@ namespace VNEffects.EditorTools
             demo.backgroundFx = bgFx;
             demo.ambientParticles = particles;
             demo.hintText = hint;
+            demo.godRays = godRays;
+            demo.vignetteFocus = vignetteFocus;
+            demo.edgeGlow = edgeGlow;
+            demo.weather = weatherCtrl;
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssetDatabase.SaveAssets();
 
             EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath));
-            Debug.Log($"[VNEffects] 演示场景已生成并保存到 {ScenePath}。直接点 Play 体验，" +
-                      "按 1~5 切换出场演出，Space 重播，X 退场，S 扫光，B 星光爆发，P 粒子开关，H 彩虹色相。");
+            Debug.Log($"[VNEffects] 演示场景已生成并保存到 {ScenePath}。直接点 Play 体验：" +
+                      "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光爆发 | P 粒子 | H 彩虹 | " +
+                      "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气循环。");
         }
 
         // ------------------------------------------------------------------
