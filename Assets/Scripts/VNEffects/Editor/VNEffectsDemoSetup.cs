@@ -235,12 +235,13 @@ namespace VNEffects.EditorTools
             string charPath = paths.FirstOrDefault(p => p.ToLower().Contains("solo")) ?? paths[0];
             string bgPath = paths.FirstOrDefault(p => p != charPath) ?? charPath;
 
-            // 除立绘外的所有图都作为转场轮换背景
+            // 除立绘外的"大图"才作为转场轮换背景（过滤掉按钮/对话框等小 UI 素材）
             foreach (var p in paths)
             {
                 if (p == charPath) continue;
                 var s = AssetDatabase.LoadAssetAtPath<Sprite>(p);
-                if (s != null) all.Add(s);
+                if (s != null && s.rect.width >= 900f && s.rect.height >= 600f)
+                    all.Add(s);
             }
 
             return (AssetDatabase.LoadAssetAtPath<Sprite>(charPath),
