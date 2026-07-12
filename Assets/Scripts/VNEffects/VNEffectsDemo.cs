@@ -61,6 +61,15 @@ namespace VNEffects
         public VNHeartbeat heartbeat;
         public VNSakuraBurst sakura;
 
+        [Header("景深/云影/色调匹配/选项（feature/depth-polish-choices）")]
+        public VNFakeDoF fakeDoF;
+        public VNCloudShadows cloudShadows;
+        public VNToneMatch toneMatch;
+        public VNChoicePanel choicePanel;
+
+        static readonly string[] DemoChoices =
+            { "牵起她的手", "假装没看见远处的烟火", "转身逃跑" };
+
         int _cameraIndex = -1;
         static readonly string[] CameraMoveNames =
             { "缓推(PushIn)", "急推(SnapZoom)", "平移(Pan)", "眩晕(DollyZoom)", "复位(Reset)" };
@@ -106,6 +115,15 @@ namespace VNEffects
                     characterB.PlayEntrance(VNEntrancePreset.FadeSlideUp)
                               .OnComplete(() => characterB.StartIdleEffects()))
                     .SetLink(characterB.gameObject);
+            }
+
+            // 开场时立绘就匹配初始背景色调
+            if (toneMatch != null && backgroundFx != null)
+            {
+                var bgImg = backgroundFx.GetComponent<Image>();
+                if (bgImg != null && bgImg.sprite != null)
+                    DOVirtual.DelayedCall(0.2f, () => toneMatch.MatchTo(bgImg.sprite))
+                             .SetLink(gameObject);
             }
 
             UpdateHint();
@@ -216,6 +234,24 @@ namespace VNEffects
             if (kb.aKey.wasPressedThisFrame && heartbeat != null) heartbeat.Toggle();
 
             if (kb.dKey.wasPressedThisFrame && sakura != null) sakura.Play();
+
+            if (kb.leftBracketKey.wasPressedThisFrame && fakeDoF != null) fakeDoF.Toggle();
+
+            if (kb.rightBracketKey.wasPressedThisFrame && cloudShadows != null)
+                cloudShadows.Toggle();
+
+            if (kb.tabKey.wasPressedThisFrame && character != null)
+                character.PlayEntrance(VNEntrancePreset.AfterimageDash)
+                         .OnComplete(() => character.StartIdleEffects());
+
+            if (kb.backspaceKey.wasPressedThisFrame && choicePanel != null && !choicePanel.IsShowing)
+            {
+                choicePanel.Show(DemoChoices, idx =>
+                {
+                    if (dialogue != null)
+                        dialogue.Say("旁白", $"你选择了「{DemoChoices[idx]}」。");
+                });
+            }
 
             // 情绪演出动作
             if (emotes != null)
@@ -330,6 +366,9 @@ namespace VNEffects
             if (img == null) return;
             _bgIndex = (_bgIndex + 1) % backgroundVariants.Length;
             img.sprite = backgroundVariants[_bgIndex];
+
+            // 立绘色调自动匹配新背景
+            if (toneMatch != null) toneMatch.MatchTo(backgroundVariants[_bgIndex]);
         }
 
         void SetPreset(VNEntrancePreset preset)
@@ -375,7 +414,8 @@ namespace VNEffects
                 "R 轮廓光 | Z 热浪 | C 星尘 | Y 说话者 | U 水面波光\n" +
                 "J/K/L 震动 | Enter 对话 | O 视差 | I 荷兰角 | F 眨眼转场 | 点击=涟漪\n" +
                 $"Q 运镜循环({(_cameraIndex >= 0 ? CameraMoveNames[_cameraIndex] : "-")}) | " +
-                "A 心跳演出 | D 樱吹雪告白";
+                "A 心跳演出 | D 樱吹雪告白\n" +
+                "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）";
         }
     }
 }

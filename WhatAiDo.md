@@ -554,7 +554,59 @@ SceneRoot(震动·位置 + 心跳·缩放)
 推荐组合：D 樱吹雪 + Q 缓推 + M 黄昏色调 = 完整告白演出。
 **需要重新执行 Tools → VN Effects → Create Demo Scene**。
 
-## 十五、问题修复记录
+## 十五、第八批功能：景深/色调匹配/脚影/残影/云影/选项（2026-07-13，分支 `feature/depth-polish-choices`）
+
+### 15.1 伪景深 — Shader 微模糊 + `VNFakeDoF.cs`
+
+- **技术修正**：原计划用 URP 真 DoF，但 Canvas UI **不写深度缓冲**，真 DoF 会把立绘和
+  背景一起糊掉。改为给 `VNImageEffect` shader 加 **9-tap 微模糊**（`_BlurAmount`，
+  中心+四方+四角采样平均），只作用于背景那张图 —— 效果反而更准确。
+- `VNFakeDoF.SetFocus(true)` 四合一：背景模糊 0.006 + 压暗 0.86 + 降饱和 0.9 +
+  背景层微放大 1.035（缩放 LayerBack 而不是背景图，避开 Ken Burns 的缩放动画）。
+  立绘瞬间"浮"出来。控制器新增 `SetBlur/DOBlur` API。
+
+### 15.2 立绘色调自动匹配背景 — `VNToneMatch.cs`
+
+- **GPU 均值采样**：`Graphics.Blit` 把背景图缩到 4×4 RenderTexture 再 `ReadPixels`
+  回读求平均（不要求贴图开 Read/Write）。
+- 平均色**归一化**（最大分量拉到 1）后只取"色调"，与白色按 `strength`(9%) 插值，
+  通过 `Image.color` 乘法微染色 —— 不占用特效 shader 的任何参数，不改变立绘亮度。
+- 换背景（T/F 转场）时自动匹配，开场也匹配初始背景。消除"立绘像贴纸"的违和感。
+
+### 15.3 立绘脚下阴影 — `VNFootShadow.cs`
+
+- 角色脚下自动生成扁椭圆软影（SoftCircle 压扁 + 黑色半透明），挂组件即用零配置。
+- 每帧联动：悬浮越高影子越小越淡（离地感）、跟随角色横移、
+  透明度同步 CanvasGroup 淡入淡出与溶解出场进度。已加入 CreateCharacter 自动挂载。
+
+### 15.4 残影冲入出场 — 出场预设新增 `AfterimageDash`
+
+- 角色从画面左侧 560px 外高速冲入（0.38s OutCubic），途中三次在当前位置生成
+  **冷色调残影副本**（复制 Image，alpha 0.42，0.3s 淡出后销毁），
+  收尾微闪白 + 光环闪耀 + 星光。惊喜/战斗系登场。
+
+### 15.5 云影飘过 — `VNCloudShadows.cs`
+
+- 3 块 950~1500px 的黑色软斑（普通透明混合 = 压暗）以不同速度缓慢横穿背景上部，
+  越界回绕 + 轻微正弦纵向漂移。只挂在 LayerBack 下，**不会盖到立绘**。晴天的"活气"。
+
+### 15.6 选项按钮演出 — `VNChoicePanel.cs`（零新特效，纯组合）
+
+- `Show(选项数组, 回调)` 运行时构建按钮（圆角面板贴图复用对话框的）：
+  - **错落飞入**：右侧 90px 滑入 + 淡入，每个延迟 0.09s
+  - **悬停**：`PlayShine` 扫光掠过 + 微放大 1.045（VNImageEffectController 直接挂按钮）
+  - **选中**：被选项闪光 + 扫光 + OutBack 轻弹；**落选项噪声溶解消散**
+- 场景生成器自动创建 **EventSystem + InputSystemUIInputModule**（新输入系统的
+  UI 点击必需，此前场景没有交互 UI 所以一直没建）。
+
+### 15.7 演示新按键
+
+`[` 伪景深开关、`]` 云影开关、`Tab` 残影冲入、`退格` 选项演出；
+色调匹配与脚下阴影全自动无按键。
+推荐组合：`[` 伪景深 + `V` 聚焦渐晕 + `Q` 缓推 = 完整对话特写运镜。
+**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+
+## 十六、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

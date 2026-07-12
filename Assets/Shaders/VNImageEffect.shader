@@ -53,6 +53,9 @@ Shader "VN/ImageEffect"
         _Saturation ("Saturation", Range(0,2)) = 1
         _Brightness ("Brightness", Range(0,2)) = 1
 
+        [Header(Blur Fake DoF)]
+        _BlurAmount ("Blur Radius (uv)", Range(0, 0.02)) = 0
+
         [Header(Wave Distortion)]
         _WaveAmount ("Wave Amount", Range(0,0.05)) = 0
         _WaveSpeed ("Wave Speed", Float) = 2
@@ -164,6 +167,7 @@ Shader "VN/ImageEffect"
             float _WaveAmount;
             float _WaveSpeed;
             float _WaveFreq;
+            float _BlurAmount;
 
             // ---- 程序化值噪声（免噪声贴图）----
             float hash21(float2 p)
@@ -234,7 +238,23 @@ Shader "VN/ImageEffect"
                 float2 uv = IN.texcoord;
                 uv.x += sin(uv.y * _WaveFreq + _Time.y * _WaveSpeed) * _WaveAmount;
 
-                half4 color = (tex2D(_MainTex, uv) + _TextureSampleAdd) * IN.color;
+                // 1.5 可选 9-tap 微模糊（伪景深：背景虚化用；UI 不写深度，真 DoF 会糊掉全屏）
+                half4 texCol = tex2D(_MainTex, uv);
+                if (_BlurAmount > 0.0001)
+                {
+                    float r = _BlurAmount;
+                    float d = r * 0.7071; // 对角
+                    texCol += tex2D(_MainTex, uv + float2( r, 0));
+                    texCol += tex2D(_MainTex, uv + float2(-r, 0));
+                    texCol += tex2D(_MainTex, uv + float2(0,  r));
+                    texCol += tex2D(_MainTex, uv + float2(0, -r));
+                    texCol += tex2D(_MainTex, uv + float2( d,  d));
+                    texCol += tex2D(_MainTex, uv + float2(-d,  d));
+                    texCol += tex2D(_MainTex, uv + float2( d, -d));
+                    texCol += tex2D(_MainTex, uv + float2(-d, -d));
+                    texCol /= 9.0;
+                }
+                half4 color = (texCol + _TextureSampleAdd) * IN.color;
 
                 // 2. HSV 调色
                 float3 hsv = rgb2hsv(color.rgb);
