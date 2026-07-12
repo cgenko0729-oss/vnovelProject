@@ -122,6 +122,71 @@ namespace VNEffects
             }
         }
 
+        // ------------------------------------------------------------------
+        // 圆角面板 / 边框（对话框用，9-slice Sprite）
+        // ------------------------------------------------------------------
+
+        static Sprite _roundedRectSprite;
+        static Sprite _roundedFrameSprite;
+
+        /// <summary>圆角矩形 SDF：d &lt; 0 在内部</summary>
+        static float RoundedBoxDist(float px, float py, float halfW, float halfH, float radius)
+        {
+            float qx = Mathf.Abs(px) - (halfW - radius);
+            float qy = Mathf.Abs(py) - (halfH - radius);
+            float ox = Mathf.Max(qx, 0f), oy = Mathf.Max(qy, 0f);
+            return Mathf.Sqrt(ox * ox + oy * oy) + Mathf.Min(Mathf.Max(qx, qy), 0f) - radius;
+        }
+
+        /// <summary>实心圆角面板（64px，圆角 16px，9-slice 边距 22px）</summary>
+        public static Sprite RoundedRectSprite
+        {
+            get
+            {
+                if (_roundedRectSprite == null)
+                {
+                    const int size = 64;
+                    var tex = Generate("VN_RoundedRect", size, size, (dx, dy) =>
+                    {
+                        float d = RoundedBoxDist(dx * size, dy * size, size * 0.5f - 1f, size * 0.5f - 1f, 16f);
+                        return Mathf.Clamp01(0.5f - d); // 1px 抗锯齿
+                    });
+                    _roundedRectSprite = Sprite.Create(tex, new Rect(0, 0, size, size),
+                        new Vector2(0.5f, 0.5f), 100f, 0,
+                        SpriteMeshType.FullRect, new Vector4(22, 22, 22, 22));
+                    _roundedRectSprite.name = "VN_RoundedRectSprite";
+                    _roundedRectSprite.hideFlags = HideFlags.DontSave;
+                }
+                return _roundedRectSprite;
+            }
+        }
+
+        /// <summary>圆角描边框（3px 线宽，对话框边缘流光的载体）</summary>
+        public static Sprite RoundedFrameSprite
+        {
+            get
+            {
+                if (_roundedFrameSprite == null)
+                {
+                    const int size = 64;
+                    const float thickness = 3f;
+                    var tex = Generate("VN_RoundedFrame", size, size, (dx, dy) =>
+                    {
+                        float d = RoundedBoxDist(dx * size, dy * size, size * 0.5f - 1f, size * 0.5f - 1f, 16f);
+                        float outer = Mathf.Clamp01(0.5f - d);
+                        float inner = Mathf.Clamp01(0.5f - (d + thickness));
+                        return outer - inner; // 只留边缘细环
+                    });
+                    _roundedFrameSprite = Sprite.Create(tex, new Rect(0, 0, size, size),
+                        new Vector2(0.5f, 0.5f), 100f, 0,
+                        SpriteMeshType.FullRect, new Vector4(22, 22, 22, 22));
+                    _roundedFrameSprite.name = "VN_RoundedFrameSprite";
+                    _roundedFrameSprite.hideFlags = HideFlags.DontSave;
+                }
+                return _roundedFrameSprite;
+            }
+        }
+
         /// <summary>径向光晕的 Sprite 包装（供 Image 使用）</summary>
         public static Sprite RadialGlowSprite
         {

@@ -41,6 +41,13 @@ Shader "VN/ImageEffect"
         _RimWidth ("Rim Width (uv)", Range(0.001,0.08)) = 0.02
         _RimAngle ("Rim Light Angle (deg)", Range(0,360)) = 45
 
+        [Header(Water Shimmer)]
+        _ShimmerAmount ("Shimmer Amount", Range(0,2)) = 0
+        [HDR] _ShimmerColor ("Shimmer Color", Color) = (1.3,1.4,1.5,1)
+        _ShimmerHeight ("Shimmer Height (uv from bottom)", Range(0,1)) = 0.45
+        _ShimmerScale ("Shimmer Scale", Float) = 60
+        _ShimmerSpeed ("Shimmer Speed", Float) = 1
+
         [Header(Color Grading)]
         _HueShift ("Hue Shift", Range(-0.5,0.5)) = 0
         _Saturation ("Saturation", Range(0,2)) = 1
@@ -144,6 +151,12 @@ Shader "VN/ImageEffect"
             float _RimWidth;
             float _RimAngle;
 
+            float _ShimmerAmount;
+            half4 _ShimmerColor;
+            float _ShimmerHeight;
+            float _ShimmerScale;
+            float _ShimmerSpeed;
+
             float _HueShift;
             float _Saturation;
             float _Brightness;
@@ -238,7 +251,7 @@ Shader "VN/ImageEffect"
                 color.rgb += _ShineColor.rgb * (s * _ShineColor.a);
 
                 // 4. HDR 自发光（呼吸发光）
-                color.rgb += _EmissionColor.rgb * _EmissionAmount;
+                //color.rgb += _EmissionColor.rgb * _EmissionAmount;
 
                 // 4.5 轮廓光（Rim Light）：朝光源方向偏移采样 alpha，
                 //     若偏移处透明说明此像素在受光一侧的外缘 → 点亮 HDR 描边
@@ -250,6 +263,25 @@ Shader "VN/ImageEffect"
                     float a2 = tex2D(_MainTex, uv + rdir * _RimWidth * 2.0).a;
                     float litEdge = saturate(1.0 - (a1 * 0.6 + a2 * 0.4));
                     color.rgb += _RimColor.rgb * (litEdge * color.a * _RimAmount);
+                }
+
+                // 4.7 水面波光：两层不同速度/频率的波纹相乘 + 噪声调制，
+                //     只出现在画面下半部（_ShimmerHeight 以下），向上渐隐
+                if (_ShimmerAmount > 0.001)
+                {
+                    float w1 = sin(IN.texcoord.x * _ShimmerScale
+                                   + _Time.y * _ShimmerSpeed * 2.1
+                                   + sin(IN.texcoord.y * 40.0) * 2.0);
+                    float w2 = sin(IN.texcoord.x * _ShimmerScale * 0.53
+                                   - _Time.y * _ShimmerSpeed * 1.3
+                                   + IN.texcoord.y * _ShimmerScale * 1.7);
+                    float sparkleW = saturate(w1 * w2);
+                    sparkleW = pow(sparkleW, 3.0);
+                    // 噪声打散规律感，波光更自然
+                    sparkleW *= 0.45 + vnoise(IN.texcoord * 22.0
+                                              + float2(_Time.y * 0.4, 0.0)) * 0.9;
+                    float zone = smoothstep(_ShimmerHeight, _ShimmerHeight * 0.15, IN.texcoord.y);
+                    color.rgb += _ShimmerColor.rgb * (sparkleW * zone * _ShimmerAmount);
                 }
 
                 // 5. 噪声溶解 + 辉光边缘

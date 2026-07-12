@@ -22,7 +22,6 @@ namespace VNEffects
         Sequence _seq;
 
         Vector2 _basePos;
-        Vector3 _baseScale;
         bool _cached;
         bool _wasFloating;
         bool _wasBreathing;
@@ -52,11 +51,11 @@ namespace VNEffects
             if (!_cached)
             {
                 _basePos = _rect.anchoredPosition;
-                _baseScale = _rect.localScale;
                 _cached = true;
             }
 
-            _rect.localScale = _baseScale;
+            // 基准缩放从控制器取（包含说话者高亮的倍率），不自己缓存
+            _rect.localScale = _fx.CurrentBaseScale;
             _rect.localRotation = Quaternion.identity;
             if (!_dejected) _rect.anchoredPosition = _basePos;
         }
@@ -80,11 +79,12 @@ namespace VNEffects
         public Sequence Surprise()
         {
             Begin();
+            var bs = _fx.CurrentBaseScale;
             var seq = DOTween.Sequence()
                 .Append(_rect.DOAnchorPosY(_basePos.y + 34f, 0.12f).SetEase(Ease.OutQuad))
-                .Join(_rect.DOScale(_baseScale * 1.05f, 0.12f).SetEase(Ease.OutQuad))
+                .Join(_rect.DOScale(bs * 1.05f, 0.12f).SetEase(Ease.OutQuad))
                 .Append(_rect.DOAnchorPosY(_basePos.y, 0.32f).SetEase(Ease.OutBounce))
-                .Join(_rect.DOScale(_baseScale, 0.26f).SetEase(Ease.OutQuad));
+                .Join(_rect.DOScale(bs, 0.26f).SetEase(Ease.OutQuad));
             return End(seq);
         }
 
@@ -102,12 +102,13 @@ namespace VNEffects
         public Sequence Shy()
         {
             Begin();
+            var bs = _fx.CurrentBaseScale;
             var seq = DOTween.Sequence()
-                .Append(_rect.DOScale(_baseScale * 0.97f, 0.28f).SetEase(Ease.OutQuad))
+                .Append(_rect.DOScale(bs * 0.97f, 0.28f).SetEase(Ease.OutQuad))
                 .Join(_rect.DOAnchorPosY(_basePos.y - 7f, 0.28f).SetEase(Ease.OutQuad))
                 .Join(_fx.PulseEmission(new Color(1.5f, 0.65f, 0.85f), 0.45f, 1.3f))
                 .AppendInterval(0.35f)
-                .Append(_rect.DOScale(_baseScale, 0.45f).SetEase(Ease.InOutSine))
+                .Append(_rect.DOScale(bs, 0.45f).SetEase(Ease.InOutSine))
                 .Join(_rect.DOAnchorPosY(_basePos.y, 0.45f).SetEase(Ease.InOutSine));
             return End(seq);
         }

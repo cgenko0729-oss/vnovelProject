@@ -28,7 +28,7 @@ namespace VNEffects.EditorTools
                 return;
 
             // ---------- 1. 找到并正确导入演示图 ----------
-            var (charSprite, bgSprite, allSprites) = PrepareSprites();
+            var (charSprite, charSprite2, bgSprite, allSprites) = PrepareSprites();
 
             // ---------- 2. 材质资产 ----------
             EnsureFolder("Assets/VNEffects");
@@ -74,11 +74,20 @@ namespace VNEffects.EditorTools
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
+            // ---------- 5.5 SceneRoot 容器（屏幕震动的作用对象：背景+光束+立绘）----------
+            var sceneRootGo = new GameObject("SceneRoot", typeof(RectTransform));
+            var sceneRoot = (RectTransform)sceneRootGo.transform;
+            sceneRoot.SetParent(canvasGo.transform, false);
+            sceneRoot.anchorMin = Vector2.zero;
+            sceneRoot.anchorMax = Vector2.one;
+            sceneRoot.offsetMin = Vector2.zero;
+            sceneRoot.offsetMax = Vector2.zero;
+
             // ---------- 6. 背景图 ----------
             VNImageEffectController bgFx = null;
             if (bgSprite != null)
             {
-                var bgGo = CreateUIImage("Background", canvasGo.transform, bgSprite);
+                var bgGo = CreateUIImage("Background", sceneRoot, bgSprite);
                 var bgRect = (RectTransform)bgGo.transform;
                 bgRect.anchorMin = Vector2.zero;
                 bgRect.anchorMax = Vector2.one;
@@ -92,7 +101,7 @@ namespace VNEffects.EditorTools
             // ---------- 6.5 God Rays 斜射光束（渲染在背景之后、立绘之前）----------
             var godRaysGo = new GameObject("GodRays", typeof(RectTransform));
             var godRaysRect = (RectTransform)godRaysGo.transform;
-            godRaysRect.SetParent(canvasGo.transform, false);
+            godRaysRect.SetParent(sceneRoot, false);
             godRaysRect.anchorMin = Vector2.zero;
             godRaysRect.anchorMax = Vector2.one;
             godRaysRect.offsetMin = Vector2.zero;
@@ -100,31 +109,28 @@ namespace VNEffects.EditorTools
             var godRays = godRaysGo.AddComponent<VNGodRays>();
             AssignSourceMaterial(godRays, additiveMat);
 
-            // ---------- 7. 立绘 ----------
-            VNEntranceAnimator charAnim = null;
-            VNImageEffectController charFx = null;
+            // ---------- 7. 立绘（有两张 solo 图时创建双角色）----------
+            VNEntranceAnimator charAnim = null, charAnimB = null;
+            VNImageEffectController charFx = null, charFxB = null;
             VNCharacterEmotes charEmotes = null;
+            bool twoChars = charSprite != null && charSprite2 != null;
+            float charHeight = twoChars ? 880f : 980f;
+
             if (charSprite != null)
             {
-                var charGo = CreateUIImage("Character", canvasGo.transform, charSprite);
-                var img = charGo.GetComponent<Image>();
-                img.preserveAspect = true;
-                var charRect = (RectTransform)charGo.transform;
-                charRect.anchorMin = charRect.anchorMax = new Vector2(0.5f, 0.5f);
-                charRect.pivot = new Vector2(0.5f, 0.5f);
-                float h = 980f;
-                float aspect = charSprite.rect.width / charSprite.rect.height;
-                charRect.sizeDelta = new Vector2(h * aspect, h);
-                charRect.anchoredPosition = new Vector2(0f, -40f);
-
-                charFx = charGo.AddComponent<VNImageEffectController>();
-                AssignSourceMaterial(charFx, imageMat);
-
-                var backdrop = charGo.AddComponent<VNGlowBackdrop>();
-                AssignSourceMaterial(backdrop, additiveMat);
-
-                charAnim = charGo.AddComponent<VNEntranceAnimator>();
-                charEmotes = charGo.AddComponent<VNCharacterEmotes>();
+                var pos = twoChars ? new Vector2(-380f, -60f) : new Vector2(0f, -40f);
+                var (anim, fx) = CreateCharacter("Character", charSprite, sceneRoot,
+                    pos, charHeight, imageMat, additiveMat);
+                charAnim = anim;
+                charFx = fx;
+                charEmotes = fx.gameObject.AddComponent<VNCharacterEmotes>();
+            }
+            if (twoChars)
+            {
+                var (anim, fx) = CreateCharacter("CharacterB", charSprite2, sceneRoot,
+                    new Vector2(380f, -60f), charHeight, imageMat, additiveMat);
+                charAnimB = anim;
+                charFxB = fx;
             }
 
             // ---------- 8. 悬浮氛围粒子（尘埃 + 星光 + 光斑）----------
@@ -148,7 +154,7 @@ namespace VNEffects.EditorTools
             hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 210f);
+            hintRect.sizeDelta = new Vector2(-60f, 250f);
             hint = hintGo.GetComponent<Text>();
             hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             hint.fontSize = 26;
@@ -185,6 +191,28 @@ namespace VNEffects.EditorTools
             var screenTransition = transitionGo.AddComponent<VNScreenTransition>();
             AssignSourceMaterial(screenTransition, transitionMat);
 
+            // ---------- 9.12 屏幕震动（震 SceneRoot，UI 保持稳定）----------
+            var shakeGo = new GameObject("ScreenShake");
+            var screenShake = shakeGo.AddComponent<VNScreenShake>();
+            screenShake.target = sceneRoot;
+
+            // ---------- 9.13 说话者高亮 ----------
+            var speakerGo = new GameObject("SpeakerHighlight");
+            var speakerHighlight = speakerGo.AddComponent<VNSpeakerHighlight>();
+            if (charFx != null) speakerHighlight.characters.Add(charFx);
+            if (charFxB != null) speakerHighlight.characters.Add(charFxB);
+
+            // ---------- 9.14 对话框（底部，排序 40）----------
+            var dialogueGo = new GameObject("DialogueBox", typeof(RectTransform));
+            var dialogueRect = (RectTransform)dialogueGo.transform;
+            dialogueRect.SetParent(canvasGo.transform, false);
+            dialogueRect.anchorMin = new Vector2(0.05f, 0f);
+            dialogueRect.anchorMax = new Vector2(0.95f, 0f);
+            dialogueRect.pivot = new Vector2(0.5f, 0f);
+            dialogueRect.anchoredPosition = new Vector2(0f, 28f);
+            dialogueRect.sizeDelta = new Vector2(0f, 230f);
+            var dialogueBox = dialogueGo.AddComponent<VNDialogueBox>();
+
             // ---------- 9.10 鼠标轨迹星尘 ----------
             var stardustGo = new GameObject("MouseStardust", typeof(ParticleSystem));
             var stardust = stardustGo.AddComponent<VNMouseStardust>();
@@ -215,6 +243,11 @@ namespace VNEffects.EditorTools
             demo.backgroundVariants = allSprites.ToArray();
             demo.stardust = stardust;
             demo.heatHaze = heatHaze;
+            demo.characterB = charAnimB;
+            demo.characterBFx = charFxB;
+            demo.speakerHighlight = speakerHighlight;
+            demo.screenShake = screenShake;
+            demo.dialogue = dialogueBox;
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -224,12 +257,13 @@ namespace VNEffects.EditorTools
             Debug.Log($"[VNEffects] 演示场景已生成并保存到 {ScenePath}。直接点 Play 体验：" +
                       "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光爆发 | P 粒子 | H 彩虹 | " +
                       "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调情绪 | T 转场换背景 | " +
-                      "6 惊讶 7 生气 8 害羞 9 沮丧/恢复 0 点头 N 摇头。");
+                      "6~0/N 情绪动作 | Y 说话者高亮 | U 水面波光 | J/K/L 分级震动 | Enter 对话框演示。");
         }
 
         // ------------------------------------------------------------------
 
-        static (Sprite character, Sprite background, System.Collections.Generic.List<Sprite> all) PrepareSprites()
+        static (Sprite character, Sprite character2, Sprite background,
+                System.Collections.Generic.List<Sprite> all) PrepareSprites()
         {
             var guids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Assets" });
             var paths = guids.Select(AssetDatabase.GUIDToAssetPath)
@@ -240,25 +274,28 @@ namespace VNEffects.EditorTools
             if (paths.Count == 0)
             {
                 Debug.LogWarning("[VNEffects] Assets/Assets 下没有找到图片，场景将不含背景/立绘。");
-                return (null, null, all);
+                return (null, null, null, all);
             }
 
             foreach (var p in paths) EnsureSpriteImport(p);
 
-            // 文件名带 "solo" 的当立绘，其余第一张当背景
-            string charPath = paths.FirstOrDefault(p => p.ToLower().Contains("solo")) ?? paths[0];
-            string bgPath = paths.FirstOrDefault(p => p != charPath) ?? charPath;
+            // 文件名带 "solo" 的前两张当立绘 A/B，其余第一张当背景
+            var soloPaths = paths.Where(p => p.ToLower().Contains("solo")).ToList();
+            string charPath = soloPaths.Count > 0 ? soloPaths[0] : paths[0];
+            string charPath2 = soloPaths.Count > 1 ? soloPaths[1] : null;
+            string bgPath = paths.FirstOrDefault(p => p != charPath && p != charPath2) ?? charPath;
 
             // 除立绘外的"大图"才作为转场轮换背景（过滤掉按钮/对话框等小 UI 素材）
             foreach (var p in paths)
             {
-                if (p == charPath) continue;
+                if (p == charPath || p == charPath2) continue;
                 var s = AssetDatabase.LoadAssetAtPath<Sprite>(p);
                 if (s != null && s.rect.width >= 900f && s.rect.height >= 600f)
                     all.Add(s);
             }
 
             return (AssetDatabase.LoadAssetAtPath<Sprite>(charPath),
+                    charPath2 != null ? AssetDatabase.LoadAssetAtPath<Sprite>(charPath2) : null,
                     AssetDatabase.LoadAssetAtPath<Sprite>(bgPath),
                     all);
         }
@@ -341,6 +378,30 @@ namespace VNEffects.EditorTools
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();
             return profile;
+        }
+
+        static (VNEntranceAnimator anim, VNImageEffectController fx) CreateCharacter(
+            string name, Sprite sprite, Transform parent, Vector2 pos, float height,
+            Material imageMat, Material additiveMat)
+        {
+            var go = CreateUIImage(name, parent, sprite);
+            var img = go.GetComponent<Image>();
+            img.preserveAspect = true;
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            float aspect = sprite.rect.width / sprite.rect.height;
+            rect.sizeDelta = new Vector2(height * aspect, height);
+            rect.anchoredPosition = pos;
+
+            var fx = go.AddComponent<VNImageEffectController>();
+            AssignSourceMaterial(fx, imageMat);
+
+            var backdrop = go.AddComponent<VNGlowBackdrop>();
+            AssignSourceMaterial(backdrop, additiveMat);
+
+            var anim = go.AddComponent<VNEntranceAnimator>();
+            return (anim, fx);
         }
 
         static GameObject CreateUIImage(string name, Transform parent, Sprite sprite)
