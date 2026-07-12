@@ -241,7 +241,17 @@ animator.PlayExitDissolve();
 
 > 注：AI 无法在此环境直接启动 Unity 编译验证。若编译出现报错，把错误信息发回来即可修复。
 
-## 八、问题修复记录
+## 八、版本控制（2026-07-12 建立）
+
+- 项目已上传到公开仓库：**https://github.com/cgenko0729-oss/vnovelProject.git**（默认分支 `main`）
+- 配置了 Unity 专用 `.gitignore`：排除 `Library/`、`Temp/`、`Logs/`、`UserSettings/`、
+  IDE 文件等所有可再生成内容（否则仓库会膨胀几个 GB），以及本地调试截图 `Assets/DebugScreenShot/`
+- **工作流约定（从现在开始严格执行）**：
+  1. 每个新功能都在**新分支**上开发：`git checkout -b feature/<功能名>`
+  2. 完成后提交并推送该分支，再合并回 `main`
+  3. **任何分支都不删除**——每个功能分支都是一个可随时回滚的历史版本点
+
+## 九、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
