@@ -74,20 +74,19 @@ namespace VNEffects.EditorTools
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
-            // ---------- 5.5 SceneRoot 容器（屏幕震动的作用对象：背景+光束+立绘）----------
-            var sceneRootGo = new GameObject("SceneRoot", typeof(RectTransform));
-            var sceneRoot = (RectTransform)sceneRootGo.transform;
-            sceneRoot.SetParent(canvasGo.transform, false);
-            sceneRoot.anchorMin = Vector2.zero;
-            sceneRoot.anchorMax = Vector2.one;
-            sceneRoot.offsetMin = Vector2.zero;
-            sceneRoot.offsetMax = Vector2.zero;
+            // ---------- 5.5 画面容器层级 ----------
+            // SceneRoot(屏幕震动) > TiltRoot(荷兰角) > LayerBack/Mid/Front(视差三层)
+            var sceneRoot = CreateStretchRect("SceneRoot", canvasGo.transform);
+            var tiltRoot = CreateStretchRect("TiltRoot", sceneRoot);
+            var layerBack = CreateStretchRect("LayerBack", tiltRoot);
+            var layerMid = CreateStretchRect("LayerMid", tiltRoot);
+            var layerFront = CreateStretchRect("LayerFront", tiltRoot);
 
             // ---------- 6. 背景图 ----------
             VNImageEffectController bgFx = null;
             if (bgSprite != null)
             {
-                var bgGo = CreateUIImage("Background", sceneRoot, bgSprite);
+                var bgGo = CreateUIImage("Background", layerBack, bgSprite);
                 var bgRect = (RectTransform)bgGo.transform;
                 bgRect.anchorMin = Vector2.zero;
                 bgRect.anchorMax = Vector2.one;
@@ -101,7 +100,7 @@ namespace VNEffects.EditorTools
             // ---------- 6.5 God Rays 斜射光束（渲染在背景之后、立绘之前）----------
             var godRaysGo = new GameObject("GodRays", typeof(RectTransform));
             var godRaysRect = (RectTransform)godRaysGo.transform;
-            godRaysRect.SetParent(sceneRoot, false);
+            godRaysRect.SetParent(layerMid, false);
             godRaysRect.anchorMin = Vector2.zero;
             godRaysRect.anchorMax = Vector2.one;
             godRaysRect.offsetMin = Vector2.zero;
@@ -119,7 +118,7 @@ namespace VNEffects.EditorTools
             if (charSprite != null)
             {
                 var pos = twoChars ? new Vector2(-380f, -60f) : new Vector2(0f, -40f);
-                var (anim, fx) = CreateCharacter("Character", charSprite, sceneRoot,
+                var (anim, fx) = CreateCharacter("Character", charSprite, layerFront,
                     pos, charHeight, imageMat, additiveMat);
                 charAnim = anim;
                 charFx = fx;
@@ -127,7 +126,7 @@ namespace VNEffects.EditorTools
             }
             if (twoChars)
             {
-                var (anim, fx) = CreateCharacter("CharacterB", charSprite2, sceneRoot,
+                var (anim, fx) = CreateCharacter("CharacterB", charSprite2, layerFront,
                     new Vector2(380f, -60f), charHeight, imageMat, additiveMat);
                 charAnimB = anim;
                 charFxB = fx;
@@ -196,6 +195,23 @@ namespace VNEffects.EditorTools
             var screenShake = shakeGo.AddComponent<VNScreenShake>();
             screenShake.target = sceneRoot;
 
+            // ---------- 9.15 多层视差（远景/中景/近景强度递增）----------
+            var parallaxGo = new GameObject("Parallax");
+            var parallax = parallaxGo.AddComponent<VNParallax>();
+            parallax.layers.Add(new VNParallax.Layer { rect = layerBack, strength = 8f });
+            parallax.layers.Add(new VNParallax.Layer { rect = layerMid, strength = 13f });
+            parallax.layers.Add(new VNParallax.Layer { rect = layerFront, strength = 19f });
+
+            // ---------- 9.16 荷兰角（作用于 TiltRoot）----------
+            var dutchGo = new GameObject("DutchAngle");
+            var dutchAngle = dutchGo.AddComponent<VNDutchAngle>();
+            dutchAngle.target = tiltRoot;
+
+            // ---------- 9.17 点击涟漪 ----------
+            var rippleGo = new GameObject("ClickRipple", typeof(ParticleSystem));
+            var clickRipple = rippleGo.AddComponent<VNClickRipple>();
+            AssignSourceMaterial(clickRipple, additiveMat);
+
             // ---------- 9.13 说话者高亮 ----------
             var speakerGo = new GameObject("SpeakerHighlight");
             var speakerHighlight = speakerGo.AddComponent<VNSpeakerHighlight>();
@@ -248,6 +264,8 @@ namespace VNEffects.EditorTools
             demo.speakerHighlight = speakerHighlight;
             demo.screenShake = screenShake;
             demo.dialogue = dialogueBox;
+            demo.parallax = parallax;
+            demo.dutchAngle = dutchAngle;
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -378,6 +396,18 @@ namespace VNEffects.EditorTools
             EditorUtility.SetDirty(profile);
             AssetDatabase.SaveAssets();
             return profile;
+        }
+
+        static RectTransform CreateStretchRect(string name, Transform parent)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            return rect;
         }
 
         static (VNEntranceAnimator anim, VNImageEffectController fx) CreateCharacter(

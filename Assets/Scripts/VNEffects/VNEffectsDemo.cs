@@ -52,6 +52,10 @@ namespace VNEffects
         public VNScreenShake screenShake;
         public VNDialogueBox dialogue;
 
+        [Header("视差/荷兰角（feature/parallax-ripple-eyelid-dutch）")]
+        public VNParallax parallax;
+        public VNDutchAngle dutchAngle;
+
         int _speakerIndex = -1; // -1 无 / 0 角色A / 1 角色B
         bool _shimmerOn;
         int _lineIndex = -1;
@@ -191,6 +195,13 @@ namespace VNEffects
 
             if (kb.enterKey.wasPressedThisFrame && dialogue != null) AdvanceDialogue();
 
+            if (kb.oKey.wasPressedThisFrame && parallax != null) parallax.Toggle();
+
+            if (kb.iKey.wasPressedThisFrame && dutchAngle != null) dutchAngle.Toggle();
+
+            if (kb.fKey.wasPressedThisFrame && transition != null && !transition.IsPlaying)
+                transition.Play(VNTransition.Eyelid, SwapBackground);
+
             // 情绪演出动作
             if (emotes != null)
             {
@@ -326,7 +337,7 @@ namespace VNEffects
                 "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调 | T 转场换背景\n" +
                 "6 惊讶 | 7 生气 | 8 害羞 | 9 沮丧/恢复 | 0 点头 | N 摇头\n" +
                 "R 轮廓光 | Z 热浪 | C 星尘 | Y 说话者 | U 水面波光\n" +
-                "J/K/L 轻/中/强震动 | Enter 对话演示（打字中再按=催促）";
+                "J/K/L 震动 | Enter 对话 | O 视差 | I 荷兰角 | F 眨眼转场 | 点击=涟漪";
         }
     }
 }

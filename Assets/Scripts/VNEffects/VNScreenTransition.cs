@@ -15,6 +15,7 @@ namespace VNEffects
         InkSpread,     // 水墨晕染
         WhiteFlash,    // 爆闪（HDR 白 + Bloom 超亮一瞬间）
         BokehOrbs,     // 光斑虚化（大光斑涌满屏幕，进入回忆）
+        Eyelid,        // POV 眨眼（上下眼睑合拢再睁开：醒来/昏迷/回忆）
     }
 
     /// <summary>
@@ -132,7 +133,9 @@ namespace VNEffects
 
             if (type == VNTransition.BokehOrbs) StartBokehOrbs();
 
-            var outEase = type == VNTransition.WhiteFlash ? Ease.OutQuad : Ease.InOutSine;
+            var outEase = type == VNTransition.WhiteFlash ? Ease.OutQuad
+                        : type == VNTransition.Eyelid ? Ease.InQuad // 眼睑合拢加速
+                        : Ease.InOutSine;
 
             _seq = DOTween.Sequence()
                 .Append(_mat.DOFloat(1f, IdProgress, outDuration).SetEase(outEase))
@@ -192,6 +195,9 @@ namespace VNEffects
                 case VNTransition.BokehOrbs:
                     mode = 5; outDur = 1.3f; inDur = 1.1f;
                     color = new Color(1.25f, 1.15f, 0.95f, 0.8f); // 柔暖光罩
+                    break;
+                case VNTransition.Eyelid:
+                    mode = 6; outDur = 0.4f; inDur = 0.65f;
                     break;
             }
         }

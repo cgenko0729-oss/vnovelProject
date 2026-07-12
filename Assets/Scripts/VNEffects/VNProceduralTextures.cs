@@ -122,6 +122,24 @@ namespace VNEffects
             }
         }
 
+        static Texture2D _ring;
+
+        /// <summary>柔边圆环（点击涟漪用）</summary>
+        public static Texture2D Ring
+        {
+            get
+            {
+                if (_ring == null)
+                    _ring = Generate("VN_Ring", 128, (dx, dy) =>
+                    {
+                        float r = Mathf.Sqrt(dx * dx + dy * dy);
+                        float band = Mathf.Abs(r - 0.36f) / 0.1f;
+                        return Mathf.Pow(Mathf.Clamp01(1f - band), 2f);
+                    });
+                return _ring;
+            }
+        }
+
         // ------------------------------------------------------------------
         // 圆角面板 / 边框（对话框用，9-slice Sprite）
         // ------------------------------------------------------------------
