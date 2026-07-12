@@ -11,6 +11,9 @@ namespace VNEffects
         static Texture2D _softCircle;
         static Texture2D _sparkle;
         static Texture2D _radialGlow;
+        static Texture2D _lightBeam;
+        static Texture2D _edgeGlowFrame;
+        static Texture2D _petal;
         static Sprite _radialGlowSprite;
 
         /// <summary>柔边圆形（尘埃 / 光斑粒子用）</summary>
@@ -64,6 +67,61 @@ namespace VNEffects
             }
         }
 
+        /// <summary>
+        /// 竖直光束（God Rays 用）：横向柔边、纵向从上（亮）到下（渐隐）。
+        /// 使用时把 RawImage 的 pivot 设在顶部，旋转即得斜射光束。
+        /// </summary>
+        public static Texture2D LightBeam
+        {
+            get
+            {
+                if (_lightBeam == null)
+                    _lightBeam = Generate("VN_LightBeam", 128, 512, (dx, dy) =>
+                    {
+                        // dy ∈ [-0.5, 0.5]，+0.5 为贴图顶部
+                        float across = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(dx) * 2f), 1.6f);
+                        float t = dy + 0.5f; // 0 = 底部, 1 = 顶部
+                        float along = Mathf.Pow(Mathf.Clamp01(t), 1.3f);
+                        return across * along;
+                    });
+                return _lightBeam;
+            }
+        }
+
+        /// <summary>屏幕边缘泛光框：越靠近边缘越亮，中心完全透明（情绪泛光用）</summary>
+        public static Texture2D EdgeGlowFrame
+        {
+            get
+            {
+                if (_edgeGlowFrame == null)
+                    _edgeGlowFrame = Generate("VN_EdgeGlowFrame", 256, 256, (dx, dy) =>
+                    {
+                        float x = dx + 0.5f;
+                        float y = dy + 0.5f;
+                        float edgeDist = Mathf.Min(Mathf.Min(x, 1f - x), Mathf.Min(y, 1f - y));
+                        return Mathf.Pow(Mathf.Clamp01(1f - edgeDist / 0.28f), 2.2f);
+                    });
+                return _edgeGlowFrame;
+            }
+        }
+
+        /// <summary>柔边椭圆花瓣（落樱/落叶粒子用）</summary>
+        public static Texture2D Petal
+        {
+            get
+            {
+                if (_petal == null)
+                    _petal = Generate("VN_Petal", 64, 64, (dx, dy) =>
+                    {
+                        float nx = dx / 0.42f;
+                        float ny = (dy + 0.06f) / 0.26f; // 轻微偏心，更像花瓣
+                        float r = Mathf.Sqrt(nx * nx + ny * ny);
+                        return Mathf.Pow(Mathf.Clamp01(1f - r), 1.3f);
+                    });
+                return _petal;
+            }
+        }
+
         /// <summary>径向光晕的 Sprite 包装（供 Image 使用）</summary>
         public static Sprite RadialGlowSprite
         {
@@ -87,8 +145,11 @@ namespace VNEffects
         /// RGB 恒为白色，颜色交给顶点色 / 材质 Tint 控制。
         /// </summary>
         static Texture2D Generate(string name, int size, System.Func<float, float, float> alphaFunc)
+            => Generate(name, size, size, alphaFunc);
+
+        static Texture2D Generate(string name, int width, int height, System.Func<float, float, float> alphaFunc)
         {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
                 name = name,
                 wrapMode = TextureWrapMode.Clamp,
@@ -96,15 +157,15 @@ namespace VNEffects
                 hideFlags = HideFlags.DontSave
             };
 
-            var pixels = new Color32[size * size];
-            for (int y = 0; y < size; y++)
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
             {
-                float dy = (y + 0.5f) / size - 0.5f;
-                for (int x = 0; x < size; x++)
+                float dy = (y + 0.5f) / height - 0.5f;
+                for (int x = 0; x < width; x++)
                 {
-                    float dx = (x + 0.5f) / size - 0.5f;
+                    float dx = (x + 0.5f) / width - 0.5f;
                     byte a = (byte)Mathf.RoundToInt(Mathf.Clamp01(alphaFunc(dx, dy)) * 255f);
-                    pixels[y * size + x] = new Color32(255, 255, 255, a);
+                    pixels[y * width + x] = new Color32(255, 255, 255, a);
                 }
             }
             tex.SetPixels32(pixels);

@@ -251,7 +251,67 @@ animator.PlayExitDissolve();
   2. 完成后提交并推送该分支，再合并回 `main`
   3. **任何分支都不删除**——每个功能分支都是一个可随时回滚的历史版本点
 
-## 九、问题修复记录
+## 九、第二批功能：氛围特效四件套（2026-07-12，分支 `feature/atmosphere-effects`）
+
+按工作流约定在新分支开发。本批实现四个功能：
+
+### 9.1 God Rays 斜射光束 — `VNGodRays.cs` + 新贴图 `LightBeam`
+
+- `VNProceduralTextures` 新增 `LightBeam` 贴图（128×512：横向柔边 × 纵向上亮下渐隐），
+  同时把内部 `Generate()` 升级为支持任意宽高。
+- `VNGodRays` 挂在 Canvas 下的空 RectTransform 上（渲染顺序在背景之后、立绘之前），
+  Awake 程序化生成 2~4 道光束 RawImage：pivot 设在顶端 → 绕顶端摆动；每道光束的
+  角度/宽度/透明度/摆动周期都带随机偏差，避免整齐划一的机械感。
+- 动态：`DOLocalRotate` 缓慢摆动（yoyo）+ `DOFade` 透明度呼吸，随机相位错开。
+- HDR 颜色（默认暖阳色 ×1.35）配合 Bloom 有柔光感。API：`Show()/Hide()/Toggle()`。
+
+### 9.2 动态暗角/聚焦渐晕 — `VNVignetteFocus.cs`
+
+- 挂在 Global Volume 上，操作 URP Vignette 的 `intensity/smoothness/center` 三个参数。
+- **关键细节**：用 `volume.profile`（运行时实例副本）而非 `sharedProfile`，避免在编辑器里
+  弄脏磁盘上的 Volume Profile 资产；`center.overrideState` 必须手动设 true（资产里没开）。
+- API：`FocusOn(transform)` 把角色世界坐标转视口坐标（`WorldToViewportPoint`）并把暗角
+  中心补间过去、强度加深 → 玩家视线聚焦说话者；`ClearFocus()` 恢复居中基础暗角。
+
+### 9.3 屏幕边缘情绪泛光 — `VNEdgeGlow.cs` + 新贴图 `EdgeGlowFrame`
+
+- 新贴图 `EdgeGlowFrame`（按到边缘的最近距离衰减：边缘亮、中心全透明）。
+- 全屏 RawImage + `VN/Additive` 加法混合 + HDR 颜色 = 屏幕边缘泛光。
+- **嵌套 Canvas + overrideSorting(20)**：保证泛光渲染在氛围粒子（sortingOrder 10~12）之上。
+- 四种情绪预设（各有专属颜色与脉动节奏）：
+  - `HeartBeat` 心动：粉色，"咚-咚——停"的心跳双脉冲序列
+  - `Danger` 危险：红色，0.5s 快速脉动
+  - `Sadness` 悲伤：蓝色，3.8s 缓慢起伏
+  - `Warmth` 温馨：暖橙，5s 极缓呼吸
+- API：`Show(VNEmotionGlow)` / `ShowCustom(颜色,透明度,节奏)` / `Hide()`。
+
+### 9.4 天气系统 — `VNAmbientParticles` 扩展 + `VNWeatherController.cs`
+
+`VNAmbientParticles` 新增四种预设（沿用原架构，全代码配置）：
+
+| 预设 | 实现要点 |
+|---|---|
+| `Petals` 落樱 | 新 `Petal` 椭圆贴图；顶端细带生成；噪声 `separateAxes`（横向强 0.55/纵向弱 0.08）→ 左右摇曳；`rotationOverLifetime` 翻转 |
+| `Rain` 雨 | **拉伸渲染的关键**：Box 形状旋转 90° 朝下 + `startSpeed 10~13` 提供真实粒子速度（Stretch 模式按真实速度拉伸方向才正确），风斜吹用 velocity 模块；自动创建子物体 `RainSplashes` 在屏幕底部持续溅起小水花 |
+| `Snow` 雪 | 慢速下落（16~24s 生命周期跨屏）+ 低频噪声横移 |
+| `Fireflies` 萤火虫 | 只在画面中下部游走；强噪声漫游 + 复用星光的 TwinkleCurve 忽明忽暗；hdrBoost 2.4 让 Bloom 泛光 |
+
+- 新增静态工厂 `VNAmbientParticles.Create(...)`：用"先 SetActive(false) 再挂组件、赋值后
+  再激活"的技巧，保证 Awake→Configure 在字段赋值**之后**执行（修正了直接 AddComponent
+  会用默认字段配置的问题；萤火虫 hdrBoost 也因此改为工厂参数传入）。
+- `VNWeatherController`：惰性创建各天气粒子，切换时旧天气停止发射（已有粒子自然消散）
+  形成交叉过渡；**调色联动**——雨天自动把注册的背景/立绘压暗降饱和（0.8/0.8 冷灰）、
+  雪天清冷透亮、萤火虫之夜整体变暗，用的就是第一批的 `DOBrightness/DOSaturation` API。
+
+### 9.5 演示与场景生成器更新
+
+- `VNEffectsDemo` 新增按键：`G` 光束开关、`V` 聚焦渐晕、`E` 情绪泛光循环、`W` 天气循环；
+  提示文字同步显示当前情绪/天气状态。
+- `VNEffectsDemoSetup` 自动创建并连线：GodRays（背景与立绘之间）、EdgeGlow（Canvas 最后）、
+  VignetteFocus（挂 Volume 上）、WeatherController（moodTargets 自动指向背景+立绘）。
+- **需要重新执行一次 Tools → VN Effects → Create Demo Scene** 让新物体进入场景。
+
+## 十、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
