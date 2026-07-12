@@ -292,6 +292,19 @@ namespace VNEffects
         public void ClearWaterShimmer() => Mat.SetFloat(IdShimmerAmount, 0f);
 
         // ------------------------------------------------------------------
+        // 微模糊（伪景深：背景虚化让立绘"浮"出来）
+        // ------------------------------------------------------------------
+
+        static readonly int IdBlurAmount = Shader.PropertyToID("_BlurAmount");
+
+        /// <summary>立即设置模糊半径（uv 单位，0.004~0.008 为宜）</summary>
+        public void SetBlur(float uvRadius) => Mat.SetFloat(IdBlurAmount, uvRadius);
+
+        /// <summary>补间模糊半径（虚化渐入渐出）</summary>
+        public Tween DOBlur(float to, float duration) =>
+            Mat.DOFloat(to, IdBlurAmount, duration).SetTarget(this).SetLink(gameObject);
+
+        // ------------------------------------------------------------------
         // 悬浮飘动（RectTransform 上下缓慢浮动，让立绘"活"起来）
         // ------------------------------------------------------------------
 

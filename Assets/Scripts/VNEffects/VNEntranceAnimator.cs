@@ -16,6 +16,8 @@ namespace VNEffects
         ShineReveal,
         /// <summary>爆闪 + 光环闪耀中显形（高潮/重要角色登场）</summary>
         FlashBloom,
+        /// <summary>高速冲入 + 身后拖出递减残影（惊喜/战斗系登场）</summary>
+        AfterimageDash,
     }
 
     /// <summary>
@@ -97,6 +99,7 @@ namespace VNEffects
                 case VNEntrancePreset.ScaleBounce: _current = BuildScaleBounce(durationScale); break;
                 case VNEntrancePreset.ShineReveal: _current = BuildShineReveal(durationScale); break;
                 case VNEntrancePreset.FlashBloom: _current = BuildFlashBloom(durationScale); break;
+                case VNEntrancePreset.AfterimageDash: _current = BuildAfterimageDash(durationScale); break;
                 default: _current = BuildFadeSlideUp(durationScale); break;
             }
             _current.SetLink(gameObject);
@@ -172,6 +175,55 @@ namespace VNEffects
                     VNAmbientParticles.PlaySparkleBurst(BurstWorldPos(), Color.white, 36));
             seq.Append(_fx.PlayShine(0.7f * k));
             return seq;
+        }
+
+        Sequence BuildAfterimageDash(float k)
+        {
+            _fx.SetDissolve(1f);
+            _group.alpha = 1f;
+            _fx.Rect.anchoredPosition = _basePos + new Vector2(-560f, 0f);
+
+            var seq = DOTween.Sequence();
+            seq.Append(_fx.Rect.DOAnchorPos(_basePos, 0.38f * k).SetEase(Ease.OutCubic));
+            // 冲入途中在当前位置留下三道递减残影
+            seq.InsertCallback(0.04f * k, SpawnGhost);
+            seq.InsertCallback(0.11f * k, SpawnGhost);
+            seq.InsertCallback(0.19f * k, SpawnGhost);
+            seq.Insert(0.3f * k, _fx.DOFlash(0.15f, 0.25f * k));
+            if (_backdrop != null)
+                seq.Insert(0.25f * k, _backdrop.Flare(1.6f, 0.7f * k));
+            if (useParticleBurst)
+                seq.InsertCallback(0.38f * k, () =>
+                    VNAmbientParticles.PlaySparkleBurst(BurstWorldPos(), burstColor, 18));
+            return seq;
+        }
+
+        /// <summary>在角色当前位置生成一个冷色残影副本，快速淡出后销毁</summary>
+        void SpawnGhost()
+        {
+            var img = GetComponent<UnityEngine.UI.Image>();
+            if (img == null || img.sprite == null) return;
+
+            var go = new GameObject("Ghost",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(_fx.Rect.parent, false);
+            rect.SetSiblingIndex(_fx.Rect.GetSiblingIndex()); // 在本体背后
+            rect.anchorMin = _fx.Rect.anchorMin;
+            rect.anchorMax = _fx.Rect.anchorMax;
+            rect.pivot = _fx.Rect.pivot;
+            rect.sizeDelta = _fx.Rect.sizeDelta;
+            rect.anchoredPosition = _fx.Rect.anchoredPosition;
+            rect.localScale = _fx.Rect.localScale;
+
+            var ghost = go.GetComponent<UnityEngine.UI.Image>();
+            ghost.sprite = img.sprite;
+            ghost.preserveAspect = true;
+            ghost.raycastTarget = false;
+            ghost.color = new Color(0.75f, 0.85f, 1f, 0.42f); // 冷色调残影
+
+            ghost.DOFade(0f, 0.3f).SetEase(Ease.OutQuad).SetLink(go)
+                 .OnComplete(() => Destroy(go));
         }
 
         // ------------------------------------------------------------------

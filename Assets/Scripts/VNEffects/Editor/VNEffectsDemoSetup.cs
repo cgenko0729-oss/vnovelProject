@@ -155,7 +155,7 @@ namespace VNEffects.EditorTools
             hintRect.anchorMax = new Vector2(1f, 0f);
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 285f);
+            hintRect.sizeDelta = new Vector2(-60f, 320f);
             hint = hintGo.GetComponent<Text>();
             hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             hint.fontSize = 26;
@@ -213,6 +213,35 @@ namespace VNEffects.EditorTools
             var rippleGo = new GameObject("ClickRipple", typeof(ParticleSystem));
             var clickRipple = rippleGo.AddComponent<VNClickRipple>();
             AssignSourceMaterial(clickRipple, additiveMat);
+
+            // ---------- 9.21 伪景深（背景模糊+压暗+微放大）----------
+            var dofGo = new GameObject("FakeDoF");
+            var fakeDoF = dofGo.AddComponent<VNFakeDoF>();
+            fakeDoF.backgroundFx = bgFx;
+            fakeDoF.backLayer = layerBack;
+
+            // ---------- 9.22 云影飘过（只盖背景层）----------
+            var cloudRect = CreateStretchRect("CloudShadows", layerBack);
+            var cloudShadows = cloudRect.gameObject.AddComponent<VNCloudShadows>();
+
+            // ---------- 9.23 立绘色调匹配背景 ----------
+            var toneGo = new GameObject("ToneMatch");
+            var toneMatch = toneGo.AddComponent<VNToneMatch>();
+            toneMatch.characters = (charFx != null && charFxB != null)
+                ? new[] { charFx, charFxB }
+                : (charFx != null ? new[] { charFx } : new VNImageEffectController[0]);
+
+            // ---------- 9.24 选项面板 + EventSystem（按钮点击必需）----------
+            var choiceGo = new GameObject("ChoicePanel", typeof(RectTransform));
+            choiceGo.transform.SetParent(canvasGo.transform, false);
+            var choicePanel = choiceGo.AddComponent<VNChoicePanel>();
+
+            if (Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            {
+                new GameObject("EventSystem",
+                    typeof(UnityEngine.EventSystems.EventSystem),
+                    typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
+            }
 
             // ---------- 9.18 镜头运动语言库（作用于 ZoomRoot）----------
             var cameraGo = new GameObject("VNCamera");
@@ -290,6 +319,10 @@ namespace VNEffects.EditorTools
             demo.vnCamera = vnCamera;
             demo.heartbeat = heartbeat;
             demo.sakura = sakura;
+            demo.fakeDoF = fakeDoF;
+            demo.cloudShadows = cloudShadows;
+            demo.toneMatch = toneMatch;
+            demo.choicePanel = choicePanel;
 
             // ---------- 11. 保存 ----------
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -455,6 +488,7 @@ namespace VNEffects.EditorTools
             AssignSourceMaterial(backdrop, additiveMat);
 
             var anim = go.AddComponent<VNEntranceAnimator>();
+            go.AddComponent<VNFootShadow>(); // 脚下椭圆软影，自动同步悬浮
             return (anim, fx);
         }
 
