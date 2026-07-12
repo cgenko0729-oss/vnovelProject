@@ -458,7 +458,55 @@ animator.PlayExitDissolve();
 `Enter` 对话演示（打字中再按 = 催促显示全文）。
 **需要重新执行 Tools → VN Effects → Create Demo Scene**。
 
-## 十三、问题修复记录
+## 十三、第六批功能：视差 / 点击涟漪 / 眨眼转场 / 荷兰角（2026-07-12，分支 `feature/parallax-ripple-eyelid-dutch`）
+
+> 附带决定：上一批误入库的图片已从当前版本移除（`d335f7e`），用户选择**不重写历史**，保持现状。
+
+### 13.1 画面容器层级重构
+
+```
+Canvas
+└─ SceneRoot   ← 屏幕震动作用于此
+   └─ TiltRoot ← 荷兰角旋转+防露角放大作用于此
+      ├─ LayerBack  (背景)        ← 视差强度 8px
+      ├─ LayerMid   (God Rays)    ← 视差强度 13px
+      └─ LayerFront (立绘×2+光环) ← 视差强度 19px
+```
+三种"整屏运动"（震动/倾斜/视差）各占一层容器，与立绘自身的悬浮/呼吸/情绪
+动作（作用于立绘 RectTransform）完全解耦，任意叠加不打架。
+
+### 13.2 多层视差（`VNParallax.cs`）
+
+- 读鼠标位置归一化到 -1..1，各层 `anchoredPosition = 基准 - 偏移 × 强度`（反向移动），
+  越"近"的层强度越大 → 纵深感。指数平滑（帧率无关）让跟随有"重量感"。
+- 支持运行时 `AddLayer()`（将来加前景树叶/窗框装饰直接注册）。`Toggle()` 关闭时平滑回中。
+- 背景本来就四边溢出 60px（Ken Burns 余量），视差 ±8px 不会露边。
+
+### 13.3 点击涟漪（`VNClickRipple.cs`）+ 新贴图 `Ring`
+
+- 新程序化贴图：柔边圆环。点击时发射**单颗粒子**：尺寸曲线 0.12→1 快速扩散、
+  透明度 0.9→0 衰减 —— 一颗粒子就是一圈涟漪；同时 `PlaySparkleBurst` 3 颗星光。
+- HDR×1.8 配 Bloom 微微发光。世界空间模拟，涟漪留在点击处。
+
+### 13.4 POV 眨眼转场 — `VNScreenTransition` 新 Mode 6
+
+- Shader：上下两片"眼睑"随 Progress 合拢，边缘用 `sin(uv.x·π)` 加眼睑弧线
+  （中间闭合更快，更像真实眼皮）；合拢用 InQuad 加速、睁开较慢（0.4s/0.65s）。
+- 醒来/昏迷/回忆开场的第一人称感。已自动进入 T 键转场轮换，另有 F 键直接触发。
+
+### 13.5 荷兰角（`VNDutchAngle.cs`）
+
+- `SetTilt(3°)` 缓慢倾斜 TiltRoot；**防露角**：按公式 `cosθ + aspect·sinθ` 自动放大
+  （3° ≈ ×1.09），旋转后四角不露底。`Clear()` 回正、`Toggle()` 开关。
+- 紧张/异常/醉酒场景的经典心理暗示手法。
+
+### 13.6 演示新按键
+
+`O` 视差开关（默认开，晃鼠标看纵深）、`I` 荷兰角开关、`F` 眨眼转场（换背景）、
+鼠标左键点击任意处 = 涟漪+星光。
+**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+
+## 十四、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

@@ -166,6 +166,15 @@ Shader "VN/ScreenTransition"
                     float r = p * 2.3 - 0.1;
                     mask = 1.0 - smoothstep(r - 0.12, r, d);
                 }
+                else if (mode == 6)
+                {
+                    // POV 眨眼：上下两片"眼睑"合拢再睁开，边缘带眼睑弧线
+                    float curve = sin(uv.x * 3.14159) * 0.07; // 中间弧度更深
+                    float coverage = p * (0.55 + curve);
+                    float mTop = smoothstep(1.0 - coverage - 0.015, 1.0 - coverage + 0.015, uv.y);
+                    float mBot = 1.0 - smoothstep(coverage - 0.015, coverage + 0.015, uv.y);
+                    mask = max(mTop, mBot);
+                }
                 else
                 {
                     // 纯色全覆盖（爆闪 / 柔光罩）
