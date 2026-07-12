@@ -65,6 +65,7 @@ namespace VNEffects
             CacheBase();
             KillCurrent();
             _fx.StopAllLoops();
+            _fx.ResetScaleMultiplier(); // 清掉说话者高亮的缩放倍率
             _group.alpha = 0f;
             _fx.SetDissolve(0f);
             _fx.SetFlash(0f);

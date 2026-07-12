@@ -409,7 +409,56 @@ animator.PlayExitDissolve();
 - 生成器新增 MouseStardust、HeatHaze 物体并连线。
 - **需要重新执行 Tools → VN Effects → Create Demo Scene**。
 
-## 十二、问题修复记录
+## 十二、第五批功能：说话者高亮 / 水面波光 / 屏幕震动 / 对话框（2026-07-12，分支 `feature/speaker-highlight`）
+
+> 注：用户同时点了"呼吸感立绘"，该功能已在第四批实现并自动运行，本批未重复开发。
+
+### 12.1 说话者高亮系统 — `VNSpeakerHighlight.cs` + 控制器"缩放倍率"改造
+
+- **关键改造**：高亮要缩放立绘，但呼吸动作也在补间缩放，会打架。给控制器引入
+  `_scaleMultiplier` 概念：`CurrentBaseScale = 初始缩放 × 倍率`；呼吸围绕它进行；
+  `DOScaleMultiplier(mult, dur)` 切倍率时先暂停呼吸缩放分量、过渡完成后围绕新基准继续呼吸。
+  情绪动作库改为从控制器读 `CurrentBaseScale`（不再自己缓存缩放），出场动画重播前
+  `ResetScaleMultiplier()`。
+- 管理器：`SetSpeaker(fx)` —— 说话者恢复亮度 + 放大 1.03 + 在立绘之间移到最前 +
+  光环 Flare 闪耀；旁听者压暗 0.6 + 降饱和 0.85 + 微缩 0.97 + 光环熄灭。`ClearSpeaker()` 全员复原。
+- 场景生成器升级为**双角色**：有两张 "solo" 图时创建 Character/CharacterB（±380 对位），
+  才能看出多人对话的层次。
+
+### 12.2 水面波光 — Shader 新开关 + 控制器 API
+
+- `VNImageEffect.shader` 新增 Water Shimmer 块：**两层不同速度/频率的正弦波相乘**
+  （w1 带 y 向扰动、w2 反向滚动）→ pow(3) 锐化成粼粼高光点，再乘一层滚动值噪声打散
+  规律感；`smoothstep` 限制在画面下部 `_ShimmerHeight` 以内并向上渐隐。HDR 颜色配 Bloom。
+- API：`SetWaterShimmer(强度, 颜色, 高度, 密度, 速度)` / `DOShimmerAmount()` 渐现渐隐。
+
+### 12.3 分级屏幕震动 — `VNScreenShake.cs` + SceneRoot 容器
+
+- **架构点**：Canvas 是 Screen Space - Camera，震相机 UI 纹丝不动。因此生成器新增
+  `SceneRoot` 容器（背景+光束+立绘都挂进去），震动作用于容器 —— 画面震、对话框稳，
+  正是电影感的做法。悬浮/呼吸等 tween 在容器的子物体上，互不冲突。
+- 三级预设：Light 6px/0.25s（心跳）、Medium 16px/0.4s（惊吓）、
+  Heavy 34px/0.6s + ±1.4° 旋转抖动（爆炸）。每次震动前重置基准位，连续触发不漂移。
+
+### 12.4 对话框高级化 — `VNDialogueBox.cs` + `VNTypewriterText.cs` + 程序化圆角贴图
+
+- `VNProceduralTextures` 新增 SDF 圆角矩形（实心面板）与 3px 描边框两张 9-slice Sprite。
+- **边缘流光**：描边框 Image 挂 `VNImageEffectController` 开扫光循环 —— 扫光带只点亮
+  边框像素，视觉上就是一条流光沿边框掠过（复用现有 shader，零新代码）。
+- **打字机文字**：`VNTypewriterText : BaseMeshEffect` 直接改 uGUI Text 网格顶点，
+  每字一个四边形，按显现进度做"上浮 10px + 淡入"（OutQuad）。**特意不用 TMP**：
+  legacy Text 走系统字体回退，中文台词开箱即用（TMP 默认字体无 CJK 字形会显示方块）。
+- 对话框：半透明磨砂圆角面板 + 底部 OutBack 轻弹入场 + 骑在顶边的名牌 + 右下角 "▼"
+  呼吸浮动继续箭头。API：`Say(名字, 内容)` / `CompleteTyping()` 催促 / `HideBox()`。
+- 演示的 Enter 键对话流程**联动说话者高亮**：谁说话谁亮，旁听者自动压暗。
+
+### 12.5 演示新按键
+
+`Y` 说话者循环（A→B→无）、`U` 水面波光开关、`J/K/L` 轻/中/强震动、
+`Enter` 对话演示（打字中再按 = 催促显示全文）。
+**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+
+## 十三、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

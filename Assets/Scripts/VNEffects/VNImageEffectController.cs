@@ -265,6 +265,33 @@ namespace VNEffects
         public void ClearRimLight() => Mat.SetFloat(IdRimAmount, 0f);
 
         // ------------------------------------------------------------------
+        // 水面波光：海边/湖边场景，画面下半部叠加缓慢滚动的高光波纹
+        // ------------------------------------------------------------------
+
+        static readonly int IdShimmerAmount = Shader.PropertyToID("_ShimmerAmount");
+        static readonly int IdShimmerColor = Shader.PropertyToID("_ShimmerColor");
+        static readonly int IdShimmerHeight = Shader.PropertyToID("_ShimmerHeight");
+        static readonly int IdShimmerScale = Shader.PropertyToID("_ShimmerScale");
+        static readonly int IdShimmerSpeed = Shader.PropertyToID("_ShimmerSpeed");
+
+        /// <summary>设置水面波光（height：波光区占画面下方的高度比例）</summary>
+        public void SetWaterShimmer(float amount, Color? hdrColor = null,
+            float height = 0.45f, float scale = 60f, float speed = 1f)
+        {
+            Mat.SetColor(IdShimmerColor, hdrColor ?? new Color(1.3f, 1.4f, 1.5f, 1f));
+            Mat.SetFloat(IdShimmerHeight, height);
+            Mat.SetFloat(IdShimmerScale, scale);
+            Mat.SetFloat(IdShimmerSpeed, speed);
+            Mat.SetFloat(IdShimmerAmount, amount);
+        }
+
+        /// <summary>补间波光强度（渐现/渐隐）</summary>
+        public Tween DOShimmerAmount(float to, float duration) =>
+            Mat.DOFloat(to, IdShimmerAmount, duration).SetTarget(this).SetLink(gameObject);
+
+        public void ClearWaterShimmer() => Mat.SetFloat(IdShimmerAmount, 0f);
+
+        // ------------------------------------------------------------------
         // 悬浮飘动（RectTransform 上下缓慢浮动，让立绘"活"起来）
         // ------------------------------------------------------------------
 
@@ -303,10 +330,56 @@ namespace VNEffects
         Tween _breathScaleX;
         Tween _breathScaleY;
         Tween _tiltTween;
-        Vector3 _breathBaseScale;
-        bool _hasBreathBase;
+        Vector3 _origScale;
+        bool _hasOrigScale;
+        float _scaleMultiplier = 1f;
         float _lastBreathAmp = 0.013f, _lastBreathPeriod = 3.6f;
         float _lastTiltDeg = 0.7f, _lastTiltPeriod = 7f;
+
+        void EnsureOrigScale()
+        {
+            if (_hasOrigScale) return;
+            _origScale = Rect.localScale;
+            _hasOrigScale = true;
+        }
+
+        /// <summary>当前基准缩放 = 初始缩放 × 缩放倍率（说话者高亮等设置）</summary>
+        public Vector3 CurrentBaseScale
+        {
+            get { EnsureOrigScale(); return _origScale * _scaleMultiplier; }
+        }
+
+        /// <summary>静默重置缩放倍率（出场动画重播前调用）</summary>
+        public void ResetScaleMultiplier() => _scaleMultiplier = 1f;
+
+        /// <summary>
+        /// 补间缩放倍率（说话者高亮用：说话者 1.03、旁听者 0.97）。
+        /// 与呼吸动作兼容：呼吸的缩放分量先暂停，倍率过渡完成后围绕新基准继续呼吸。
+        /// </summary>
+        public Tween DOScaleMultiplier(float mult, float duration)
+        {
+            EnsureOrigScale();
+            _scaleMultiplier = mult;
+            bool wasBreathing = _breathScaleX != null;
+            _breathScaleX?.Kill();
+            _breathScaleY?.Kill();
+            _breathScaleX = _breathScaleY = null;
+            var tween = Rect.DOScale(CurrentBaseScale, duration)
+                .SetEase(Ease.InOutSine).SetTarget(this).SetLink(gameObject);
+            if (wasBreathing) tween.OnComplete(RestartBreathScale);
+            return tween;
+        }
+
+        void RestartBreathScale()
+        {
+            var bs = CurrentBaseScale;
+            _breathScaleX = Rect.DOScaleX(bs.x * (1f + _lastBreathAmp), _lastBreathPeriod * 0.5f)
+                                .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
+                                .SetLink(gameObject);
+            _breathScaleY = Rect.DOScaleY(bs.y * (1f + _lastBreathAmp * 0.4f), _lastBreathPeriod * 0.5f)
+                                .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
+                                .SetLink(gameObject);
+        }
 
         /// <summary>当前是否在呼吸动作中</summary>
         public bool IsBreathingMotion => _breathScaleX != null;
@@ -329,19 +402,8 @@ namespace VNEffects
             _lastTiltPeriod = tiltPeriod;
 
             var t = Rect;
-            if (!_hasBreathBase)
-            {
-                _breathBaseScale = t.localScale;
-                _hasBreathBase = true;
-            }
-            t.localScale = _breathBaseScale;
-
-            _breathScaleX = t.DOScaleX(_breathBaseScale.x * (1f + scaleAmplitude), period * 0.5f)
-                             .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
-                             .SetLink(gameObject);
-            _breathScaleY = t.DOScaleY(_breathBaseScale.y * (1f + scaleAmplitude * 0.4f), period * 0.5f)
-                             .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
-                             .SetLink(gameObject);
+            t.localScale = CurrentBaseScale;
+            RestartBreathScale();
 
             if (tiltDegrees > 0.01f)
             {
@@ -365,9 +427,9 @@ namespace VNEffects
             _breathScaleY?.Kill();
             _tiltTween?.Kill();
             _breathScaleX = _breathScaleY = _tiltTween = null;
-            if (_hasBreathBase)
+            if (_hasOrigScale)
             {
-                Rect.localScale = _breathBaseScale;
+                Rect.localScale = CurrentBaseScale;
                 Rect.localRotation = Quaternion.identity;
             }
         }

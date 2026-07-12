@@ -45,6 +45,26 @@ namespace VNEffects
         public VNMouseStardust stardust;
         public VNHeatHaze heatHaze;
 
+        [Header("说话者/波光/震动/对话框（feature/speaker-highlight）")]
+        public VNEntranceAnimator characterB;
+        public VNImageEffectController characterBFx;
+        public VNSpeakerHighlight speakerHighlight;
+        public VNScreenShake screenShake;
+        public VNDialogueBox dialogue;
+
+        int _speakerIndex = -1; // -1 无 / 0 角色A / 1 角色B
+        bool _shimmerOn;
+        int _lineIndex = -1;
+
+        // 演示台词：(说话者序号, 名字, 内容)
+        static readonly (int who, string name, string text)[] DemoLines =
+        {
+            (0, "亚里沙", "今天的晚霞真漂亮啊……整片天空都烧起来了一样。"),
+            (1, "小雪", "是啊。你看，连云的边缘都镶上了金色。"),
+            (0, "亚里沙", "要是每天都能这样，和你一起看着天空发呆就好了。"),
+            (1, "小雪", "笨蛋……说什么呢。走吧，再不回去天就黑了。"),
+        };
+
         int _transitionIndex = -1;
         int _bgIndex;
         int _rimIndex; // 0 关 / 1 夕阳橙 / 2 月夜蓝
@@ -65,6 +85,16 @@ namespace VNEffects
             }
 
             PlayCurrent();
+
+            // 第二角色（如果有）延迟一点滑入
+            if (characterB != null)
+            {
+                DOVirtual.DelayedCall(0.5f, () =>
+                    characterB.PlayEntrance(VNEntrancePreset.FadeSlideUp)
+                              .OnComplete(() => characterB.StartIdleEffects()))
+                    .SetLink(characterB.gameObject);
+            }
+
             UpdateHint();
         }
 
@@ -139,6 +169,28 @@ namespace VNEffects
 
             if (kb.rKey.wasPressedThisFrame && characterFx != null) CycleRimLight();
 
+            if (kb.yKey.wasPressedThisFrame && speakerHighlight != null) CycleSpeaker();
+
+            if (kb.uKey.wasPressedThisFrame && backgroundFx != null)
+            {
+                _shimmerOn = !_shimmerOn;
+                if (_shimmerOn)
+                {
+                    backgroundFx.SetWaterShimmer(0f);
+                    backgroundFx.DOShimmerAmount(0.85f, 1f);
+                }
+                else backgroundFx.DOShimmerAmount(0f, 0.8f);
+            }
+
+            if (screenShake != null)
+            {
+                if (kb.jKey.wasPressedThisFrame) screenShake.Shake(VNShakeLevel.Light);
+                if (kb.kKey.wasPressedThisFrame) screenShake.Shake(VNShakeLevel.Medium);
+                if (kb.lKey.wasPressedThisFrame) screenShake.Shake(VNShakeLevel.Heavy);
+            }
+
+            if (kb.enterKey.wasPressedThisFrame && dialogue != null) AdvanceDialogue();
+
             // 情绪演出动作
             if (emotes != null)
             {
@@ -152,6 +204,40 @@ namespace VNEffects
                 }
                 if (kb.digit0Key.wasPressedThisFrame) emotes.Nod();
                 if (kb.nKey.wasPressedThisFrame) emotes.HeadShake();
+            }
+        }
+
+        void CycleSpeaker()
+        {
+            // A → B → 无 循环（没有 B 时 A → 无）
+            int count = characterBFx != null ? 3 : 2;
+            _speakerIndex = (_speakerIndex + 2) % count; // 从 -1 起步也正确
+            if (_speakerIndex == 0) speakerHighlight.SetSpeaker(characterFx);
+            else if (_speakerIndex == 1 && characterBFx != null)
+                speakerHighlight.SetSpeaker(characterBFx);
+            else
+            {
+                speakerHighlight.ClearSpeaker();
+                _speakerIndex = -1;
+            }
+        }
+
+        void AdvanceDialogue()
+        {
+            if (dialogue.IsTyping)
+            {
+                dialogue.CompleteTyping();
+                return;
+            }
+            _lineIndex = (_lineIndex + 1) % DemoLines.Length;
+            var line = DemoLines[_lineIndex];
+            dialogue.Say(line.name, line.text);
+
+            // 联动说话者高亮
+            if (speakerHighlight != null)
+            {
+                var fx = line.who == 1 && characterBFx != null ? characterBFx : characterFx;
+                speakerHighlight.SetSpeaker(fx);
             }
         }
 
@@ -239,7 +325,8 @@ namespace VNEffects
                 "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光 | P 粒子 | H 彩虹\n" +
                 "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调 | T 转场换背景\n" +
                 "6 惊讶 | 7 生气 | 8 害羞 | 9 沮丧/恢复 | 0 点头 | N 摇头\n" +
-                "R 轮廓光(夕阳/月夜) | Z 热浪+蒸汽 | C 鼠标星尘";
+                "R 轮廓光 | Z 热浪 | C 星尘 | Y 说话者 | U 水面波光\n" +
+                "J/K/L 轻/中/强震动 | Enter 对话演示（打字中再按=催促）";
         }
     }
 }
