@@ -255,9 +255,104 @@ namespace VNEffects
             return c;
         }
 
+        /// <summary>角色显示名（未注册时原样返回，Backlog 用）</summary>
+        public string GetDisplayName(string speaker)
+        {
+            var def = characters.Find(c => c.id == speaker);
+            return def != null ? def.displayName : speaker;
+        }
+
+        // ------------------------------------------------------------------
+        // 存档快照 / 读档恢复
+        // ------------------------------------------------------------------
+
+        /// <summary>把当前舞台状态写入存档数据</summary>
+        public void CaptureSnapshot(VNSaveData data)
+        {
+            data.backgroundId = CurrentBackgroundId;
+            data.weather = weather != null ? weather.Current.ToString() : null;
+            data.mood = mood != null ? mood.Current.ToString() : null;
+
+            data.fxOn.Clear();
+            foreach (var kv in _fxStates)
+                if (kv.Value) data.fxOn.Add(kv.Key);
+
+            data.characters.Clear();
+            foreach (var kv in _active)
+            {
+                data.characters.Add(new VNSaveData.CharSave
+                {
+                    id = kv.Key,
+                    x = kv.Value.rect.anchoredPosition.x,
+                    expr = kv.Value.expression,
+                });
+            }
+        }
+
+        /// <summary>清空舞台并按存档数据瞬间摆台（读档用）</summary>
+        public void RestoreSnapshot(VNSaveData data)
+        {
+            ClearStage();
+
+            if (!string.IsNullOrEmpty(data.backgroundId))
+                SetBackground(data.backgroundId, null);
+
+            if (weather != null)
+                weather.SetWeather(
+                    VNScriptParser.ParseEnum(data.weather, VNWeather.None, 0), 0.1f);
+            if (mood != null)
+                mood.SetMood(
+                    VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0), 0.3f);
+
+            // 先全部关掉可开关 fx，再打开存档里记录的
+            foreach (var name in ToggleFxNames) Fx(name, "off");
+            foreach (var name in data.fxOn) Fx(name, "on");
+
+            foreach (var cs in data.characters)
+                ShowInstant(cs.id, cs.x, cs.expr);
+        }
+
+        /// <summary>清空舞台：销毁全部在场角色、关闭残留的选项面板</summary>
+        public void ClearStage()
+        {
+            foreach (var kv in _active)
+                if (kv.Value.go != null) Destroy(kv.Value.go);
+            _active.Clear();
+            if (choicePanel != null) choicePanel.ForceClose();
+            RefreshRegistries();
+        }
+
+        /// <summary>瞬间摆台一个角色（无出场动画，读档用）</summary>
+        public void ShowInstant(string id, float x, string expr)
+        {
+            var def = characters.Find(c => c.id == id);
+            if (def == null)
+            {
+                Debug.LogError($"[VNSave] 存档里的角色「{id}」未在 VNStage.characters 注册");
+                return;
+            }
+
+            var c = Get(id) ?? CreateCharacter(def);
+            var pos = new Vector2(x, -60f);
+            c.rect.anchoredPosition = pos;
+            c.animator.SetBasePosition(pos);
+            c.emotes.SetBasePosition(pos);
+            ApplyExpression(c, expr);
+
+            // 直接置为完全可见状态
+            c.fx.SetDissolve(1f);
+            c.fx.SetFlash(0f);
+            var group = c.go.GetComponent<CanvasGroup>();
+            if (group != null) group.alpha = 1f;
+            c.animator.StartIdleEffects();
+        }
+
         /// <summary>在场角色变化后，刷新色调匹配等注册表</summary>
         void RefreshRegistries()
         {
+            if (speakerHighlight != null)
+                speakerHighlight.characters.RemoveAll(f => f == null);
+
             if (toneMatch != null)
             {
                 var list = new List<VNImageEffectController>();
@@ -294,6 +389,9 @@ namespace VNEffects
         // 背景
         // ------------------------------------------------------------------
 
+        /// <summary>当前背景 id（存档用）</summary>
+        public string CurrentBackgroundId { get; private set; }
+
         /// <summary>切换背景（可选全屏转场），返回可等待的 Sequence（无转场时为 null）</summary>
         public Sequence SetBackground(string id, string transitionName, int line = 0)
         {
@@ -304,6 +402,7 @@ namespace VNEffects
                 return null;
             }
 
+            CurrentBackgroundId = id;
             if (!string.IsNullOrEmpty(transitionName) && transition != null)
             {
                 var type = VNScriptParser.ParseEnum(transitionName, VNTransition.NoiseDissolve, line);
@@ -324,10 +423,18 @@ namespace VNEffects
         // fx 开关分发
         // ------------------------------------------------------------------
 
+        /// <summary>可开关型 fx 的当前状态（存档用）</summary>
+        readonly Dictionary<string, bool> _fxStates = new Dictionary<string, bool>();
+
+        static readonly string[] ToggleFxNames =
+            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch" };
+
         /// <summary>fx 命令：fx godrays on / fx dof off / fx focus 亚里沙 / fx heartbeat on …</summary>
         public void Fx(string name, string arg, int line = 0)
         {
             bool on = arg == "on" || arg == "true" || string.IsNullOrEmpty(arg);
+            if (System.Array.IndexOf(ToggleFxNames, name) >= 0)
+                _fxStates[name] = on && arg != "off"; // focus 等非开关型不记录
             switch (name)
             {
                 case "godrays":
