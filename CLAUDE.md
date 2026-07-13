@@ -15,7 +15,8 @@
 ## 工作规则（必须遵守）
 
 1. **全程用中文回复用户**
-2. **每个新功能开新分支**（`feature/<名称>`），完成后合并回 `main`，**永远不删除任何分支**（用户靠分支回滚）
+2. **每个新功能开新分支**（当前约定 `agent/<名称>`；历史分支也有 `feature/*`），完成后合并回
+   `main`，**永远不删除任何分支**（用户靠分支回滚）
 3. 每批开发完成后**详细追加记录到 `WhatAiDo.md`**（计划、文件说明、技术决策、修复记录）
 4. 提交信息英文、正文中文注释；commit 尾部加 Co-Authored-By
 5. 合并时若报 `unable to unlink ... VNEffectsDemo.unity`：是 Unity 编辑器占用场景文件，
@@ -29,7 +30,8 @@ Assets/
 ├── Assets/                  用户随手放的图片素材（AI 生成立绘/背景/UI 素材混放）
 ├── Scenes/VNEffectsDemo.unity   演示场景（由生成器一键重建，可随时覆盖）
 ├── Scripts/VNEffects/       ★ 核心特效系统（全部代码在此）
-│   └── Editor/VNEffectsDemoSetup.cs   一键场景生成器
+│   ├── Script/              剧本 Parser / Runner / Stage / 存档 / 音频
+│   └── Editor/              场景生成器、剧本编辑器、角色/镜头预览工具
 ├── Shaders/                 VNImageEffect / VNAdditive / VNScreenTransition
 ├── VNEffects/Materials/     生成器创建的材质资产
 └── Plugins/                 DOTween、Pixel Crushers Dialogue System
@@ -104,3 +106,39 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - P2（已完成）：F5/F9 快速存读档（JSON 快照=脚本指针+flags+舞台状态，仅台词处可存）、
   H/滚轮 回想、A 自动、S 快进（DOTween.timeScale 全局加速）、VNToast 提示
 - **路线图**：P0/P1/P2 完成 → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令
+
+## 剧本可视化编辑器（当前状态）
+
+- 菜单：**Tools → VN Effects → Scenario Editor**；核心文件：
+  `Editor/VNScenarioEditorWindow.cs`、`VNScenarioDoc.cs`、`VNScenarioSchema.cs`。
+- 文本仍是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`；保存时重新生成文本，注释/空行保留。
+- 主命令菜单为分层 `GenericMenu`：Dialogue / Scene / Character / Camera / FX / Audio / Flow，
+  关键字保留英文并带中文说明；`say（对白）` 是可与命令行互转的一等行类型。
+- transition 与 emote 枚举显示中英对照，但剧本值保持英文；其他动态 id 不强制翻译。
+- 工具栏“分类颜色”可为七个分类自定义颜色，值存 `EditorPrefs`，不能因此把剧本文档标脏。
+- `bg`、`say`、`show` 使用通用 Sprite 缩略图浏览器（搜索/网格/当前项/清除/custom）；主行
+  也显示内联小图。Sprite 必须按 `textureRect` 画 UV，不能直接把整张 texture 当缩略图。
+- `say` 的角色/表情是专用字段 `VNRow.speaker / expression`，不是 `VNRow.values`；图片选择回调
+  必须经专用访问器读写。`show` 才使用普通 `character / expr` 参数。不要再次混用这两条路径。
+- 背景预览来源是当前场景 `VNStage.backgrounds`；角色与表情来源是项目中的
+  `VNCharacterDef` 资产。`Refresh Sources` 会重建这些缓存。
+
+### 从选中行播放
+
+- Edit 页选中一行后点击 `▶ 从选中行播放`；默认勾选“重建前置状态”。
+- UI 行号必须用 `SourceLineForRow` 换算物理文本行：choice 选项和 camseq waypoint 都会额外占行；
+  空行/注释从下一条有效命令启动。
+- 编辑器 Bridge 用 `SessionState` 传递 `_doc.GenerateText()`、目标行、rebuild 标志后进入 Play，
+  因此未保存文本也能调试；请求消费后必须清除。
+- Bridge 必须等待 `VNScriptRunner.IsInitialized`，否则 Runner 的 `Start/playOnStart` 会在调试启动后
+  再覆盖一次播放位置。
+- 运行时入口：`VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`；直接模式最终调用
+  `ResumeAt(index)`。
+- 重建模式按目标前的文件顺序汇总状态，复用 `VNSaveData` 与
+  `VNStage.RestoreSnapshot(data, true)`：背景、天气、氛围、BGM/音量/循环 SE、角色站位与表情、
+  portrait、FX、focus、flags、可确定镜头状态。不会预播台词、等待、转场、一次性 SE、voice。
+- `VNAudio.ResetForDebug()` 用来清除默认启动留下的声音/Tween；只应在编辑器中间行调试重建时调用。
+- choice/jump/if 的历史路径无法由一个目标物理行唯一推断，当前按文件顺序重建并警告；如需精确
+  分支上下文，应扩展为“从存档快照启动”，不要假装自动推断玩家选择。
+
+完整开发与分支记录见 `WhatAiDo.md` 第三十二章。
