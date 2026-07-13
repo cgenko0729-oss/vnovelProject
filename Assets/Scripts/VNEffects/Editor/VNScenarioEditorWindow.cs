@@ -83,6 +83,14 @@ namespace VNEffects.EditorTools
                 { "BokehOrbs", "光斑圆球" }, { "Eyelid", "眼睑闭合" },
             };
 
+        static readonly Dictionary<string, string> EmoteTranslations =
+            new Dictionary<string, string>
+            {
+                { "Surprise", "惊讶" }, { "Angry", "生气" }, { "Shy", "害羞" },
+                { "Dejected", "沮丧" }, { "Recover", "恢复" }, { "Nod", "点头" },
+                { "HeadShake", "摇头" },
+            };
+
         [MenuItem("Tools/VN Effects/Scenario Editor")]
         static void Open()
         {
@@ -730,8 +738,11 @@ namespace VNEffects.EditorTools
                 return;
             }
 
-            string[] displayOptions = IsTransitionParameter(r, p)
-                ? BuildTranslatedOptions(options, TransitionTranslations) : null;
+            string[] displayOptions = null;
+            if (IsTransitionParameter(r, p))
+                displayOptions = BuildTranslatedOptions(options, TransitionTranslations);
+            else if (IsEmoteParameter(r, p))
+                displayOptions = BuildTranslatedOptions(options, EmoteTranslations);
             string nv2 = PopupString(rect, v, options, "-", (r, p.id), displayOptions);
             if (nv2 != v) r.Set(p.id, nv2);
         }
@@ -739,6 +750,9 @@ namespace VNEffects.EditorTools
         static bool IsTransitionParameter(VNRow row, VNParamDef parameter) =>
             (row.keyword == "bg" && parameter.id == "transition") ||
             (row.keyword == "transition" && parameter.id == "type");
+
+        static bool IsEmoteParameter(VNRow row, VNParamDef parameter) =>
+            row.keyword == "emote" && parameter.id == "emote";
 
         static string[] BuildTranslatedOptions(string[] options,
             Dictionary<string, string> translations)
