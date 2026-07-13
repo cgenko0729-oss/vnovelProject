@@ -101,5 +101,6 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 关键语义：命令默认同步等待，行尾 `@` = 异步；台词行 = 等打字完+玩家推进
 - 分支语法（P1，已完成）：`label/jump`、`flag 名字 [+1|数值]`（VNFlags 全局整型字典）、
   `if 条件 jump 标签`（条件无空格：`好感度>=2`）、`choice` + `* 文本 [flag:op] [-> 标签]`
-- **路线图**：P0 核心(完成) → P1 分支(完成) → P2 存档/回想/Auto/Skip
-  → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令
+- P2（已完成）：F5/F9 快速存读档（JSON 快照=脚本指针+flags+舞台状态，仅台词处可存）、
+  H/滚轮 回想、A 自动、S 快进（DOTween.timeScale 全局加速）、VNToast 提示
+- **路线图**：P0/P1/P2 完成 → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令

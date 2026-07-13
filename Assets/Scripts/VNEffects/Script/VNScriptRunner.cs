@@ -7,11 +7,11 @@ using UnityEngine.InputSystem;
 namespace VNEffects
 {
     /// <summary>
-    /// 剧本解释器（P0）：逐条执行 VNScriptParser 解析出的命令。
-    ///   - 默认同步执行（等待演出完成才继续），行尾 @ = 异步不等待
-    ///   - 台词行：等打字机播完 + 玩家点击/Enter/空格推进（打字中按键 = 催促全文）
-    ///   - wait 命令 = 分镜停顿
-    /// 用法：Inspector 指定 stage 与 script（TextAsset），Play On Start 自动播放。
+    /// 剧本解释器（P0+P1+P2）：逐条执行 VNScriptParser 解析出的命令。
+    ///   - 默认同步执行（等待演出完成），行尾 @ = 异步不等待
+    ///   - 台词行：等打字机播完 + 玩家点击/Enter/空格推进（打字中按键 = 催促）
+    ///   - P1：label/jump/choice/flag/if 分支
+    ///   - P2：F5 快速存档 / F9 快速读档、H(或滚轮上滑) 回想、A 自动模式、S 快进
     /// </summary>
     public class VNScriptRunner : MonoBehaviour
     {
@@ -24,6 +24,13 @@ namespace VNEffects
         [Tooltip("启动时自动播放")]
         public bool playOnStart = true;
 
+        [Header("Auto / Skip")]
+        [Tooltip("自动模式：打字完后的基础等待秒数（另按字数追加）")]
+        public float autoDelay = 1.4f;
+
+        [Tooltip("快进时的演出加速倍率（DOTween 全局 timeScale）")]
+        public float skipTimeScale = 4f;
+
         List<VNScriptCommand> _commands;
         readonly Dictionary<string, int> _labels = new Dictionary<string, int>();
         int _index;
@@ -31,23 +38,48 @@ namespace VNEffects
         bool _advance;
         Coroutine _co;
 
+        VNBacklog _backlog;
+        bool _auto;
+        bool _skip;
+        bool _waitingAtSay;   // 只有停在台词上时才允许存档
+        int _currentSayIndex; // 正在显示的台词命令索引（存档恢复点）
+        string _lastSayText = "";
+
         public bool IsRunning => _running;
+        public bool IsAuto => _auto;
+        public bool IsSkipping => _skip;
         public int CurrentLine =>
             _running && _index > 0 && _index <= _commands.Count ? _commands[_index - 1].line : 0;
 
         void Start()
         {
+            if (_backlog == null)
+            {
+                _backlog = FindFirstObjectByType<VNBacklog>();
+                if (_backlog == null)
+                    _backlog = new GameObject("VNBacklog").AddComponent<VNBacklog>();
+            }
             if (playOnStart && script != null) Play(script);
         }
+
+        // ------------------------------------------------------------------
+        // 播放控制
+        // ------------------------------------------------------------------
 
         public void Play(TextAsset asset) => Play(asset.text);
 
         public void Play(string source)
         {
+            Prepare(source);
+            ResumeAt(0);
+        }
+
+        /// <summary>解析剧本并预扫描 label 表（允许向前跳转）</summary>
+        void Prepare(string source)
+        {
             Stop();
             _commands = VNScriptParser.Parse(source);
 
-            // 预扫描全部 label（允许向前跳转）
             _labels.Clear();
             for (int i = 0; i < _commands.Count; i++)
             {
@@ -60,12 +92,34 @@ namespace VNEffects
                 else
                     _labels[name] = i;
             }
+        }
 
-            _index = 0;
+        /// <summary>从指定命令索引开始（读档恢复用）</summary>
+        public void ResumeAt(int index)
+        {
+            if (_commands == null)
+            {
+                if (script == null)
+                {
+                    Debug.LogError("[VNScript] 没有剧本可播放");
+                    return;
+                }
+                Prepare(script.text);
+            }
+            Stop();
+            _index = Mathf.Clamp(index, 0, _commands.Count);
+            _currentSayIndex = _index;
             _co = StartCoroutine(Run());
         }
 
-        /// <summary>跳转到标签（找不到时报错并原地继续）</summary>
+        public void Stop()
+        {
+            if (_co != null) StopCoroutine(_co);
+            _co = null;
+            _running = false;
+            _waitingAtSay = false;
+        }
+
         void JumpTo(string label, int fromLine)
         {
             if (_labels.TryGetValue(label, out int idx))
@@ -74,28 +128,122 @@ namespace VNEffects
                 Debug.LogError($"[VNScript] 第 {fromLine} 行：跳转目标 label「{label}」不存在");
         }
 
-        public void Stop()
+        // ------------------------------------------------------------------
+        // 存档 / 读档
+        // ------------------------------------------------------------------
+
+        public void SaveTo(int slot)
         {
-            if (_co != null) StopCoroutine(_co);
-            _co = null;
-            _running = false;
+            if (!_waitingAtSay)
+            {
+                VNToast.Show("演出进行中，此刻不能存档");
+                return;
+            }
+            var data = new VNSaveData
+            {
+                commandIndex = _currentSayIndex,
+                lastLine = _lastSayText,
+            };
+            stage.CaptureSnapshot(data);
+            VNSaveSystem.Save(slot, data);
+            VNToast.Show($"已保存（槽位 {slot}）");
         }
+
+        public void LoadFrom(int slot)
+        {
+            var data = VNSaveSystem.Load(slot);
+            if (data == null)
+            {
+                VNToast.Show($"槽位 {slot} 没有存档");
+                return;
+            }
+            SetSkip(false);
+            SetAuto(false);
+            Stop();
+            stage.RestoreSnapshot(data);
+            VNToast.Show($"已读取（槽位 {slot}）");
+            ResumeAt(data.commandIndex);
+        }
+
+        // ------------------------------------------------------------------
+        // 模式
+        // ------------------------------------------------------------------
+
+        public void SetAuto(bool on)
+        {
+            _auto = on;
+            if (on) SetSkip(false);
+            UpdateModeLabel();
+            VNToast.Show(on ? "自动模式 开" : "自动模式 关");
+        }
+
+        public void SetSkip(bool on)
+        {
+            if (_skip == on) return;
+            _skip = on;
+            if (on) _auto = false;
+            DOTween.timeScale = on ? skipTimeScale : 1f;
+            UpdateModeLabel();
+            VNToast.Show(on ? "快进 开" : "快进 关");
+        }
+
+        void UpdateModeLabel() =>
+            VNToast.SetMode(_skip ? "SKIP ▶▶" : _auto ? "AUTO ▶" : null);
+
+        void OnDestroy()
+        {
+            if (_skip) DOTween.timeScale = 1f; // 别把加速留给别的场景
+        }
+
+        // ------------------------------------------------------------------
+        // 输入
+        // ------------------------------------------------------------------
 
         void Update()
         {
-            if (!_running) return;
             var kb = Keyboard.current;
             var mouse = Mouse.current;
+            if (kb == null) return;
+
+            // 回想面板打开期间：只处理关闭，不推进剧情
+            if (_backlog != null && _backlog.IsOpen)
+            {
+                if (kb.hKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                    _backlog.Close();
+                return;
+            }
+
+            if (kb.hKey.wasPressedThisFrame ||
+                (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
+            {
+                _backlog?.Open();
+                return;
+            }
+
+            if (kb.f5Key.wasPressedThisFrame) { SaveTo(1); return; }
+            if (kb.f9Key.wasPressedThisFrame) { LoadFrom(1); return; }
+            if (kb.aKey.wasPressedThisFrame) { SetAuto(!_auto); return; }
+            if (kb.sKey.wasPressedThisFrame) { SetSkip(!_skip); return; }
+
+            if (!_running) return;
+
             bool pressed =
-                (kb != null && (kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame))
+                kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame
                 || (mouse != null && mouse.leftButton.wasPressedThisFrame);
             if (!pressed) return;
 
+            // 手动推进会顺手退出快进（惯例）
+            if (_skip) SetSkip(false);
+
             if (stage != null && stage.dialogue != null && stage.dialogue.IsTyping)
-                stage.dialogue.CompleteTyping(); // 打字中 = 催促
+                stage.dialogue.CompleteTyping();
             else
-                _advance = true;                 // 已显示完 = 推进
+                _advance = true;
         }
+
+        // ------------------------------------------------------------------
+        // 主循环
+        // ------------------------------------------------------------------
 
         IEnumerator Run()
         {
@@ -117,18 +265,16 @@ namespace VNEffects
                 else yield return StartCoroutine(co);
             }
             _running = false;
+            SetSkip(false);
             Debug.Log("[VNScript] 剧本播放结束");
         }
-
-        // ------------------------------------------------------------------
-        // 命令分发
-        // ------------------------------------------------------------------
 
         IEnumerator Dispatch(VNScriptCommand cmd)
         {
             switch (cmd.keyword)
             {
                 case "say":
+                    _currentSayIndex = _index - 1;
                     return SayCo(cmd);
 
                 case "wait":
@@ -238,18 +384,48 @@ namespace VNEffects
         IEnumerator SayCo(VNScriptCommand cmd)
         {
             stage.Say(cmd.speaker, cmd.expression, cmd.text);
+            _lastSayText = cmd.text;
+            _backlog?.Record(stage.GetDisplayName(cmd.speaker), cmd.text);
+
             yield return null; // 让打字机先启动
+            if (_skip && stage.dialogue != null) stage.dialogue.CompleteTyping();
             while (stage.dialogue != null && stage.dialogue.IsTyping)
+            {
+                if (_skip) stage.dialogue.CompleteTyping();
                 yield return null;
+            }
+
+            _waitingAtSay = true;
             _advance = false;
+            float doneTime = Time.time;
+            float autoWait = autoDelay + cmd.text.Length * 0.045f;
             while (!_advance)
+            {
+                if (_backlog == null || !_backlog.IsOpen)
+                {
+                    if (_skip && Time.time - doneTime > 0.07f) break;
+                    if (_auto && Time.time - doneTime > autoWait) break;
+                }
                 yield return null;
+            }
+            _waitingAtSay = false;
             _advance = false;
         }
 
-        static IEnumerator WaitCo(float seconds)
+        IEnumerator WaitCo(float seconds)
         {
-            yield return new WaitForSeconds(seconds);
+            float t = 0f;
+            while (t < seconds)
+            {
+                t += Time.deltaTime * (_skip ? skipTimeScale : 1f); // 快进时停顿也加速
+                yield return null;
+            }
+        }
+
+        static IEnumerator WaitTween(Tween t)
+        {
+            if (t == null) yield break;
+            yield return t.WaitForCompletion();
         }
 
         IEnumerator ChoiceCo(VNScriptCommand cmd)
@@ -265,6 +441,8 @@ namespace VNEffects
                 yield break;
             }
 
+            SetSkip(false); // 到选项必停，玩家必须亲自选
+
             var texts = new string[cmd.options.Count];
             for (int i = 0; i < texts.Length; i++) texts[i] = cmd.options[i].text;
 
@@ -273,15 +451,10 @@ namespace VNEffects
             while (chosen < 0) yield return null;
 
             var opt = cmd.options[chosen];
+            _backlog?.Record("选择", opt.text);
             if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
             if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
             // 无跳转目标 = 顺序继续（choice 块后的下一条命令）
-        }
-
-        static IEnumerator WaitTween(Tween t)
-        {
-            if (t == null) yield break;
-            yield return t.WaitForCompletion();
         }
 
         IEnumerator CameraCo(VNScriptCommand cmd)

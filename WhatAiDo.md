@@ -705,7 +705,42 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 `FindFirstObjectByType` 查找（容器/背景按名字找）。从此给 VNStage 加新字段，
 旧场景不重新生成也能自愈，这类错误一劳永逸。
 
-## 十九、其他问题修复记录
+## 十九、剧本系统 P2：存档/回想/Auto/Skip（2026-07-13，分支 `feature/vn-save-backlog`）
+
+### 19.1 存档系统 — `VNSaveSystem.cs`
+
+- **快照内容** = 恢复点（正在显示的那句台词的命令索引）+ 全部 flag +
+  舞台状态（背景 id / 天气 / 色调 / 可开关 fx 的开关表 / 在场角色的 id·横坐标·表情）。
+  JSON 存到 `persistentDataPath/vn_save_{槽位}.json`，多槽位。
+- **只允许停在台词上时存档**（`_waitingAtSay`）——保证"恢复点之后的命令都没执行过"，
+  读档重播不会出现 flag 双重加算之类的错乱。
+- **读档流程**：停解释器 → 恢复 flag → `RestoreSnapshot`（清场→背景瞬切→天气/色调
+  快速过渡→fx 先全关再按记录开→角色 `ShowInstant` 瞬间摆台+直接开常驻活图）→
+  从恢复点那句台词继续。VNStage 为此新增 CurrentBackgroundId 跟踪与 fx 状态表。
+
+### 19.2 回想 Backlog — `VNBacklog.cs`
+
+- 每句台词（含选择记录）入列（上限 200 条）；`H` 或**滚轮上滑**打开全屏回想面板，
+  滚轮浏览，H/Esc/点击背景关闭；打开期间剧情推进被阻止。
+- UI 全程序化：独立 Overlay Canvas + ScrollRect（VerticalLayoutGroup +
+  ContentSizeFitter），说话人名用富文本金色加粗。
+
+### 19.3 Auto / Skip 模式 + 屏幕提示
+
+- **Auto（A 键）**：打字完自动等待「基础 1.4s + 字数×0.045s」后推进。
+- **Skip（S 键）**：打字瞬间完成 + 0.07s 自动推进 + **`DOTween.timeScale`=4 全局加速
+  所有演出**（出场/转场/运镜跟着快），`wait` 停顿同步加速；到 choice 强制停下
+  （玩家必须亲自选）；手动点击推进会顺手退出快进（VN 惯例）；场景销毁时恢复 timeScale。
+- **`VNToast`**：自建 Overlay Canvas 的轻量提示——底部气泡（"已保存"）+
+  右上角常驻模式标签（AUTO ▶ / SKIP ▶▶）。
+- 读档时若选项面板开着会被 `VNChoicePanel.ForceClose()` 强制清掉。
+
+### 19.4 操作一览（剧本场景）
+
+`Enter/空格/点击` 推进 | `H`/滚轮上滑 回想 | `A` 自动 | `S` 快进 | `F5` 快速存档 | `F9` 快速读档
+（Backlog 物体缺失时解释器会自动创建，旧场景无需重新生成）
+
+## 二十、其他问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

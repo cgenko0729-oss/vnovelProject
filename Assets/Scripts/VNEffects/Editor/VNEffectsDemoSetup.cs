@@ -408,15 +408,17 @@ namespace VNEffects.EditorTools
             stage.toneMatch = rig.toneMatch;
             stage.choicePanel = rig.choicePanel;
 
-            // ---------- VNScriptRunner ----------
+            // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
             runner.script = scriptAsset;
             runner.playOnStart = true;
+            new GameObject("VNBacklog").AddComponent<VNBacklog>();
 
             // ---------- 极简提示 ----------
-            var hint = CreateHintText(rig.canvasGo.transform, 40f);
-            hint.text = "Enter / 空格 / 鼠标点击 = 推进剧情（打字中按下 = 催促全文）";
+            var hint = CreateHintText(rig.canvasGo.transform, 70f);
+            hint.text = "Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进\n" +
+                        "F5 快速存档 | F9 快速读档";
 
             // ---------- 保存 ----------
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);

@@ -216,5 +216,14 @@ namespace VNEffects
                 if (e.go != null) Destroy(e.go);
             _entries.Clear();
         }
+
+        /// <summary>立即关闭并丢弃当前选项（读档/中断剧本时用）</summary>
+        public void ForceClose()
+        {
+            _callback = null;
+            _busy = false;
+            if (_group != null) _group.blocksRaycasts = false;
+            ClearEntries();
+        }
     }
 }
