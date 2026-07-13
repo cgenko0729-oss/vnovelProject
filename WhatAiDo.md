@@ -740,7 +740,21 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 `Enter/空格/点击` 推进 | `H`/滚轮上滑 回想 | `A` 自动 | `S` 快进 | `F5` 快速存档 | `F9` 快速读档
 （Backlog 物体缺失时解释器会自动创建，旧场景无需重新生成）
 
-## 二十、其他问题修复记录
+## 二十、角色尺寸标定（2026-07-13，分支 `feature/character-calibration`）
+
+**问题**：不同来源的立绘构图不统一（占满画面 vs 四周留白 vs 半身近景），
+统一高度缩放后视觉大小和站位不一致——"小图放左边"和"正常图放左边"结果不同。
+
+**解法（业界通行）**：每角色标定，剧本命令保持统一，差异在资产层吸收。
+`VNCharacterDef` 新增两个字段：
+
+- `sizeScale`（默认 1）：该角色显示高度 = 舞台统一高度 × 此值。留白多显小→调大；近景显大→调小
+- `positionOffset`：在 at:left/center/right 标准站位上的附加偏移（脚下留白多→y 负值下压）
+
+`VNStage` 全链路应用：登场摆位（含基准位同步）、初建尺寸、表情切换重算宽度、
+读档 ShowInstant（存档 x 已含偏移、y 按标定重建）。标定方法已写入 HowToUse.md 第七章。
+
+## 二十一、其他问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
