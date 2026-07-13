@@ -25,6 +25,7 @@ namespace VNEffects
         public bool playOnStart = true;
 
         List<VNScriptCommand> _commands;
+        readonly Dictionary<string, int> _labels = new Dictionary<string, int>();
         int _index;
         bool _running;
         bool _advance;
@@ -45,8 +46,32 @@ namespace VNEffects
         {
             Stop();
             _commands = VNScriptParser.Parse(source);
+
+            // 预扫描全部 label（允许向前跳转）
+            _labels.Clear();
+            for (int i = 0; i < _commands.Count; i++)
+            {
+                if (_commands[i].keyword != "label") continue;
+                string name = _commands[i].Arg(0);
+                if (string.IsNullOrEmpty(name))
+                    Debug.LogError($"[VNScript] 第 {_commands[i].line} 行：label 缺少名字");
+                else if (_labels.ContainsKey(name))
+                    Debug.LogError($"[VNScript] 第 {_commands[i].line} 行：label「{name}」重复定义");
+                else
+                    _labels[name] = i;
+            }
+
             _index = 0;
             _co = StartCoroutine(Run());
+        }
+
+        /// <summary>跳转到标签（找不到时报错并原地继续）</summary>
+        void JumpTo(string label, int fromLine)
+        {
+            if (_labels.TryGetValue(label, out int idx))
+                _index = idx;
+            else
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：跳转目标 label「{label}」不存在");
         }
 
         public void Stop()
@@ -158,14 +183,47 @@ namespace VNEffects
                     stage.Fx(cmd.Arg(0), cmd.Arg(1), cmd.line);
                     return null;
 
-                // ---- P1 预留：解析通过但暂不执行 ----
+                // ---- P1 分支系统 ----
                 case "label":
+                    return null; // 只是位置标记
+
                 case "jump":
-                case "flag":
-                case "if":
-                case "choice":
-                    Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：「{cmd.keyword}」将在 P1 分支系统中实现，已跳过");
+                    JumpTo(cmd.Arg(0), cmd.line);
                     return null;
+
+                case "flag":
+                {
+                    // flag 名字 / flag 名字 3 / flag 名字 +1（也支持 flag 名字+1）
+                    string name = cmd.Arg(0);
+                    string value = cmd.Arg(1);
+                    if (string.IsNullOrEmpty(value))
+                        VNFlags.Apply(name);
+                    else if (value.StartsWith("+") || value.StartsWith("-"))
+                        VNFlags.Apply(name + value);
+                    else if (int.TryParse(value, out int v))
+                        VNFlags.Set(name, v);
+                    else
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：flag 值「{value}」无法识别");
+                    return null;
+                }
+
+                case "if":
+                {
+                    // if 条件 jump 标签   （条件内不能有空格，如 好感度>=2）
+                    string cond = cmd.Arg(0);
+                    string action = cmd.Arg(1);
+                    if (action != "jump" || string.IsNullOrEmpty(cmd.Arg(2)))
+                    {
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：if 语法应为「if 条件 jump 标签」");
+                        return null;
+                    }
+                    if (VNFlags.Evaluate(cond, cmd.line))
+                        JumpTo(cmd.Arg(2), cmd.line);
+                    return null;
+                }
+
+                case "choice":
+                    return ChoiceCo(cmd);
 
                 default:
                     Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：未知命令「{cmd.keyword}」");
@@ -192,6 +250,32 @@ namespace VNEffects
         static IEnumerator WaitCo(float seconds)
         {
             yield return new WaitForSeconds(seconds);
+        }
+
+        IEnumerator ChoiceCo(VNScriptCommand cmd)
+        {
+            if (cmd.options == null || cmd.options.Count == 0)
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：choice 下面没有任何「* 选项」行");
+                yield break;
+            }
+            if (stage.choicePanel == null)
+            {
+                Debug.LogError($"[VNScript] 第 {cmd.line} 行：VNStage 未连线 choicePanel");
+                yield break;
+            }
+
+            var texts = new string[cmd.options.Count];
+            for (int i = 0; i < texts.Length; i++) texts[i] = cmd.options[i].text;
+
+            int chosen = -1;
+            stage.choicePanel.Show(texts, i => chosen = i);
+            while (chosen < 0) yield return null;
+
+            var opt = cmd.options[chosen];
+            if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
+            if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
+            // 无跳转目标 = 顺序继续（choice 块后的下一条命令）
         }
 
         static IEnumerator WaitTween(Tween t)

@@ -3,6 +3,15 @@ using UnityEngine;
 
 namespace VNEffects
 {
+    /// <summary>choice 命令的一个选项</summary>
+    public class VNChoiceOption
+    {
+        public string text;      // 选项显示文本
+        public string flagOp;    // 可选：flag 操作（如 勇气+1）
+        public string jumpLabel; // 可选：跳转标签（空 = 顺序继续）
+        public int line;
+    }
+
     /// <summary>一条剧本命令（解析结果）</summary>
     public class VNScriptCommand
     {
@@ -16,6 +25,9 @@ namespace VNEffects
         public string speaker;     // 说话者 id（空 = 旁白）
         public string expression;  // 可选表情
         public string text;        // 台词内容
+
+        // choice 命令专用
+        public List<VNChoiceOption> options;
 
         public string Arg(int i, string def = null) => i < args.Count ? args[i] : def;
 
@@ -55,10 +67,21 @@ namespace VNEffects
             if (string.IsNullOrEmpty(source)) return result;
 
             var lines = source.Replace("\r\n", "\n").Split('\n');
+            VNScriptCommand lastChoice = null;
             for (int i = 0; i < lines.Length; i++)
             {
                 string raw = lines[i].Trim();
                 if (raw.Length == 0 || raw.StartsWith("#")) continue;
+
+                // 选项行：* 文本 [flag:操作] [-> 标签]，挂到上一个 choice 命令
+                if (raw.StartsWith("*"))
+                {
+                    if (lastChoice == null)
+                        Debug.LogWarning($"[VNScript] 第 {i + 1} 行：选项行前面没有 choice 命令，已忽略");
+                    else
+                        ParseChoiceOption(lastChoice, raw, i + 1);
+                    continue;
+                }
 
                 var cmd = new VNScriptCommand { line = i + 1 };
 
@@ -75,9 +98,49 @@ namespace VNEffects
                 else
                     ParseSay(cmd, raw);
 
+                if (cmd.keyword == "choice")
+                {
+                    cmd.options = new List<VNChoiceOption>();
+                    lastChoice = cmd;
+                }
+                else
+                {
+                    lastChoice = null; // 选项行必须紧跟 choice 块
+                }
+
                 result.Add(cmd);
             }
             return result;
+        }
+
+        /// <summary>解析选项行：* 文本 [flag:名字+1] [-> 标签]</summary>
+        static void ParseChoiceOption(VNScriptCommand choiceCmd, string raw, int line)
+        {
+            string s = raw.Substring(1).Trim();
+
+            string target = null;
+            int arrow = s.LastIndexOf("->", System.StringComparison.Ordinal);
+            if (arrow >= 0)
+            {
+                target = s.Substring(arrow + 2).Trim();
+                s = s.Substring(0, arrow).Trim();
+            }
+
+            string flagOp = null;
+            int fi = s.IndexOf("flag:", System.StringComparison.Ordinal);
+            if (fi >= 0)
+            {
+                flagOp = s.Substring(fi + 5).Trim();
+                s = s.Substring(0, fi).Trim();
+            }
+
+            choiceCmd.options.Add(new VNChoiceOption
+            {
+                text = s,
+                flagOp = string.IsNullOrEmpty(flagOp) ? null : flagOp,
+                jumpLabel = string.IsNullOrEmpty(target) ? null : target,
+                line = line,
+            });
         }
 
         static string FirstToken(string s)

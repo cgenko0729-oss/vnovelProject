@@ -406,6 +406,7 @@ namespace VNEffects.EditorTools
             stage.vignetteFocus = rig.vignetteFocus;
             stage.speakerHighlight = rig.speakerHighlight;
             stage.toneMatch = rig.toneMatch;
+            stage.choicePanel = rig.choicePanel;
 
             // ---------- VNScriptRunner ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
@@ -452,12 +453,17 @@ namespace VNEffects.EditorTools
                 File.WriteAllText(DemoScriptPath, DemoScriptContent, System.Text.Encoding.UTF8);
                 AssetDatabase.ImportAsset(DemoScriptPath);
             }
+            else
+            {
+                Debug.Log($"[VNScript] {DemoScriptPath} 已存在，未覆盖你的修改。" +
+                          "想获取最新演示剧本（含分支/选项/flag），删除该文件后重新生成场景即可。");
+            }
             return AssetDatabase.LoadAssetAtPath<TextAsset>(DemoScriptPath);
         }
 
         const string DemoScriptContent =
 @"# ============================================
-# VN 剧本演示（P0）— 直接编辑本文件后重新 Play 即可
+# VN 剧本演示（P0+P1）— 直接编辑本文件后重新 Play 即可
 # 语法速查：
 #   bg <背景id> [transition:转场名]
 #   show <角色> [at:left|center|right] [expr:表情] [with:出场预设]
@@ -469,6 +475,12 @@ namespace VNEffects.EditorTools
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
 #   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch> <on|off>
 #   行尾加 @ = 不等待该演出完成（异步）
+# ---- P1 分支 ----
+#   label <名字> / jump <名字>
+#   flag <名字> [数值|+1|-1]
+#   if <条件> jump <名字>       条件不能有空格：勇气 / !勇气 / 好感度>=2
+#   choice                       下一行起用 * 列出选项：
+#   * 选项文本 [flag:名字+1] [-> 标签]   （无 -> = 顺序继续）
 # ============================================
 
 bg bg1
@@ -490,26 +502,48 @@ emote 小雪 Surprise
 
 fx heartbeat on
 亚里沙: 我一直……有件事想告诉你。
-wait 0.6
-emote 亚里沙 Shy
-亚里沙: ……还、还是下次再说吧！
-fx heartbeat off
-camera reset @
 
+choice
+* 鼓起勇气说出来 flag:好感度+2 -> 告白线
+* 还是算了…… -> 退缩线
+
+label 告白线
+camera snapzoom 1.1 focus:亚里沙 @
+sakura
+亚里沙: 小雪……我喜欢你！从很久以前开始就是！
+emote 小雪 Surprise
+wait 0.5
+emote 小雪 Shy
+小雪: ……笨蛋。怎么突然、说这种话啦。
+jump 夜晚
+
+label 退缩线
+fx heartbeat off
+emote 亚里沙 Dejected
+亚里沙: ……没、没什么！忘了吧！
 emote 小雪 HeadShake
 小雪: 什么嘛，真是的。
-shake light
-小雪: 走吧，再不回去天就黑了。
+emote 亚里沙 Recover
+jump 夜晚
 
+label 夜晚
+fx heartbeat off
+camera reset @
 bg bg2 transition:Eyelid
 mood Night
 weather Fireflies
 fx godrays off
-
 旁白: ——那天夜里，萤火虫漫天飞舞。
-sakura
-亚里沙: （总有一天，我一定会说出口的。）
 
+if 好感度>=2 jump 好结局
+亚里沙: （总有一天，我一定会说出口的。）
+jump 落幕
+
+label 好结局
+亚里沙: （今天……是最棒的一天。）
+小雪: （明天也想……和她一起看晚霞。）
+
+label 落幕
 hide 小雪 with:fade
 hide 亚里沙 with:dissolve
 : 第一章　完

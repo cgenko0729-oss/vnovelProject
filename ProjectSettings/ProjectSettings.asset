@@ -834,7 +834,7 @@ PlayerSettings:
     PS4: DOTWEEN
     PS5: DOTWEEN
     QNX: DOTWEEN
-    Standalone: DOTWEEN;TMP_PRESENT;USE_NEW_INPUT
+    Standalone: DOTWEEN;TMP_PRESENT
     VisionOS: DOTWEEN
     WebGL: DOTWEEN
     Windows Store Apps: DOTWEEN

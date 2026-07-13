@@ -44,6 +44,7 @@ namespace VNEffects
         public VNVignetteFocus vignetteFocus;
         public VNSpeakerHighlight speakerHighlight;
         public VNToneMatch toneMatch;
+        public VNChoicePanel choicePanel;
 
         [Header("角色生成参数")]
         public float characterHeight = 880f;

@@ -99,5 +99,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 角色定义：`Assets/VNEffects/Characters/*.asset`（VNCharacterDef：id/名牌/表情→立绘映射）
 - 剧本场景：菜单 **Tools → VN Effects → Create Script Demo Scene** → `VNScriptDemo.unity`
 - 关键语义：命令默认同步等待，行尾 `@` = 异步；台词行 = 等打字完+玩家推进
-- **路线图**：P0 核心(已完成) → P1 label/jump/choice/flag/if 分支 → P2 存档/回想/Auto/Skip
+- 分支语法（P1，已完成）：`label/jump`、`flag 名字 [+1|数值]`（VNFlags 全局整型字典）、
+  `if 条件 jump 标签`（条件无空格：`好感度>=2`）、`choice` + `* 文本 [flag:op] [-> 标签]`
+- **路线图**：P0 核心(完成) → P1 分支(完成) → P2 存档/回想/Auto/Skip
   → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令
