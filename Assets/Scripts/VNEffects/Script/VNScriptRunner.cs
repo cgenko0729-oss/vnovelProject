@@ -325,6 +325,41 @@ namespace VNEffects
                     stage.sakura?.Play();
                     return null;
 
+                case "move":
+                    // move 亚里沙 left 0.6
+                    return WaitTween(stage.Move(cmd.Arg(0), cmd.Arg(1, "center"),
+                        cmd.ArgF(2, 0.6f), cmd.line));
+
+                case "bgm":
+                {
+                    // bgm play 黄昏之歌 [fade:2] / bgm stop [fade:3]
+                    string sub = cmd.Arg(0, "play");
+                    float fade = 1.5f;
+                    if (float.TryParse(cmd.Kw("fade"), out float f)) fade = f;
+                    if (sub == "stop") stage.vnAudio?.StopBgm(fade);
+                    else if (sub == "play") stage.vnAudio?.PlayBgm(cmd.Arg(1), fade, cmd.line);
+                    else Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：bgm 用法为 bgm play <id> 或 bgm stop");
+                    return null;
+                }
+
+                case "se":
+                {
+                    // se 雨声 loop / se 心跳 / se stop 雨声
+                    if (cmd.Arg(0) == "stop")
+                        stage.vnAudio?.StopSe(cmd.Arg(1));
+                    else
+                        stage.vnAudio?.PlaySe(cmd.Arg(0), cmd.args.Contains("loop"), cmd.line);
+                    return null;
+                }
+
+                case "voice":
+                    stage.vnAudio?.PlayVoice(cmd.Arg(0), cmd.line);
+                    return null;
+
+                case "volume":
+                    stage.vnAudio?.SetVolume(cmd.Arg(0), cmd.ArgF(1, 1f), cmd.line);
+                    return null;
+
                 case "fx":
                     stage.Fx(cmd.Arg(0), cmd.Arg(1), cmd.line);
                     return null;

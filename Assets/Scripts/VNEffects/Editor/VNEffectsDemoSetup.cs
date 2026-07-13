@@ -407,6 +407,7 @@ namespace VNEffects.EditorTools
             stage.speakerHighlight = rig.speakerHighlight;
             stage.toneMatch = rig.toneMatch;
             stage.choicePanel = rig.choicePanel;
+            stage.vnAudio = new GameObject("VNAudio").AddComponent<VNAudio>();
 
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();

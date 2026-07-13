@@ -64,6 +64,9 @@ hide 亚里沙 with:dissolve
 说话者 [表情]: 台词内容
 ```
 
+> 换表情自动带 0.25 秒**交叉溶解**（旧表情淡出到新表情），不再瞬间跳变。
+> 时长可在 VNStage 的 `expressionCrossfade` 调整（0 = 关闭）。
+
 四种写法：
 
 ```
@@ -251,6 +254,40 @@ sakura
 ```
 
 一行触发告白级演出：花瓣暴风横扫全屏 3 秒 + 心跳自动开启再关闭。
+
+### move — 角色滑步换位
+
+```
+move 亚里沙 left          # 0.6 秒滑到左位
+move 亚里沙 right 1.2     # 1.2 秒慢慢走过去
+move 亚里沙 -200 0.4      # 滑到横坐标 -200
+```
+
+角色平滑滑到新站位（自动应用该角色的标定偏移、自动同步悬浮/动作基准位）。
+两人对话时"走近一步"的演出必备。常配 `@` 边走边说。
+
+### bgm / se / voice / volume — 音频 🎵
+
+```
+bgm play 黄昏之歌            # 播放/切换 BGM（自动交叉淡入淡出）
+bgm play 战斗曲 fade:0.5     # 指定淡化时长
+bgm stop fade:3              # BGM 淡出停止
+
+se 开门声                    # 一次性音效
+se 雨声 loop                 # 循环环境音（雨声/蝉鸣/人群）
+se stop 雨声                 # 停止某个循环音（淡出）
+
+voice 亚里沙_001             # 语音（新的自动顶掉旧的，配音用）
+
+volume bgm 0.5               # 通道音量 0~1（bgm / se / voice）
+```
+
+- **音频库**：所有声音先在场景 `VNAudio` 物体的 **Library** 列表登记（id + AudioClip），
+  剧本用 id 引用。音频文件（.mp3/.ogg/.wav）放进 Assets 任意目录即可拖入
+- **打字音**：把一个短促音效拖到 `VNAudio.typingTick` 栏 → 打字机自动"哒哒哒"
+  （带节流与随机音高）
+- 当前 BGM 随存档保存，读档自动恢复；循环 SE 暂不入档
+- 免费素材站：DOVA-SYNDROME、魔王魂、甘茶の音楽工房（BGM）、效果音ラボ（音效）
 
 ### wait — 分镜停顿
 
@@ -542,6 +579,11 @@ show <角色> [at:位置] [expr:表情] [with:预设]     登场
 hide <角色> [with:dissolve|fade]                 退场
 emote <角色> <动作>                              情绪动作
 <角色> [表情]: 台词                              说话
+move <角色> <位置> [秒]                          滑步换位
+bgm play <id> [fade:秒] / bgm stop [fade:秒]     背景音乐
+se <id> [loop] / se stop <id>                    音效/环境音
+voice <id>                                       语音
+volume <bgm|se|voice> <0~1>                      音量
 wait <秒>                                        停顿
 camera <pushin|snapzoom|pan|dolly|reset> [...]   运镜
 shake <light|medium|heavy>                       震动

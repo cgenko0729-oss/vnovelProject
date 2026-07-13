@@ -58,7 +58,8 @@ namespace VNEffects
             "bg", "show", "hide", "emote", "wait",
             "camera", "shake", "weather", "mood", "fx",
             "sakura", "transition",
-            "label", "jump", "flag", "if", "choice", // P1 预留
+            "label", "jump", "flag", "if", "choice",
+            "move", "bgm", "se", "voice", "volume",
         };
 
         public static List<VNScriptCommand> Parse(string source)

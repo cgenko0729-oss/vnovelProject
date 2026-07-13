@@ -18,6 +18,7 @@ namespace VNEffects
         public string backgroundId;
         public string weather;
         public string mood;
+        public string bgm;
         public List<string> fxOn = new List<string>(); // 处于开启状态的 fx 名
 
         [System.Serializable]

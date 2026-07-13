@@ -19,8 +19,10 @@
 #   * 选项文本 [flag:名字+1] [-> 标签]   （无 -> = 顺序继续）
 # ============================================
 
+#小雪02
+
 bg bg1
-mood Sunset
+mood Normal
 fx godrays on
 weather Petals
 
@@ -35,6 +37,11 @@ camera pushin 1.05 5 focus:亚里沙 @
 亚里沙: 那个……小雪。
 emote 小雪 Surprise
 小雪 Surprise: 怎、怎么了？突然这么严肃。
+
+hide 小雪 with:fade
+hide 亚里沙 with:dissolve
+show 小雪02 at:middle with:FadeSlideUp
+小雪02: 是啊。你看，连云的边缘都镶上了金色。
 
 fx heartbeat on
 亚里沙: 我一直……有件事想告诉你。

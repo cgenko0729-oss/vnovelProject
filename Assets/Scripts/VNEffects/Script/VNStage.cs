@@ -45,6 +45,10 @@ namespace VNEffects
         public VNSpeakerHighlight speakerHighlight;
         public VNToneMatch toneMatch;
         public VNChoicePanel choicePanel;
+        public VNAudio vnAudio;
+
+        [Tooltip("表情切换的交叉溶解时长（0 = 瞬间切换）")]
+        public float expressionCrossfade = 0.25f;
 
         [Header("角色生成参数")]
         public float characterHeight = 880f;
@@ -95,6 +99,12 @@ namespace VNEffects
             if (speakerHighlight == null) speakerHighlight = FindFirstObjectByType<VNSpeakerHighlight>();
             if (toneMatch == null) toneMatch = FindFirstObjectByType<VNToneMatch>();
             if (choicePanel == null) choicePanel = FindFirstObjectByType<VNChoicePanel>();
+            if (vnAudio == null)
+            {
+                vnAudio = FindFirstObjectByType<VNAudio>();
+                if (vnAudio == null) // 旧场景自愈：自动创建
+                    vnAudio = new GameObject("VNAudio").AddComponent<VNAudio>();
+            }
 
             if (characterLayer == null)
             {
@@ -151,6 +161,7 @@ namespace VNEffects
                 // 关键：同步各组件缓存的"基准位"，否则出场动画会把角色重置回旧位置
                 c.animator.SetBasePosition(pos);
                 c.emotes.SetBasePosition(pos);
+                c.fx.SetFloatBaseY(pos.y);
             }
             ApplyExpression(c, expr);
 
@@ -212,12 +223,67 @@ namespace VNEffects
         {
             var sprite = c.def.GetSprite(expr);
             if (sprite == null || sprite == c.image.sprite) return;
+
+            // 交叉溶解：角色完全可见时，旧表情以"残像"覆盖在上面淡出（新表情立即生效）
+            var group = c.go.GetComponent<CanvasGroup>();
+            bool visible = c.fx.GetDissolve() > 0.9f && (group == null || group.alpha > 0.5f);
+            if (visible && expressionCrossfade > 0.01f && c.image.sprite != null)
+                SpawnExpressionGhost(c);
+
             c.image.sprite = sprite;
             c.expression = expr;
             // 不同表情图宽高比可能不同 → 以该角色的标定高度重算宽度
             float h = HeightFor(c.def);
             float aspect = sprite.rect.width / sprite.rect.height;
             c.rect.sizeDelta = new Vector2(h * aspect, h);
+        }
+
+        /// <summary>复制一份旧表情立绘覆盖在角色上淡出（表情交叉溶解）</summary>
+        void SpawnExpressionGhost(ActiveCharacter c)
+        {
+            var go = new GameObject("ExprGhost",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(c.rect.parent, false);
+            rect.SetSiblingIndex(c.rect.GetSiblingIndex() + 1); // 盖在本体之上
+            rect.anchorMin = c.rect.anchorMin;
+            rect.anchorMax = c.rect.anchorMax;
+            rect.pivot = c.rect.pivot;
+            rect.sizeDelta = c.rect.sizeDelta;
+            rect.anchoredPosition = c.rect.anchoredPosition;
+            rect.localScale = c.rect.localScale;
+            rect.localRotation = c.rect.localRotation;
+
+            var img = go.GetComponent<Image>();
+            img.sprite = c.image.sprite;
+            img.preserveAspect = true;
+            img.raycastTarget = false;
+
+            img.DOFade(0f, expressionCrossfade).SetEase(Ease.InOutSine)
+               .SetLink(go).OnComplete(() => Destroy(go));
+        }
+
+        /// <summary>角色滑步换位（move 命令）：悬浮暂停、基准位同步、到位后恢复</summary>
+        public Tween Move(string id, string at, float duration, int line = 0)
+        {
+            var c = Get(id);
+            if (c == null)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：move 的角色「{id}」不在场上");
+                return null;
+            }
+
+            var target = SlotPosition(at) + c.def.positionOffset;
+            bool wasFloating = c.fx.IsFloating;
+            c.fx.StopFloating(); // 会重置到旧基准位，从干净状态起步
+            c.animator.SetBasePosition(target);
+            c.emotes.SetBasePosition(target);
+            c.fx.SetFloatBaseY(target.y);
+
+            var t = c.rect.DOAnchorPos(target, Mathf.Max(0.05f, duration))
+                          .SetEase(Ease.InOutSine).SetLink(c.go);
+            if (wasFloating) t.OnComplete(() => c.fx.ResumeFloating());
+            return t;
         }
 
         /// <summary>运行时生成完整的角色特效组件栈</summary>
@@ -279,6 +345,7 @@ namespace VNEffects
             data.backgroundId = CurrentBackgroundId;
             data.weather = weather != null ? weather.Current.ToString() : null;
             data.mood = mood != null ? mood.Current.ToString() : null;
+            data.bgm = vnAudio != null ? vnAudio.CurrentBgm : null;
 
             data.fxOn.Clear();
             foreach (var kv in _fxStates)
@@ -315,6 +382,12 @@ namespace VNEffects
             foreach (var name in ToggleFxNames) Fx(name, "off");
             foreach (var name in data.fxOn) Fx(name, "on");
 
+            if (vnAudio != null)
+            {
+                if (!string.IsNullOrEmpty(data.bgm)) vnAudio.PlayBgm(data.bgm, 0.6f);
+                else vnAudio.StopBgm(0.6f);
+            }
+
             foreach (var cs in data.characters)
                 ShowInstant(cs.id, cs.x, cs.expr);
         }
@@ -345,6 +418,7 @@ namespace VNEffects
             c.rect.anchoredPosition = pos;
             c.animator.SetBasePosition(pos);
             c.emotes.SetBasePosition(pos);
+            c.fx.SetFloatBaseY(pos.y);
             ApplyExpression(c, expr);
 
             // 直接置为完全可见状态
