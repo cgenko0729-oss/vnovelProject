@@ -529,8 +529,10 @@ namespace VNEffects.EditorTools
         void DrawSayRow(Rect rect, VNRow r)
         {
             float x = rect.x;
-            GUI.Label(new Rect(x, rect.y, 30f, rect.height), "say", EditorStyles.miniLabel);
-            x += 32f;
+            var typeRect = new Rect(x, rect.y, 128f, rect.height);
+            if (GUI.Button(typeRect, "say（对白）", EditorStyles.popup))
+                ShowRowTypeMenu(typeRect, r);
+            x += 132f;
 
             // 说话者
             r.speaker = PopupString(new Rect(x, rect.y, 110f, rect.height),
@@ -558,7 +560,7 @@ namespace VNEffects.EditorTools
             // 关键字下拉
             var keywordRect = new Rect(x, line0.y, 128f, line0.height);
             if (GUI.Button(keywordRect, CommandDisplayName(r.keyword), EditorStyles.popup))
-                ShowKeywordMenu(keywordRect, r);
+                ShowRowTypeMenu(keywordRect, r);
             x += 132f;
 
             var def = VNScenarioSchema.Find(r.keyword);
@@ -618,16 +620,25 @@ namespace VNEffects.EditorTools
             }
         }
 
-        void ShowKeywordMenu(Rect rect, VNRow row)
+        void ShowRowTypeMenu(Rect rect, VNRow row)
         {
             var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Dialogue（对话）/say（对白）"),
+                row.kind == VNRowKind.Say, () =>
+                {
+                    if (row.kind == VNRowKind.Say) return;
+                    MarkStructural();
+                    SetSayRow(row);
+                });
+            menu.AddSeparator("");
             foreach (var command in VNScenarioSchema.Commands)
             {
                 string keyword = command.keyword;
                 string path = $"{CategoryDisplayName(command.category)}/{CommandDisplayName(keyword)}";
-                menu.AddItem(new GUIContent(path), keyword == row.keyword, () =>
+                menu.AddItem(new GUIContent(path),
+                    row.kind == VNRowKind.Command && keyword == row.keyword, () =>
                 {
-                    if (keyword == row.keyword) return;
+                    if (row.kind == VNRowKind.Command && keyword == row.keyword) return;
                     MarkStructural();
                     SetKeyword(row, keyword);
                 });
@@ -643,8 +654,23 @@ namespace VNEffects.EditorTools
             CategoryTranslations.TryGetValue(category, out string translation)
                 ? $"{category}（{translation}）" : category;
 
+        void SetSayRow(VNRow row)
+        {
+            row.kind = VNRowKind.Say;
+            row.keyword = "";
+            row.values.Clear();
+            row.extraTokens.Clear();
+            row.options = null;
+            row.camLines = null;
+            row.speaker = "";
+            row.expression = "";
+            row.text = "";
+            Bump();
+        }
+
         void SetKeyword(VNRow r, string keyword)
         {
+            r.kind = VNRowKind.Command;
             r.keyword = keyword;
             r.values.Clear();
             r.extraTokens.Clear();
