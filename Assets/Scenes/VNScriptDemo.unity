@@ -15540,6 +15540,7 @@ MonoBehaviour:
   panelColor: {r: 0.05, g: 0.07, b: 0.13, a: 0.78}
   frameColor: {r: 1, g: 0.85, b: 0.5, a: 0.9}
   nameTagColor: {r: 0.45, g: 0.3, b: 0.75, a: 0.9}
+  portraitWindowSize: {x: 230, y: 300}
 --- !u!1 &1003239861
 GameObject:
   m_ObjectHideFlags: 0
@@ -15996,6 +15997,8 @@ MonoBehaviour:
   bgmVolume: 0.75
   seVolume: 1
   voiceVolume: 1
+  voiceBgmReduction: 0.5
+  voiceBgmFadeDuration: 0.15
   typingTick: {fileID: 0}
   typingTickInterval: 0.055
 --- !u!4 &1387719274
@@ -16095,6 +16098,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 1160453604}
   dollyCharacters: []
+  clampToCanvas: 1
+  canvasHalf: {x: 960, y: 540}
+  overscan: {x: 60, y: 60}
+  cameraFade: {fileID: 0}
 --- !u!4 &1669955717
 Transform:
   m_ObjectHideFlags: 0
@@ -21137,8 +21144,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 0ce9369dd33c3484f87b80580753005b, type: 3}
-  m_Type: 0
+  m_Sprite: {fileID: 2877471580529523173, guid: c15ba1dcb835b28498cc6239dc893a2e, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4

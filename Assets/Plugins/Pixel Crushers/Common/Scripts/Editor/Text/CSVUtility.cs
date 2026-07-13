@@ -1,1 +1,0 @@
-﻿// Moved to Common/Scripts/Text to give access to non-editor code.
