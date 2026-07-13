@@ -311,6 +311,13 @@ namespace VNEffects
         /// <summary>用上次的参数恢复悬浮（情绪动作结束后调用）</summary>
         public void ResumeFloating() => StartFloating(_lastFloatAmplitude, _lastFloatPeriod);
 
+        /// <summary>重设悬浮基准 Y（剧本移动/换位角色后调用，否则悬浮会拽回旧位置）</summary>
+        public void SetFloatBaseY(float y)
+        {
+            _floatBaseY = y;
+            _hasFloatBase = true;
+        }
+
         public void StartFloating(float amplitude = 8f, float period = 4f)
         {
             _lastFloatAmplitude = amplitude;

@@ -63,7 +63,10 @@ namespace VNEffects
         void Update()
         {
             if (!_playing) return;
+            int before = Mathf.FloorToInt(_visible);
             _visible += charsPerSecond * Time.deltaTime;
+            if (Mathf.FloorToInt(_visible) > before)
+                VNAudio.TypeTick(); // 每显现一个新字打一次字音（内部带节流）
             graphic.SetVerticesDirty();
             if (_lastQuadCount > 0 && _visible >= _lastQuadCount + fadeSpanChars)
             {

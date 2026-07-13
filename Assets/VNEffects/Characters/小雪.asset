@@ -20,3 +20,5 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: b43a57825a93a7e46a5bdda314d90500, type: 3}
   - name: Surprise
     sprite: {fileID: 21300000, guid: 403381e4697f08643938e96490fb8167, type: 3}
+  sizeScale: 1.76
+  positionOffset: {x: 0, y: -400}

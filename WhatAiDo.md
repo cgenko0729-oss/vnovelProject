@@ -754,7 +754,42 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 `VNStage` 全链路应用：登场摆位（含基准位同步）、初建尺寸、表情切换重算宽度、
 读档 ShowInstant（存档 x 已含偏移、y 按标定重建）。标定方法已写入 HowToUse.md 第七章。
 
-## 二十一、其他问题修复记录
+## 二十一、剧本系统 P4：音频 / 表情溶解 / move（2026-07-13，分支 `feature/vn-audio-move-crossfade`）
+
+### 21.1 音频系统 — `VNAudio.cs`（项目首次有声音）
+
+- **BGM**：双 AudioSource 交叉淡入淡出（切曲无缝），`bgm play <id> [fade:秒]` / `bgm stop`
+- **SE**：一次性用 `PlayOneShot`；循环环境音（`se 雨声 loop`）每个独立 AudioSource
+  + 淡入淡出，`se stop <id>` 停止
+- **Voice**：独立通道，新语音顶掉旧的（配音预留）
+- **音量**：`volume bgm|se|voice 0~1`，立即作用于在播声音
+- **打字音**：`typingTick` 槽位赋一个短音效 → 打字机每字自动"哒哒哒"
+  （0.055s 节流 + ±6% 随机音高防机械感），`VNTypewriterText` 按整字推进触发
+- **音频库**：id → AudioClip 列表（同背景库模式）；当前 BGM 随存档保存、读档恢复
+- 旧场景自愈：VNStage.AutoWire 找不到 VNAudio 会自动创建
+
+### 21.2 表情交叉溶解
+
+- `ApplyExpression` 升级：角色完全可见时（溶解≈1 且未淡出），换表情前复制一份
+  旧表情立绘**覆盖在本体之上**淡出 0.25s（新表情立即生效在底下）——视觉上就是
+  旧表情融化成新表情。时长 `VNStage.expressionCrossfade` 可调（0=关闭）。
+- 出场前的表情设置不触发溶解（不可见时无意义）。
+
+### 21.3 move 滑步换位命令
+
+- `move 亚里沙 left [0.6]`：平滑滑到新站位（支持 left/center/right/数字坐标，
+  自动应用角色标定偏移）。
+- **基准位三连同步**：出场器 SetBasePosition + 情绪库 SetBasePosition +
+  控制器新增的 `SetFloatBaseY`（悬浮基准；顺带修了 Show/ShowInstant 换位后
+  悬浮会拽回旧 Y 的隐患——float base 此前只在首次 StartFloating 缓存一次）。
+- 滑动期间悬浮暂停、到位恢复。常配 `@` 边走边说。
+
+### 21.4 新命令一览
+
+`move` / `bgm play|stop` / `se [loop]|stop` / `voice` / `volume`，
+均已写入 HowToUse.md（含免费音频素材站推荐）。
+
+## 二十二、其他问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
