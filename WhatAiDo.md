@@ -1034,3 +1034,60 @@ CameraFade 会自动创建）→ Play：眨眼转场睁眼时画面应直接在 
 - 顺带修正用户测试剧本里的 `startfade : 0.5`（冒号两边不能有空格，
   否则被拆成三个 token 参数不生效）→ `startfade:0.5`
 - 想要某个角色不显示头像：取消其资产里 showPortrait；想全程关闭：剧本开头 `portrait off`
+
+## 二十九、角色立绘与对话头像实时预览编辑器（2026-07-13，分支 `agent/character-visual-preview`）
+
+### 29.1 需求
+
+`VNCharacterDef` 的 `sizeScale / positionOffset / portraitScale / portraitOffset` 此前只能修改
+Inspector 后进入 Play，等角色登场和说出台词才能看到实际效果。不同素材的透明留白、长宽比、
+人物构图差异很大，反复 Play 校准立绘高度、脚底位置和头像裁切效率很低。
+
+### 29.2 新工具
+
+新增 `Assets/Scripts/VNEffects/Editor/VNCharacterVisualPreviewWindow.cs`，菜单：
+
+**Tools → VN Effects → Character Visual Preview**
+
+也可以在 Project 窗口选中任意 `VNCharacterDef` 后：
+
+- 右键 **VN Effects → Open Character Visual Preview**；
+- 或在角色资产 Inspector 的右键上下文菜单打开。
+
+窗口顶部可在项目中的全部角色定义之间切换；在 Project 窗口选择另一个角色资产时，预览窗口
+也会自动跟随。
+
+### 29.3 立绘实时预览
+
+- 左侧显示 **1920×1080 舞台预览**，支持 left / center / right 三个标准站位；
+- 表情下拉可检查该角色的每张表情立绘；
+- 预览严格复用运行时尺寸公式：
+  `显示高度 = VNStage.characterHeight × sizeScale`，
+  `显示位置 = 标准站位 + positionOffset`；
+- 可指定一张背景图辅助检查实际构图（仅编辑器预览，不写入角色资产）；
+- 「从场景读取尺寸」会读取当前场景 `VNStage.characterHeight`、背景图和
+  `VNDialogueBox.portraitWindowSize`；场景中没有这些组件时使用 880 / 230×300 默认值；
+- 直接在舞台拖动立绘 = 实时修改 `positionOffset`；鼠标滚轮 = 修改 `sizeScale`；
+- 同时保留精确数值输入、参数归零和当前立绘资产定位按钮。
+
+### 29.4 头像实时预览
+
+- 右侧按照 `VNDialogueBox` 的真实 **RectMask2D 顶边锚定裁切公式**显示头像窗口；
+- 头像列表优先读取 `VNCharacterDef.portraits`；列表为空时明确标注「回退立绘」，并使用
+  `expressions` 预览，与运行时 `GetPortrait()` 行为一致；
+- 直接拖动头像 = 修改 `portraitOffset`；鼠标滚轮 = 修改 `portraitScale`；
+- `showPortrait` 关闭时仍以半透明方式显示素材，方便先校准再开启，同时显示关闭提示；
+- 支持自定义预览头像窗口尺寸、参数归零和当前头像资产定位。
+
+运行时头像公式保持完全一致：宽度为
+`portraitWindowSize.x × portraitScale`，高度按 Sprite 长宽比计算；头像锚点/轴心为顶边中央，
+`portraitOffset.y` 为正时向上移动，窗口外内容被裁切。
+
+### 29.5 编辑安全与验证
+
+- 所有拖动、滚轮和数值修改均调用 Unity Undo，支持 Ctrl+Z / Ctrl+Y；
+- 修改后只标脏当前 `VNCharacterDef`，不创建临时场景物体、不修改场景；
+- 工具栏「保存角色资产」可显式保存当前资产；
+- 窗口会同步重绘 Inspector、Scene/Game 等编辑器视图；
+- 新代码仅位于 `Editor/`，不会进入玩家运行时构建；
+- `dotnet build Assembly-CSharp-Editor.csproj --no-restore` 验证通过：0 warning / 0 error。
