@@ -67,6 +67,49 @@ namespace VNEffects
         public ActiveCharacter Get(string id) =>
             id != null && _active.TryGetValue(id, out var c) ? c : null;
 
+        void Awake()
+        {
+            AutoWire();
+        }
+
+        /// <summary>
+        /// 自动补线：Inspector 里为空的引用自动在场景中查找。
+        /// 这样给 VNStage 加新字段后，旧场景不重新生成也能正常工作。
+        /// </summary>
+        void AutoWire()
+        {
+            if (dialogue == null) dialogue = FindFirstObjectByType<VNDialogueBox>();
+            if (transition == null) transition = FindFirstObjectByType<VNScreenTransition>();
+            if (weather == null) weather = FindFirstObjectByType<VNWeatherController>();
+            if (mood == null) mood = FindFirstObjectByType<VNMoodGrading>();
+            if (vnCamera == null) vnCamera = FindFirstObjectByType<VNCamera>();
+            if (screenShake == null) screenShake = FindFirstObjectByType<VNScreenShake>();
+            if (dutchAngle == null) dutchAngle = FindFirstObjectByType<VNDutchAngle>();
+            if (heartbeat == null) heartbeat = FindFirstObjectByType<VNHeartbeat>();
+            if (sakura == null) sakura = FindFirstObjectByType<VNSakuraBurst>();
+            if (fakeDoF == null) fakeDoF = FindFirstObjectByType<VNFakeDoF>();
+            if (cloudShadows == null) cloudShadows = FindFirstObjectByType<VNCloudShadows>();
+            if (godRays == null) godRays = FindFirstObjectByType<VNGodRays>();
+            if (heatHaze == null) heatHaze = FindFirstObjectByType<VNHeatHaze>();
+            if (vignetteFocus == null) vignetteFocus = FindFirstObjectByType<VNVignetteFocus>();
+            if (speakerHighlight == null) speakerHighlight = FindFirstObjectByType<VNSpeakerHighlight>();
+            if (toneMatch == null) toneMatch = FindFirstObjectByType<VNToneMatch>();
+            if (choicePanel == null) choicePanel = FindFirstObjectByType<VNChoicePanel>();
+
+            if (characterLayer == null)
+            {
+                var go = GameObject.Find("LayerFront");
+                if (go != null) characterLayer = (RectTransform)go.transform;
+            }
+            if (backgroundImage == null)
+            {
+                var go = GameObject.Find("Background");
+                if (go != null) backgroundImage = go.GetComponent<Image>();
+            }
+            if (backgroundFx == null && backgroundImage != null)
+                backgroundFx = backgroundImage.GetComponent<VNImageEffectController>();
+        }
+
         // ------------------------------------------------------------------
         // 角色
         // ------------------------------------------------------------------

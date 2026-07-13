@@ -694,7 +694,18 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 重开 `VNScriptDemo` 场景 Play 即可（纯代码+剧本更新，场景无需重新生成）。
 玩到"我一直……有件事想告诉你"会弹出选项，两条路线通向不同结局。
 
-## 十八、问题修复记录
+## 十八、问题修复记录（剧本系统）
+
+### 修复 3：`VNStage 未连线 choicePanel`（2026-07-13）
+
+**现象**：P1 后在旧的 VNScriptDemo 场景里走到 choice 命令报错。
+**原因**：场景是 P0 时生成的，`choicePanel` 是 P1 新加的字段——生成器的自动连线
+只在重新生成场景时执行，旧场景里新字段为空。
+**修复**：给 `VNStage.Awake()` 加 **AutoWire 自动补线**：所有为空的引用自动
+`FindFirstObjectByType` 查找（容器/背景按名字找）。从此给 VNStage 加新字段，
+旧场景不重新生成也能自愈，这类错误一劳永逸。
+
+## 十九、其他问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
