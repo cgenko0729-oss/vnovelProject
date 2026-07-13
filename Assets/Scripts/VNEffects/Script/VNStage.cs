@@ -450,19 +450,29 @@ namespace VNEffects
         }
 
         /// <summary>清空舞台并按存档数据瞬间摆台（读档用）</summary>
-        public void RestoreSnapshot(VNSaveData data)
+        public void RestoreSnapshot(VNSaveData data) => RestoreSnapshot(data, false);
+
+        /// <summary>恢复舞台快照；instant 用于“从选中行播放”的静默状态重建。</summary>
+        public void RestoreSnapshot(VNSaveData data, bool instant)
         {
             ClearStage();
 
             if (!string.IsNullOrEmpty(data.backgroundId))
                 SetBackground(data.backgroundId, null);
+            else
+            {
+                CurrentBackgroundId = null;
+                if (backgroundImage != null) backgroundImage.sprite = null;
+            }
 
             if (weather != null)
                 weather.SetWeather(
-                    VNScriptParser.ParseEnum(data.weather, VNWeather.None, 0), 0.1f);
+                    VNScriptParser.ParseEnum(data.weather, VNWeather.None, 0),
+                    instant ? 0.01f : 0.1f);
             if (mood != null)
                 mood.SetMood(
-                    VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0), 0.3f);
+                    VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0),
+                    instant ? 0.01f : 0.3f);
 
             // 先全部关掉可开关 fx，再打开存档里记录的
             foreach (var name in ToggleFxNames) Fx(name, "off");
@@ -470,8 +480,10 @@ namespace VNEffects
 
             if (vnAudio != null)
             {
-                if (!string.IsNullOrEmpty(data.bgm)) vnAudio.PlayBgm(data.bgm, 0.6f);
-                else vnAudio.StopBgm(0.6f);
+                if (instant) vnAudio.ResetForDebug();
+                float fade = instant ? 0.01f : 0.6f;
+                if (!string.IsNullOrEmpty(data.bgm)) vnAudio.PlayBgm(data.bgm, fade);
+                else vnAudio.StopBgm(fade);
             }
 
             SetPortraitEnabled(!data.portraitOff);

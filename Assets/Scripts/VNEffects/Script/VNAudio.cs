@@ -49,6 +49,7 @@ namespace VNEffects
         readonly Dictionary<string, AudioSource> _loopingSe =
             new Dictionary<string, AudioSource>();
         float _lastTickTime;
+        float _initialBgmVolume, _initialSeVolume, _initialVoiceVolume;
 
         /// <summary>当前 BGM 的 id（存档用；null = 无）</summary>
         public string CurrentBgm => _currentBgm;
@@ -56,11 +57,38 @@ namespace VNEffects
         void Awake()
         {
             _instance = this;
+            _initialBgmVolume = bgmVolume;
+            _initialSeVolume = seVolume;
+            _initialVoiceVolume = voiceVolume;
             _bgmA = CreateSource("BGM_A", true);
             _bgmB = CreateSource("BGM_B", true);
             _seOneShot = CreateSource("SE", false);
             _voice = CreateSource("Voice", false);
             _tick = CreateSource("TypeTick", false);
+        }
+
+        /// <summary>编辑器从中间行调试前，立即清除之前自动播放留下的音频状态。</summary>
+        public void ResetForDebug()
+        {
+            foreach (var source in new[] { _bgmA, _bgmB, _seOneShot, _voice, _tick })
+            {
+                if (source == null) continue;
+                source.DOKill();
+                source.Stop();
+                source.clip = null;
+            }
+            foreach (var source in _loopingSe.Values)
+            {
+                if (source == null) continue;
+                source.DOKill();
+                Destroy(source.gameObject);
+            }
+            _loopingSe.Clear();
+            _currentBgm = null;
+            _usingA = false;
+            bgmVolume = _initialBgmVolume;
+            seVolume = _initialSeVolume;
+            voiceVolume = _initialVoiceVolume;
         }
 
         void OnDestroy()
