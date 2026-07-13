@@ -16,6 +16,10 @@ namespace VNEffects
         WhiteFlash,    // 爆闪（HDR 白 + Bloom 超亮一瞬间）
         BokehOrbs,     // 光斑虚化（大光斑涌满屏幕，进入回忆）
         Eyelid,        // POV 眨眼（上下眼睑合拢再睁开：醒来/昏迷/回忆）
+        PageCurl,      // 卷页（弯曲页缘 + 背光 + 阴影）
+        Shatter,       // 碎裂（放射碎片 + 裂缝高光）
+        Ripple,        // 水波扩散（多重波纹环）
+        InkBleed,      // 墨水晕染（多墨滴融合 + 飞墨颗粒）
     }
 
     /// <summary>
@@ -108,7 +112,7 @@ namespace VNEffects
         /// <summary>
         /// 播放转场。onCovered 在画面完全被盖住的瞬间调用（此时切换背景/场景内容）。
         /// outDuration / inDuration 传负值时使用该转场类型的推荐时长。
-        /// viewportCenter：CircleWipe / InkSpread 的扩散中心（视口坐标 0~1）。
+        /// viewportCenter：CircleWipe / InkSpread / Shatter / Ripple / InkBleed 的中心（视口坐标 0~1）。
         /// </summary>
         public Sequence Play(VNTransition type, Action onCovered = null,
             float outDuration = -1f, float inDuration = -1f,
@@ -124,6 +128,7 @@ namespace VNEffects
 
             _mat.SetFloat(IdMode, mode);
             _mat.SetColor(IdColor, color ?? defColor);
+            _mat.SetColor(IdEdgeColor, GetEdgeColor(type));
             _mat.SetFloat(IdNoiseScale, noiseScale);
             _mat.SetFloat(IdCount, count);
             _mat.SetVector(IdCenter, viewportCenter ?? new Vector2(0.5f, 0.5f));
@@ -199,6 +204,33 @@ namespace VNEffects
                 case VNTransition.Eyelid:
                     mode = 6; outDur = 0.4f; inDur = 0.65f;
                     break;
+                case VNTransition.PageCurl:
+                    mode = 7; outDur = 1.15f; inDur = 1.0f;
+                    color = new Color(0.08f, 0.065f, 0.055f, 1f);
+                    break;
+                case VNTransition.Shatter:
+                    mode = 8; outDur = 0.8f; inDur = 0.95f; count = 11f;
+                    break;
+                case VNTransition.Ripple:
+                    mode = 9; outDur = 1.0f; inDur = 0.9f; count = 6f;
+                    color = new Color(0.015f, 0.045f, 0.075f, 1f);
+                    break;
+                case VNTransition.InkBleed:
+                    mode = 10; outDur = 1.25f; inDur = 1.1f; noiseScale = 6f;
+                    color = new Color(0.012f, 0.009f, 0.016f, 1f);
+                    break;
+            }
+        }
+
+        static Color GetEdgeColor(VNTransition type)
+        {
+            switch (type)
+            {
+                case VNTransition.PageCurl: return new Color(1.8f, 1.35f, 0.85f, 1f);
+                case VNTransition.Shatter: return new Color(0.75f, 1.45f, 2.5f, 1f);
+                case VNTransition.Ripple: return new Color(0.35f, 1.15f, 2.2f, 1f);
+                case VNTransition.InkBleed: return new Color(0.38f, 0.22f, 0.5f, 1f);
+                default: return new Color(2.5f, 1.6f, 0.6f, 1f);
             }
         }
 

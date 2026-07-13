@@ -87,6 +87,8 @@ namespace VNEffects.EditorTools
                 { "Tiles", "方块翻转" }, { "CircleWipe", "圆形擦除" },
                 { "InkSpread", "水墨扩散" }, { "WhiteFlash", "白色闪光" },
                 { "BokehOrbs", "光斑圆球" }, { "Eyelid", "眼睑闭合" },
+                { "PageCurl", "卷页" }, { "Shatter", "画面碎裂" },
+                { "Ripple", "水波扩散" }, { "InkBleed", "墨水晕染" },
             };
 
         static readonly Dictionary<string, string> EmoteTranslations =
