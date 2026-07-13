@@ -27,12 +27,19 @@ fx godrays on
 weather Petals
 bgm play b01 [fade:2]
 
+camseq 
+> right 2.5 2 
+> left 2.5 5 
+> middle 1.0 3
+
 show 亚里沙 at:left with:DissolveGlow
 wait 0.4
 show 小雪 at:right with:FadeSlideUp
 #camera pan 1.2 5 focus:小雪 
 亚里沙: 今天的晚霞真漂亮啊……整片天空都烧起来了一样。
 voice v02
+
+
 小雪: 是啊。你看，连云的边缘都镶上了金色。
 voice v01
 camera pushin 1.05 5 focus:亚里沙 @

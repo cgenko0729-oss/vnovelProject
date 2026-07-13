@@ -189,6 +189,10 @@ camera reset
 
 ### camseq / camto / camcut — 自由镜头路径 🎬
 
+> 💡 不想手写数值？用可视化编辑器：**Tools → VN Effects → Camera Sequence Editor**
+> ——迷你画布上点选/拖动路径点、拖进度条预览整条运镜、一键生成文本复制进剧本，
+> 也能把已有的 camseq 文本粘贴进去反向载入继续调。
+
 `camera` 的五个预设不够用时（任意点、多段路径、精确秒数），用路径镜头：
 
 ```

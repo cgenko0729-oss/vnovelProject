@@ -125,11 +125,15 @@ namespace VNEffects
             public bool easeSet;
         }
 
-        /// <summary>"看向点 p"（居中语义）所需的容器偏移，含防露边钳制</summary>
-        Vector2 OffsetFor(Vector2 point, float zoom)
+        /// <summary>
+        /// "看向点 p"（居中语义）所需的容器偏移，含防露边钳制。
+        /// 静态版供编辑器预览共用同一份公式。
+        /// </summary>
+        public static Vector2 ComputeOffset(Vector2 point, float zoom,
+            Vector2 canvasHalf, Vector2 overscan, bool clamp)
         {
             var o = -point * zoom;
-            if (clampToCanvas)
+            if (clamp)
             {
                 var max = (canvasHalf + overscan) * zoom - canvasHalf;
                 max = Vector2.Max(max, Vector2.zero);
@@ -138,6 +142,9 @@ namespace VNEffects
             }
             return o;
         }
+
+        Vector2 OffsetFor(Vector2 point, float zoom) =>
+            ComputeOffset(point, zoom, canvasHalf, overscan, clampToCanvas);
 
         /// <summary>瞬切到镜头状态（"一开始就已经 zoom 在那里"的起手）</summary>
         public void Cut(Vector2 point, float zoom)
