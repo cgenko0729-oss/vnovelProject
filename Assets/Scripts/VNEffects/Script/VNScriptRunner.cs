@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace VNEffects
@@ -40,10 +41,13 @@ namespace VNEffects
 
         VNBacklog _backlog;
         VNSaveLoadPanel _saveLoadPanel;
+        VNConfigPanel _configPanel;
+        VNQuickToolbar _quickToolbar;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
         bool _menuPaused;
+        bool _uiHidden;
         bool _auto;
         bool _skip;
         bool _waitingAtSay;   // 只有停在台词上时才允许存档
@@ -66,6 +70,8 @@ namespace VNEffects
                     _backlog = new GameObject("VNBacklog").AddComponent<VNBacklog>();
             }
             EnsureSaveLoadPanel();
+            EnsureQuickToolbar();
+            EnsureConfigPanel(); // 启动时应用 PlayerPrefs 中保存的音量、文字速度与显示模式
             if (playOnStart && script != null) Play(script);
             IsInitialized = true;
         }
@@ -397,6 +403,29 @@ namespace VNEffects
             _saveLoadPanel.Initialize(this);
         }
 
+        void EnsureQuickToolbar()
+        {
+            if (stage == null || stage.dialogue == null) return;
+            if (_quickToolbar == null)
+            {
+                _quickToolbar = stage.dialogue.GetComponent<VNQuickToolbar>();
+                if (_quickToolbar == null)
+                    _quickToolbar = stage.dialogue.gameObject.AddComponent<VNQuickToolbar>();
+            }
+            _quickToolbar.Initialize(this);
+        }
+
+        void EnsureConfigPanel()
+        {
+            if (_configPanel == null)
+            {
+                _configPanel = FindFirstObjectByType<VNConfigPanel>();
+                if (_configPanel == null)
+                    _configPanel = new GameObject("VNConfigPanel").AddComponent<VNConfigPanel>();
+            }
+            _configPanel.Initialize(this, stage);
+        }
+
         /// <summary>F5 / 保存页签入口：先隐藏 UI 并截取游戏画面，再显示 20 槽网格。</summary>
         public void RequestSavePanel()
         {
@@ -421,6 +450,26 @@ namespace VNEffects
             CancelSaveCapture();
             PauseForSaveLoadMenu();
             _saveLoadPanel.OpenLoad();
+        }
+
+        public void RequestBacklog()
+        {
+            if (_backlog == null) return;
+            _backlog.Open();
+        }
+
+        public void RequestConfigPanel()
+        {
+            EnsureConfigPanel();
+            PauseForSaveLoadMenu();
+            _configPanel.Open();
+        }
+
+        public void SetInterfaceHidden(bool hidden)
+        {
+            _uiHidden = hidden;
+            if (stage != null && stage.dialogue != null)
+                stage.dialogue.SetInterfaceVisible(!hidden);
         }
 
         IEnumerator CaptureSaveThumbnailCo(int token)
@@ -459,6 +508,8 @@ namespace VNEffects
             Time.timeScale = _timeScaleBeforeMenu;
             _menuPaused = false;
         }
+
+        public void OnConfigPanelClosed() => OnSaveLoadPanelClosed();
 
         void CancelSaveCapture()
         {
@@ -515,6 +566,23 @@ namespace VNEffects
             var mouse = Mouse.current;
             if (kb == null) return;
 
+            // 隐藏 UI 后，第一次操作只恢复界面，不会顺便推进台词。
+            if (_uiHidden)
+            {
+                bool restore = kb.uKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame ||
+                               kb.spaceKey.wasPressedThisFrame ||
+                               (mouse != null && (mouse.leftButton.wasPressedThisFrame ||
+                                                  mouse.rightButton.wasPressedThisFrame));
+                if (restore) SetInterfaceHidden(false);
+                return;
+            }
+
+            if (_configPanel != null && _configPanel.IsOpen)
+            {
+                if (kb.escapeKey.wasPressedThisFrame) _configPanel.Close();
+                return;
+            }
+
             // 存读档界面打开期间只响应界面快捷键，不推进剧情。
             if (_saveLoadPanel != null && _saveLoadPanel.IsOpen)
             {
@@ -539,6 +607,12 @@ namespace VNEffects
                 return;
             }
 
+            if (mouse != null && mouse.rightButton.wasPressedThisFrame)
+            {
+                SetInterfaceHidden(true);
+                return;
+            }
+
             if (kb.f5Key.wasPressedThisFrame) { RequestSavePanel(); return; }
             if (kb.f9Key.wasPressedThisFrame) { RequestLoadPanel(); return; }
             if (kb.aKey.wasPressedThisFrame) { SetAuto(!_auto); return; }
@@ -546,9 +620,9 @@ namespace VNEffects
 
             if (!_running) return;
 
-            bool pressed =
-                kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame
-                || (mouse != null && mouse.leftButton.wasPressedThisFrame);
+            bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            bool pressed = kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame ||
+                           (mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverUi);
             if (!pressed) return;
 
             // 手动推进会顺手退出快进（惯例）

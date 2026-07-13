@@ -104,7 +104,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 分支语法（P1，已完成）：`label/jump`、`flag 名字 [+1|数值]`（VNFlags 全局整型字典）、
   `if 条件 jump 标签`（条件无空格：`好感度>=2`）、`choice` + `* 文本 [flag:op] [-> 标签]`
 - P2（已完成）：F5/F9 打开 20 槽存读档界面（JSON 快照+PNG 截图缩略图+时间+末句台词，仅台词处可存）、
-  H/滚轮 回想、A 自动、S 快进（DOTween.timeScale 全局加速）、VNToast 提示
+  对话框快捷功能条（Save/Load/Auto/Skip/Log/Config/隐藏 UI）、H/滚轮 回想、A 自动、
+  S 快进（DOTween.timeScale 全局加速）、VNToast 提示
 - **路线图**：P0/P1/P2 完成 → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令
 
 ## 剧本可视化编辑器（当前状态）
