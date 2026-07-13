@@ -4,6 +4,25 @@ using UnityEngine;
 
 namespace VNEffects.EditorTools
 {
+    /// <summary>预览窗口的临时校准草稿；HideAndDontSave，确认前不会触碰角色资产。</summary>
+    internal sealed class VNCharacterPreviewDraft : ScriptableObject
+    {
+        public float sizeScale = 1f;
+        public Vector2 positionOffset;
+        public bool showPortrait = true;
+        public float portraitScale = 1f;
+        public Vector2 portraitOffset;
+
+        public void ReadFrom(VNCharacterDef character)
+        {
+            sizeScale = character.sizeScale;
+            positionOffset = character.positionOffset;
+            showPortrait = character.showPortrait;
+            portraitScale = character.portraitScale;
+            portraitOffset = character.portraitOffset;
+        }
+    }
+
     /// <summary>
     /// 角色视觉校准窗口：不进入 Play Mode，也能按运行时公式预览并调整
     /// VNCharacterDef 的立绘尺寸/站位偏移与对话头像缩放/偏移。
@@ -21,9 +40,15 @@ namespace VNEffects.EditorTools
         readonly List<string> _characterLabels = new List<string>();
 
         VNCharacterDef _character;
+        VNCharacterPreviewDraft _draft;
         Sprite _background;
         float _baseCharacterHeight = DefaultCharacterHeight;
         Vector2 _portraitWindowSize = new Vector2(230f, 300f);
+        Color _dialoguePanelColor = new Color(0.05f, 0.07f, 0.13f, 0.78f);
+        Color _dialogueFrameColor = new Color(1f, 0.85f, 0.5f, 0.9f);
+        Color _dialogueNameTagColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
+        bool _showDialogueUi = true;
+        string _previewDialogue = "今天的晚霞真漂亮啊……整片天空都烧起来了一样。";
         int _characterIndex;
         int _expressionIndex;
         int _portraitIndex;
@@ -62,7 +87,7 @@ namespace VNEffects.EditorTools
         {
             Open();
             var window = GetWindow<VNCharacterVisualPreviewWindow>();
-            window.SetCharacter(character);
+            window.TrySetCharacter(character);
         }
 
         void OnEnable()
@@ -73,21 +98,22 @@ namespace VNEffects.EditorTools
             EditorApplication.projectChanged += OnProjectChanged;
 
             if (Selection.activeObject is VNCharacterDef selected)
-                SetCharacter(selected);
+                SetCharacterImmediate(selected);
             else if (_character == null && _characters.Count > 0)
-                SetCharacter(_characters[0]);
+                SetCharacterImmediate(_characters[0]);
         }
 
         void OnDisable()
         {
             Undo.undoRedoPerformed -= OnUndoRedo;
             EditorApplication.projectChanged -= OnProjectChanged;
+            if (_draft != null) DestroyImmediate(_draft);
         }
 
         void OnSelectionChange()
         {
             if (Selection.activeObject is VNCharacterDef selected && selected != _character)
-                SetCharacter(selected);
+                TrySetCharacter(selected);
         }
 
         void OnUndoRedo()
@@ -114,17 +140,20 @@ namespace VNEffects.EditorTools
                 return;
             }
 
+            EnsureDraft();
             ClampSelectionIndices();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             DrawPreviews();
             GUILayout.Space(8f);
             DrawCalibrationControls();
+            DrawConfirmationBar();
             GUILayout.Space(8f);
             EditorGUILayout.HelpBox(
-                "实时操作：在左侧舞台拖动立绘可调整 positionOffset，滚轮调整 sizeScale；" +
-                "在右侧头像窗口拖动可调整 portraitOffset，滚轮调整 portraitScale。\n" +
+                "预览操作：在左侧舞台拖动立绘可调整草稿 positionOffset，滚轮调整草稿 sizeScale；" +
+                "在右侧头像窗口拖动可调整草稿 portraitOffset，滚轮调整草稿 portraitScale。\n" +
                 "立绘预览严格使用运行时公式：高度 = VNStage.characterHeight × sizeScale，" +
-                "位置 = 标准站位 + positionOffset。头像预览使用 VNDialogueBox 的顶边锚定与裁切公式。",
+                "位置 = 标准站位 + positionOffset。头像预览使用 VNDialogueBox 的顶边锚定与裁切公式。" +
+                "所有校准值只有按下“确认写入角色资产”才会保存。",
                 MessageType.Info);
             EditorGUILayout.EndScrollView();
         }
@@ -146,7 +175,7 @@ namespace VNEffects.EditorTools
                         int next = EditorGUILayout.Popup(_characterIndex, _characterLabels.ToArray(),
                             EditorStyles.toolbarPopup, GUILayout.MinWidth(190f));
                         if (check.changed && next >= 0 && next < _characters.Count)
-                            SetCharacter(_characters[next]);
+                            TrySetCharacter(_characters[next]);
                     }
                 }
 
@@ -161,12 +190,13 @@ namespace VNEffects.EditorTools
                     ReadSceneDefaults(true);
 
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("保存角色资产", EditorStyles.toolbarButton, GUILayout.Width(86f)))
+                GUIStyle stateStyle = new GUIStyle(EditorStyles.miniLabel)
                 {
-                    EditorUtility.SetDirty(_character);
-                    AssetDatabase.SaveAssetIfDirty(_character);
-                    ShowNotification(new GUIContent("角色资产已保存"));
-                }
+                    normal = { textColor = HasPendingChanges
+                        ? new Color(1f, 0.65f, 0.18f) : new Color(0.45f, 0.8f, 0.5f) },
+                };
+                GUILayout.Label(HasPendingChanges ? "● 有未确认调整" : "✓ 资产值已同步",
+                    stateStyle, GUILayout.Width(96f));
             }
         }
 
@@ -204,11 +234,11 @@ namespace VNEffects.EditorTools
                 DrawSprite(_background, rect, new Color(1f, 1f, 1f, 0.72f), ScaleMode.ScaleAndCrop);
 
             Vector2 slot = new Vector2(SlotX[Mathf.Clamp(_slotIndex, 0, SlotX.Length - 1)], -60f);
-            Vector2 center = slot + _character.positionOffset;
+            Vector2 center = slot + _draft.positionOffset;
             Sprite sprite = ExpressionSprite();
             if (sprite != null)
             {
-                float height = _baseCharacterHeight * Mathf.Max(0.05f, _character.sizeScale);
+                float height = _baseCharacterHeight * Mathf.Max(0.05f, _draft.sizeScale);
                 float width = height * sprite.rect.width / Mathf.Max(1f, sprite.rect.height);
                 Vector2 guiCenter = CanvasToGui(rect, center);
                 Rect spriteRect = new Rect(
@@ -237,12 +267,15 @@ namespace VNEffects.EditorTools
             Handles.DrawLine(groundA, groundB);
             Handles.EndGUI();
 
+            if (_showDialogueUi)
+                DrawDialogueOverlay(rect);
+
             EditorGUIUtility.AddCursorRect(rect, MouseCursor.Pan);
             HandleStageInput(rect);
 
             GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 20f),
-                $"{SlotNames[_slotIndex]}  |  高度 {_baseCharacterHeight * _character.sizeScale:0}px  |  " +
-                $"偏移 ({_character.positionOffset.x:0}, {_character.positionOffset.y:0})",
+                $"{SlotNames[_slotIndex]}  |  高度 {_baseCharacterHeight * _draft.sizeScale:0}px  |  " +
+                $"偏移 ({_draft.positionOffset.x:0}, {_draft.positionOffset.y:0})",
                 EditorStyles.miniLabel);
         }
 
@@ -261,16 +294,16 @@ namespace VNEffects.EditorTools
             Sprite sprite = PortraitSprite();
             if (sprite != null)
             {
-                float width = _portraitWindowSize.x * Mathf.Max(0.05f, _character.portraitScale) * scale;
+                float width = _portraitWindowSize.x * Mathf.Max(0.05f, _draft.portraitScale) * scale;
                 float height = sprite.rect.height / Mathf.Max(1f, sprite.rect.width) * width;
                 Rect imageRect = new Rect(
-                    windowRect.width * 0.5f - width * 0.5f + _character.portraitOffset.x * scale,
-                    -_character.portraitOffset.y * scale,
+                    windowRect.width * 0.5f - width * 0.5f + _draft.portraitOffset.x * scale,
+                    -_draft.portraitOffset.y * scale,
                     width, height);
 
                 GUI.BeginGroup(windowRect);
                 DrawSprite(sprite, imageRect,
-                    _character.showPortrait ? Color.white : new Color(1f, 1f, 1f, 0.35f));
+                    _draft.showPortrait ? Color.white : new Color(1f, 1f, 1f, 0.35f));
                 GUI.EndGroup();
             }
             else
@@ -279,10 +312,10 @@ namespace VNEffects.EditorTools
             }
 
             DrawRectOutline(windowRect,
-                _character.showPortrait ? new Color(1f, 0.78f, 0.32f, 0.95f)
+                _draft.showPortrait ? new Color(1f, 0.78f, 0.32f, 0.95f)
                     : new Color(0.6f, 0.6f, 0.6f, 0.8f), 2f);
 
-            if (!_character.showPortrait)
+            if (!_draft.showPortrait)
                 GUI.Label(new Rect(windowRect.x, windowRect.center.y - 10f, windowRect.width, 20f),
                     "该角色头像已关闭", CenteredLabelStyle());
 
@@ -290,8 +323,8 @@ namespace VNEffects.EditorTools
             HandlePortraitInput(windowRect, scale);
 
             GUI.Label(new Rect(area.x + 6f, area.y + 5f, area.width - 12f, 20f),
-                $"缩放 ×{_character.portraitScale:0.00}  |  偏移 " +
-                $"({_character.portraitOffset.x:0}, {_character.portraitOffset.y:0})",
+                $"缩放 ×{_draft.portraitScale:0.00}  |  偏移 " +
+                $"({_draft.portraitOffset.x:0}, {_draft.portraitOffset.y:0})",
                 EditorStyles.miniLabel);
         }
 
@@ -309,28 +342,31 @@ namespace VNEffects.EditorTools
                         EditorGUILayout.FloatField("舞台统一高度", _baseCharacterHeight));
                     _background = (Sprite)EditorGUILayout.ObjectField(
                         "预览背景（不保存）", _background, typeof(Sprite), false);
+                    _showDialogueUi = EditorGUILayout.Toggle("显示完整对话 UI", _showDialogueUi);
+                    using (new EditorGUI.DisabledScope(!_showDialogueUi))
+                        _previewDialogue = EditorGUILayout.TextField("预览对白", _previewDialogue);
 
                     float size = EditorGUILayout.Slider("sizeScale",
-                        _character.sizeScale, 0.3f, 2.5f);
+                        _draft.sizeScale, 0.3f, 2.5f);
                     Vector2 offset = EditorGUILayout.Vector2Field(
-                        "positionOffset", _character.positionOffset);
-                    if (!Mathf.Approximately(size, _character.sizeScale) ||
-                        offset != _character.positionOffset)
+                        "positionOffset", _draft.positionOffset);
+                    if (!Mathf.Approximately(size, _draft.sizeScale) ||
+                        offset != _draft.positionOffset)
                     {
-                        RecordCharacter("调整角色立绘校准");
-                        _character.sizeScale = size;
-                        _character.positionOffset = offset;
-                        ChangedCharacter();
+                        RecordDraft("调整角色立绘校准草稿");
+                        _draft.sizeScale = size;
+                        _draft.positionOffset = offset;
+                        ChangedDraft();
                     }
 
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         if (GUILayout.Button("立绘参数归零"))
                         {
-                            RecordCharacter("重置角色立绘校准");
-                            _character.sizeScale = 1f;
-                            _character.positionOffset = Vector2.zero;
-                            ChangedCharacter();
+                            RecordDraft("重置角色立绘校准草稿");
+                            _draft.sizeScale = 1f;
+                            _draft.positionOffset = Vector2.zero;
+                            ChangedDraft();
                         }
                         if (GUILayout.Button("选中当前立绘") && ExpressionSprite() != null)
                         {
@@ -348,30 +384,30 @@ namespace VNEffects.EditorTools
                     _portraitWindowSize = EditorGUILayout.Vector2Field(
                         "头像窗口（预览）", _portraitWindowSize);
 
-                    bool show = EditorGUILayout.Toggle("showPortrait", _character.showPortrait);
+                    bool show = EditorGUILayout.Toggle("showPortrait", _draft.showPortrait);
                     float scale = EditorGUILayout.Slider("portraitScale",
-                        _character.portraitScale, 0.2f, 6f);
+                        _draft.portraitScale, 0.2f, 6f);
                     Vector2 offset = EditorGUILayout.Vector2Field(
-                        "portraitOffset", _character.portraitOffset);
-                    if (show != _character.showPortrait ||
-                        !Mathf.Approximately(scale, _character.portraitScale) ||
-                        offset != _character.portraitOffset)
+                        "portraitOffset", _draft.portraitOffset);
+                    if (show != _draft.showPortrait ||
+                        !Mathf.Approximately(scale, _draft.portraitScale) ||
+                        offset != _draft.portraitOffset)
                     {
-                        RecordCharacter("调整角色对话头像校准");
-                        _character.showPortrait = show;
-                        _character.portraitScale = scale;
-                        _character.portraitOffset = offset;
-                        ChangedCharacter();
+                        RecordDraft("调整角色对话头像校准草稿");
+                        _draft.showPortrait = show;
+                        _draft.portraitScale = scale;
+                        _draft.portraitOffset = offset;
+                        ChangedDraft();
                     }
 
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         if (GUILayout.Button("头像参数归零"))
                         {
-                            RecordCharacter("重置角色对话头像校准");
-                            _character.portraitScale = 1f;
-                            _character.portraitOffset = Vector2.zero;
-                            ChangedCharacter();
+                            RecordDraft("重置角色对话头像校准草稿");
+                            _draft.portraitScale = 1f;
+                            _draft.portraitOffset = Vector2.zero;
+                            ChangedDraft();
                         }
                         if (GUILayout.Button("选中当前头像") && PortraitSprite() != null)
                         {
@@ -383,6 +419,154 @@ namespace VNEffects.EditorTools
             }
         }
 
+        void DrawConfirmationBar()
+        {
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            {
+                GUILayout.Label(HasPendingChanges
+                    ? "当前显示的是未确认草稿；角色资产尚未改变。"
+                    : "当前草稿与角色资产一致。",
+                    HasPendingChanges ? EditorStyles.boldLabel : EditorStyles.label);
+                GUILayout.FlexibleSpace();
+
+                using (new EditorGUI.DisabledScope(!HasPendingChanges))
+                {
+                    if (GUILayout.Button("放弃未确认调整", GUILayout.Width(130f), GUILayout.Height(28f)))
+                        DiscardDraft(true);
+                    if (GUILayout.Button("确认写入角色资产", GUILayout.Width(150f), GUILayout.Height(28f)))
+                        ApplyDraft(true);
+                }
+            }
+        }
+
+        void ApplyDraft(bool notify)
+        {
+            if (_character == null || _draft == null || !HasPendingChanges)
+            {
+                if (notify) ShowNotification(new GUIContent("没有需要确认的调整"));
+                return;
+            }
+
+            Undo.RecordObject(_character, "确认角色视觉校准");
+            _character.sizeScale = _draft.sizeScale;
+            _character.positionOffset = _draft.positionOffset;
+            _character.showPortrait = _draft.showPortrait;
+            _character.portraitScale = _draft.portraitScale;
+            _character.portraitOffset = _draft.portraitOffset;
+            EditorUtility.SetDirty(_character);
+            AssetDatabase.SaveAssetIfDirty(_character);
+            if (notify) ShowNotification(new GUIContent("角色资产已更新并保存"));
+            RepaintAll();
+        }
+
+        void DiscardDraft(bool notify)
+        {
+            if (_character == null || _draft == null) return;
+            _draft.ReadFrom(_character);
+            if (notify) ShowNotification(new GUIContent("已放弃未确认调整"));
+            RepaintAll();
+        }
+
+        void DrawDialogueOverlay(Rect stageRect)
+        {
+            Rect rootScreen = new Rect(96f, 28f, 1728f, 230f);
+            Rect root = ScreenRectToGui(stageRect, rootScreen);
+            float uiScale = stageRect.width / CanvasWidth;
+            Sprite portrait = PortraitSprite();
+            bool showPortrait = _draft.showPortrait && portrait != null;
+            float portraitInset = showPortrait ? _portraitWindowSize.x + 14f : 0f;
+
+            EditorGUI.DrawRect(new Rect(root.x + 2f, root.y + 3f, root.width, root.height),
+                new Color(0f, 0f, 0f, 0.35f));
+            EditorGUI.DrawRect(root, _dialoguePanelColor);
+            DrawRectOutline(root, _dialogueFrameColor, Mathf.Max(1f, 2f * uiScale));
+
+            Rect nameTagScreen = new Rect(
+                rootScreen.x + 44f + portraitInset,
+                rootScreen.y + rootScreen.height + 4f - 25f,
+                210f, 50f);
+            Rect nameTag = ScreenRectToGui(stageRect, nameTagScreen);
+            Color nameColor = _dialogueNameTagColor;
+            nameColor.a = Mathf.Max(0.85f, nameColor.a);
+            EditorGUI.DrawRect(nameTag, nameColor);
+
+            var nameStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.Max(8, Mathf.RoundToInt(26f * uiScale)),
+                normal = { textColor = Color.white },
+            };
+            string speaker = string.IsNullOrEmpty(_character.displayName)
+                ? _character.name : _character.displayName;
+            GUI.Label(nameTag, speaker, nameStyle);
+
+            Rect bodyScreen = new Rect(
+                rootScreen.x + 40f + portraitInset,
+                rootScreen.y + 26f,
+                rootScreen.width - 80f - portraitInset,
+                rootScreen.height - 66f);
+            Rect body = ScreenRectToGui(stageRect, bodyScreen);
+            var bodyStyle = new GUIStyle(EditorStyles.label)
+            {
+                alignment = TextAnchor.UpperLeft,
+                wordWrap = true,
+                fontSize = Mathf.Max(8, Mathf.RoundToInt(28f * uiScale)),
+                normal = { textColor = Color.white },
+            };
+            GUI.Label(body, _previewDialogue, bodyStyle);
+
+            if (showPortrait)
+            {
+                Rect portraitScreen = new Rect(
+                    rootScreen.x + 14f,
+                    rootScreen.y + 12f,
+                    _portraitWindowSize.x,
+                    _portraitWindowSize.y);
+                Rect portraitWindow = ScreenRectToGui(stageRect, portraitScreen);
+                DrawDialoguePortrait(portraitWindow, uiScale, portrait);
+            }
+
+            Rect arrowScreen = new Rect(
+                rootScreen.xMax - 58f,
+                rootScreen.y + 9f,
+                40f, 34f);
+            Rect arrow = ScreenRectToGui(stageRect, arrowScreen);
+            var arrowStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.Max(8, Mathf.RoundToInt(26f * uiScale)),
+                normal = { textColor = new Color(1f, 0.9f, 0.62f) },
+            };
+            GUI.Label(arrow, "▼", arrowStyle);
+        }
+
+        void DrawDialoguePortrait(Rect windowRect, float uiScale, Sprite portrait)
+        {
+            EditorGUI.DrawRect(windowRect, new Color(0.02f, 0.025f, 0.04f, 0.55f));
+            float width = _portraitWindowSize.x * Mathf.Max(0.05f, _draft.portraitScale) * uiScale;
+            float height = portrait.rect.height / Mathf.Max(1f, portrait.rect.width) * width;
+            Rect imageRect = new Rect(
+                windowRect.width * 0.5f - width * 0.5f + _draft.portraitOffset.x * uiScale,
+                -_draft.portraitOffset.y * uiScale,
+                width, height);
+
+            GUI.BeginGroup(windowRect);
+            DrawSprite(portrait, imageRect, Color.white);
+            GUI.EndGroup();
+            DrawRectOutline(windowRect, new Color(1f, 1f, 1f, 0.16f), 1f);
+        }
+
+        static Rect ScreenRectToGui(Rect stageRect, Rect screenRect)
+        {
+            float scaleX = stageRect.width / CanvasWidth;
+            float scaleY = stageRect.height / CanvasHeight;
+            return new Rect(
+                stageRect.x + screenRect.x * scaleX,
+                stageRect.y + (CanvasHeight - screenRect.yMax) * scaleY,
+                screenRect.width * scaleX,
+                screenRect.height * scaleY);
+        }
+
         void HandleStageInput(Rect rect)
         {
             Event e = Event.current;
@@ -390,17 +574,17 @@ namespace VNEffects.EditorTools
             {
                 _draggingStage = true;
                 _dragStartMouse = e.mousePosition;
-                _dragStartOffset = _character.positionOffset;
-                Undo.RecordObject(_character, "拖动角色立绘位置");
+                _dragStartOffset = _draft.positionOffset;
+                RecordDraft("拖动角色立绘位置草稿");
                 e.Use();
             }
             else if (e.type == EventType.MouseDrag && _draggingStage && e.button == 0)
             {
                 Vector2 delta = e.mousePosition - _dragStartMouse;
-                _character.positionOffset = _dragStartOffset + new Vector2(
+                _draft.positionOffset = _dragStartOffset + new Vector2(
                     delta.x / rect.width * CanvasWidth,
                     -delta.y / rect.height * CanvasHeight);
-                ChangedCharacter();
+                ChangedDraft();
                 e.Use();
             }
             else if (e.type == EventType.MouseUp && _draggingStage && e.button == 0)
@@ -410,10 +594,10 @@ namespace VNEffects.EditorTools
             }
             else if (e.type == EventType.ScrollWheel && rect.Contains(e.mousePosition))
             {
-                Undo.RecordObject(_character, "滚轮调整角色立绘尺寸");
-                _character.sizeScale = Mathf.Clamp(
-                    _character.sizeScale * (1f - e.delta.y * 0.035f), 0.3f, 2.5f);
-                ChangedCharacter();
+                RecordDraft("滚轮调整角色立绘尺寸草稿");
+                _draft.sizeScale = Mathf.Clamp(
+                    _draft.sizeScale * (1f - e.delta.y * 0.035f), 0.3f, 2.5f);
+                ChangedDraft();
                 e.Use();
             }
         }
@@ -425,15 +609,15 @@ namespace VNEffects.EditorTools
             {
                 _draggingPortrait = true;
                 _dragStartMouse = e.mousePosition;
-                _dragStartOffset = _character.portraitOffset;
-                Undo.RecordObject(_character, "拖动对话头像位置");
+                _dragStartOffset = _draft.portraitOffset;
+                RecordDraft("拖动对话头像位置草稿");
                 e.Use();
             }
             else if (e.type == EventType.MouseDrag && _draggingPortrait && e.button == 0)
             {
                 Vector2 delta = (e.mousePosition - _dragStartMouse) / Mathf.Max(0.01f, displayScale);
-                _character.portraitOffset = _dragStartOffset + new Vector2(delta.x, -delta.y);
-                ChangedCharacter();
+                _draft.portraitOffset = _dragStartOffset + new Vector2(delta.x, -delta.y);
+                ChangedDraft();
                 e.Use();
             }
             else if (e.type == EventType.MouseUp && _draggingPortrait && e.button == 0)
@@ -443,10 +627,10 @@ namespace VNEffects.EditorTools
             }
             else if (e.type == EventType.ScrollWheel && rect.Contains(e.mousePosition))
             {
-                Undo.RecordObject(_character, "滚轮调整对话头像尺寸");
-                _character.portraitScale = Mathf.Clamp(
-                    _character.portraitScale * (1f - e.delta.y * 0.035f), 0.2f, 6f);
-                ChangedCharacter();
+                RecordDraft("滚轮调整对话头像尺寸草稿");
+                _draft.portraitScale = Mathf.Clamp(
+                    _draft.portraitScale * (1f - e.delta.y * 0.035f), 0.2f, 6f);
+                ChangedDraft();
                 e.Use();
             }
         }
@@ -470,14 +654,53 @@ namespace VNEffects.EditorTools
 
             _characterIndex = Mathf.Max(0, _characters.IndexOf(keep));
             if (keep != null && _characters.Contains(keep)) _character = keep;
-            else if (_characters.Count > 0) SetCharacter(_characters[_characterIndex]);
-            else _character = null;
+            else if (_characters.Count > 0) SetCharacterImmediate(_characters[_characterIndex]);
+            else
+            {
+                _character = null;
+                if (_draft != null) DestroyImmediate(_draft);
+            }
         }
 
-        void SetCharacter(VNCharacterDef character)
+        void EnsureDraft()
+        {
+            if (_draft != null) return;
+            _draft = CreateInstance<VNCharacterPreviewDraft>();
+            _draft.name = "VN Character Preview Draft";
+            _draft.hideFlags = HideFlags.HideAndDontSave;
+            if (_character != null) _draft.ReadFrom(_character);
+        }
+
+        bool HasPendingChanges => _character != null && _draft != null &&
+            (!Mathf.Approximately(_draft.sizeScale, _character.sizeScale) ||
+             _draft.positionOffset != _character.positionOffset ||
+             _draft.showPortrait != _character.showPortrait ||
+             !Mathf.Approximately(_draft.portraitScale, _character.portraitScale) ||
+             _draft.portraitOffset != _character.portraitOffset);
+
+        bool TrySetCharacter(VNCharacterDef character)
+        {
+            if (character == null || character == _character) return character != null;
+            if (HasPendingChanges)
+            {
+                int choice = EditorUtility.DisplayDialogComplex(
+                    "存在未确认调整",
+                    $"角色“{_character.displayName}”仍有未写入资产的预览草稿。切换前要如何处理？",
+                    "确认并切换", "取消切换", "放弃并切换");
+                if (choice == 1) return false;
+                if (choice == 0) ApplyDraft(false);
+            }
+
+            SetCharacterImmediate(character);
+            return true;
+        }
+
+        void SetCharacterImmediate(VNCharacterDef character)
         {
             if (character == null) return;
             _character = character;
+            EnsureDraft();
+            _draft.ReadFrom(character);
             int index = _characters.IndexOf(character);
             if (index >= 0) _characterIndex = index;
             _expressionIndex = 0;
@@ -496,7 +719,13 @@ namespace VNEffects.EditorTools
             }
 
             var dialogue = Object.FindFirstObjectByType<VNDialogueBox>();
-            if (dialogue != null) _portraitWindowSize = dialogue.portraitWindowSize;
+            if (dialogue != null)
+            {
+                _portraitWindowSize = dialogue.portraitWindowSize;
+                _dialoguePanelColor = dialogue.panelColor;
+                _dialogueFrameColor = dialogue.frameColor;
+                _dialogueNameTagColor = dialogue.nameTagColor;
+            }
 
             if (notify)
                 ShowNotification(new GUIContent(stage != null || dialogue != null
@@ -558,14 +787,14 @@ namespace VNEffects.EditorTools
             _slotIndex = Mathf.Clamp(_slotIndex, 0, SlotNames.Length - 1);
         }
 
-        void RecordCharacter(string action)
+        void RecordDraft(string action)
         {
-            Undo.RecordObject(_character, action);
+            EnsureDraft();
+            Undo.RecordObject(_draft, action);
         }
 
-        void ChangedCharacter()
+        void ChangedDraft()
         {
-            EditorUtility.SetDirty(_character);
             RepaintAll();
         }
 
