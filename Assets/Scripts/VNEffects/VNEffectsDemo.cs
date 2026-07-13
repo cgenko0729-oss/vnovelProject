@@ -349,8 +349,10 @@ namespace VNEffects
             _transitionIndex = (_transitionIndex + 1) % types.Length;
             var type = types[_transitionIndex];
 
-            // 圆形扩散/水墨从立绘位置扩散，其余居中
-            if ((type == VNTransition.CircleWipe || type == VNTransition.InkSpread)
+            // 放射类转场从立绘位置扩散，其余居中
+            if ((type == VNTransition.CircleWipe || type == VNTransition.InkSpread ||
+                 type == VNTransition.Shatter || type == VNTransition.Ripple ||
+                 type == VNTransition.InkBleed)
                 && characterFx != null)
                 transition.PlayFrom(type, characterFx.Rect, SwapBackground);
             else
