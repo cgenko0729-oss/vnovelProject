@@ -40,6 +40,22 @@ namespace VNEffects
                  "素材脚底留白多导致角色偏高 → y 给负值往下压；构图偏左/右 → 用 x 修正")]
         public Vector2 positionOffset = Vector2.zero;
 
+        [Header("对话框头像")]
+        [Tooltip("这个角色说话时是否在对话框显示头像（另有剧本全局开关 portrait on/off）")]
+        public bool showPortrait = true;
+
+        [Tooltip("头像图列表（name 对应表情名；台词行带表情时优先匹配同名头像，否则用第一个）。\n" +
+                 "留空 = 直接用表情立绘当头像，配合下方缩放/偏移在窗口里框出半身")]
+        public List<Expression> portraits = new List<Expression>();
+
+        [Tooltip("头像缩放：1 = 图片宽度正好填满头像窗口；调大后配合偏移可框出脸部特写")]
+        [Range(0.2f, 6f)]
+        public float portraitScale = 1f;
+
+        [Tooltip("头像位置偏移（像素）：在窗口内平移图片，把想要的部位（脸）挪进窗口。\n" +
+                 "图片默认顶边贴窗口顶边，y 给正值往上推、负值往下拉")]
+        public Vector2 portraitOffset = Vector2.zero;
+
         /// <summary>按表情名取立绘；空/找不到时回退到第一个并告警</summary>
         public Sprite GetSprite(string expressionName)
         {
@@ -57,6 +73,25 @@ namespace VNEffects
 
             Debug.LogWarning($"[VNScript] 角色 {id} 没有表情「{expressionName}」，使用默认表情", this);
             return expressions[0].sprite;
+        }
+
+        /// <summary>
+        /// 按表情名取对话框头像；未配置头像列表时回退用表情立绘
+        /// （头像窗口有裁切，配合 portraitScale/portraitOffset 可框出半身）。
+        /// 返回 null = 该角色不显示头像。
+        /// </summary>
+        public Sprite GetPortrait(string expressionName)
+        {
+            if (!showPortrait) return null;
+            if (portraits.Count > 0)
+            {
+                if (!string.IsNullOrEmpty(expressionName))
+                    foreach (var p in portraits)
+                        if (p.name == expressionName && p.sprite != null)
+                            return p.sprite;
+                return portraits[0].sprite;
+            }
+            return expressions.Count > 0 ? GetSprite(expressionName) : null;
         }
     }
 }

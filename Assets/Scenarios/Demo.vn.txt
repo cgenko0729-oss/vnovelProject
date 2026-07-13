@@ -10,6 +10,8 @@
 #   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
 #   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch> <on|off>
+#   portrait <on|off>            对话头像全局开关（头像图/每角色开关/缩放/偏移
+#                                在角色 .asset 的「对话框头像」里配；不配图则自动用立绘）
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----
 #   label <名字> / jump <名字>
@@ -31,23 +33,23 @@
 
 #小雪02
 
-bg bg1
+
 mood Normal
-fx godrays on
-weather Petals
+
 bgm play b01 [fade:2]
 
-bg bg2 transition:Eyelid
-
+bg bg1 transition:Eyelid
 # start:cut → 眨眼睁开时画面已在 top 2.05 视角；end:fade → 末镜头叠化回全图
-camseq start:cut end:fade endfade:0.8
+camseq start:fade startfade:0.5 end:fade endfade:1
 > top 2.05 0
 > 34,-269 2.05 2
 > right 2 0 xfade:0.5
-> left 2 3
+> -427,0 2 3
 
 
-
+wait 0.3
+fx godrays on
+weather Petals
 
 show 亚里沙 at:left with:DissolveGlow
 wait 0.4

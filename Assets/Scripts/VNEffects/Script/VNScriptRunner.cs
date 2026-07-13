@@ -314,6 +314,11 @@ namespace VNEffects
                     return null;
                 }
 
+                case "portrait":
+                    // portrait on / portrait off：对话头像全局开关
+                    stage.SetPortraitEnabled(cmd.Arg(0, "on") != "off");
+                    return null;
+
                 case "camera":
                     return CameraCo(cmd);
 
