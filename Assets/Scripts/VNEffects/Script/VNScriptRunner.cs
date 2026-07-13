@@ -316,6 +316,28 @@ namespace VNEffects
                 case "camera":
                     return CameraCo(cmd);
 
+                case "camseq":
+                    return CamseqCo(cmd);
+
+                case "camcut":
+                {
+                    // camcut <目标点> [zoom]
+                    var p = stage.ResolveCamPoint(cmd.Arg(0), cmd.line);
+                    if (p.HasValue)
+                        stage.vnCamera?.Cut(p.Value, cmd.ArgF(1, 1.5f));
+                    return null;
+                }
+
+                case "camto":
+                {
+                    // camto <目标点> [zoom] [秒] [ease:名]
+                    var p = stage.ResolveCamPoint(cmd.Arg(0), cmd.line);
+                    if (!p.HasValue || stage.vnCamera == null) return null;
+                    return WaitTween(stage.vnCamera.GoTo(p.Value,
+                        cmd.ArgF(1, 1.4f), cmd.ArgF(2, 0.8f),
+                        ParseEase(cmd.Kw("ease"), Ease.InOutSine)));
+                }
+
                 case "transition":
                     if (stage.transition == null) return null;
                     return WaitTween(stage.transition.Play(
@@ -526,6 +548,44 @@ namespace VNEffects
                     break;
             }
             if (t != null) yield return t.WaitForCompletion();
+        }
+
+        static Ease ParseEase(string name, Ease def)
+        {
+            if (!string.IsNullOrEmpty(name) &&
+                System.Enum.TryParse(name, true, out Ease e)) return e;
+            return def;
+        }
+
+        IEnumerator CamseqCo(VNScriptCommand cmd)
+        {
+            if (stage.vnCamera == null) yield break;
+            if (cmd.camPoints == null || cmd.camPoints.Count == 0)
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：camseq 下面没有任何「> 路径点」行");
+                yield break;
+            }
+
+            // 执行时才解析点位（角色可能刚移动过）
+            var list = new List<VNCamera.Waypoint>();
+            foreach (var def in cmd.camPoints)
+            {
+                var p = stage.ResolveCamPoint(def.point, def.line);
+                if (!p.HasValue) continue; // 已告警，跳过该点
+                bool easeSet = System.Enum.TryParse(def.ease, true, out Ease easeVal);
+                list.Add(new VNCamera.Waypoint
+                {
+                    point = p.Value,
+                    zoom = def.zoom,
+                    duration = def.duration,
+                    ease = easeVal,
+                    easeSet = easeSet,
+                });
+            }
+            if (list.Count == 0) yield break;
+
+            var seq = stage.vnCamera.PlayPath(list);
+            if (seq != null) yield return seq.WaitForCompletion();
         }
 
         /// <summary>camera 命令的 focus:角色id 参数 → 该角色的画布坐标</summary>

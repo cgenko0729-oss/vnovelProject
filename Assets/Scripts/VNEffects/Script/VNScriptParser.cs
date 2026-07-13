@@ -12,6 +12,16 @@ namespace VNEffects
         public int line;
     }
 
+    /// <summary>camseq 命令的一个路径点（点位在运行时解析）</summary>
+    public class VNCamWaypointDef
+    {
+        public string point;    // 目标点 token：锚点名/角色[:部位]/x,y
+        public float zoom = 1f;
+        public float duration = 0.8f;
+        public string ease;     // 可选缓动名
+        public int line;
+    }
+
     /// <summary>一条剧本命令（解析结果）</summary>
     public class VNScriptCommand
     {
@@ -28,6 +38,9 @@ namespace VNEffects
 
         // choice 命令专用
         public List<VNChoiceOption> options;
+
+        // camseq 命令专用
+        public List<VNCamWaypointDef> camPoints;
 
         public string Arg(int i, string def = null) => i < args.Count ? args[i] : def;
 
@@ -60,6 +73,7 @@ namespace VNEffects
             "sakura", "transition",
             "label", "jump", "flag", "if", "choice",
             "move", "bgm", "se", "voice", "volume",
+            "camseq", "camcut", "camto",
         };
 
         public static List<VNScriptCommand> Parse(string source)
@@ -69,6 +83,7 @@ namespace VNEffects
 
             var lines = source.Replace("\r\n", "\n").Split('\n');
             VNScriptCommand lastChoice = null;
+            VNScriptCommand lastCamseq = null;
             for (int i = 0; i < lines.Length; i++)
             {
                 string raw = lines[i].Trim();
@@ -81,6 +96,16 @@ namespace VNEffects
                         Debug.LogWarning($"[VNScript] 第 {i + 1} 行：选项行前面没有 choice 命令，已忽略");
                     else
                         ParseChoiceOption(lastChoice, raw, i + 1);
+                    continue;
+                }
+
+                // 镜头路径点行：> 目标点 zoom 时长 [ease:名]，挂到上一个 camseq 命令
+                if (raw.StartsWith(">"))
+                {
+                    if (lastCamseq == null)
+                        Debug.LogWarning($"[VNScript] 第 {i + 1} 行：路径点行前面没有 camseq 命令，已忽略");
+                    else
+                        ParseCamWaypoint(lastCamseq, raw, i + 1);
                     continue;
                 }
 
@@ -103,15 +128,52 @@ namespace VNEffects
                 {
                     cmd.options = new List<VNChoiceOption>();
                     lastChoice = cmd;
+                    lastCamseq = null;
+                }
+                else if (cmd.keyword == "camseq")
+                {
+                    cmd.camPoints = new List<VNCamWaypointDef>();
+                    lastCamseq = cmd;
+                    lastChoice = null;
                 }
                 else
                 {
-                    lastChoice = null; // 选项行必须紧跟 choice 块
+                    lastChoice = null;  // 块的附属行必须紧跟块命令
+                    lastCamseq = null;
                 }
 
                 result.Add(cmd);
             }
             return result;
+        }
+
+        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名]</summary>
+        static void ParseCamWaypoint(VNScriptCommand camseqCmd, string raw, int line)
+        {
+            var tokens = raw.Substring(1).Trim()
+                .Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：空的路径点行");
+                return;
+            }
+
+            var wp = new VNCamWaypointDef { point = tokens[0], line = line };
+            int numIndex = 0; // 第 1 个数字 = zoom，第 2 个 = 时长
+            for (int t = 1; t < tokens.Length; t++)
+            {
+                if (tokens[t].StartsWith("ease:"))
+                {
+                    wp.ease = tokens[t].Substring(5);
+                }
+                else if (float.TryParse(tokens[t], out float v))
+                {
+                    if (numIndex == 0) wp.zoom = v;
+                    else if (numIndex == 1) wp.duration = v;
+                    numIndex++;
+                }
+            }
+            camseqCmd.camPoints.Add(wp);
         }
 
         /// <summary>解析选项行：* 文本 [flag:名字+1] [-> 标签]</summary>

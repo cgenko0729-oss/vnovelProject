@@ -101,6 +101,120 @@ namespace VNEffects
             return seq;
         }
 
+        // ------------------------------------------------------------------
+        // 路径镜头（camseq / camto / camcut）
+        // ------------------------------------------------------------------
+
+        [Header("路径镜头")]
+        [Tooltip("自动钳制偏移量，防止高倍缩放对准边角时露出画布边缘")]
+        public bool clampToCanvas = true;
+
+        [Tooltip("画布半尺寸（1920×1080 的一半）")]
+        public Vector2 canvasHalf = new Vector2(960f, 540f);
+
+        [Tooltip("背景图的四边溢出量（生成器默认 60px）")]
+        public Vector2 overscan = new Vector2(60f, 60f);
+
+        /// <summary>一个镜头路径点</summary>
+        public struct Waypoint
+        {
+            public Vector2 point;   // 看向的画布坐标（中心为原点）
+            public float zoom;      // 缩放倍率
+            public float duration;  // 到达本点的时长（≤0 = 瞬切）
+            public Ease ease;       // 本段缓动（easeSet 为 true 时生效）
+            public bool easeSet;
+        }
+
+        /// <summary>"看向点 p"（居中语义）所需的容器偏移，含防露边钳制</summary>
+        Vector2 OffsetFor(Vector2 point, float zoom)
+        {
+            var o = -point * zoom;
+            if (clampToCanvas)
+            {
+                var max = (canvasHalf + overscan) * zoom - canvasHalf;
+                max = Vector2.Max(max, Vector2.zero);
+                o.x = Mathf.Clamp(o.x, -max.x, max.x);
+                o.y = Mathf.Clamp(o.y, -max.y, max.y);
+            }
+            return o;
+        }
+
+        /// <summary>瞬切到镜头状态（"一开始就已经 zoom 在那里"的起手）</summary>
+        public void Cut(Vector2 point, float zoom)
+        {
+            Cache();
+            if (target == null) return;
+            KillTweens();
+            target.localScale = Vector3.one * zoom;
+            target.anchoredPosition = _basePos + OffsetFor(point, zoom);
+        }
+
+        /// <summary>单段直达：补间到指定镜头状态</summary>
+        public Sequence GoTo(Vector2 point, float zoom, float duration, Ease ease = Ease.InOutSine)
+        {
+            Cache();
+            if (target == null) return null;
+            KillTweens();
+            return DOTween.Sequence()
+                .Append(target.DOScale(zoom, duration).SetEase(ease))
+                .Join(target.DOAnchorPos(_basePos + OffsetFor(point, zoom), duration).SetEase(ease))
+                .SetTarget(this).SetLink(gameObject);
+        }
+
+        /// <summary>
+        /// 多段镜头路径：整条路径编成一条 Sequence（可等待/可异步）。
+        /// 默认缓动让整条路径像一次连续运镜：
+        /// 首个移动段 InSine（从静止缓起）、中间段 Linear（匀速）、末段 OutSine（缓停）；
+        /// 单段路径用 InOutSine；每个路径点可用 ease 覆盖。
+        /// </summary>
+        public Sequence PlayPath(System.Collections.Generic.List<Waypoint> points)
+        {
+            Cache();
+            if (target == null || points == null || points.Count == 0) return null;
+            KillTweens();
+
+            // 找出第一个/最后一个"移动段"（时长>0），用于默认缓动分配
+            int firstMove = -1, lastMove = -1, moveCount = 0;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (points[i].duration > 0.001f)
+                {
+                    if (firstMove < 0) firstMove = i;
+                    lastMove = i;
+                    moveCount++;
+                }
+            }
+
+            var seq = DOTween.Sequence().SetTarget(this).SetLink(gameObject);
+            for (int i = 0; i < points.Count; i++)
+            {
+                var wp = points[i];
+                float zoom = Mathf.Max(0.1f, wp.zoom);
+                var pos = _basePos + OffsetFor(wp.point, zoom);
+
+                if (wp.duration <= 0.001f)
+                {
+                    // 瞬切段
+                    seq.AppendCallback(() =>
+                    {
+                        target.localScale = Vector3.one * zoom;
+                        target.anchoredPosition = pos;
+                    });
+                    continue;
+                }
+
+                Ease ease = wp.easeSet ? wp.ease
+                    : moveCount <= 1 ? Ease.InOutSine
+                    : i == firstMove ? Ease.InSine
+                    : i == lastMove ? Ease.OutSine
+                    : Ease.Linear;
+
+                seq.Append(target.DOScale(zoom, wp.duration).SetEase(ease));
+                seq.Join(target.DOAnchorPos(pos, wp.duration).SetEase(ease));
+            }
+            return seq;
+        }
+
         /// <summary>镜头复位（缩放/平移/立绘补偿全部还原）</summary>
         public Sequence ResetCamera(float duration = 1f)
         {
