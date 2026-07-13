@@ -20,3 +20,9 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: b43a57825a93a7e46a5bdda314d90500, type: 3}
   sizeScale: 2.1
   positionOffset: {x: 0, y: -280}
+  showPortrait: 1
+  portraits:
+  - name: p01
+    sprite: {fileID: 21300000, guid: 90436bdfb80ce304eb379df16e5979b2, type: 3}
+  portraitScale: 3.55
+  portraitOffset: {x: 0, y: 0}
