@@ -35,8 +35,10 @@ namespace VNEffects.EditorTools
         float _pendingScrollY = -1f;
 
         readonly VNScenarioSourceContext _ctx = new VNScenarioSourceContext();
-        readonly List<BackgroundPreviewItem> _backgroundPreviews =
-            new List<BackgroundPreviewItem>();
+        readonly List<SpritePreviewItem> _backgroundPreviews =
+            new List<SpritePreviewItem>();
+        readonly List<CharacterPreviewItem> _characterPreviews =
+            new List<CharacterPreviewItem>();
         List<VNIssue> _issues = new List<VNIssue>();
         readonly Dictionary<int, bool> _rowHasError = new Dictionary<int, bool>();
         List<string> _labels = new List<string>();
@@ -159,6 +161,7 @@ namespace VNEffects.EditorTools
         {
             var ids = new List<string>();
             _ctx.expressions.Clear();
+            _characterPreviews.Clear();
             foreach (var guid in AssetDatabase.FindAssets("t:VNCharacterDef"))
             {
                 var def = AssetDatabase.LoadAssetAtPath<VNCharacterDef>(
@@ -166,9 +169,15 @@ namespace VNEffects.EditorTools
                 if (def == null || string.IsNullOrEmpty(def.id)) continue;
                 ids.Add(def.id);
                 var exprs = new List<string>();
+                var previews = new List<SpritePreviewItem>();
                 foreach (var e in def.expressions)
-                    if (!string.IsNullOrEmpty(e.name)) exprs.Add(e.name);
+                {
+                    if (string.IsNullOrEmpty(e.name)) continue;
+                    exprs.Add(e.name);
+                    previews.Add(new SpritePreviewItem(e.name, e.sprite));
+                }
                 _ctx.expressions[def.id] = exprs.ToArray();
+                _characterPreviews.Add(new CharacterPreviewItem(def.id, previews));
             }
             _ctx.characterIds = ids.ToArray();
 
@@ -181,7 +190,7 @@ namespace VNEffects.EditorTools
                 {
                     if (b == null || string.IsNullOrEmpty(b.id)) continue;
                     bgs.Add(b.id);
-                    _backgroundPreviews.Add(new BackgroundPreviewItem(b.id, b.sprite));
+                    _backgroundPreviews.Add(new SpritePreviewItem(b.id, b.sprite));
                 }
                 _ctx.backgroundIds = bgs.ToArray();
             }
@@ -606,15 +615,14 @@ namespace VNEffects.EditorTools
             x += 132f;
 
             // 说话者
-            r.speaker = PopupString(new Rect(x, rect.y, 110f, rect.height),
-                r.speaker, _ctx.characterIds, "(narration)", (r, "say.speaker"));
+            r.speaker = CharacterPopup(new Rect(x, rect.y, 110f, rect.height),
+                r.speaker, r.expression, (r, "say.speaker"),
+                _ => r.expression = "");
             x += 114f;
 
             // 表情
-            string[] exprs = _ctx.expressions.TryGetValue(r.speaker, out var e)
-                ? e : System.Array.Empty<string>();
-            r.expression = PopupString(new Rect(x, rect.y, 92f, rect.height),
-                r.expression, exprs, "(default)", (r, "say.expr"));
+            r.expression = ExpressionPopup(new Rect(x, rect.y, 92f, rect.height),
+                r.expression, r.speaker, (r, "say.expr"));
             x += 96f;
 
             float asyncW = 26f;
@@ -874,6 +882,21 @@ namespace VNEffects.EditorTools
             string v = r.Get(p.id);
             string[] options = OptionsFor(r, p);
 
+            if (r.keyword == "show" && p.source == VNParamSource.Character)
+            {
+                string character = CharacterPopup(rect, v, r.Get("expr"), (r, p.id),
+                    _ => r.Set("expr", ""));
+                if (character != v) r.Set(p.id, character);
+                return;
+            }
+
+            if (r.keyword == "show" && p.source == VNParamSource.Expression)
+            {
+                string expression = ExpressionPopup(rect, v, r.Get(p.dependsOn), (r, p.id));
+                if (expression != v) r.Set(p.id, expression);
+                return;
+            }
+
             if (p.source == VNParamSource.Background)
             {
                 string background = BackgroundPopup(rect, v, (r, p.id));
@@ -990,9 +1013,56 @@ namespace VNEffects.EditorTools
         }
 
         string BackgroundPopup(Rect rect, string value, (VNRow, string) key)
+            => SpritePopup(rect, value, key, _backgroundPreviews,
+                SpriteFor(_backgroundPreviews, value), "-", "未选择背景",
+                "清除选择", "没有匹配的背景", null);
+
+        string CharacterPopup(Rect rect, string value, string expression,
+            (VNRow, string) key, System.Action<string> afterSelect)
+        {
+            var items = new List<SpritePreviewItem>();
+            foreach (var character in _characterPreviews)
+                items.Add(new SpritePreviewItem(character.id, character.DefaultSprite));
+            return SpritePopup(rect, value, key, items,
+                CharacterSprite(value, expression), "(narration)", "未选择角色（旁白）",
+                "设为旁白", "没有匹配的角色", afterSelect);
+        }
+
+        string ExpressionPopup(Rect rect, string value, string characterId,
+            (VNRow, string) key)
+        {
+            CharacterPreviewItem character =
+                _characterPreviews.Find(item => item.id == characterId);
+            var items = character != null
+                ? new List<SpritePreviewItem>(character.expressions)
+                : new List<SpritePreviewItem>();
+            return SpritePopup(rect, value, key, items,
+                CharacterSprite(characterId, value), "(default)", "使用默认表情",
+                "默认表情", "没有匹配的表情", null);
+        }
+
+        Sprite CharacterSprite(string characterId, string expression)
+        {
+            CharacterPreviewItem character =
+                _characterPreviews.Find(item => item.id == characterId);
+            if (character == null) return null;
+            Sprite selected = SpriteFor(character.expressions, expression);
+            return selected != null ? selected : character.DefaultSprite;
+        }
+
+        static Sprite SpriteFor(List<SpritePreviewItem> items, string id)
+        {
+            SpritePreviewItem item = items.Find(candidate => candidate.id == id);
+            return item != null ? item.sprite : null;
+        }
+
+        string SpritePopup(Rect rect, string value, (VNRow, string) key,
+            List<SpritePreviewItem> items, Sprite inlineSprite, string emptyLabel,
+            string emptyTooltip, string clearLabel, string noMatchesLabel,
+            System.Action<string> afterSelect)
         {
             bool registered = string.IsNullOrEmpty(value) ||
-                _backgroundPreviews.Exists(item => item.id == value);
+                items.Exists(item => item.id == value);
             bool custom = _customEdit.Contains(key) || !registered;
             if (custom)
             {
@@ -1002,7 +1072,7 @@ namespace VNEffects.EditorTools
                     EditorStyles.miniButton))
                 {
                     _customEdit.Remove(key);
-                    if (!_backgroundPreviews.Exists(item => item.id == edited)) edited = "";
+                    if (!items.Exists(item => item.id == edited)) edited = "";
                     GUI.changed = true;
                 }
                 return edited;
@@ -1018,14 +1088,12 @@ namespace VNEffects.EditorTools
                     rect.width - previewWidth - 2f, rect.height);
 
                 EditorGUI.DrawRect(previewRect, new Color(0.08f, 0.08f, 0.08f, 1f));
-                BackgroundPreviewItem current =
-                    _backgroundPreviews.Find(item => item.id == value);
-                string tooltip = string.IsNullOrEmpty(value) ? "未选择背景" : value;
-                if (current != null && current.sprite != null)
+                string tooltip = string.IsNullOrEmpty(value) ? emptyTooltip : value;
+                if (inlineSprite != null)
                 {
                     DrawSpritePreview(new Rect(previewRect.x + 1f, previewRect.y + 1f,
-                        previewRect.width - 2f, previewRect.height - 2f), current.sprite);
-                    string path = AssetDatabase.GetAssetPath(current.sprite);
+                        previewRect.width - 2f, previewRect.height - 2f), inlineSprite);
+                    string path = AssetDatabase.GetAssetPath(inlineSprite);
                     if (!string.IsNullOrEmpty(path)) tooltip += "\n" + path;
                 }
                 else if (!string.IsNullOrEmpty(value))
@@ -1038,22 +1106,27 @@ namespace VNEffects.EditorTools
                     openPicker = true;
             }
 
-            string label = string.IsNullOrEmpty(value) ? "-" : value;
+            string label = string.IsNullOrEmpty(value) ? emptyLabel : value;
             if (GUI.Button(popupRect, label, EditorStyles.popup)) openPicker = true;
-            if (openPicker) ShowBackgroundPicker(rect, value, key);
+            if (openPicker)
+                ShowSpritePicker(rect, value, key, items, clearLabel, noMatchesLabel,
+                    afterSelect);
             return value;
         }
 
-        void ShowBackgroundPicker(Rect activatorRect, string value, (VNRow, string) key)
+        void ShowSpritePicker(Rect activatorRect, string value, (VNRow, string) key,
+            List<SpritePreviewItem> items, string clearLabel, string noMatchesLabel,
+            System.Action<string> afterSelect)
         {
-            var items = new List<BackgroundPreviewItem>(_backgroundPreviews);
-            PopupWindow.Show(activatorRect, new BackgroundPickerPopup(items, value,
+            PopupWindow.Show(activatorRect, new SpritePickerPopup(
+                new List<SpritePreviewItem>(items), value, clearLabel, noMatchesLabel,
                 selected =>
                 {
                     if (key.Item1.Get(key.Item2) == selected) return;
                     PushUndo(_doc.GenerateText());
                     key.Item1.Set(key.Item2, selected);
                     _customEdit.Remove(key);
+                    afterSelect?.Invoke(selected);
                     Bump();
                     Repaint();
                 },
@@ -1086,38 +1159,57 @@ namespace VNEffects.EditorTools
             GUI.DrawTextureWithTexCoords(fitted, texture, uv, true);
         }
 
-        sealed class BackgroundPreviewItem
+        sealed class SpritePreviewItem
         {
             public readonly string id;
             public readonly Sprite sprite;
 
-            public BackgroundPreviewItem(string id, Sprite sprite)
+            public SpritePreviewItem(string id, Sprite sprite)
             {
                 this.id = id;
                 this.sprite = sprite;
             }
         }
 
-        sealed class BackgroundPickerPopup : PopupWindowContent
+        sealed class CharacterPreviewItem
+        {
+            public readonly string id;
+            public readonly List<SpritePreviewItem> expressions;
+
+            public CharacterPreviewItem(string id, List<SpritePreviewItem> expressions)
+            {
+                this.id = id;
+                this.expressions = expressions;
+            }
+
+            public Sprite DefaultSprite => expressions.Count > 0 ? expressions[0].sprite : null;
+        }
+
+        sealed class SpritePickerPopup : PopupWindowContent
         {
             const float CellWidth = 154f;
             const float CellHeight = 116f;
             const float PreviewHeight = 82f;
 
-            readonly List<BackgroundPreviewItem> _items;
+            readonly List<SpritePreviewItem> _items;
             readonly string _selected;
+            readonly string _clearLabel;
+            readonly string _noMatchesLabel;
             readonly System.Action<string> _onSelect;
             readonly System.Action _onCustom;
-            readonly List<BackgroundPreviewItem> _filtered =
-                new List<BackgroundPreviewItem>();
+            readonly List<SpritePreviewItem> _filtered =
+                new List<SpritePreviewItem>();
             Vector2 _scroll;
             string _search = "";
 
-            public BackgroundPickerPopup(List<BackgroundPreviewItem> items, string selected,
+            public SpritePickerPopup(List<SpritePreviewItem> items, string selected,
+                string clearLabel, string noMatchesLabel,
                 System.Action<string> onSelect, System.Action onCustom)
             {
                 _items = items;
                 _selected = selected;
+                _clearLabel = clearLabel;
+                _noMatchesLabel = noMatchesLabel;
                 _onSelect = onSelect;
                 _onCustom = onCustom;
             }
@@ -1130,8 +1222,8 @@ namespace VNEffects.EditorTools
                 {
                     GUI.SetNextControlName("BackgroundSearch");
                     _search = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
-                    if (GUILayout.Button("清除选择", EditorStyles.toolbarButton,
-                            GUILayout.Width(64f)))
+                    if (GUILayout.Button(_clearLabel, EditorStyles.toolbarButton,
+                            GUILayout.Width(72f)))
                     {
                         _onSelect("");
                         editorWindow.Close();
@@ -1155,7 +1247,7 @@ namespace VNEffects.EditorTools
 
                 if (_filtered.Count == 0)
                 {
-                    GUI.Label(grid, "没有匹配的背景", EditorStyles.centeredGreyMiniLabel);
+                    GUI.Label(grid, _noMatchesLabel, EditorStyles.centeredGreyMiniLabel);
                 }
                 else
                 {
@@ -1182,7 +1274,7 @@ namespace VNEffects.EditorTools
                 }
             }
 
-            void DrawItem(Rect rect, BackgroundPreviewItem item)
+            void DrawItem(Rect rect, SpritePreviewItem item)
             {
                 bool selected = item.id == _selected;
                 EditorGUI.DrawRect(rect, selected
