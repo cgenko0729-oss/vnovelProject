@@ -1,6 +1,7 @@
 using System;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Sprites;
 using UnityEngine.UI;
 
 namespace VNEffects
@@ -39,6 +40,9 @@ namespace VNEffects
         static readonly int IdCount = Shader.PropertyToID("_Count");
         static readonly int IdCenter = Shader.PropertyToID("_Center");
         static readonly int IdAspect = Shader.PropertyToID("_Aspect");
+        static readonly int IdUvRect = Shader.PropertyToID("_UVRect");
+        static readonly int IdRectMinMax = Shader.PropertyToID("_RectMinMax");
+        static readonly int IdScatter = Shader.PropertyToID("_Scatter");
 
         [Tooltip("渲染排序（要盖住一切，包括粒子和边缘泛光）")]
         public int sortingOrder = 100;
@@ -47,7 +51,10 @@ namespace VNEffects
         [SerializeField] Material sourceMaterial;
 
         RawImage _img;
+        Image _inputBlocker;
         Material _mat;
+        Material _directMat;
+        GameObject _directOverlay;
         Sequence _seq;
         VNAmbientParticles _bokehOrbs;
 
@@ -107,6 +114,66 @@ namespace VNEffects
             _mat.hideFlags = HideFlags.DontSave;
             _img.material = _mat;
             _img.enabled = false;
+
+            var blockerGo = new GameObject("DirectTransitionInputBlocker",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var blockerRect = (RectTransform)blockerGo.transform;
+            blockerRect.SetParent(transform, false);
+            blockerRect.anchorMin = Vector2.zero;
+            blockerRect.anchorMax = Vector2.one;
+            blockerRect.offsetMin = Vector2.zero;
+            blockerRect.offsetMax = Vector2.zero;
+            _inputBlocker = blockerGo.GetComponent<Image>();
+            _inputBlocker.color = Color.clear;
+            _inputBlocker.raycastTarget = true;
+            _inputBlocker.enabled = false;
+        }
+
+        /// <summary>这些效果在 bg 命令中直接让旧背景离场并露出新背景，不经过黑色遮罩。</summary>
+        public static bool SupportsDirectBackground(VNTransition type) =>
+            type == VNTransition.PageCurl || type == VNTransition.Shatter ||
+            type == VNTransition.Ripple || type == VNTransition.InkBleed;
+
+        /// <summary>
+        /// 背景 A→B 直接转场。先复制当前背景 A，再立即把真实 Image 换成 B，
+        /// 最后只动画上层副本；页后、碎片间、波纹内和墨迹内会直接露出 B。
+        /// </summary>
+        public Sequence PlayBackground(VNTransition type, Image backgroundImage,
+            Sprite nextSprite, Action onNextVisible = null, Vector2? viewportCenter = null)
+        {
+            if (!SupportsDirectBackground(type) || backgroundImage == null ||
+                backgroundImage.sprite == null || nextSprite == null)
+                return null;
+
+            Build();
+            StopCurrentTransition();
+
+            Sprite oldSprite = backgroundImage.sprite;
+            _directMat = CreateDirectMaterial();
+            if (_directMat == null) return null;
+
+            float duration = DirectDuration(type);
+            int mode = DirectMode(type);
+            Vector2 center = viewportCenter ?? new Vector2(0.5f, 0.5f);
+
+            if (type == VNTransition.Shatter)
+                CreateShatterOverlay(backgroundImage, oldSprite);
+            else
+                CreateImageOverlay(backgroundImage, oldSprite);
+
+            ConfigureDirectMaterial(oldSprite, backgroundImage.rectTransform.rect,
+                mode, center);
+
+            // 新背景先放在临时旧背景下面，动画一开始就能从空隙中看到。
+            backgroundImage.sprite = nextSprite;
+            onNextVisible?.Invoke();
+            if (_inputBlocker != null) _inputBlocker.enabled = true;
+
+            _seq = DOTween.Sequence()
+                .Append(_directMat.DOFloat(1f, IdProgress, duration).SetEase(DirectEase(type)))
+                .OnComplete(CleanupDirectOverlay)
+                .SetLink(gameObject);
+            return _seq;
         }
 
         /// <summary>
@@ -119,7 +186,7 @@ namespace VNEffects
             Color? color = null, Vector2? viewportCenter = null)
         {
             Build();
-            _seq?.Kill();
+            StopCurrentTransition();
 
             GetDefaults(type, out float defOut, out float defIn, out Color defColor,
                 out int mode, out float noiseScale, out float count);
@@ -154,6 +221,144 @@ namespace VNEffects
                 })
                 .SetLink(gameObject);
             return _seq;
+        }
+
+        Material CreateDirectMaterial()
+        {
+            var shader = Shader.Find("VN/DirectBackgroundTransition");
+            if (shader == null)
+            {
+                Debug.LogError("[VNEffects] 找不到 Shader \"VN/DirectBackgroundTransition\"。", this);
+                return null;
+            }
+            var material = new Material(shader) { hideFlags = HideFlags.DontSave };
+            material.SetFloat(IdProgress, 0f);
+            return material;
+        }
+
+        void CreateImageOverlay(Image source, Sprite oldSprite)
+        {
+            var go = new GameObject($"DirectTransition_{oldSprite.name}",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            _directOverlay = go;
+            var rect = (RectTransform)go.transform;
+            CopyRectTransform(source.rectTransform, rect);
+            var image = go.GetComponent<Image>();
+            image.sprite = oldSprite;
+            image.type = source.type;
+            image.useSpriteMesh = source.useSpriteMesh;
+            image.preserveAspect = source.preserveAspect;
+            image.fillCenter = source.fillCenter;
+            image.fillMethod = source.fillMethod;
+            image.fillAmount = source.fillAmount;
+            image.fillClockwise = source.fillClockwise;
+            image.fillOrigin = source.fillOrigin;
+            image.color = source.color;
+            image.raycastTarget = false;
+            image.material = _directMat;
+        }
+
+        void CreateShatterOverlay(Image source, Sprite oldSprite)
+        {
+            var go = new GameObject($"DirectShatter_{oldSprite.name}",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(VNShatterGraphic));
+            _directOverlay = go;
+            var rect = (RectTransform)go.transform;
+            CopyRectTransform(source.rectTransform, rect);
+            var graphic = go.GetComponent<VNShatterGraphic>();
+            graphic.Sprite = oldSprite;
+            graphic.color = source.color;
+            graphic.raycastTarget = false;
+            graphic.material = _directMat;
+
+            var canvas = source.GetComponentInParent<Canvas>();
+            if (canvas != null)
+                canvas.additionalShaderChannels |= AdditionalCanvasShaderChannels.TexCoord1 |
+                                                   AdditionalCanvasShaderChannels.TexCoord2;
+        }
+
+        static void CopyRectTransform(RectTransform source, RectTransform target)
+        {
+            target.SetParent(source.parent, false);
+            target.SetSiblingIndex(source.GetSiblingIndex() + 1);
+            target.anchorMin = source.anchorMin;
+            target.anchorMax = source.anchorMax;
+            target.pivot = source.pivot;
+            target.anchoredPosition3D = source.anchoredPosition3D;
+            target.sizeDelta = source.sizeDelta;
+            target.localRotation = source.localRotation;
+            target.localScale = source.localScale;
+        }
+
+        void ConfigureDirectMaterial(Sprite sprite, Rect localRect, int mode, Vector2 center)
+        {
+            // DataUtility 同时支持普通 Sprite 与图集 Sprite，避免 tight packing 下 textureRect 抛异常。
+            Vector4 outerUv = DataUtility.GetOuterUV(sprite);
+            _directMat.SetVector(IdUvRect, outerUv);
+            _directMat.SetVector(IdRectMinMax, new Vector4(
+                localRect.xMin, localRect.yMin, localRect.xMax, localRect.yMax));
+            _directMat.SetVector(IdCenter, center);
+            _directMat.SetFloat(IdAspect, Mathf.Max(0.01f,
+                localRect.width / Mathf.Max(1f, localRect.height)));
+            _directMat.SetFloat(IdMode, mode);
+            _directMat.SetFloat(IdScatter, 0.42f);
+            _directMat.SetFloat(IdProgress, 0f);
+        }
+
+        static int DirectMode(VNTransition type)
+        {
+            switch (type)
+            {
+                case VNTransition.Ripple: return 1;
+                case VNTransition.InkBleed: return 2;
+                case VNTransition.Shatter: return 3;
+                default: return 0;
+            }
+        }
+
+        static float DirectDuration(VNTransition type)
+        {
+            switch (type)
+            {
+                case VNTransition.PageCurl: return 1.2f;
+                case VNTransition.Shatter: return 1.05f;
+                case VNTransition.Ripple: return 1.0f;
+                case VNTransition.InkBleed: return 1.25f;
+                default: return 1f;
+            }
+        }
+
+        static Ease DirectEase(VNTransition type) => type == VNTransition.Shatter
+            ? Ease.InQuad : Ease.InOutSine;
+
+        void StopCurrentTransition()
+        {
+            if (_seq != null)
+            {
+                var sequence = _seq;
+                _seq = null;
+                sequence.Kill();
+            }
+            if (_img != null) _img.enabled = false;
+            StopBokehOrbs();
+            CleanupDirectOverlay();
+        }
+
+        void CleanupDirectOverlay()
+        {
+            _seq = null;
+            if (_inputBlocker != null) _inputBlocker.enabled = false;
+            if (_directOverlay != null)
+            {
+                _directOverlay.SetActive(false);
+                Destroy(_directOverlay);
+                _directOverlay = null;
+            }
+            if (_directMat != null)
+            {
+                Destroy(_directMat);
+                _directMat = null;
+            }
         }
 
         /// <summary>从某个世界坐标目标（如说话角色）扩散的圆形转场</summary>
@@ -258,6 +463,7 @@ namespace VNEffects
         void OnDestroy()
         {
             _seq?.Kill();
+            CleanupDirectOverlay();
             if (_mat != null) Destroy(_mat);
         }
     }
