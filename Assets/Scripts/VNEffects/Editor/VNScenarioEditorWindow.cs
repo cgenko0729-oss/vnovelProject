@@ -1008,27 +1008,82 @@ namespace VNEffects.EditorTools
                 return edited;
             }
 
-            string label = string.IsNullOrEmpty(value) ? "-" : value;
-            if (GUI.Button(rect, label, EditorStyles.popup))
+            bool openPicker = false;
+            Rect popupRect = rect;
+            if (rect.width >= 76f)
             {
-                var items = new List<BackgroundPreviewItem>(_backgroundPreviews);
-                PopupWindow.Show(rect, new BackgroundPickerPopup(items, value,
-                    selected =>
-                    {
-                        if (key.Item1.Get(key.Item2) == selected) return;
-                        PushUndo(_doc.GenerateText());
-                        key.Item1.Set(key.Item2, selected);
-                        _customEdit.Remove(key);
-                        Bump();
-                        Repaint();
-                    },
-                    () =>
-                    {
-                        _customEdit.Add(key);
-                        Repaint();
-                    }));
+                float previewWidth = Mathf.Min(42f, rect.height * 2.2f);
+                var previewRect = new Rect(rect.x, rect.y, previewWidth, rect.height);
+                popupRect = new Rect(previewRect.xMax + 2f, rect.y,
+                    rect.width - previewWidth - 2f, rect.height);
+
+                EditorGUI.DrawRect(previewRect, new Color(0.08f, 0.08f, 0.08f, 1f));
+                BackgroundPreviewItem current =
+                    _backgroundPreviews.Find(item => item.id == value);
+                string tooltip = string.IsNullOrEmpty(value) ? "未选择背景" : value;
+                if (current != null && current.sprite != null)
+                {
+                    DrawSpritePreview(new Rect(previewRect.x + 1f, previewRect.y + 1f,
+                        previewRect.width - 2f, previewRect.height - 2f), current.sprite);
+                    string path = AssetDatabase.GetAssetPath(current.sprite);
+                    if (!string.IsNullOrEmpty(path)) tooltip += "\n" + path;
+                }
+                else if (!string.IsNullOrEmpty(value))
+                {
+                    GUI.Label(previewRect, "!", EditorStyles.centeredGreyMiniLabel);
+                    tooltip += "\n没有可用的 Sprite 预览";
+                }
+
+                if (GUI.Button(previewRect, new GUIContent("", tooltip), GUIStyle.none))
+                    openPicker = true;
             }
+
+            string label = string.IsNullOrEmpty(value) ? "-" : value;
+            if (GUI.Button(popupRect, label, EditorStyles.popup)) openPicker = true;
+            if (openPicker) ShowBackgroundPicker(rect, value, key);
             return value;
+        }
+
+        void ShowBackgroundPicker(Rect activatorRect, string value, (VNRow, string) key)
+        {
+            var items = new List<BackgroundPreviewItem>(_backgroundPreviews);
+            PopupWindow.Show(activatorRect, new BackgroundPickerPopup(items, value,
+                selected =>
+                {
+                    if (key.Item1.Get(key.Item2) == selected) return;
+                    PushUndo(_doc.GenerateText());
+                    key.Item1.Set(key.Item2, selected);
+                    _customEdit.Remove(key);
+                    Bump();
+                    Repaint();
+                },
+                () =>
+                {
+                    _customEdit.Add(key);
+                    Repaint();
+                }));
+        }
+
+        static void DrawSpritePreview(Rect rect, Sprite sprite)
+        {
+            Rect source = sprite.textureRect;
+            float aspect = source.width / Mathf.Max(1f, source.height);
+            Rect fitted = rect;
+            if (aspect > rect.width / rect.height)
+            {
+                fitted.height = rect.width / aspect;
+                fitted.y += (rect.height - fitted.height) * 0.5f;
+            }
+            else
+            {
+                fitted.width = rect.height * aspect;
+                fitted.x += (rect.width - fitted.width) * 0.5f;
+            }
+
+            Texture2D texture = sprite.texture;
+            var uv = new Rect(source.x / texture.width, source.y / texture.height,
+                source.width / texture.width, source.height / texture.height);
+            GUI.DrawTextureWithTexCoords(fitted, texture, uv, true);
         }
 
         sealed class BackgroundPreviewItem
@@ -1138,7 +1193,7 @@ namespace VNEffects.EditorTools
                     rect.width - 8f, PreviewHeight);
                 EditorGUI.DrawRect(previewRect, new Color(0.08f, 0.08f, 0.08f, 1f));
                 if (item.sprite != null)
-                    DrawSprite(previewRect, item.sprite);
+                    DrawSpritePreview(previewRect, item.sprite);
                 else
                     GUI.Label(previewRect, "无预览", EditorStyles.centeredGreyMiniLabel);
 
@@ -1154,27 +1209,6 @@ namespace VNEffects.EditorTools
                 }
             }
 
-            static void DrawSprite(Rect rect, Sprite sprite)
-            {
-                Rect source = sprite.textureRect;
-                float aspect = source.width / Mathf.Max(1f, source.height);
-                Rect fitted = rect;
-                if (aspect > rect.width / rect.height)
-                {
-                    fitted.height = rect.width / aspect;
-                    fitted.y += (rect.height - fitted.height) * 0.5f;
-                }
-                else
-                {
-                    fitted.width = rect.height * aspect;
-                    fitted.x += (rect.width - fitted.width) * 0.5f;
-                }
-
-                var texture = sprite.texture;
-                var uv = new Rect(source.x / texture.width, source.y / texture.height,
-                    source.width / texture.width, source.height / texture.height);
-                GUI.DrawTextureWithTexCoords(fitted, texture, uv, true);
-            }
         }
 
         // ---- 添加菜单 ----
