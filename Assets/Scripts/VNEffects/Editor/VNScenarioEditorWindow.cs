@@ -35,6 +35,8 @@ namespace VNEffects.EditorTools
         float _pendingScrollY = -1f;
 
         readonly VNScenarioSourceContext _ctx = new VNScenarioSourceContext();
+        readonly List<BackgroundPreviewItem> _backgroundPreviews =
+            new List<BackgroundPreviewItem>();
         List<VNIssue> _issues = new List<VNIssue>();
         readonly Dictionary<int, bool> _rowHasError = new Dictionary<int, bool>();
         List<string> _labels = new List<string>();
@@ -171,11 +173,16 @@ namespace VNEffects.EditorTools
             _ctx.characterIds = ids.ToArray();
 
             var stage = FindFirstObjectByType<VNStage>();
+            _backgroundPreviews.Clear();
             if (stage != null)
             {
                 var bgs = new List<string>();
                 foreach (var b in stage.backgrounds)
-                    if (b != null && !string.IsNullOrEmpty(b.id)) bgs.Add(b.id);
+                {
+                    if (b == null || string.IsNullOrEmpty(b.id)) continue;
+                    bgs.Add(b.id);
+                    _backgroundPreviews.Add(new BackgroundPreviewItem(b.id, b.sprite));
+                }
                 _ctx.backgroundIds = bgs.ToArray();
             }
             else _ctx.backgroundIds = System.Array.Empty<string>();
@@ -867,6 +874,13 @@ namespace VNEffects.EditorTools
             string v = r.Get(p.id);
             string[] options = OptionsFor(r, p);
 
+            if (p.source == VNParamSource.Background)
+            {
+                string background = BackgroundPopup(rect, v, (r, p.id));
+                if (background != v) r.Set(p.id, background);
+                return;
+            }
+
             if (options == null)
             {
                 // 自由文本 / 数字
@@ -973,6 +987,194 @@ namespace VNEffects.EditorTools
                 return nidx == 0 ? "" : options[nidx - 1];
             }
             return value;
+        }
+
+        string BackgroundPopup(Rect rect, string value, (VNRow, string) key)
+        {
+            bool registered = string.IsNullOrEmpty(value) ||
+                _backgroundPreviews.Exists(item => item.id == value);
+            bool custom = _customEdit.Contains(key) || !registered;
+            if (custom)
+            {
+                var textRect = new Rect(rect.x, rect.y, rect.width - 16f, rect.height);
+                string edited = EditorGUI.TextField(textRect, value);
+                if (GUI.Button(new Rect(rect.xMax - 15f, rect.y, 15f, rect.height), "▾",
+                    EditorStyles.miniButton))
+                {
+                    _customEdit.Remove(key);
+                    if (!_backgroundPreviews.Exists(item => item.id == edited)) edited = "";
+                    GUI.changed = true;
+                }
+                return edited;
+            }
+
+            string label = string.IsNullOrEmpty(value) ? "-" : value;
+            if (GUI.Button(rect, label, EditorStyles.popup))
+            {
+                var items = new List<BackgroundPreviewItem>(_backgroundPreviews);
+                PopupWindow.Show(rect, new BackgroundPickerPopup(items, value,
+                    selected =>
+                    {
+                        if (key.Item1.Get(key.Item2) == selected) return;
+                        PushUndo(_doc.GenerateText());
+                        key.Item1.Set(key.Item2, selected);
+                        _customEdit.Remove(key);
+                        Bump();
+                        Repaint();
+                    },
+                    () =>
+                    {
+                        _customEdit.Add(key);
+                        Repaint();
+                    }));
+            }
+            return value;
+        }
+
+        sealed class BackgroundPreviewItem
+        {
+            public readonly string id;
+            public readonly Sprite sprite;
+
+            public BackgroundPreviewItem(string id, Sprite sprite)
+            {
+                this.id = id;
+                this.sprite = sprite;
+            }
+        }
+
+        sealed class BackgroundPickerPopup : PopupWindowContent
+        {
+            const float CellWidth = 154f;
+            const float CellHeight = 116f;
+            const float PreviewHeight = 82f;
+
+            readonly List<BackgroundPreviewItem> _items;
+            readonly string _selected;
+            readonly System.Action<string> _onSelect;
+            readonly System.Action _onCustom;
+            readonly List<BackgroundPreviewItem> _filtered =
+                new List<BackgroundPreviewItem>();
+            Vector2 _scroll;
+            string _search = "";
+
+            public BackgroundPickerPopup(List<BackgroundPreviewItem> items, string selected,
+                System.Action<string> onSelect, System.Action onCustom)
+            {
+                _items = items;
+                _selected = selected;
+                _onSelect = onSelect;
+                _onCustom = onCustom;
+            }
+
+            public override Vector2 GetWindowSize() => new Vector2(520f, 430f);
+
+            public override void OnGUI(Rect rect)
+            {
+                using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+                {
+                    GUI.SetNextControlName("BackgroundSearch");
+                    _search = GUILayout.TextField(_search, EditorStyles.toolbarSearchField);
+                    if (GUILayout.Button("清除选择", EditorStyles.toolbarButton,
+                            GUILayout.Width(64f)))
+                    {
+                        _onSelect("");
+                        editorWindow.Close();
+                        return;
+                    }
+                    if (GUILayout.Button("custom…", EditorStyles.toolbarButton,
+                            GUILayout.Width(66f)))
+                    {
+                        _onCustom();
+                        editorWindow.Close();
+                        return;
+                    }
+                }
+
+                BuildFilteredList();
+                _scroll = EditorGUILayout.BeginScrollView(_scroll);
+                int columns = Mathf.Max(1, Mathf.FloorToInt((rect.width - 12f) / CellWidth));
+                int rows = Mathf.CeilToInt(_filtered.Count / (float)columns);
+                Rect grid = GUILayoutUtility.GetRect(rect.width - 12f,
+                    Mathf.Max(40f, rows * CellHeight));
+
+                if (_filtered.Count == 0)
+                {
+                    GUI.Label(grid, "没有匹配的背景", EditorStyles.centeredGreyMiniLabel);
+                }
+                else
+                {
+                    for (int i = 0; i < _filtered.Count; i++)
+                    {
+                        int column = i % columns;
+                        int row = i / columns;
+                        var cell = new Rect(grid.x + column * CellWidth,
+                            grid.y + row * CellHeight, CellWidth - 6f, CellHeight - 6f);
+                        DrawItem(cell, _filtered[i]);
+                    }
+                }
+                EditorGUILayout.EndScrollView();
+            }
+
+            void BuildFilteredList()
+            {
+                _filtered.Clear();
+                foreach (var item in _items)
+                {
+                    if (string.IsNullOrEmpty(_search) ||
+                        item.id.IndexOf(_search, System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        _filtered.Add(item);
+                }
+            }
+
+            void DrawItem(Rect rect, BackgroundPreviewItem item)
+            {
+                bool selected = item.id == _selected;
+                EditorGUI.DrawRect(rect, selected
+                    ? new Color(0.25f, 0.55f, 0.9f, 0.42f)
+                    : new Color(0f, 0f, 0f, 0.16f));
+
+                var previewRect = new Rect(rect.x + 4f, rect.y + 4f,
+                    rect.width - 8f, PreviewHeight);
+                EditorGUI.DrawRect(previewRect, new Color(0.08f, 0.08f, 0.08f, 1f));
+                if (item.sprite != null)
+                    DrawSprite(previewRect, item.sprite);
+                else
+                    GUI.Label(previewRect, "无预览", EditorStyles.centeredGreyMiniLabel);
+
+                var labelRect = new Rect(rect.x + 4f, previewRect.yMax + 3f,
+                    rect.width - 8f, 20f);
+                GUI.Label(labelRect, selected ? $"✓  {item.id}" : item.id,
+                    EditorStyles.centeredGreyMiniLabel);
+
+                if (GUI.Button(rect, new GUIContent("", item.id), GUIStyle.none))
+                {
+                    _onSelect(item.id);
+                    editorWindow.Close();
+                }
+            }
+
+            static void DrawSprite(Rect rect, Sprite sprite)
+            {
+                Rect source = sprite.textureRect;
+                float aspect = source.width / Mathf.Max(1f, source.height);
+                Rect fitted = rect;
+                if (aspect > rect.width / rect.height)
+                {
+                    fitted.height = rect.width / aspect;
+                    fitted.y += (rect.height - fitted.height) * 0.5f;
+                }
+                else
+                {
+                    fitted.width = rect.height * aspect;
+                    fitted.x += (rect.width - fitted.width) * 0.5f;
+                }
+
+                var texture = sprite.texture;
+                var uv = new Rect(source.x / texture.width, source.y / texture.height,
+                    source.width / texture.width, source.height / texture.height);
+                GUI.DrawTextureWithTexCoords(fitted, texture, uv, true);
+            }
         }
 
         // ---- 添加菜单 ----
