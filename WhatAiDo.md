@@ -1296,3 +1296,15 @@ Unity 自动进入 Play Mode → `VNScriptRunner` 从该行或下一条有效命
 每批功能均运行 `dotnet build Assembly-CSharp-Editor.csproj --no-restore --nologo`；最终合并版本
 Assembly-CSharp 与 Assembly-CSharp-Editor 均为 **0 warning / 0 error**。开发过程中只提交目标源码，
 用户已有的场景、剧本、角色资产与图片工作区修改全部保留且未混入提交。
+
+## 三十三、语音播放时自动压低 BGM（2026-07-14）
+
+修改 `Assets/Scripts/VNEffects/Script/VNAudio.cs`：
+
+- `voice` 开始播放时，当前 BGM 平滑降低 20%（保留基础音量的 80%）。
+- 语音自然播放结束或被停止后，BGM 自动平滑恢复到原基础音量。
+- 语音播放期间切换 BGM，新 BGM 会直接使用压低后的目标音量。
+- `volume bgm` 在语音期间仍修改基础音量，恢复后不会遗失玩家设置。
+- Inspector 可通过 `voiceBgmReduction` 和 `voiceBgmFadeDuration` 调整降低比例与过渡时间。
+
+验证：`dotnet build Assembly-CSharp-Editor.csproj --no-restore --nologo`，结果为 **0 warning / 0 error**。
