@@ -24,14 +24,27 @@ namespace VNEffects
         public Color frameColor = new Color(1f, 0.85f, 0.5f, 0.9f);
         public Color nameTagColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
 
+        [Header("头像")]
+        [Tooltip("头像窗口尺寸（像素）：窗口外的部分被裁掉，窗口可高出面板顶边（半身像效果）")]
+        public Vector2 portraitWindowSize = new Vector2(230f, 300f);
+
         RectTransform _root;
         CanvasGroup _group;
         Text _nameText;
         GameObject _nameTag;
+        RectTransform _tagRect;
+        RectTransform _bodyRect;
         VNTypewriterText _typer;
         Text _arrowText;
         RectTransform _arrowRect;
         VNImageEffectController _frameFx;
+
+        RectTransform _portraitWindow;
+        Image _portraitImage;
+        bool _portraitEnabled = true;
+        Sprite _portraitSprite;
+        float _portraitScale = 1f;
+        Vector2 _portraitOffset;
 
         Vector2 _basePos;
         float _arrowBaseY;
@@ -99,6 +112,7 @@ namespace VNEffects
             tagBg.type = Image.Type.Sliced;
             tagBg.color = nameTagColor;
             tagBg.raycastTarget = false;
+            _tagRect = tagRect;
 
             _nameText = CreateChildText(tagRect, "Name", font, 26, TextAnchor.MiddleCenter);
             _nameText.fontStyle = FontStyle.Bold;
@@ -112,6 +126,26 @@ namespace VNEffects
             bodyRect.offsetMax = new Vector2(-40f, -40f);
             body.lineSpacing = 1.25f;
             _typer = body.gameObject.AddComponent<VNTypewriterText>();
+            _bodyRect = bodyRect;
+
+            // ---- 说话者头像（左侧裁切窗口，可高出面板顶边）----
+            var winGo = new GameObject("PortraitWindow", typeof(RectTransform), typeof(RectMask2D));
+            _portraitWindow = (RectTransform)winGo.transform;
+            _portraitWindow.SetParent(transform, false);
+            _portraitWindow.anchorMin = _portraitWindow.anchorMax = Vector2.zero;
+            _portraitWindow.pivot = Vector2.zero;
+            _portraitWindow.anchoredPosition = new Vector2(14f, 12f);
+            _portraitWindow.sizeDelta = portraitWindowSize;
+
+            var portraitGo = new GameObject("Portrait",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var portraitRect = (RectTransform)portraitGo.transform;
+            portraitRect.SetParent(_portraitWindow, false);
+            portraitRect.anchorMin = portraitRect.anchorMax = new Vector2(0.5f, 1f);
+            portraitRect.pivot = new Vector2(0.5f, 1f);
+            _portraitImage = portraitGo.GetComponent<Image>();
+            _portraitImage.raycastTarget = false;
+            winGo.SetActive(false);
 
             // ---- 继续箭头 ----
             var arrow = CreateChildText((RectTransform)transform, "Arrow", font, 26, TextAnchor.MiddleCenter);
@@ -213,6 +247,51 @@ namespace VNEffects
 
         /// <summary>玩家催促：立即显示全部文字</summary>
         public void CompleteTyping() => _typer.Complete();
+
+        // ------------------------------------------------------------------
+        // 说话者头像
+        // ------------------------------------------------------------------
+
+        public bool PortraitEnabled => _portraitEnabled;
+
+        /// <summary>头像全局开关（剧本 portrait on/off），立即生效</summary>
+        public void SetPortraitEnabled(bool on)
+        {
+            Build();
+            _portraitEnabled = on;
+            ApplyPortrait();
+        }
+
+        /// <summary>
+        /// 设置本句台词的头像（null = 无头像/旁白）。
+        /// scale：1 = 图片宽度填满窗口；offset：在窗口内平移图片（框出脸部）。
+        /// </summary>
+        public void SetPortrait(Sprite sprite, float scale = 1f, Vector2 offset = default)
+        {
+            Build();
+            _portraitSprite = sprite;
+            _portraitScale = scale;
+            _portraitOffset = offset;
+            ApplyPortrait();
+        }
+
+        void ApplyPortrait()
+        {
+            bool show = _portraitEnabled && _portraitSprite != null;
+            _portraitWindow.gameObject.SetActive(show);
+
+            // 正文与名牌避让头像窗口
+            float inset = show ? portraitWindowSize.x + 14f : 0f;
+            _bodyRect.offsetMin = new Vector2(40f + inset, 26f);
+            _tagRect.anchoredPosition = new Vector2(44f + inset, 4f);
+
+            if (!show) return;
+            _portraitImage.sprite = _portraitSprite;
+            float w = portraitWindowSize.x * Mathf.Max(0.05f, _portraitScale);
+            float h = _portraitSprite.rect.height / Mathf.Max(1f, _portraitSprite.rect.width) * w;
+            _portraitImage.rectTransform.sizeDelta = new Vector2(w, h);
+            _portraitImage.rectTransform.anchoredPosition = _portraitOffset;
+        }
 
         void ShowArrow()
         {

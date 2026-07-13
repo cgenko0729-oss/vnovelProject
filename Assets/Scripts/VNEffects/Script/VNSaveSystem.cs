@@ -19,6 +19,7 @@ namespace VNEffects
         public string weather;
         public string mood;
         public string bgm;
+        public bool portraitOff;                       // 对话头像被 portrait off 关闭
         public List<string> fxOn = new List<string>(); // 处于开启状态的 fx 名
 
         [System.Serializable]

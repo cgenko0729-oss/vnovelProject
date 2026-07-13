@@ -81,6 +81,7 @@ namespace VNEffects
             "label", "jump", "flag", "if", "choice",
             "move", "bgm", "se", "voice", "volume",
             "camseq", "camcut", "camto",
+            "portrait",
         };
 
         public static List<VNScriptCommand> Parse(string source)

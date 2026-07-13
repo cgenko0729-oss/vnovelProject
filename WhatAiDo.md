@@ -989,3 +989,48 @@ CameraFade 会自动创建）→ Play：眨眼转场睁眼时画面应直接在 
   startfade:/endfade:）；路径点行追加 `xfade:秒`
 - 解析载入：读 camseq 的 start/end/startfade/endfade kwargs 与路径点 fade 字段
 - 预设库存的就是 camseq 文本 → 叠化选项自动随预设保存/载入，零改动
+
+## 二十八、对话框说话者头像（2026-07-13，分支 `feature/dialogue-portrait`）
+
+参考截图（Assets/DebugScreenShot/Snipaste_2026-07-13_20-46-11.png）：
+角色说话时在对话框左侧显示半身头像，名字与正文在头像右边。
+
+### 28.1 设计
+
+- **裁切窗口方案**：对话框左下角放一个 `RectMask2D` 窗口（默认 230×300，
+  可高出面板顶边形成"半身像探出对话框"的效果），头像图放窗口内、
+  超出部分被裁掉 → **全身立绘配合缩放/偏移就能框出胸像特写，不需要单独出头像素材**
+- 头像图默认"宽度填满窗口、顶边贴窗口顶边"（脸在图片上方，默认就能看到头部），
+  `portraitScale` 放大、`portraitOffset` 平移即可精确构图
+- 显示头像时正文与名牌自动右移避让；隐藏时恢复原布局
+
+### 28.2 配置与控制（对应需求：开关 / 选图 / 缩放 / 偏移）
+
+| 层级 | 控制方式 |
+|---|---|
+| 全局开关 | 剧本命令 `portrait on` / `portrait off`（状态进存档快照） |
+| 每角色开关 | `VNCharacterDef.showPortrait`（Inspector 勾选） |
+| 选图 | `VNCharacterDef.portraits` 列表（name 对应表情名：台词行 `角色 表情: …` 自动匹配同名头像，没匹配用第一个；**列表留空 = 自动用表情立绘当头像**） |
+| 缩放 | `VNCharacterDef.portraitScale`（1 = 宽度填满窗口，调大出特写） |
+| 偏移 | `VNCharacterDef.portraitOffset`（窗口内平移，把脸挪进窗口） |
+| 窗口尺寸 | `VNDialogueBox.portraitWindowSize`（Inspector） |
+
+### 28.3 文件改动
+
+| 文件 | 改动 |
+|---|---|
+| `VNCharacterDef.cs` | 新增「对话框头像」区块：showPortrait / portraits / portraitScale / portraitOffset + `GetPortrait(表情)`（未配头像回退立绘；showPortrait=false 返回 null） |
+| `VNDialogueBox.cs` | 头像窗口（RectMask2D + Image）程序化构建；`SetPortrait(sprite, scale, offset)` / `SetPortraitEnabled(bool)`；正文 offsetMin 与名牌 x 按窗口宽度避让 |
+| `VNStage.cs` | `Say` 里按说话者设置头像（优先本句表情，否则用角色当前表情）；旁白/未注册角色清空头像；`SetPortraitEnabled` + `_portraitOff` 进 Capture/RestoreSnapshot |
+| `VNSaveSystem.cs` | `VNSaveData.portraitOff` 字段（旧存档缺字段默认 false = 开启，兼容） |
+| `VNScriptParser.cs` | Keywords 加 `portrait` |
+| `VNScriptRunner.cs` | `case "portrait"`：`stage.SetPortraitEnabled(Arg(0) != "off")` |
+| `Demo.vn.txt` | 文件头补 portrait 语法说明 |
+
+### 28.4 注意
+
+- 旧角色资产反序列化时新字段取 C# 初始值（showPortrait=true、scale=1）→
+  **重建场景/改资产都不需要，Play 即生效**（头像回退用立绘）
+- 顺带修正用户测试剧本里的 `startfade : 0.5`（冒号两边不能有空格，
+  否则被拆成三个 token 参数不生效）→ `startfade:0.5`
+- 想要某个角色不显示头像：取消其资产里 showPortrait；想全程关闭：剧本开头 `portrait off`

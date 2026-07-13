@@ -431,6 +431,7 @@ namespace VNEffects
             data.weather = weather != null ? weather.Current.ToString() : null;
             data.mood = mood != null ? mood.Current.ToString() : null;
             data.bgm = vnAudio != null ? vnAudio.CurrentBgm : null;
+            data.portraitOff = _portraitOff;
 
             data.fxOn.Clear();
             foreach (var kv in _fxStates)
@@ -472,6 +473,8 @@ namespace VNEffects
                 if (!string.IsNullOrEmpty(data.bgm)) vnAudio.PlayBgm(data.bgm, 0.6f);
                 else vnAudio.StopBgm(0.6f);
             }
+
+            SetPortraitEnabled(!data.portraitOff);
 
             foreach (var cs in data.characters)
                 ShowInstant(cs.id, cs.x, cs.expr);
@@ -534,7 +537,7 @@ namespace VNEffects
         // 台词
         // ------------------------------------------------------------------
 
-        /// <summary>说一句话：注册角色自动高亮+切表情；否则名字原样显示（旁白）</summary>
+        /// <summary>说一句话：注册角色自动高亮+切表情+头像；否则名字原样显示（旁白）</summary>
         public void Say(string speaker, string expr, string text)
         {
             var c = Get(speaker);
@@ -542,15 +545,29 @@ namespace VNEffects
             {
                 if (!string.IsNullOrEmpty(expr)) ApplyExpression(c, expr);
                 if (speakerHighlight != null) speakerHighlight.SetSpeaker(c.fx);
+                // 头像跟随说话者：优先本句表情，否则用角色当前表情的头像
+                dialogue.SetPortrait(
+                    c.def.GetPortrait(string.IsNullOrEmpty(expr) ? c.expression : expr),
+                    c.def.portraitScale, c.def.portraitOffset);
                 dialogue.Say(c.def.displayName, text);
             }
             else
             {
                 if (speakerHighlight != null && string.IsNullOrEmpty(speaker) == false)
                     speakerHighlight.ClearSpeaker();
+                dialogue.SetPortrait(null); // 旁白/未注册角色不显示头像
                 dialogue.Say(speaker, text); // speaker 为空 = 无名牌旁白
             }
         }
+
+        /// <summary>对话头像全局开关（剧本 portrait on/off，进存档快照）</summary>
+        public void SetPortraitEnabled(bool on)
+        {
+            _portraitOff = !on;
+            if (dialogue != null) dialogue.SetPortraitEnabled(on);
+        }
+
+        bool _portraitOff;
 
         // ------------------------------------------------------------------
         // 背景
