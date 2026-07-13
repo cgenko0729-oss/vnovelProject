@@ -281,7 +281,8 @@ namespace VNEffects
                     return WaitCo(cmd.ArgF(0, 0.5f));
 
                 case "bg":
-                    return WaitTween(stage.SetBackground(cmd.Arg(0), cmd.Kw("transition"), cmd.line));
+                    return WaitTween(stage.SetBackground(
+                        cmd.Arg(0), cmd.Kw("transition"), cmd.line, PrecutFor(cmd)));
 
                 case "show":
                     return WaitTween(stage.Show(cmd.Arg(0), cmd.Kw("at"),
@@ -557,6 +558,41 @@ namespace VNEffects
             return def;
         }
 
+        /// <summary>已由 bg 转场在盖屏瞬间应用过首镜头的 camseq（该 camseq 要跳过首点）</summary>
+        VNScriptCommand _precutDone;
+
+        /// <summary>
+        /// camseq start:cut 与 bg 转场的衔接：若紧跟本条 bg 的命令是 start:cut
+        /// 且首点为瞬切（时长 0）的 camseq，返回一个"转场盖住画面瞬间执行的
+        /// 首镜头瞬切"动作（与换背景图同帧 → 转场揭示时画面已在首镜头视角）。
+        /// </summary>
+        System.Action PrecutFor(VNScriptCommand bgCmd)
+        {
+            if (bgCmd.isAsync) return null;
+            if (string.IsNullOrEmpty(bgCmd.Kw("transition"))) return null;
+            if (stage.vnCamera == null) return null;
+            if (_commands == null || _index >= _commands.Count) return null;
+
+            var next = _commands[_index];
+            if (next.keyword != "camseq" || next.Kw("start") != "cut") return null;
+            if (next.camPoints == null || next.camPoints.Count == 0) return null;
+
+            var first = next.camPoints[0];
+            if (first.duration > 0.001f)
+            {
+                Debug.LogWarning($"[VNScript] 第 {next.line} 行：start:cut 要求首个路径点时长为 0，" +
+                                 "已按普通 camseq 执行");
+                return null;
+            }
+            return () =>
+            {
+                var p = stage.ResolveCamPoint(first.point, first.line);
+                if (!p.HasValue) return;
+                stage.vnCamera.Cut(p.Value, Mathf.Max(0.1f, first.zoom));
+                _precutDone = next;
+            };
+        }
+
         IEnumerator CamseqCo(VNScriptCommand cmd)
         {
             if (stage.vnCamera == null) yield break;
@@ -566,10 +602,15 @@ namespace VNEffects
                 yield break;
             }
 
+            // start:cut 的首点已在上一条 bg 转场盖屏时应用过 → 跳过它
+            bool skipFirst = _precutDone == cmd;
+            if (skipFirst) _precutDone = null;
+
             // 执行时才解析点位（角色可能刚移动过）
             var list = new List<VNCamera.Waypoint>();
-            foreach (var def in cmd.camPoints)
+            for (int i = skipFirst ? 1 : 0; i < cmd.camPoints.Count; i++)
             {
+                var def = cmd.camPoints[i];
                 var p = stage.ResolveCamPoint(def.point, def.line);
                 if (!p.HasValue) continue; // 已告警，跳过该点
                 bool easeSet = System.Enum.TryParse(def.ease, true, out Ease easeVal);
@@ -580,12 +621,16 @@ namespace VNEffects
                     duration = def.duration,
                     ease = easeVal,
                     easeSet = easeSet,
+                    fade = def.fade,
                 });
             }
-            if (list.Count == 0) yield break;
 
-            var seq = stage.vnCamera.PlayPath(list);
-            if (seq != null) yield return seq.WaitForCompletion();
+            // start:fade = 开始时从当前画面叠化到首镜头；end:fade = 走完后叠化回复位全图
+            float startFade = cmd.Kw("start") == "fade" ? cmd.KwF("startfade", 0.6f) : 0f;
+            float endFade = cmd.Kw("end") == "fade" ? cmd.KwF("endfade", 0.6f) : 0f;
+
+            if (list.Count == 0 && endFade <= 0f) yield break;
+            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade);
         }
 
         /// <summary>camera 命令的 focus:角色id 参数 → 该角色的画布坐标</summary>

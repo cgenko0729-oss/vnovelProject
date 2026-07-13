@@ -222,6 +222,11 @@ namespace VNEffects.EditorTools
             rig.vnCamera = new GameObject("VNCamera").AddComponent<VNCamera>();
             rig.vnCamera.target = rig.zoomRoot;
 
+            // 镜头交叉淡化覆盖层（camseq start:fade / end:fade / xfade: 用）
+            var camFadeGo = new GameObject("CameraFade", typeof(RectTransform));
+            camFadeGo.transform.SetParent(canvasGo.transform, false);
+            rig.vnCamera.cameraFade = camFadeGo.AddComponent<VNCameraFade>();
+
             rig.heartbeat = new GameObject("Heartbeat").AddComponent<VNHeartbeat>();
             rig.heartbeat.target = rig.sceneRoot;
             rig.heartbeat.edgeGlow = rig.edgeGlow;
