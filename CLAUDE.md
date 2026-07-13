@@ -91,8 +91,13 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 全部按键列表见场景内提示文字或 `VNEffectsDemo.UpdateHint()`
 - 立绘选择规则：`Assets/Assets` 下文件名含 "solo" 的前两张；背景轮换=其余 ≥900×600 的大图
 
-## 下一步大方向（已与用户讨论）
+## 剧本系统（自研轻量 DSL，选型已定）
 
-1. **VNDirector 复合演出编排器**（把 60+ API 固化成一行名场面预设）
-2. **剧本/对话流程系统**（管理台词、立绘、分镜、演出 timing、分支——正在选型：
-   自研轻量 DSL vs Pixel Crushers Dialogue System vs Ink，见 WhatAiDo.md 相关章节）
+- **选型结论**：自研 Ren'Py 风格纯文本剧本（Git/AI 协作友好）；Dialogue System 插件保留不用
+- 代码在 `Assets/Scripts/VNEffects/Script/`：VNScriptParser → VNScriptRunner → VNStage → 特效 API
+- 剧本文件：`Assets/Scenarios/*.vn.txt`（语法速查见 Demo.vn.txt 文件头 / WhatAiDo.md 十六章）
+- 角色定义：`Assets/VNEffects/Characters/*.asset`（VNCharacterDef：id/名牌/表情→立绘映射）
+- 剧本场景：菜单 **Tools → VN Effects → Create Script Demo Scene** → `VNScriptDemo.unity`
+- 关键语义：命令默认同步等待，行尾 `@` = 异步；台词行 = 等打字完+玩家推进
+- **路线图**：P0 核心(已完成) → P1 label/jump/choice/flag/if 分支 → P2 存档/回想/Auto/Skip
+  → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令

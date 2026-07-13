@@ -10,40 +10,82 @@ using UnityEngine.UI;
 namespace VNEffects.EditorTools
 {
     /// <summary>
-    /// 一键生成视觉小说特效演示场景：
-    /// 菜单 Tools → VN Effects → Create Demo Scene
-    /// 自动完成：贴图导入设置 → 材质资产 → Bloom Volume → 相机 →
-    /// Canvas + 背景/立绘 + 特效组件 → 悬浮粒子 → 演示驱动 → 保存场景。
+    /// 场景生成器（两个菜单）：
+    ///   Tools → VN Effects → Create Demo Scene        键盘演示场景（体验全部特效）
+    ///   Tools → VN Effects → Create Script Demo Scene 剧本演示场景（VNStage+VNScriptRunner）
+    /// 两者共享 BuildStageRig()：相机/后处理/Canvas/容器层级/全部特效管理器。
     /// </summary>
     public static class VNEffectsDemoSetup
     {
         const string MaterialsDir = "Assets/VNEffects/Materials";
+        const string CharactersDir = "Assets/VNEffects/Characters";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
+        const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
+        const string DemoScriptPath = "Assets/Scenarios/Demo.vn.txt";
 
-        [MenuItem("Tools/VN Effects/Create Demo Scene")]
-        public static void CreateDemoScene()
+        /// <summary>BuildStageRig 的产物：舞台所有引用</summary>
+        class RigRefs
         {
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
-                return;
+            public Camera cam;
+            public GameObject canvasGo;
+            public RectTransform sceneRoot, zoomRoot, tiltRoot, layerBack, layerMid, layerFront;
+            public VNImageEffectController bgFx;
+            public Image bgImage;
+            public VNGodRays godRays;
+            public VNEdgeGlow edgeGlow;
+            public VNVignetteFocus vignetteFocus;
+            public VNWeatherController weather;
+            public VNMoodGrading mood;
+            public VNScreenTransition transition;
+            public VNScreenShake screenShake;
+            public VNParallax parallax;
+            public VNDutchAngle dutchAngle;
+            public VNCamera vnCamera;
+            public VNHeartbeat heartbeat;
+            public VNSakuraBurst sakura;
+            public VNFakeDoF fakeDoF;
+            public VNCloudShadows cloudShadows;
+            public VNToneMatch toneMatch;
+            public VNChoicePanel choicePanel;
+            public VNMouseStardust stardust;
+            public VNHeatHaze heatHaze;
+            public VNDialogueBox dialogueBox;
+            public VNSpeakerHighlight speakerHighlight;
+            public VNAmbientParticles[] particles;
+            public Material imageMat, additiveMat, transitionMat;
+            public Sprite charSprite, charSprite2, bgSprite;
+            public System.Collections.Generic.List<Sprite> allSprites;
+        }
+
+        // ==================================================================
+        // 共享舞台装配
+        // ==================================================================
+
+        static RigRefs BuildStageRig()
+        {
+            var rig = new RigRefs();
 
             // ---------- 1. 找到并正确导入演示图 ----------
             var (charSprite, charSprite2, bgSprite, allSprites) = PrepareSprites();
+            rig.charSprite = charSprite;
+            rig.charSprite2 = charSprite2;
+            rig.bgSprite = bgSprite;
+            rig.allSprites = allSprites;
 
             // ---------- 2. 材质资产 ----------
             EnsureFolder("Assets/VNEffects");
             EnsureFolder(MaterialsDir);
-            var imageMat = EnsureMaterial($"{MaterialsDir}/VNImageEffect.mat", "VN/ImageEffect");
-            var additiveMat = EnsureMaterial($"{MaterialsDir}/VNAdditive.mat", "VN/Additive");
-            var transitionMat = EnsureMaterial($"{MaterialsDir}/VNScreenTransition.mat", "VN/ScreenTransition");
+            rig.imageMat = EnsureMaterial($"{MaterialsDir}/VNImageEffect.mat", "VN/ImageEffect");
+            rig.additiveMat = EnsureMaterial($"{MaterialsDir}/VNAdditive.mat", "VN/Additive");
+            rig.transitionMat = EnsureMaterial($"{MaterialsDir}/VNScreenTransition.mat", "VN/ScreenTransition");
 
             // ---------- 3. 后处理 Volume Profile（Bloom + Vignette）----------
             var profile = EnsureVolumeProfile();
 
-            // ---------- 4. 新场景 ----------
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            // ---------- 4. 新场景：相机 + 全局 Volume ----------
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // 相机：正交、HDR 后处理开
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
@@ -52,16 +94,15 @@ namespace VNEffects.EditorTools
             cam.transform.position = new Vector3(0f, 0f, -10f);
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.03f, 0.03f, 0.06f);
-            var camData = cam.GetUniversalAdditionalCameraData();
-            camData.renderPostProcessing = true;
+            cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
+            rig.cam = cam;
 
-            // 全局 Volume
             var volGo = new GameObject("Global Volume");
             var vol = volGo.AddComponent<Volume>();
             vol.isGlobal = true;
             vol.sharedProfile = profile;
 
-            // ---------- 5. Canvas（Screen Space - Camera，粒子才能叠在 UI 前后）----------
+            // ---------- 5. Canvas（Screen Space - Camera）----------
             var canvasGo = new GameObject("Canvas",
                 typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -73,168 +114,102 @@ namespace VNEffects.EditorTools
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
+            rig.canvasGo = canvasGo;
 
             // ---------- 5.5 画面容器层级 ----------
-            // SceneRoot(震动+心跳脉动) > ZoomRoot(镜头缩放/平移) > TiltRoot(荷兰角)
-            //   > LayerBack/Mid/Front(视差三层)
-            var sceneRoot = CreateStretchRect("SceneRoot", canvasGo.transform);
-            var zoomRoot = CreateStretchRect("ZoomRoot", sceneRoot);
-            var tiltRoot = CreateStretchRect("TiltRoot", zoomRoot);
-            var layerBack = CreateStretchRect("LayerBack", tiltRoot);
-            var layerMid = CreateStretchRect("LayerMid", tiltRoot);
-            var layerFront = CreateStretchRect("LayerFront", tiltRoot);
+            // SceneRoot(震动+心跳) > ZoomRoot(运镜) > TiltRoot(荷兰角) > 视差三层
+            rig.sceneRoot = CreateStretchRect("SceneRoot", canvasGo.transform);
+            rig.zoomRoot = CreateStretchRect("ZoomRoot", rig.sceneRoot);
+            rig.tiltRoot = CreateStretchRect("TiltRoot", rig.zoomRoot);
+            rig.layerBack = CreateStretchRect("LayerBack", rig.tiltRoot);
+            rig.layerMid = CreateStretchRect("LayerMid", rig.tiltRoot);
+            rig.layerFront = CreateStretchRect("LayerFront", rig.tiltRoot);
 
             // ---------- 6. 背景图 ----------
-            VNImageEffectController bgFx = null;
             if (bgSprite != null)
             {
-                var bgGo = CreateUIImage("Background", layerBack, bgSprite);
+                var bgGo = CreateUIImage("Background", rig.layerBack, bgSprite);
                 var bgRect = (RectTransform)bgGo.transform;
                 bgRect.anchorMin = Vector2.zero;
                 bgRect.anchorMax = Vector2.one;
-                // 四边溢出 60px，给 Ken Burns 缓慢缩放留余量
+                // 四边溢出 60px，给 Ken Burns / 视差留余量
                 bgRect.offsetMin = new Vector2(-60f, -60f);
                 bgRect.offsetMax = new Vector2(60f, 60f);
-                bgFx = bgGo.AddComponent<VNImageEffectController>();
-                AssignSourceMaterial(bgFx, imageMat);
+                rig.bgImage = bgGo.GetComponent<Image>();
+                rig.bgFx = bgGo.AddComponent<VNImageEffectController>();
+                AssignSourceMaterial(rig.bgFx, rig.imageMat);
             }
 
-            // ---------- 6.5 God Rays 斜射光束（渲染在背景之后、立绘之前）----------
-            var godRaysGo = new GameObject("GodRays", typeof(RectTransform));
-            var godRaysRect = (RectTransform)godRaysGo.transform;
-            godRaysRect.SetParent(layerMid, false);
-            godRaysRect.anchorMin = Vector2.zero;
-            godRaysRect.anchorMax = Vector2.one;
-            godRaysRect.offsetMin = Vector2.zero;
-            godRaysRect.offsetMax = Vector2.zero;
-            var godRays = godRaysGo.AddComponent<VNGodRays>();
-            AssignSourceMaterial(godRays, additiveMat);
+            // ---------- 6.5 God Rays（背景之后、立绘之前）----------
+            var godRaysRect = CreateStretchRect("GodRays", rig.layerMid);
+            rig.godRays = godRaysRect.gameObject.AddComponent<VNGodRays>();
+            AssignSourceMaterial(rig.godRays, rig.additiveMat);
 
-            // ---------- 7. 立绘（有两张 solo 图时创建双角色）----------
-            VNEntranceAnimator charAnim = null, charAnimB = null;
-            VNImageEffectController charFx = null, charFxB = null;
-            VNCharacterEmotes charEmotes = null;
-            bool twoChars = charSprite != null && charSprite2 != null;
-            float charHeight = twoChars ? 880f : 980f;
-
-            if (charSprite != null)
-            {
-                var pos = twoChars ? new Vector2(-380f, -60f) : new Vector2(0f, -40f);
-                var (anim, fx) = CreateCharacter("Character", charSprite, layerFront,
-                    pos, charHeight, imageMat, additiveMat);
-                charAnim = anim;
-                charFx = fx;
-                charEmotes = fx.gameObject.AddComponent<VNCharacterEmotes>();
-            }
-            if (twoChars)
-            {
-                var (anim, fx) = CreateCharacter("CharacterB", charSprite2, layerFront,
-                    new Vector2(380f, -60f), charHeight, imageMat, additiveMat);
-                charAnimB = anim;
-                charFxB = fx;
-            }
-
-            // ---------- 8. 悬浮氛围粒子（尘埃 + 星光 + 光斑）----------
-            var particles = new[]
+            // ---------- 7. 悬浮氛围粒子 ----------
+            rig.particles = new[]
             {
                 CreateAmbient("Ambient_Dust", VNAmbientParticles.Preset.Dust,
-                    new Color(1f, 0.97f, 0.88f), 11, additiveMat),
+                    new Color(1f, 0.97f, 0.88f), 11, rig.additiveMat),
                 CreateAmbient("Ambient_Sparkles", VNAmbientParticles.Preset.Sparkles,
-                    new Color(1f, 0.93f, 0.65f), 12, additiveMat),
+                    new Color(1f, 0.93f, 0.65f), 12, rig.additiveMat),
                 CreateAmbient("Ambient_Orbs", VNAmbientParticles.Preset.Orbs,
-                    new Color(0.75f, 0.85f, 1f), 10, additiveMat),
+                    new Color(0.75f, 0.85f, 1f), 10, rig.additiveMat),
             };
 
-            // ---------- 9. 操作提示文字 ----------
-            Text hint = null;
-            var hintGo = new GameObject("HintText",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-            var hintRect = (RectTransform)hintGo.transform;
-            hintRect.SetParent(canvasGo.transform, false);
-            hintRect.anchorMin = new Vector2(0f, 0f);
-            hintRect.anchorMax = new Vector2(1f, 0f);
-            hintRect.pivot = new Vector2(0.5f, 0f);
-            hintRect.anchoredPosition = new Vector2(0f, 18f);
-            hintRect.sizeDelta = new Vector2(-60f, 320f);
-            hint = hintGo.GetComponent<Text>();
-            hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            hint.fontSize = 26;
-            hint.alignment = TextAnchor.LowerCenter;
-            hint.color = new Color(1f, 1f, 1f, 0.85f);
-            hint.supportRichText = true;
-            hint.raycastTarget = false;
-
-            // ---------- 9.5 边缘情绪泛光（Canvas 最后一个子物体，嵌套 Canvas 排序最高）----------
+            // ---------- 8. 边缘情绪泛光 ----------
             var edgeGlowGo = new GameObject("EdgeGlow", typeof(RectTransform));
             edgeGlowGo.transform.SetParent(canvasGo.transform, false);
-            var edgeGlow = edgeGlowGo.AddComponent<VNEdgeGlow>();
-            AssignSourceMaterial(edgeGlow, additiveMat);
+            rig.edgeGlow = edgeGlowGo.AddComponent<VNEdgeGlow>();
+            AssignSourceMaterial(rig.edgeGlow, rig.additiveMat);
 
-            // ---------- 9.6 聚焦渐晕（挂在 Volume 上）----------
-            var vignetteFocus = volGo.AddComponent<VNVignetteFocus>();
-            vignetteFocus.volume = vol;
+            // ---------- 9. 聚焦渐晕（挂在 Volume 上）----------
+            rig.vignetteFocus = volGo.AddComponent<VNVignetteFocus>();
+            rig.vignetteFocus.volume = vol;
 
-            // ---------- 9.7 天气控制器 ----------
+            // ---------- 10. 天气 / 色调 / 转场 ----------
             var weatherGo = new GameObject("WeatherController");
-            var weatherCtrl = weatherGo.AddComponent<VNWeatherController>();
-            weatherCtrl.additiveMaterial = additiveMat;
-            weatherCtrl.moodTargets = (bgFx != null && charFx != null)
-                ? new[] { bgFx, charFx }
-                : (bgFx != null ? new[] { bgFx } : new VNImageEffectController[0]);
+            rig.weather = weatherGo.AddComponent<VNWeatherController>();
+            rig.weather.additiveMaterial = rig.additiveMat;
+            rig.weather.moodTargets = rig.bgFx != null
+                ? new[] { rig.bgFx } : new VNImageEffectController[0];
 
-            // ---------- 9.8 色调情绪预设系统 ----------
-            var moodGo = new GameObject("MoodGrading");
-            var moodGrading = moodGo.AddComponent<VNMoodGrading>();
+            rig.mood = new GameObject("MoodGrading").AddComponent<VNMoodGrading>();
 
-            // ---------- 9.9 全屏转场（Canvas 最后子物体，嵌套 Canvas 排序 100 盖住一切）----------
             var transitionGo = new GameObject("ScreenTransition", typeof(RectTransform));
             transitionGo.transform.SetParent(canvasGo.transform, false);
-            var screenTransition = transitionGo.AddComponent<VNScreenTransition>();
-            AssignSourceMaterial(screenTransition, transitionMat);
+            rig.transition = transitionGo.AddComponent<VNScreenTransition>();
+            AssignSourceMaterial(rig.transition, rig.transitionMat);
 
-            // ---------- 9.12 屏幕震动（震 SceneRoot，UI 保持稳定）----------
-            var shakeGo = new GameObject("ScreenShake");
-            var screenShake = shakeGo.AddComponent<VNScreenShake>();
-            screenShake.target = sceneRoot;
+            // ---------- 11. 震动 / 视差 / 荷兰角 / 涟漪 ----------
+            rig.screenShake = new GameObject("ScreenShake").AddComponent<VNScreenShake>();
+            rig.screenShake.target = rig.sceneRoot;
 
-            // ---------- 9.15 多层视差（远景/中景/近景强度递增）----------
-            var parallaxGo = new GameObject("Parallax");
-            var parallax = parallaxGo.AddComponent<VNParallax>();
-            parallax.layers.Add(new VNParallax.Layer { rect = layerBack, strength = 8f });
-            parallax.layers.Add(new VNParallax.Layer { rect = layerMid, strength = 13f });
-            parallax.layers.Add(new VNParallax.Layer { rect = layerFront, strength = 19f });
+            rig.parallax = new GameObject("Parallax").AddComponent<VNParallax>();
+            rig.parallax.layers.Add(new VNParallax.Layer { rect = rig.layerBack, strength = 8f });
+            rig.parallax.layers.Add(new VNParallax.Layer { rect = rig.layerMid, strength = 13f });
+            rig.parallax.layers.Add(new VNParallax.Layer { rect = rig.layerFront, strength = 19f });
 
-            // ---------- 9.16 荷兰角（作用于 TiltRoot）----------
-            var dutchGo = new GameObject("DutchAngle");
-            var dutchAngle = dutchGo.AddComponent<VNDutchAngle>();
-            dutchAngle.target = tiltRoot;
+            rig.dutchAngle = new GameObject("DutchAngle").AddComponent<VNDutchAngle>();
+            rig.dutchAngle.target = rig.tiltRoot;
 
-            // ---------- 9.17 点击涟漪 ----------
             var rippleGo = new GameObject("ClickRipple", typeof(ParticleSystem));
             var clickRipple = rippleGo.AddComponent<VNClickRipple>();
-            AssignSourceMaterial(clickRipple, additiveMat);
+            AssignSourceMaterial(clickRipple, rig.additiveMat);
 
-            // ---------- 9.21 伪景深（背景模糊+压暗+微放大）----------
-            var dofGo = new GameObject("FakeDoF");
-            var fakeDoF = dofGo.AddComponent<VNFakeDoF>();
-            fakeDoF.backgroundFx = bgFx;
-            fakeDoF.backLayer = layerBack;
+            // ---------- 12. 伪景深 / 云影 / 色调匹配 / 选项面板 / EventSystem ----------
+            rig.fakeDoF = new GameObject("FakeDoF").AddComponent<VNFakeDoF>();
+            rig.fakeDoF.backgroundFx = rig.bgFx;
+            rig.fakeDoF.backLayer = rig.layerBack;
 
-            // ---------- 9.22 云影飘过（只盖背景层）----------
-            var cloudRect = CreateStretchRect("CloudShadows", layerBack);
-            var cloudShadows = cloudRect.gameObject.AddComponent<VNCloudShadows>();
+            var cloudRect = CreateStretchRect("CloudShadows", rig.layerBack);
+            rig.cloudShadows = cloudRect.gameObject.AddComponent<VNCloudShadows>();
 
-            // ---------- 9.23 立绘色调匹配背景 ----------
-            var toneGo = new GameObject("ToneMatch");
-            var toneMatch = toneGo.AddComponent<VNToneMatch>();
-            toneMatch.characters = (charFx != null && charFxB != null)
-                ? new[] { charFx, charFxB }
-                : (charFx != null ? new[] { charFx } : new VNImageEffectController[0]);
+            rig.toneMatch = new GameObject("ToneMatch").AddComponent<VNToneMatch>();
+            rig.toneMatch.characters = new VNImageEffectController[0];
 
-            // ---------- 9.24 选项面板 + EventSystem（按钮点击必需）----------
             var choiceGo = new GameObject("ChoicePanel", typeof(RectTransform));
             choiceGo.transform.SetParent(canvasGo.transform, false);
-            var choicePanel = choiceGo.AddComponent<VNChoicePanel>();
+            rig.choicePanel = choiceGo.AddComponent<VNChoicePanel>();
 
             if (Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
             {
@@ -243,32 +218,21 @@ namespace VNEffects.EditorTools
                     typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
             }
 
-            // ---------- 9.18 镜头运动语言库（作用于 ZoomRoot）----------
-            var cameraGo = new GameObject("VNCamera");
-            var vnCamera = cameraGo.AddComponent<VNCamera>();
-            vnCamera.target = zoomRoot;
-            if (charFx != null) vnCamera.dollyCharacters.Add(charFx);
-            if (charFxB != null) vnCamera.dollyCharacters.Add(charFxB);
+            // ---------- 13. 运镜 / 心跳 / 樱吹雪 ----------
+            rig.vnCamera = new GameObject("VNCamera").AddComponent<VNCamera>();
+            rig.vnCamera.target = rig.zoomRoot;
 
-            // ---------- 9.19 心跳演出（脉动 SceneRoot + 粉色泛光）----------
-            var heartbeatGo = new GameObject("Heartbeat");
-            var heartbeat = heartbeatGo.AddComponent<VNHeartbeat>();
-            heartbeat.target = sceneRoot;
-            heartbeat.edgeGlow = edgeGlow;
+            rig.heartbeat = new GameObject("Heartbeat").AddComponent<VNHeartbeat>();
+            rig.heartbeat.target = rig.sceneRoot;
+            rig.heartbeat.edgeGlow = rig.edgeGlow;
 
-            // ---------- 9.20 樱吹雪爆发 ----------
-            var sakuraGo = new GameObject("SakuraBurst");
-            var sakura = sakuraGo.AddComponent<VNSakuraBurst>();
-            sakura.additiveMaterial = additiveMat;
-            sakura.heartbeat = heartbeat;
+            rig.sakura = new GameObject("SakuraBurst").AddComponent<VNSakuraBurst>();
+            rig.sakura.additiveMaterial = rig.additiveMat;
+            rig.sakura.heartbeat = rig.heartbeat;
 
-            // ---------- 9.13 说话者高亮 ----------
-            var speakerGo = new GameObject("SpeakerHighlight");
-            var speakerHighlight = speakerGo.AddComponent<VNSpeakerHighlight>();
-            if (charFx != null) speakerHighlight.characters.Add(charFx);
-            if (charFxB != null) speakerHighlight.characters.Add(charFxB);
+            // ---------- 14. 说话者高亮 / 对话框 ----------
+            rig.speakerHighlight = new GameObject("SpeakerHighlight").AddComponent<VNSpeakerHighlight>();
 
-            // ---------- 9.14 对话框（底部，排序 40）----------
             var dialogueGo = new GameObject("DialogueBox", typeof(RectTransform));
             var dialogueRect = (RectTransform)dialogueGo.transform;
             dialogueRect.SetParent(canvasGo.transform, false);
@@ -277,65 +241,304 @@ namespace VNEffects.EditorTools
             dialogueRect.pivot = new Vector2(0.5f, 0f);
             dialogueRect.anchoredPosition = new Vector2(0f, 28f);
             dialogueRect.sizeDelta = new Vector2(0f, 230f);
-            var dialogueBox = dialogueGo.AddComponent<VNDialogueBox>();
+            rig.dialogueBox = dialogueGo.AddComponent<VNDialogueBox>();
 
-            // ---------- 9.10 鼠标轨迹星尘 ----------
+            // ---------- 15. 鼠标星尘 / 热浪 ----------
             var stardustGo = new GameObject("MouseStardust", typeof(ParticleSystem));
-            var stardust = stardustGo.AddComponent<VNMouseStardust>();
-            AssignSourceMaterial(stardust, additiveMat);
+            rig.stardust = stardustGo.AddComponent<VNMouseStardust>();
+            AssignSourceMaterial(rig.stardust, rig.additiveMat);
 
-            // ---------- 9.11 热浪/空气扭曲（默认关闭，Z 键开启）----------
-            var hazeGo = new GameObject("HeatHaze");
-            var heatHaze = hazeGo.AddComponent<VNHeatHaze>();
-            heatHaze.targets = bgFx != null
-                ? new[] { bgFx } : new VNImageEffectController[0];
-            heatHaze.additiveMaterial = additiveMat;
+            rig.heatHaze = new GameObject("HeatHaze").AddComponent<VNHeatHaze>();
+            rig.heatHaze.targets = rig.bgFx != null
+                ? new[] { rig.bgFx } : new VNImageEffectController[0];
+            rig.heatHaze.additiveMaterial = rig.additiveMat;
 
-            // ---------- 10. 演示驱动 ----------
-            var demoGo = new GameObject("VNEffectsDemo");
-            var demo = demoGo.AddComponent<VNEffectsDemo>();
-            demo.character = charAnim;
-            demo.characterFx = charFx;
-            demo.backgroundFx = bgFx;
-            demo.ambientParticles = particles;
-            demo.hintText = hint;
-            demo.godRays = godRays;
-            demo.vignetteFocus = vignetteFocus;
-            demo.edgeGlow = edgeGlow;
-            demo.weather = weatherCtrl;
-            demo.mood = moodGrading;
-            demo.transition = screenTransition;
-            demo.emotes = charEmotes;
-            demo.backgroundVariants = allSprites.ToArray();
-            demo.stardust = stardust;
-            demo.heatHaze = heatHaze;
-            demo.characterB = charAnimB;
-            demo.characterBFx = charFxB;
-            demo.speakerHighlight = speakerHighlight;
-            demo.screenShake = screenShake;
-            demo.dialogue = dialogueBox;
-            demo.parallax = parallax;
-            demo.dutchAngle = dutchAngle;
-            demo.vnCamera = vnCamera;
-            demo.heartbeat = heartbeat;
-            demo.sakura = sakura;
-            demo.fakeDoF = fakeDoF;
-            demo.cloudShadows = cloudShadows;
-            demo.toneMatch = toneMatch;
-            demo.choicePanel = choicePanel;
-
-            // ---------- 11. 保存 ----------
-            EditorSceneManager.SaveScene(scene, ScenePath);
-            AssetDatabase.SaveAssets();
-
-            EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath));
-            Debug.Log($"[VNEffects] 演示场景已生成并保存到 {ScenePath}。直接点 Play 体验：" +
-                      "1~5 出场演出 | Space 重播 | X 退场 | S 扫光 | B 星光爆发 | P 粒子 | H 彩虹 | " +
-                      "G 光束 | V 聚焦渐晕 | E 情绪泛光 | W 天气 | M 色调情绪 | T 转场换背景 | " +
-                      "6~0/N 情绪动作 | Y 说话者高亮 | U 水面波光 | J/K/L 分级震动 | Enter 对话框演示。");
+            return rig;
         }
 
-        // ------------------------------------------------------------------
+        // ==================================================================
+        // 菜单一：键盘演示场景
+        // ==================================================================
+
+        [MenuItem("Tools/VN Effects/Create Demo Scene")]
+        public static void CreateDemoScene()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            var rig = BuildStageRig();
+
+            // ---------- 立绘（有两张 solo 图时创建双角色）----------
+            VNEntranceAnimator charAnim = null, charAnimB = null;
+            VNImageEffectController charFx = null, charFxB = null;
+            VNCharacterEmotes charEmotes = null;
+            bool twoChars = rig.charSprite != null && rig.charSprite2 != null;
+            float charHeight = twoChars ? 880f : 980f;
+
+            if (rig.charSprite != null)
+            {
+                var pos = twoChars ? new Vector2(-380f, -60f) : new Vector2(0f, -40f);
+                var (anim, fx) = CreateCharacter("Character", rig.charSprite, rig.layerFront,
+                    pos, charHeight, rig.imageMat, rig.additiveMat);
+                charAnim = anim;
+                charFx = fx;
+                charEmotes = fx.gameObject.AddComponent<VNCharacterEmotes>();
+            }
+            if (twoChars)
+            {
+                var (anim, fx) = CreateCharacter("CharacterB", rig.charSprite2, rig.layerFront,
+                    new Vector2(380f, -60f), charHeight, rig.imageMat, rig.additiveMat);
+                charAnimB = anim;
+                charFxB = fx;
+            }
+
+            // 角色相关的注册
+            if (charFx != null) rig.vnCamera.dollyCharacters.Add(charFx);
+            if (charFxB != null) rig.vnCamera.dollyCharacters.Add(charFxB);
+            if (charFx != null) rig.speakerHighlight.characters.Add(charFx);
+            if (charFxB != null) rig.speakerHighlight.characters.Add(charFxB);
+            rig.weather.moodTargets = (rig.bgFx != null && charFx != null)
+                ? new[] { rig.bgFx, charFx }
+                : rig.weather.moodTargets;
+            rig.toneMatch.characters = (charFx != null && charFxB != null)
+                ? new[] { charFx, charFxB }
+                : (charFx != null ? new[] { charFx } : new VNImageEffectController[0]);
+
+            // ---------- 操作提示文字 ----------
+            var hint = CreateHintText(rig.canvasGo.transform, 320f);
+
+            // ---------- 演示驱动 ----------
+            var demo = new GameObject("VNEffectsDemo").AddComponent<VNEffectsDemo>();
+            demo.character = charAnim;
+            demo.characterFx = charFx;
+            demo.backgroundFx = rig.bgFx;
+            demo.ambientParticles = rig.particles;
+            demo.hintText = hint;
+            demo.godRays = rig.godRays;
+            demo.vignetteFocus = rig.vignetteFocus;
+            demo.edgeGlow = rig.edgeGlow;
+            demo.weather = rig.weather;
+            demo.mood = rig.mood;
+            demo.transition = rig.transition;
+            demo.emotes = charEmotes;
+            demo.backgroundVariants = rig.allSprites.ToArray();
+            demo.stardust = rig.stardust;
+            demo.heatHaze = rig.heatHaze;
+            demo.characterB = charAnimB;
+            demo.characterBFx = charFxB;
+            demo.speakerHighlight = rig.speakerHighlight;
+            demo.screenShake = rig.screenShake;
+            demo.dialogue = rig.dialogueBox;
+            demo.parallax = rig.parallax;
+            demo.dutchAngle = rig.dutchAngle;
+            demo.vnCamera = rig.vnCamera;
+            demo.heartbeat = rig.heartbeat;
+            demo.sakura = rig.sakura;
+            demo.fakeDoF = rig.fakeDoF;
+            demo.cloudShadows = rig.cloudShadows;
+            demo.toneMatch = rig.toneMatch;
+            demo.choicePanel = rig.choicePanel;
+
+            // ---------- 保存 ----------
+            EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
+            AssetDatabase.SaveAssets();
+            EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath));
+            Debug.Log($"[VNEffects] 键盘演示场景已保存到 {ScenePath}。按键说明见画面底部提示。");
+        }
+
+        // ==================================================================
+        // 菜单二：剧本演示场景（VNStage + VNScriptRunner）
+        // ==================================================================
+
+        [MenuItem("Tools/VN Effects/Create Script Demo Scene")]
+        public static void CreateScriptDemoScene()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            var rig = BuildStageRig();
+
+            // ---------- 角色定义资产 ----------
+            EnsureFolder(CharactersDir);
+            var defA = rig.charSprite != null
+                ? EnsureCharacterDef("亚里沙", new Color(0.45f, 0.3f, 0.75f, 0.9f), rig.charSprite)
+                : null;
+            var defB = rig.charSprite2 != null
+                ? EnsureCharacterDef("小雪", new Color(0.25f, 0.45f, 0.8f, 0.9f), rig.charSprite2)
+                : null;
+
+            // ---------- 演示剧本 ----------
+            var scriptAsset = EnsureDemoScript();
+
+            // ---------- VNStage ----------
+            var stage = new GameObject("VNStage").AddComponent<VNStage>();
+            if (defA != null) stage.characters.Add(defA);
+            if (defB != null) stage.characters.Add(defB);
+
+            // 背景库：bg1 = 初始背景，其余大图依次 bg2...
+            int bgIndex = 1;
+            if (rig.bgSprite != null)
+                stage.backgrounds.Add(new VNStage.BackgroundEntry
+                    { id = $"bg{bgIndex++}", sprite = rig.bgSprite });
+            foreach (var s in rig.allSprites)
+            {
+                if (s == rig.bgSprite) continue;
+                stage.backgrounds.Add(new VNStage.BackgroundEntry
+                    { id = $"bg{bgIndex++}", sprite = s });
+            }
+
+            stage.characterLayer = rig.layerFront;
+            stage.backgroundImage = rig.bgImage;
+            stage.backgroundFx = rig.bgFx;
+            stage.dialogue = rig.dialogueBox;
+            stage.transition = rig.transition;
+            stage.weather = rig.weather;
+            stage.mood = rig.mood;
+            stage.vnCamera = rig.vnCamera;
+            stage.screenShake = rig.screenShake;
+            stage.dutchAngle = rig.dutchAngle;
+            stage.heartbeat = rig.heartbeat;
+            stage.sakura = rig.sakura;
+            stage.fakeDoF = rig.fakeDoF;
+            stage.cloudShadows = rig.cloudShadows;
+            stage.godRays = rig.godRays;
+            stage.heatHaze = rig.heatHaze;
+            stage.vignetteFocus = rig.vignetteFocus;
+            stage.speakerHighlight = rig.speakerHighlight;
+            stage.toneMatch = rig.toneMatch;
+
+            // ---------- VNScriptRunner ----------
+            var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
+            runner.stage = stage;
+            runner.script = scriptAsset;
+            runner.playOnStart = true;
+
+            // ---------- 极简提示 ----------
+            var hint = CreateHintText(rig.canvasGo.transform, 40f);
+            hint.text = "Enter / 空格 / 鼠标点击 = 推进剧情（打字中按下 = 催促全文）";
+
+            // ---------- 保存 ----------
+            EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);
+            AssetDatabase.SaveAssets();
+            EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScriptScenePath));
+            Debug.Log($"[VNScript] 剧本演示场景已保存到 {ScriptScenePath}。" +
+                      $"剧本文件：{DemoScriptPath}（可直接编辑后重新 Play）。");
+        }
+
+        // ==================================================================
+        // 剧本系统辅助
+        // ==================================================================
+
+        static VNCharacterDef EnsureCharacterDef(string id, Color nameColor, Sprite sprite)
+        {
+            string path = $"{CharactersDir}/{id}.asset";
+            var def = AssetDatabase.LoadAssetAtPath<VNCharacterDef>(path);
+            if (def != null) return def;
+
+            def = ScriptableObject.CreateInstance<VNCharacterDef>();
+            def.id = id;
+            def.displayName = id;
+            def.nameColor = nameColor;
+            def.expressions.Add(new VNCharacterDef.Expression { name = "默认", sprite = sprite });
+            AssetDatabase.CreateAsset(def, path);
+            return def;
+        }
+
+        static TextAsset EnsureDemoScript()
+        {
+            EnsureFolder("Assets/Scenarios");
+            if (!File.Exists(DemoScriptPath))
+            {
+                File.WriteAllText(DemoScriptPath, DemoScriptContent, System.Text.Encoding.UTF8);
+                AssetDatabase.ImportAsset(DemoScriptPath);
+            }
+            return AssetDatabase.LoadAssetAtPath<TextAsset>(DemoScriptPath);
+        }
+
+        const string DemoScriptContent =
+@"# ============================================
+# VN 剧本演示（P0）— 直接编辑本文件后重新 Play 即可
+# 语法速查：
+#   bg <背景id> [transition:转场名]
+#   show <角色> [at:left|center|right] [expr:表情] [with:出场预设]
+#   hide <角色> [with:dissolve|fade]
+#   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake>
+#   角色 [表情]: 台词        /  旁白: 台词  /  : 无名牌旁白
+#   wait <秒> | shake <light|medium|heavy> | sakura
+#   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
+#   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
+#   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch> <on|off>
+#   行尾加 @ = 不等待该演出完成（异步）
+# ============================================
+
+bg bg1
+mood Sunset
+fx godrays on
+weather Petals
+
+show 亚里沙 at:left with:DissolveGlow
+wait 0.4
+show 小雪 at:right with:FadeSlideUp
+
+亚里沙: 今天的晚霞真漂亮啊……整片天空都烧起来了一样。
+小雪: 是啊。你看，连云的边缘都镶上了金色。
+
+camera pushin 1.05 5 focus:亚里沙 @
+亚里沙: 那个……小雪。
+emote 小雪 Surprise
+小雪: 怎、怎么了？突然这么严肃。
+
+fx heartbeat on
+亚里沙: 我一直……有件事想告诉你。
+wait 0.6
+emote 亚里沙 Shy
+亚里沙: ……还、还是下次再说吧！
+fx heartbeat off
+camera reset @
+
+emote 小雪 HeadShake
+小雪: 什么嘛，真是的。
+shake light
+小雪: 走吧，再不回去天就黑了。
+
+bg bg2 transition:Eyelid
+mood Night
+weather Fireflies
+fx godrays off
+
+旁白: ——那天夜里，萤火虫漫天飞舞。
+sakura
+亚里沙: （总有一天，我一定会说出口的。）
+
+hide 小雪 with:fade
+hide 亚里沙 with:dissolve
+: 第一章　完
+";
+
+        static Text CreateHintText(Transform canvasParent, float height)
+        {
+            var hintGo = new GameObject("HintText",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var hintRect = (RectTransform)hintGo.transform;
+            hintRect.SetParent(canvasParent, false);
+            hintRect.anchorMin = new Vector2(0f, 0f);
+            hintRect.anchorMax = new Vector2(1f, 0f);
+            hintRect.pivot = new Vector2(0.5f, 0f);
+            hintRect.anchoredPosition = new Vector2(0f, 18f);
+            hintRect.sizeDelta = new Vector2(-60f, height);
+            var hint = hintGo.GetComponent<Text>();
+            hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            hint.fontSize = 26;
+            hint.alignment = TextAnchor.LowerCenter;
+            hint.color = new Color(1f, 1f, 1f, 0.85f);
+            hint.supportRichText = true;
+            hint.raycastTarget = false;
+            return hint;
+        }
+
+        // ==================================================================
+        // 通用辅助（与旧版一致）
+        // ==================================================================
 
         static (Sprite character, Sprite character2, Sprite background,
                 System.Collections.Generic.List<Sprite> all) PrepareSprites()
@@ -360,7 +563,7 @@ namespace VNEffects.EditorTools
             string charPath2 = soloPaths.Count > 1 ? soloPaths[1] : null;
             string bgPath = paths.FirstOrDefault(p => p != charPath && p != charPath2) ?? charPath;
 
-            // 除立绘外的"大图"才作为转场轮换背景（过滤掉按钮/对话框等小 UI 素材）
+            // 除立绘外的"大图"才作为背景（过滤掉按钮/对话框等小 UI 素材）
             foreach (var p in paths)
             {
                 if (p == charPath || p == charPath2) continue;
