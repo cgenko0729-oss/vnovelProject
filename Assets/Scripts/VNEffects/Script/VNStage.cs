@@ -128,6 +128,10 @@ namespace VNEffects
             }
         }
 
+        /// <summary>该角色的实际显示高度（舞台统一高度 × 角色尺寸标定）</summary>
+        float HeightFor(VNCharacterDef def) =>
+            characterHeight * Mathf.Max(0.05f, def.sizeScale);
+
         /// <summary>角色登场（已在场则换位置/表情并重播出场）</summary>
         public Sequence Show(string id, string at, string expr, string presetName, int line = 0)
         {
@@ -141,7 +145,8 @@ namespace VNEffects
             var c = Get(id) ?? CreateCharacter(def);
             if (!string.IsNullOrEmpty(at))
             {
-                var pos = SlotPosition(at);
+                // 标准站位 + 该角色的标定偏移（吸收素材构图差异）
+                var pos = SlotPosition(at) + def.positionOffset;
                 c.rect.anchoredPosition = pos;
                 // 关键：同步各组件缓存的"基准位"，否则出场动画会把角色重置回旧位置
                 c.animator.SetBasePosition(pos);
@@ -209,9 +214,10 @@ namespace VNEffects
             if (sprite == null || sprite == c.image.sprite) return;
             c.image.sprite = sprite;
             c.expression = expr;
-            // 不同表情图宽高比可能不同 → 以固定高度重算宽度
+            // 不同表情图宽高比可能不同 → 以该角色的标定高度重算宽度
+            float h = HeightFor(c.def);
             float aspect = sprite.rect.width / sprite.rect.height;
-            c.rect.sizeDelta = new Vector2(characterHeight * aspect, characterHeight);
+            c.rect.sizeDelta = new Vector2(h * aspect, h);
         }
 
         /// <summary>运行时生成完整的角色特效组件栈</summary>
@@ -223,7 +229,7 @@ namespace VNEffects
             rect.SetParent(characterLayer, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(0f, -60f);
+            rect.anchoredPosition = new Vector2(0f, -60f) + def.positionOffset;
 
             var img = go.GetComponent<Image>();
             img.preserveAspect = true;
@@ -232,8 +238,9 @@ namespace VNEffects
             img.sprite = sprite;
             if (sprite != null)
             {
+                float h = HeightFor(def);
                 float aspect = sprite.rect.width / sprite.rect.height;
-                rect.sizeDelta = new Vector2(characterHeight * aspect, characterHeight);
+                rect.sizeDelta = new Vector2(h * aspect, h);
             }
 
             var c = new ActiveCharacter
@@ -333,7 +340,8 @@ namespace VNEffects
             }
 
             var c = Get(id) ?? CreateCharacter(def);
-            var pos = new Vector2(x, -60f);
+            // 存档里的 x 已含偏移，y 用标定偏移重建
+            var pos = new Vector2(x, -60f + def.positionOffset.y);
             c.rect.anchoredPosition = pos;
             c.animator.SetBasePosition(pos);
             c.emotes.SetBasePosition(pos);

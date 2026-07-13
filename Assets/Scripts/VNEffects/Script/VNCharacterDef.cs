@@ -30,6 +30,16 @@ namespace VNEffects
         [Tooltip("表情立绘列表（第一个为默认表情）")]
         public List<Expression> expressions = new List<Expression>();
 
+        [Header("尺寸标定（解决素材构图不统一）")]
+        [Tooltip("尺寸倍率：这个角色的显示高度 = 舞台统一高度 × 此值。\n" +
+                 "素材四周留白多/角色显小 → 调大（如 1.15）；近景图显大 → 调小（如 0.85）")]
+        [Range(0.3f, 2.5f)]
+        public float sizeScale = 1f;
+
+        [Tooltip("站位偏移（像素）：在 at:left/center/right 的标准位置上附加的偏移。\n" +
+                 "素材脚底留白多导致角色偏高 → y 给负值往下压；构图偏左/右 → 用 x 修正")]
+        public Vector2 positionOffset = Vector2.zero;
+
         /// <summary>按表情名取立绘；空/找不到时回退到第一个并告警</summary>
         public Sprite GetSprite(string expressionName)
         {
