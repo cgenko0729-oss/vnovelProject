@@ -27,17 +27,19 @@ namespace VNEffects
         public Vector2 offset = new Vector2(0f, 6f);
 
         VNImageEffectController _fx;
+        VNEntranceAnimator _animator; // 有则动态读取基准位（角色可能被剧本换位）
         RectTransform _charRect;
         CanvasGroup _charGroup;
         RawImage _shadow;
         RectTransform _shadowRect;
-        float _baseY;      // 角色基准 Y（未悬浮时）
-        float _groundY;    // 影子的地面 Y
+        float _baseY;       // 角色基准 Y（无出场器时的后备）
+        float _halfHeight;  // 角色半高（算脚底位置用）
         bool _built;
 
         void Awake()
         {
             _fx = GetComponent<VNImageEffectController>();
+            _animator = GetComponent<VNEntranceAnimator>();
             _charRect = _fx.Rect;
             _charGroup = GetComponent<CanvasGroup>();
         }
@@ -52,9 +54,10 @@ namespace VNEffects
             if (_built) return;
             _built = true;
 
-            _baseY = _charRect.anchoredPosition.y;
+            _baseY = _animator != null ? _animator.BasePosition.y : _charRect.anchoredPosition.y;
             float charW = _charRect.rect.width;
             float charH = _charRect.rect.height;
+            _halfHeight = charH * 0.5f * _charRect.localScale.y;
             float w = charW * widthRatio;
 
             var go = new GameObject($"{name}_FootShadow",
@@ -67,9 +70,6 @@ namespace VNEffects
             _shadowRect.pivot = new Vector2(0.5f, 0.5f);
             _shadowRect.sizeDelta = new Vector2(w, w * heightRatio);
 
-            // 地面 = 角色底边（pivot 在中心）
-            _groundY = _baseY - charH * 0.5f * _charRect.localScale.y + offset.y;
-
             _shadow = go.GetComponent<RawImage>();
             _shadow.texture = VNProceduralTextures.SoftCircle;
             _shadow.raycastTarget = false;
@@ -80,8 +80,12 @@ namespace VNEffects
         {
             if (_shadow == null) return;
 
+            // 基准位动态取自出场器（角色可能被剧本换位）
+            float baseY = _animator != null ? _animator.BasePosition.y : _baseY;
+            float groundY = baseY - _halfHeight + offset.y;
+
             // 悬浮高度差 → 影子缩小变淡
-            float lift = Mathf.Max(0f, _charRect.anchoredPosition.y - _baseY);
+            float lift = Mathf.Max(0f, _charRect.anchoredPosition.y - baseY);
             float shrink = Mathf.Clamp01(1f - lift * 0.008f);
 
             float alpha = baseAlpha * Mathf.Clamp01(1f - lift * 0.02f);
@@ -91,7 +95,7 @@ namespace VNEffects
             _shadow.color = new Color(0f, 0f, 0f, alpha);
             _shadowRect.localScale = new Vector3(shrink, shrink, 1f);
             _shadowRect.anchoredPosition = new Vector2(
-                _charRect.anchoredPosition.x + offset.x, _groundY);
+                _charRect.anchoredPosition.x + offset.x, groundY);
         }
 
         void OnDestroy()

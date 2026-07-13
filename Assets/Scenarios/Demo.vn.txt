@@ -1,0 +1,61 @@
+﻿# ============================================
+# VN 剧本演示（P0）— 直接编辑本文件后重新 Play 即可
+# 语法速查：
+#   bg <背景id> [transition:转场名]
+#   show <角色> [at:left|center|right] [expr:表情] [with:出场预设]
+#   hide <角色> [with:dissolve|fade]
+#   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake>
+#   角色 [表情]: 台词        /  旁白: 台词  /  : 无名牌旁白
+#   wait <秒> | shake <light|medium|heavy> | sakura
+#   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
+#   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
+#   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch> <on|off>
+#   行尾加 @ = 不等待该演出完成（异步）
+# ============================================
+
+bg bg1
+mood Normal
+fx godrays on
+weather Rain
+
+show 亚里沙 at:left with:DissolveGlow
+wait 0.4
+show 小雪 at:right with:FadeSlideUp
+
+亚里沙: 今天的晚霞真漂亮啊……整片天空都烧起来了一样。
+小雪: 是啊。你看，连云的边缘都镶上了金色。
+亚里沙: opps。
+
+weather Fireflies
+shake <heavy>
+
+camera pushin 1.05 5 focus:亚里沙 @
+亚里沙: 那个……小雪。
+emote 小雪 Surprise
+小雪: 怎、怎么了？突然这么严肃。
+
+fx heartbeat on
+亚里沙: 我一直……有件事想告诉你。
+wait 0.6
+emote 亚里沙 Shy
+亚里沙: ……还、还是下次再说吧！
+fx heartbeat off
+camera reset @
+
+emote 小雪 HeadShake
+小雪: 什么嘛，真是的。
+shake light
+小雪: 走吧，再不回去天就黑了。
+
+bg bg2 transition:Eyelid
+mood Night
+weather Fireflies
+fx godrays off
+
+旁白: ——那天夜里，萤火虫漫天飞舞。
+sakura
+亚里沙: （总有一天，我一定会说出口的。）
+
+hide 小雪 with:fade
+hide 亚里沙 with:dissolve
+: 第一章　完

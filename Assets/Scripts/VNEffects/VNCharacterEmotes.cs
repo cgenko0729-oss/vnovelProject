@@ -29,6 +29,13 @@ namespace VNEffects
 
         public bool IsDejected => _dejected;
 
+        /// <summary>重设基准位置（剧本系统改变角色站位后调用）</summary>
+        public void SetBasePosition(Vector2 pos)
+        {
+            _basePos = pos;
+            _cached = true;
+        }
+
         void Awake()
         {
             _fx = GetComponent<VNImageEffectController>();

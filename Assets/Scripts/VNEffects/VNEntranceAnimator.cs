@@ -61,6 +61,22 @@ namespace VNEffects
             _baseCached = true;
         }
 
+        /// <summary>当前基准位置（脚下阴影等组件动态读取）</summary>
+        public Vector2 BasePosition
+        {
+            get { CacheBase(); return _basePos; }
+        }
+
+        /// <summary>
+        /// 重设基准位置。剧本系统改变角色站位后必须调用，
+        /// 否则 PlayEntrance 的 PrepareHidden 会把角色重置回旧基准位。
+        /// </summary>
+        public void SetBasePosition(Vector2 pos)
+        {
+            CacheBase(); // 先保证缩放基准已缓存
+            _basePos = pos;
+        }
+
         /// <summary>把图片重置到"完全隐藏"状态，准备出场</summary>
         public void PrepareHidden()
         {

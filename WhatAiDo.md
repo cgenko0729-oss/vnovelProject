@@ -674,3 +674,16 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 （隐式转换为单常数模式）。Unity 要求同一速度模块的三条曲线**模式必须一致**。
 **修复**：三个粒子预设（Dust / Sparkles / Orbs）的 Z 轴统一改为
 `new ParticleSystem.MinMaxCurve(0f, 0f)`，与 X/Y 保持双常数模式。
+
+### 修复 2：剧本场景双角色都挤在画面中央（2026-07-13）
+
+**现象**：`show 亚里沙 at:left` / `show 小雪 at:right` 后两人都出现在中央叠在一起。
+**原因**：初始化顺序 bug —— 角色运行时生成于 (0,-60)，`VNEntranceAnimator.Awake()`
+立刻把该位置缓存为基准位；`VNStage.Show` 随后虽移到了 at: 指定的站位，但
+`PlayEntrance → PrepareHidden` 会把角色**重置回缓存的旧基准位**。
+**修复**：
+1. `VNEntranceAnimator` 新增 `BasePosition` 属性与 `SetBasePosition()`；
+   `VNCharacterEmotes` 同样新增 `SetBasePosition()`。
+2. `VNStage.Show` 摆位后同步调用两者的 SetBasePosition。
+3. 顺带加固 `VNFootShadow`：基准位改为**每帧动态读取**出场器的 BasePosition
+   （角色被剧本换位/滑入出场时影子位置不再漂移）。

@@ -96,7 +96,13 @@ namespace VNEffects
 
             var c = Get(id) ?? CreateCharacter(def);
             if (!string.IsNullOrEmpty(at))
-                c.rect.anchoredPosition = SlotPosition(at);
+            {
+                var pos = SlotPosition(at);
+                c.rect.anchoredPosition = pos;
+                // 关键：同步各组件缓存的"基准位"，否则出场动画会把角色重置回旧位置
+                c.animator.SetBasePosition(pos);
+                c.emotes.SetBasePosition(pos);
+            }
             ApplyExpression(c, expr);
 
             var preset = VNScriptParser.ParseEnum(presetName, VNEntrancePreset.DissolveGlow, line);
