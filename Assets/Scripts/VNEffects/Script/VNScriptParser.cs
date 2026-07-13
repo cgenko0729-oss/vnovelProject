@@ -19,6 +19,7 @@ namespace VNEffects
         public float zoom = 1f;
         public float duration = 0.8f;
         public string ease;     // 可选缓动名
+        public float fade;      // >0 = 交叉淡化到本点（xfade:秒），代替平移/瞬切
         public int line;
     }
 
@@ -52,6 +53,12 @@ namespace VNEffects
 
         public string Kw(string key, string def = null) =>
             kwargs.TryGetValue(key, out var v) ? v : def;
+
+        public float KwF(string key, float def)
+        {
+            if (kwargs.TryGetValue(key, out var v) && float.TryParse(v, out float f)) return f;
+            return def;
+        }
     }
 
     /// <summary>
@@ -147,7 +154,7 @@ namespace VNEffects
             return result;
         }
 
-        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名]</summary>
+        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名] [xfade:秒]</summary>
         static void ParseCamWaypoint(VNScriptCommand camseqCmd, string raw, int line)
         {
             var tokens = raw.Substring(1).Trim()
@@ -165,6 +172,13 @@ namespace VNEffects
                 if (tokens[t].StartsWith("ease:"))
                 {
                     wp.ease = tokens[t].Substring(5);
+                }
+                else if (tokens[t].StartsWith("xfade:"))
+                {
+                    if (float.TryParse(tokens[t].Substring(6), out float f) && f > 0f)
+                        wp.fade = f;
+                    else
+                        Debug.LogWarning($"[VNScript] 第 {line} 行：xfade 时长「{tokens[t]}」应为正数");
                 }
                 else if (float.TryParse(tokens[t], out float v))
                 {

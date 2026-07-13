@@ -559,8 +559,13 @@ namespace VNEffects
         /// <summary>当前背景 id（存档用）</summary>
         public string CurrentBackgroundId { get; private set; }
 
-        /// <summary>切换背景（可选全屏转场），返回可等待的 Sequence（无转场时为 null）</summary>
-        public Sequence SetBackground(string id, string transitionName, int line = 0)
+        /// <summary>
+        /// 切换背景（可选全屏转场），返回可等待的 Sequence（无转场时为 null）。
+        /// onCovered：转场盖住画面瞬间额外执行的动作
+        /// （camseq start:cut 的首镜头瞬切走这里，与换图同帧，睁眼即是新视角）。
+        /// </summary>
+        public Sequence SetBackground(string id, string transitionName, int line = 0,
+            System.Action onCovered = null)
         {
             var entry = backgrounds.Find(b => b.id == id);
             if (entry == null || entry.sprite == null)
@@ -573,7 +578,11 @@ namespace VNEffects
             if (!string.IsNullOrEmpty(transitionName) && transition != null)
             {
                 var type = VNScriptParser.ParseEnum(transitionName, VNTransition.NoiseDissolve, line);
-                return transition.Play(type, () => ApplyBackground(entry.sprite));
+                return transition.Play(type, () =>
+                {
+                    ApplyBackground(entry.sprite);
+                    onCovered?.Invoke();
+                });
             }
 
             ApplyBackground(entry.sprite);

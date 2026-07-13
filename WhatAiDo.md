@@ -896,3 +896,64 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 2. `VNStage.Show` 摆位后同步调用两者的 SetBasePosition。
 3. 顺带加固 `VNFootShadow`：基准位改为**每帧动态读取**出场器的 BasePosition
    （角色被剧本换位/滑入出场时影子位置不再漂移）。
+
+## 二十六、camseq 镜头交叉淡化（2026-07-13，分支 `feature/camseq-fade`）
+
+### 26.1 需求与问题
+
+`bg bg2 transition:Eyelid` 后紧跟首点为瞬切（时长 0）的 camseq 时，
+转场揭示的是**全图**，下一帧才跳到首镜头视角——有明显的"瞬间移动感"。
+另外镜头之间的瞬切、以及 camseq 结束后的复位，也希望能选择"叠化"过渡。
+
+### 26.2 核心思路：截屏叠化
+
+两个镜头状态本质是 ZoomRoot 的两组 scale/position，无法直接补间出"叠化"。
+通用解法（各家 VN 引擎同款）：**截取当前整屏画面盖在最上层 → 镜头瞬切 →
+把截图淡出**，视觉上就是旧视角叠化到新视角。
+
+### 26.3 新语法（全部可选，默认行为不变）
+
+```
+bg bg2 transition:Eyelid
+camseq start:cut end:fade endfade:0.8
+> top 2.05 0            # start:cut → 眨眼睁开时画面已在 top 2.05
+> 34,-269 2.05 2
+> right 2 0 xfade:0.5   # 该瞬切改为 0.5 秒叠化
+> left 2 3
+```
+
+| 选项 | 语义 |
+|---|---|
+| `start:cut` | 紧跟带转场的 bg 时：首镜头瞬切塞进转场 `onCovered` 回调（与换背景图同帧），揭示时画面直接是首镜头视角。要求首点时长 0；条件不满足自动退化为普通 camseq 并告警 |
+| `start:fade` | camseq 开始时截屏当前画面 → 瞬切首镜头 → 叠化（`startfade:秒`，默认 0.6） |
+| `end:fade` | 走完路径后截屏 → 瞬间复位 → 叠化回全图（`endfade:秒`，默认 0.6） |
+| 路径点 `xfade:秒` | 该点用"截屏→瞬切→叠化"代替平移/瞬切 |
+
+### 26.4 文件改动
+
+| 文件 | 改动 |
+|---|---|
+| `VNCameraFade.cs`（新增） | 截屏叠化组件：嵌套 Canvas 排序 90（对话框 40 之上、ScreenTransition 100 之下）+ 全屏 RawImage。`CaptureCo()` 协程等帧末用 `ScreenCapture.CaptureScreenshotIntoRenderTexture` 截屏（URP 下不能手动 `Camera.Render()`）；`FadeOut(秒)` 淡出。D3D 等平台后备缓冲上下颠倒，按 `SystemInfo.graphicsUVStartsAtTop` 用负 uvRect 翻转（Inspector 有 FlipMode 手动开关兜底） |
+| `VNCamera.cs` | `Waypoint` 加 `fade` 字段；`PlayPath` 抽出 `BuildSegment(from,to)`（编辑器预览不受影响）；新增协程版 `PlayPathCo(points, startFade, endFade)`——连续普通点仍合成一条 Sequence 保持原缓动手感，fade 点走"截屏→Cut→淡出"；`SnapReset()` 瞬间复位；`cameraFade` 引用留空时自动在 Canvas 下创建（旧场景不重建也能用） |
+| `VNScriptParser.cs` | `VNCamWaypointDef.fade` + 路径点行识别 `xfade:`；`VNScriptCommand.KwF()` 浮点 kwargs 助手 |
+| `VNScriptRunner.cs` | `PrecutFor(bgCmd)`：bg 带转场且同步执行时向后看一条命令，若是 `start:cut` 的 camseq 就把首镜头瞬切并入转场盖屏回调，并记录 `_precutDone` 让该 camseq 跳过首点；`CamseqCo` 改调 `PlayPathCo` 并解析 start/end 选项 |
+| `VNStage.cs` | `SetBackground` 加 `onCovered` 回调参数（转场盖屏瞬间与换图一起执行） |
+| `VNEffectsDemoSetup.cs` | `BuildStageRig` 创建 CameraFade 覆盖层并接线（两个演示场景共用） |
+| `Demo.vn.txt` | 文件头补 camseq 语法速查；演示段应用 start:cut / end:fade / xfade |
+
+### 26.5 技术要点
+
+- 截屏时序：帧末截屏（画面 = 旧视角）→ 立即 Cut（下一帧生效）→ 下一帧新视角
+  被不透明截图盖住 → 淡出。全程无裸帧。
+- 截图是整屏静帧，叠化的零点几秒内粒子/对话框在旧图里冻结——camseq 通常在
+  台词之间执行，观感无差别。
+- 快进模式的 `DOTween.timeScale` 全局加速对叠化淡出同样生效。
+- 顺带修正演示剧本：camseq 的 `>` 路径点块中间插过一行 `fx heartbeat on`，
+  会把块截断导致后续 `>` 行被忽略（解析器会告警）；语法速查里已加注意事项。
+
+### 26.6 验证方法
+
+Tools → VN Effects → Create Script Demo Scene 重建剧本场景（或直接 Play 旧场景，
+CameraFade 会自动创建）→ Play：眨眼转场睁眼时画面应直接在 top 2.05 视角，
+`right` 一镜为 0.5 秒叠化，结尾从 `left` 视角 0.8 秒叠化回全图。
+若截图上下颠倒，把 CameraFade 的 Flip 改为 ForceFlip/NoFlip。

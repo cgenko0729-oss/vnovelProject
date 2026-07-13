@@ -17,6 +17,16 @@
 #   if <条件> jump <名字>       条件不能有空格：勇气 / !勇气 / 好感度>=2
 #   choice                       下一行起用 * 列出选项：
 #   * 选项文本 [flag:名字+1] [-> 标签]   （无 -> = 顺序继续）
+# ---- 镜头路径 camseq ----
+#   camseq [start:cut|fade] [end:fade] [startfade:秒] [endfade:秒]
+#   > 目标点 [zoom] [时长] [ease:名] [xfade:秒]
+#     目标点 = 九宫格锚点(top/left/middle...) / x,y 坐标 / 角色[:部位]
+#     时长 0 = 瞬切；xfade:秒 = 该点改用交叉淡化（截屏叠化，代替平移/瞬切）
+#     start:cut  紧跟带转场的 bg 时，转场盖屏瞬间就切到首镜头（要求首点时长 0），
+#                揭示时画面直接是首镜头视角，没有"全图→瞬移"的跳变
+#     start:fade 开始时从当前画面叠化到首镜头（startfade: 秒数，默认 0.6）
+#     end:fade   走完后从末镜头叠化回复位全图（endfade: 秒数，默认 0.6）
+#   注意：> 路径点行之间不能插入其他命令行（会截断路径点块）
 # ============================================
 
 #小雪02
@@ -27,25 +37,14 @@ fx godrays on
 weather Petals
 bgm play b01 [fade:2]
 
-#camseq 
-#> right 2.5 2 
-#> left 2.5 5 
-#> middle 1.0 3
+bg bg2 transition:Eyelid
 
-#camseq
-#> topright 2.05 2
-#> 415,-45 2.05 2
-#> -295,-29 2 2
-#> -476,80 2 2
-#> middle 1 2
-
-camseq
+# start:cut → 眨眼睁开时画面已在 top 2.05 视角；end:fade → 末镜头叠化回全图
+camseq start:cut end:fade endfade:0.8
 > top 2.05 0
 > 34,-269 2.05 2
-> right 2 0
+> right 2 0 xfade:0.5
 > left 2 3
-> middle 1 2
-
 
 
 
