@@ -31,6 +31,12 @@ namespace VNEffects
         [Range(0f, 1f)] public float seVolume = 1f;
         [Range(0f, 1f)] public float voiceVolume = 1f;
 
+        [Header("语音时压低 BGM")]
+        [Tooltip("播放语音时 BGM 降低的比例。0.2 = 降低 20%，即保留原音量的 80%。")]
+        [Range(0f, 1f)] public float voiceBgmReduction = 0.2f;
+        [Tooltip("BGM 压低和恢复所需的淡入淡出时间（秒）")]
+        [Min(0f)] public float voiceBgmFadeDuration = 0.25f;
+
         [Header("打字音（可选）")]
         [Tooltip("打字机逐字音效；留空 = 无打字音")]
         public AudioClip typingTick;
@@ -46,6 +52,7 @@ namespace VNEffects
         AudioSource _seOneShot;
         AudioSource _voice;
         AudioSource _tick;
+        bool _isBgmDucked;
         readonly Dictionary<string, AudioSource> _loopingSe =
             new Dictionary<string, AudioSource>();
         float _lastTickTime;
@@ -86,6 +93,7 @@ namespace VNEffects
             _loopingSe.Clear();
             _currentBgm = null;
             _usingA = false;
+            _isBgmDucked = false;
             bgmVolume = _initialBgmVolume;
             seVolume = _initialSeVolume;
             voiceVolume = _initialVoiceVolume;
@@ -94,6 +102,14 @@ namespace VNEffects
         void OnDestroy()
         {
             if (_instance == this) _instance = null;
+        }
+
+        void Update()
+        {
+            // AudioSource 没有“自然播放完毕”事件，因此在语音结束后的第一帧恢复 BGM。
+            // 新语音会在 PlayVoice 中直接替换旧语音，不会在两条语音之间误恢复。
+            if (_isBgmDucked && (_voice == null || !_voice.isPlaying))
+                SetBgmDucked(false);
         }
 
         AudioSource CreateSource(string name, bool loop)
@@ -136,7 +152,7 @@ namespace VNEffects
             fadeIn.clip = clip;
             fadeIn.volume = 0f;
             fadeIn.Play();
-            fadeIn.DOFade(bgmVolume, Mathf.Max(0.01f, fade)).SetLink(gameObject);
+            fadeIn.DOFade(EffectiveBgmVolume, Mathf.Max(0.01f, fade)).SetLink(gameObject);
 
             if (fadeOut.isPlaying)
                 fadeOut.DOFade(0f, Mathf.Max(0.01f, fade)).SetLink(gameObject)
@@ -206,6 +222,22 @@ namespace VNEffects
             _voice.clip = clip;
             _voice.volume = voiceVolume;
             _voice.Play();
+            SetBgmDucked(true);
+        }
+
+        float EffectiveBgmVolume => bgmVolume * (_isBgmDucked ? 1f - voiceBgmReduction : 1f);
+
+        void SetBgmDucked(bool ducked)
+        {
+            if (_isBgmDucked == ducked) return;
+            _isBgmDucked = ducked;
+
+            var active = _usingA ? _bgmA : _bgmB;
+            if (active == null || !active.isPlaying) return;
+
+            active.DOKill();
+            active.DOFade(EffectiveBgmVolume, Mathf.Max(0.01f, voiceBgmFadeDuration))
+                  .SetLink(gameObject);
         }
 
         // ------------------------------------------------------------------
@@ -224,7 +256,7 @@ namespace VNEffects
                     if (active.isPlaying)
                     {
                         active.DOKill();
-                        active.DOFade(volume, 0.3f).SetLink(gameObject);
+                        active.DOFade(EffectiveBgmVolume, 0.3f).SetLink(gameObject);
                     }
                     break;
                 case "se":
