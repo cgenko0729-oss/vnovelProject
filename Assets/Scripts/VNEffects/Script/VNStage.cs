@@ -607,6 +607,17 @@ namespace VNEffects
             if (!string.IsNullOrEmpty(transitionName) && transition != null)
             {
                 var type = VNScriptParser.ParseEnum(transitionName, VNTransition.NoiseDissolve, line);
+                if (VNScreenTransition.SupportsDirectBackground(type) &&
+                    backgroundImage != null && backgroundImage.sprite != null)
+                {
+                    var directSequence = transition.PlayBackground(type, backgroundImage, entry.sprite, () =>
+                    {
+                        if (toneMatch != null) toneMatch.MatchTo(entry.sprite);
+                        onCovered?.Invoke();
+                    });
+                    if (directSequence != null) return directSequence;
+                    // 直接转场 Shader 不可用时安全退回原全屏转场，确保背景仍会切换。
+                }
                 return transition.Play(type, () =>
                 {
                     ApplyBackground(entry.sprite);
