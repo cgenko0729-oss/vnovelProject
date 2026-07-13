@@ -1122,9 +1122,9 @@ namespace VNEffects.EditorTools
                 new List<SpritePreviewItem>(items), value, clearLabel, noMatchesLabel,
                 selected =>
                 {
-                    if (key.Item1.Get(key.Item2) == selected) return;
+                    if (PopupValue(key) == selected) return;
                     PushUndo(_doc.GenerateText());
-                    key.Item1.Set(key.Item2, selected);
+                    SetPopupValue(key, selected);
                     _customEdit.Remove(key);
                     afterSelect?.Invoke(selected);
                     Bump();
@@ -1135,6 +1135,34 @@ namespace VNEffects.EditorTools
                     _customEdit.Add(key);
                     Repaint();
                 }));
+        }
+
+        static string PopupValue((VNRow, string) key)
+        {
+            switch (key.Item2)
+            {
+                case "say.speaker": return key.Item1.speaker;
+                case "say.expr": return key.Item1.expression;
+                default: return key.Item1.Get(key.Item2);
+            }
+        }
+
+        static void SetPopupValue((VNRow, string) key, string value)
+        {
+            switch (key.Item2)
+            {
+                case "say.speaker":
+                    key.Item1.speaker = value;
+                    key.Item1.Set(key.Item2, ""); // 清理由旧版错误回调写入的普通参数
+                    break;
+                case "say.expr":
+                    key.Item1.expression = value;
+                    key.Item1.Set(key.Item2, "");
+                    break;
+                default:
+                    key.Item1.Set(key.Item2, value);
+                    break;
+            }
         }
 
         static void DrawSpritePreview(Rect rect, Sprite sprite)
