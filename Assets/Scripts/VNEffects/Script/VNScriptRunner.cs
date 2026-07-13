@@ -11,7 +11,7 @@ namespace VNEffects
     ///   - 默认同步执行（等待演出完成），行尾 @ = 异步不等待
     ///   - 台词行：等打字机播完 + 玩家点击/Enter/空格推进（打字中按键 = 催促）
     ///   - P1：label/jump/choice/flag/if 分支
-    ///   - P2：F5 快速存档 / F9 快速读档、H(或滚轮上滑) 回想、A 自动模式、S 快进
+    ///   - P2：F5/F9 打开 20 槽存读档界面、H(或滚轮上滑) 回想、A 自动模式、S 快进
     /// </summary>
     public class VNScriptRunner : MonoBehaviour
     {
@@ -39,6 +39,11 @@ namespace VNEffects
         Coroutine _co;
 
         VNBacklog _backlog;
+        VNSaveLoadPanel _saveLoadPanel;
+        Coroutine _saveCaptureCo;
+        int _saveCaptureToken;
+        float _timeScaleBeforeMenu = 1f;
+        bool _menuPaused;
         bool _auto;
         bool _skip;
         bool _waitingAtSay;   // 只有停在台词上时才允许存档
@@ -60,6 +65,7 @@ namespace VNEffects
                 if (_backlog == null)
                     _backlog = new GameObject("VNBacklog").AddComponent<VNBacklog>();
             }
+            EnsureSaveLoadPanel();
             if (playOnStart && script != null) Play(script);
             IsInitialized = true;
         }
@@ -344,6 +350,11 @@ namespace VNEffects
 
         public void SaveTo(int slot)
         {
+            SaveTo(slot, null);
+        }
+
+        public void SaveTo(int slot, Texture2D thumbnail)
+        {
             if (!_waitingAtSay)
             {
                 VNToast.Show("演出进行中，此刻不能存档");
@@ -355,7 +366,7 @@ namespace VNEffects
                 lastLine = _lastSayText,
             };
             stage.CaptureSnapshot(data);
-            VNSaveSystem.Save(slot, data);
+            VNSaveSystem.Save(slot, data, thumbnail);
             VNToast.Show($"已保存（槽位 {slot}）");
         }
 
@@ -373,6 +384,94 @@ namespace VNEffects
             stage.RestoreSnapshot(data);
             VNToast.Show($"已读取（槽位 {slot}）");
             ResumeAt(data.commandIndex);
+        }
+
+        void EnsureSaveLoadPanel()
+        {
+            if (_saveLoadPanel == null)
+            {
+                _saveLoadPanel = FindFirstObjectByType<VNSaveLoadPanel>();
+                if (_saveLoadPanel == null)
+                    _saveLoadPanel = new GameObject("VNSaveLoadPanel").AddComponent<VNSaveLoadPanel>();
+            }
+            _saveLoadPanel.Initialize(this);
+        }
+
+        /// <summary>F5 / 保存页签入口：先隐藏 UI 并截取游戏画面，再显示 20 槽网格。</summary>
+        public void RequestSavePanel()
+        {
+            if (!_waitingAtSay)
+            {
+                VNToast.Show("演出进行中，此刻不能存档");
+                return;
+            }
+            EnsureSaveLoadPanel();
+            PauseForSaveLoadMenu();
+            _saveLoadPanel.PrepareForSaveCapture();
+
+            if (_saveCaptureCo != null) StopCoroutine(_saveCaptureCo);
+            int token = ++_saveCaptureToken;
+            _saveCaptureCo = StartCoroutine(CaptureSaveThumbnailCo(token));
+        }
+
+        /// <summary>F9 / 读取页签入口。</summary>
+        public void RequestLoadPanel()
+        {
+            EnsureSaveLoadPanel();
+            CancelSaveCapture();
+            PauseForSaveLoadMenu();
+            _saveLoadPanel.OpenLoad();
+        }
+
+        IEnumerator CaptureSaveThumbnailCo(int token)
+        {
+            VNCameraFade capture = stage != null && stage.vnCamera != null
+                ? stage.vnCamera.cameraFade : null;
+            if (capture == null) capture = FindFirstObjectByType<VNCameraFade>();
+            if (capture == null)
+                capture = new GameObject("SaveThumbnailCapture").AddComponent<VNCameraFade>();
+
+            Texture2D thumbnail = null;
+            yield return capture.CaptureThumbnailCo(320, 180, texture => thumbnail = texture);
+            _saveCaptureCo = null;
+            if (token != _saveCaptureToken || _saveLoadPanel == null || !_menuPaused)
+            {
+                if (thumbnail != null) Destroy(thumbnail);
+                yield break;
+            }
+            _saveLoadPanel.OpenSave(thumbnail);
+        }
+
+        void PauseForSaveLoadMenu()
+        {
+            if (_menuPaused) return;
+            _menuPaused = true;
+            _timeScaleBeforeMenu = Time.timeScale;
+            Time.timeScale = 0f;
+            if (_auto) SetAuto(false);
+            if (_skip) SetSkip(false);
+        }
+
+        public void OnSaveLoadPanelClosed()
+        {
+            CancelSaveCapture();
+            if (!_menuPaused) return;
+            Time.timeScale = _timeScaleBeforeMenu;
+            _menuPaused = false;
+        }
+
+        void CancelSaveCapture()
+        {
+            _saveCaptureToken++;
+            if (_saveCaptureCo == null) return;
+            StopCoroutine(_saveCaptureCo);
+            _saveCaptureCo = null;
+        }
+
+        public void LoadFromPanel(int slot)
+        {
+            _saveLoadPanel?.Close();
+            LoadFrom(slot);
         }
 
         // ------------------------------------------------------------------
@@ -403,6 +502,7 @@ namespace VNEffects
         void OnDestroy()
         {
             if (_skip) DOTween.timeScale = 1f; // 别把加速留给别的场景
+            if (_menuPaused) Time.timeScale = _timeScaleBeforeMenu;
         }
 
         // ------------------------------------------------------------------
@@ -414,6 +514,15 @@ namespace VNEffects
             var kb = Keyboard.current;
             var mouse = Mouse.current;
             if (kb == null) return;
+
+            // 存读档界面打开期间只响应界面快捷键，不推进剧情。
+            if (_saveLoadPanel != null && _saveLoadPanel.IsOpen)
+            {
+                if (kb.escapeKey.wasPressedThisFrame) _saveLoadPanel.Close();
+                else if (kb.f5Key.wasPressedThisFrame) RequestSavePanel();
+                else if (kb.f9Key.wasPressedThisFrame) RequestLoadPanel();
+                return;
+            }
 
             // 回想面板打开期间：只处理关闭，不推进剧情
             if (_backlog != null && _backlog.IsOpen)
@@ -430,8 +539,8 @@ namespace VNEffects
                 return;
             }
 
-            if (kb.f5Key.wasPressedThisFrame) { SaveTo(1); return; }
-            if (kb.f9Key.wasPressedThisFrame) { LoadFrom(1); return; }
+            if (kb.f5Key.wasPressedThisFrame) { RequestSavePanel(); return; }
+            if (kb.f9Key.wasPressedThisFrame) { RequestLoadPanel(); return; }
             if (kb.aKey.wasPressedThisFrame) { SetAuto(!_auto); return; }
             if (kb.sKey.wasPressedThisFrame) { SetSkip(!_skip); return; }
 
