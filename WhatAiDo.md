@@ -957,3 +957,35 @@ Tools → VN Effects → Create Script Demo Scene 重建剧本场景（或直接
 CameraFade 会自动创建）→ Play：眨眼转场睁眼时画面应直接在 top 2.05 视角，
 `right` 一镜为 0.5 秒叠化，结尾从 `left` 视角 0.8 秒叠化回全图。
 若截图上下颠倒，把 CameraFade 的 Flip 改为 ForceFlip/NoFlip。
+
+## 二十七、镜头编辑器支持交叉叠化（2026-07-13，分支 `feature/camseq-editor-fade`）
+
+把二十六章的 camseq 叠化选项接进可视化编辑器（VNCamseqEditorWindow），
+文本生成/解析/预览三条通道全部对齐运行时。
+
+### 27.1 界面新增
+
+- **开场/收尾选项行**（画布与路径点列表之间）：
+  - 开场下拉：无 / cut（接 bg 转场盖屏瞬切）/ fade（当前画面叠化到首镜头）+ 秒数
+  - 「收尾叠化回全图」开关 + 秒数
+  - start:cut 但首点时长非 0 时显示黄色警告（运行时会退化为普通 camseq）
+- **路径点第二行新增 `xfade` 输入框**：>0 = 该点用叠化代替平移/瞬切
+  （zoom 滑条 160→130 腾出宽度）；「清空」同时重置开场/收尾选项
+
+### 27.2 预览时间轴重构
+
+- 原 `StateAtTime`（直接遍历路径点）重构为 **`BuildSegments()` 段列表模型**：
+  开场 fade 段（消费首点）→ 各路径点（xfade 覆盖为叠化段）→ 收尾 fade 段
+- 缓动默认分配改为**按叠化段切组**，每组内 首 InSine / 中 Linear / 末 OutSine
+  （单段 InOutSine）——与运行时 `PlayPathCo` 按 fade 分组调 `BuildSegment` 完全一致
+- `PreviewAtTime` 返回镜头状态 + 叠化信息：叠化段内白色取景框瞬切到新视角，
+  **橙色残框按 InOutSine 渐隐 = 正在淡出的旧视角**；总时长把叠化秒数计入进度条
+- 场景预览（驱动 ZoomRoot）在叠化段表现为瞬切——符合运行时真实行为
+  （真实叠化发生在截屏覆盖层上，ZoomRoot 本身就是瞬切）
+
+### 27.3 文本双向
+
+- 生成：`camseq [start:cut|start:fade] [end:fade]`（秒数非默认 0.6 才写
+  startfade:/endfade:）；路径点行追加 `xfade:秒`
+- 解析载入：读 camseq 的 start/end/startfade/endfade kwargs 与路径点 fade 字段
+- 预设库存的就是 camseq 文本 → 叠化选项自动随预设保存/载入，零改动
