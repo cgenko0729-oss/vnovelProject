@@ -28,6 +28,7 @@ namespace VNEffects.EditorTools
         bool _dirty;
         bool _externalChanged;
         Tab _tab;
+        bool _showCategoryColors;
 
         ReorderableList _list;
         Vector2 _scroll;
@@ -91,6 +92,18 @@ namespace VNEffects.EditorTools
                 { "HeadShake", "摇头" },
             };
 
+        const string CategoryColorPrefPrefix = "VNEffects.ScenarioEditor.CategoryColor.";
+        static readonly string[] ColorCategoryIds =
+            { "Dialogue", "Scene", "Character", "Camera", "FX", "Audio", "Flow" };
+        static readonly Dictionary<string, string> ColorCategoryLabels =
+            new Dictionary<string, string>
+            {
+                { "Dialogue", "对话" }, { "Scene", "场景" }, { "Character", "角色" },
+                { "Camera", "镜头" }, { "FX", "特效" }, { "Audio", "音频" },
+                { "Flow", "流程" },
+            };
+        readonly Dictionary<string, Color> _categoryColors = new Dictionary<string, Color>();
+
         [MenuItem("Tools/VN Effects/Scenario Editor")]
         static void Open()
         {
@@ -100,6 +113,7 @@ namespace VNEffects.EditorTools
 
         void OnEnable()
         {
+            LoadCategoryColors();
             BuildList();
             RefreshSources();
         }
@@ -326,6 +340,12 @@ namespace VNEffects.EditorTools
             HandleUndoKeys();
             ValidateIfNeeded();
             DrawToolbar();
+            if (_showCategoryColors)
+            {
+                bool previousChanged = GUI.changed;
+                DrawCategoryColorSettings();
+                GUI.changed = previousChanged;
+            }
 
             if (_externalChanged)
             {
@@ -386,6 +406,10 @@ namespace VNEffects.EditorTools
                 }
                 if (GUILayout.Button("Refresh Sources", EditorStyles.toolbarButton, GUILayout.Width(104f)))
                     RefreshSources();
+                bool previousChanged = GUI.changed;
+                _showCategoryColors = GUILayout.Toggle(_showCategoryColors, "分类颜色",
+                    EditorStyles.toolbarButton, GUILayout.Width(64f));
+                GUI.changed = previousChanged;
 
                 GUILayout.Space(8f);
                 string name = string.IsNullOrEmpty(_path) ? "(untitled)" : Path.GetFileName(_path);
@@ -411,6 +435,46 @@ namespace VNEffects.EditorTools
                 DrawTabButton(Tab.Edit, "Edit");
                 DrawTabButton(Tab.Text, "Text");
                 DrawTabButton(Tab.Issues, $"Issues ({errors}E/{warns}W)");
+            }
+        }
+
+        void DrawCategoryColorSettings()
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Label("主下拉分类颜色", EditorStyles.miniBoldLabel,
+                        GUILayout.Width(92f));
+                    foreach (string category in ColorCategoryIds)
+                        DrawCategoryColorField(category);
+                    if (GUILayout.Button("恢复默认", GUILayout.Width(64f)))
+                    {
+                        foreach (string category in ColorCategoryIds)
+                        {
+                            _categoryColors[category] = DefaultCategoryColor(category);
+                            SaveCategoryColor(category);
+                        }
+                        Repaint();
+                    }
+                }
+            }
+        }
+
+        void DrawCategoryColorField(string category)
+        {
+            using (new EditorGUILayout.VerticalScope(GUILayout.Width(86f)))
+            {
+                GUILayout.Label(ColorCategoryLabels[category], EditorStyles.centeredGreyMiniLabel);
+                EditorGUI.BeginChangeCheck();
+                Color value = EditorGUILayout.ColorField(GUIContent.none,
+                    CategoryColor(category), true, false, false, GUILayout.Width(82f));
+                if (EditorGUI.EndChangeCheck())
+                {
+                    _categoryColors[category] = value;
+                    SaveCategoryColor(category);
+                    Repaint();
+                }
             }
         }
 
@@ -530,7 +594,7 @@ namespace VNEffects.EditorTools
         {
             float x = rect.x;
             var typeRect = new Rect(x, rect.y, 128f, rect.height);
-            if (GUI.Button(typeRect, "say（对白）", EditorStyles.popup))
+            if (CategoryPopupButton(typeRect, "say（对白）", "Dialogue"))
                 ShowRowTypeMenu(typeRect, r);
             x += 132f;
 
@@ -559,7 +623,8 @@ namespace VNEffects.EditorTools
 
             // 关键字下拉
             var keywordRect = new Rect(x, line0.y, 128f, line0.height);
-            if (GUI.Button(keywordRect, CommandDisplayName(r.keyword), EditorStyles.popup))
+            if (CategoryPopupButton(keywordRect, CommandDisplayName(r.keyword),
+                    CommandCategory(r.keyword)))
                 ShowRowTypeMenu(keywordRect, r);
             x += 132f;
 
@@ -653,6 +718,59 @@ namespace VNEffects.EditorTools
         static string CategoryDisplayName(string category) =>
             CategoryTranslations.TryGetValue(category, out string translation)
                 ? $"{category}（{translation}）" : category;
+
+        static string CommandCategory(string keyword)
+        {
+            var definition = VNScenarioSchema.Find(keyword);
+            return definition != null ? definition.category : "";
+        }
+
+        bool CategoryPopupButton(Rect rect, string label, string category)
+        {
+            Color previous = GUI.backgroundColor;
+            GUI.backgroundColor = CategoryColor(category);
+            bool clicked = GUI.Button(rect, label, EditorStyles.popup);
+            GUI.backgroundColor = previous;
+            return clicked;
+        }
+
+        Color CategoryColor(string category) =>
+            _categoryColors.TryGetValue(category, out Color color) ? color : Color.white;
+
+        void LoadCategoryColors()
+        {
+            _categoryColors.Clear();
+            foreach (string category in ColorCategoryIds)
+            {
+                string html = EditorPrefs.GetString(CategoryColorPrefPrefix + category, "");
+                if (!string.IsNullOrEmpty(html) &&
+                    ColorUtility.TryParseHtmlString("#" + html, out Color saved))
+                    _categoryColors[category] = saved;
+                else
+                    _categoryColors[category] = DefaultCategoryColor(category);
+            }
+        }
+
+        void SaveCategoryColor(string category)
+        {
+            EditorPrefs.SetString(CategoryColorPrefPrefix + category,
+                ColorUtility.ToHtmlStringRGBA(CategoryColor(category)));
+        }
+
+        static Color DefaultCategoryColor(string category)
+        {
+            switch (category)
+            {
+                case "Dialogue": return new Color(0.55f, 0.78f, 1f);
+                case "Scene": return new Color(0.58f, 0.88f, 0.66f);
+                case "Character": return new Color(1f, 0.68f, 0.78f);
+                case "Camera": return new Color(0.65f, 0.72f, 1f);
+                case "FX": return new Color(0.86f, 0.65f, 1f);
+                case "Audio": return new Color(1f, 0.78f, 0.42f);
+                case "Flow": return new Color(0.72f, 0.78f, 0.82f);
+                default: return Color.white;
+            }
+        }
 
         void SetSayRow(VNRow row)
         {
