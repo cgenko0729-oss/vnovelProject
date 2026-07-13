@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace VNEffects
@@ -26,14 +28,25 @@ namespace VNEffects
             if (_root != null) return;
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
+            if (EventSystem.current == null)
+                new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+
             _root = new GameObject("QuickToolbar", typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Image), typeof(HorizontalLayoutGroup));
+                typeof(Canvas), typeof(GraphicRaycaster), typeof(CanvasRenderer),
+                typeof(Image), typeof(HorizontalLayoutGroup));
             var rect = (RectTransform)_root.transform;
             rect.SetParent(transform, false);
             rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 0f);
             rect.anchoredPosition = new Vector2(-18f, 9f);
             rect.sizeDelta = new Vector2(616f, 42f);
+
+            // VNDialogueBox 自己是 overrideSorting 的嵌套 Canvas。工具条需要独立
+            // GraphicRaycaster 才能接收按钮点击，同时提高一层排序保证文字在按钮底图之上。
+            var parentCanvas = GetComponent<Canvas>();
+            var toolbarCanvas = _root.GetComponent<Canvas>();
+            toolbarCanvas.overrideSorting = true;
+            toolbarCanvas.sortingOrder = parentCanvas != null ? parentCanvas.sortingOrder + 1 : 41;
 
             var bg = _root.GetComponent<Image>();
             bg.sprite = VNProceduralTextures.RoundedRectSprite;
@@ -84,6 +97,7 @@ namespace VNEffects
             textRect.offsetMax = Vector2.zero;
             var text = textGo.GetComponent<Text>();
             text.font = _font;
+            text.text = label;
             text.fontSize = 16;
             text.fontStyle = FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;
