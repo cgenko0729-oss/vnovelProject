@@ -424,7 +424,7 @@ namespace VNEffects.EditorTools
             // ---------- 极简提示 ----------
             var hint = CreateHintText(rig.canvasGo.transform, 70f);
             hint.text = "Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进\n" +
-                        "F5 快速存档 | F9 快速读档";
+                        "F5 存档界面 | F9 读档界面";
 
             // ---------- 保存 ----------
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);

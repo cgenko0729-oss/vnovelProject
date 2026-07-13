@@ -38,8 +38,13 @@ namespace VNEffects
     /// </summary>
     public static class VNSaveSystem
     {
+        public const int SlotCount = 20;
+
         static string PathFor(int slot) =>
             Path.Combine(Application.persistentDataPath, $"vn_save_{slot}.json");
+
+        static string ThumbnailPathFor(int slot) =>
+            Path.Combine(Application.persistentDataPath, $"vn_save_{slot}.png");
 
         public static bool HasSave(int slot) => File.Exists(PathFor(slot));
 
@@ -58,6 +63,60 @@ namespace VNEffects
             File.WriteAllText(PathFor(slot), JsonUtility.ToJson(data, true),
                 System.Text.Encoding.UTF8);
             Debug.Log($"[VNSave] 已保存到槽位 {slot}：{PathFor(slot)}");
+        }
+
+        /// <summary>保存 JSON 与界面缩略图；旧的无图存档仍可正常读取。</summary>
+        public static void Save(int slot, VNSaveData data, Texture2D thumbnail)
+        {
+            Save(slot, data);
+            if (thumbnail == null) return;
+            try
+            {
+                File.WriteAllBytes(ThumbnailPathFor(slot), thumbnail.EncodeToPNG());
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[VNSave] 槽位 {slot} 缩略图保存失败：{e.Message}");
+            }
+        }
+
+        /// <summary>只读槽位信息，不修改 VNFlags；用于存读档界面的 20 槽预览。</summary>
+        public static VNSaveData Peek(int slot)
+        {
+            if (!HasSave(slot)) return null;
+            try
+            {
+                return JsonUtility.FromJson<VNSaveData>(
+                    File.ReadAllText(PathFor(slot), System.Text.Encoding.UTF8));
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[VNSave] 槽位 {slot} 元数据读取失败：{e.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>读取槽位 PNG 缩略图；调用方负责 Destroy 返回的 Texture2D。</summary>
+        public static Texture2D LoadThumbnail(int slot)
+        {
+            string path = ThumbnailPathFor(slot);
+            if (!File.Exists(path)) return null;
+            try
+            {
+                var texture = new Texture2D(2, 2, TextureFormat.RGB24, false)
+                {
+                    name = $"SaveThumbnail_{slot}",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                if (texture.LoadImage(File.ReadAllBytes(path), true)) return texture;
+                Object.Destroy(texture);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[VNSave] 槽位 {slot} 缩略图读取失败：{e.Message}");
+            }
+            return null;
         }
 
         public static VNSaveData Load(int slot)

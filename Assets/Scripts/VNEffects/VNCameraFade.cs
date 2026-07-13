@@ -90,12 +90,50 @@ namespace VNEffects
             EnsureRT();
             ScreenCapture.CaptureScreenshotIntoRenderTexture(_rt);
             _img.texture = _rt;
-            bool flipY = flip == FlipMode.ForceFlip ||
-                         (flip == FlipMode.Auto && SystemInfo.graphicsUVStartsAtTop);
+            bool flipY = ShouldFlipY();
             _img.uvRect = flipY ? new Rect(0f, 1f, 1f, -1f) : new Rect(0f, 0f, 1f, 1f);
             _img.color = Color.white;
             _img.enabled = true;
         }
+
+        /// <summary>
+        /// 复用镜头淡化的帧末截屏管线，生成适合存档网格的低分辨率、方向统一 Texture2D。
+        /// 返回纹理由调用方负责 Destroy；不会显示 CameraFadeOverlay。
+        /// </summary>
+        public IEnumerator CaptureThumbnailCo(int width, int height,
+            System.Action<Texture2D> onCaptured)
+        {
+            yield return new WaitForEndOfFrame();
+            EnsureRT();
+            ScreenCapture.CaptureScreenshotIntoRenderTexture(_rt);
+
+            width = Mathf.Max(16, width);
+            height = Mathf.Max(9, height);
+            var small = RenderTexture.GetTemporary(width, height, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            small.filterMode = FilterMode.Bilinear;
+
+            bool flipY = ShouldFlipY();
+            Graphics.Blit(_rt, small, new Vector2(1f, flipY ? -1f : 1f),
+                new Vector2(0f, flipY ? 1f : 0f));
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = small;
+            var texture = new Texture2D(width, height, TextureFormat.RGB24, false)
+            {
+                name = "PendingSaveThumbnail",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            texture.ReadPixels(new Rect(0f, 0f, width, height), 0, 0, false);
+            texture.Apply(false, false);
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(small);
+            onCaptured?.Invoke(texture);
+        }
+
+        bool ShouldFlipY() => flip == FlipMode.ForceFlip ||
+                              (flip == FlipMode.Auto && SystemInfo.graphicsUVStartsAtTop);
 
         /// <summary>把截图淡出，露出新镜头画面</summary>
         public Tween FadeOut(float duration)
