@@ -606,7 +606,65 @@ SceneRoot(震动·位置 + 心跳·缩放)
 推荐组合：`[` 伪景深 + `V` 聚焦渐晕 + `Q` 缓推 = 完整对话特写运镜。
 **需要重新执行 Tools → VN Effects → Create Demo Scene**。
 
-## 十六、问题修复记录
+## 十六、剧本系统 P0：自研轻量 DSL 核心（2026-07-13，分支 `feature/vn-script-core`）
+
+> 选型结论（详见对话分析）：放弃 Pixel Crushers Dialogue System 作为核心（其数据库资产
+> 对 Git/AI 协作不友好），采用**自研 Ren'Py 风格纯文本剧本**。DS 插件保留备用。
+
+### 16.1 架构（新增 `Assets/Scripts/VNEffects/Script/`）
+
+```
+Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptCommand 列表
+      → VNScriptRunner（协程解释器：顺序/异步/等待/推进） → VNStage（舞台落地层）
+            → 既有的 60+ VNEffects API
+```
+
+### 16.2 剧本语法（P0 已实现命令集）
+
+| 命令 | 说明 |
+|---|---|
+| `bg bg1 [transition:Eyelid]` | 切背景（背景库 id），可带全屏转场 |
+| `show 亚里沙 [at:left] [expr:微笑] [with:DissolveGlow]` | 角色登场（运行时生成完整组件栈） |
+| `hide 亚里沙 [with:dissolve\|fade]` | 退场并销毁 |
+| `emote 小雪 Surprise` | 情绪动作（7 种） |
+| `亚里沙 微笑: 台词` / `旁白: 台词` / `: 无名牌旁白` | 台词行（说话者自动高亮+切表情） |
+| `wait 0.6` | 分镜停顿 |
+| `camera pushin 1.05 5 [focus:角色]` | 运镜（pushin/snapzoom/pan/dolly/reset） |
+| `shake light\|medium\|heavy` / `sakura` | 震动 / 樱吹雪 |
+| `weather Petals` / `mood Sunset` / `transition WhiteFlash` | 天气 / 色调 / 独立转场 |
+| `fx godrays\|dof\|clouds\|haze\|shimmer\|heartbeat\|dutch on\|off`、`fx focus 角色` | 特效开关 |
+| 行尾 `@` | **异步**：不等待该演出完成（演出 timing 的核心语义） |
+| `label/jump/choice/flag/if` | 已解析、P1 实现 |
+
+### 16.3 核心组件
+
+- **`VNCharacterDef`（ScriptableObject）**：角色 id/显示名/名牌色/**表情名→立绘映射**，
+  立绘表情资产集中管理（`Create → VN → Character Definition`）。
+- **`VNScriptParser`**：行解析（注释/异步后缀/命令 kwargs/台词行全半角冒号），
+  保留行号 → 所有报错精确到"第 N 行"。
+- **`VNStage`**：角色运行时工厂（Image+控制器+光环+出场器+情绪+脚影全栈生成）、
+  表情切换（按高度重算宽度）、背景库、说话分发（自动说话者高亮）、fx 分发、
+  在场角色变化时自动刷新 ToneMatch/SpeakerHighlight 注册。
+- **`VNScriptRunner`**：协程解释器——同步命令 `yield WaitForCompletion()`，
+  `@` 异步 fire-and-forget；台词=等打字完+玩家推进（Enter/空格/点击，打字中按下=催促）。
+
+### 16.4 场景生成器重构
+
+- 把原 CreateDemoScene 拆出共享的 **`BuildStageRig()`**（相机/后处理/Canvas/容器层级/
+  全部特效管理器），键盘演示场景与剧本场景共用。
+- 新菜单 **Tools → VN Effects → Create Script Demo Scene**：自动创建
+  两个角色定义资产（`Assets/VNEffects/Characters/亚里沙|小雪.asset`）、
+  演示剧本 `Assets/Scenarios/Demo.vn.txt`（已存在则不覆盖，放心改）、
+  VNStage（背景库 bg1..bgN 自动填充）+ VNScriptRunner，保存为 `VNScriptDemo.unity`。
+
+### 16.5 使用方法
+
+1. 菜单 Tools → VN Effects → **Create Script Demo Scene** → Play，
+   Enter/空格/点击推进剧情（演示剧本含出场/表情动作/运镜/心跳/换景/天气/樱吹雪全流程）
+2. 直接编辑 `Assets/Scenarios/Demo.vn.txt` 再 Play 即可看到修改（语法速查在文件头注释）
+3. 后续：P1 分支选项 → P2 存档回想 → P3 台词内嵌演出标记
+
+## 十七、问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
