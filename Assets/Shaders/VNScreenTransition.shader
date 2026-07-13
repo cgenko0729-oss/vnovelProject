@@ -200,8 +200,8 @@ Shader "VN/ScreenTransition"
                     float2 grid = float2(_Count * _Aspect, _Count);
                     float2 cell = floor(uv * grid);
                     float2 local = frac(uv * grid);
-                    float triangle = step(1.0, local.x + local.y);
-                    float shardNoise = hash21(cell + triangle * 19.37);
+                    float shardSide = step(1.0, local.x + local.y);
+                    float shardNoise = hash21(cell + shardSide * 19.37);
                     float threshold = radial * 0.62 + shardNoise * 0.38;
                     mask = smoothstep(threshold - 0.055, threshold + 0.025, p * 1.12);
 
