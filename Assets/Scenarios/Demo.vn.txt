@@ -27,10 +27,28 @@ fx godrays on
 weather Petals
 bgm play b01 [fade:2]
 
-camseq 
-> right 2.5 2 
-> left 2.5 5 
-> middle 1.0 3
+#camseq 
+#> right 2.5 2 
+#> left 2.5 5 
+#> middle 1.0 3
+
+#camseq
+#> topright 2.05 2
+#> 415,-45 2.05 2
+#> -295,-29 2 2
+#> -476,80 2 2
+#> middle 1 2
+
+camseq
+> top 2.05 0
+> 34,-269 2.05 2
+> right 2 0
+> left 2 3
+> middle 1 2
+
+
+
+
 
 show 亚里沙 at:left with:DissolveGlow
 wait 0.4

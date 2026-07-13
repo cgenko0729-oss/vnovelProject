@@ -65,6 +65,21 @@ namespace VNEffects.EditorTools
         string _generatedText = "";
         Vector2 _scroll;
 
+        // ---- 第二批：场景预览 / 画布拖拽 / 预设库 ----
+        enum DragMode { None, Center, Corner }
+        DragMode _dragMode;
+
+        bool _scenePreviewing;
+        RectTransform _zoomRoot;
+        Vector2 _origPos;
+        Vector3 _origScale;
+
+        VNCamseqPresetLibrary _library;
+        string _presetName = "";
+        int _presetIndex;
+
+        const string LibraryPath = "Assets/VNEffects/CamseqPresets.asset";
+
         [MenuItem("Tools/VN Effects/Camera Sequence Editor")]
         static void Open()
         {
@@ -82,20 +97,37 @@ namespace VNEffects.EditorTools
                 onAddCallback = l => _points.Add(new Waypoint()),
             };
             _lastUpdateTime = EditorApplication.timeSinceStartup;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            _library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
+        }
+
+        void OnDisable()
+        {
+            StopScenePreview();
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+        }
+
+        void OnPlayModeChanged(PlayModeStateChange change)
+        {
+            // 进出 Play 前后都还原场景，避免把预览状态序列化进场景/运行副本
+            StopScenePreview();
         }
 
         void Update()
         {
-            if (!_playing) return;
-            double now = EditorApplication.timeSinceStartup;
-            _scrub += (float)(now - _lastUpdateTime);
-            _lastUpdateTime = now;
-            if (_scrub >= TotalDuration())
+            if (_playing)
             {
-                _scrub = TotalDuration();
-                _playing = false;
+                double now = EditorApplication.timeSinceStartup;
+                _scrub += (float)(now - _lastUpdateTime);
+                _lastUpdateTime = now;
+                if (_scrub >= TotalDuration())
+                {
+                    _scrub = TotalDuration();
+                    _playing = false;
+                }
+                Repaint();
             }
-            Repaint();
+            if (_scenePreviewing) ApplySceneState();
         }
 
         // ==================================================================
@@ -149,8 +181,13 @@ namespace VNEffects.EditorTools
             if (GUILayout.Button("解析载入")) ParseText();
 
             EditorGUILayout.HelpBox(
-                "画布点击 = 给选中路径点设坐标（自动切为坐标类型），拖动可微调。\n" +
-                "编辑态下「角色部位」按假定站位显示（行内可选 left/center/right），Play 中按真实位置。\n" +
+                "画布：点空白 = 给选中点设坐标；点取景中心 = 选中；拖动 = 移动；" +
+                "拖选中框的四角 = 改 zoom。\n" +
+                "场景预览：开启后拖进度条/按 ▶，Game 视图实时显示真实画面运镜，" +
+                "关闭或进出 Play 自动还原（场景可能显示未保存标记，属正常）。\n" +
+                "捕获当前镜头：把场景里 ZoomRoot 的当前状态反推成一个路径点" +
+                "（可先手动摆好 ZoomRoot 再捕获）。\n" +
+                "编辑态下「角色部位」按假定站位显示，Play 中按真实位置。" +
                 "缓动默认：单段 InOutSine；多段首 InSine / 中 Linear / 末 OutSine（与运行时一致）。",
                 MessageType.Info);
 
@@ -183,6 +220,38 @@ namespace VNEffects.EditorTools
                 }
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"{_points.Count} 个路径点", EditorStyles.miniLabel);
+            }
+
+            // 第二行：场景预览 / 捕获 / 预设库
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            {
+                bool newPreview = GUILayout.Toggle(_scenePreviewing, "场景预览",
+                    EditorStyles.toolbarButton, GUILayout.Width(70f));
+                if (newPreview != _scenePreviewing)
+                {
+                    if (newPreview) StartScenePreview();
+                    else StopScenePreview();
+                }
+
+                if (GUILayout.Button("捕获当前镜头", EditorStyles.toolbarButton, GUILayout.Width(94f)))
+                    CaptureCurrentCamera();
+
+                GUILayout.Space(10f);
+                GUILayout.Label("预设:", GUILayout.Width(34f));
+                _presetName = GUILayout.TextField(_presetName, GUILayout.Width(90f));
+                if (GUILayout.Button("保存", EditorStyles.toolbarButton, GUILayout.Width(40f)))
+                    SavePreset();
+
+                var names = PresetNames();
+                _presetIndex = EditorGUILayout.Popup(_presetIndex, names, GUILayout.Width(110f));
+                using (new EditorGUI.DisabledScope(names.Length == 0 || names[0] == "(无预设)"))
+                {
+                    if (GUILayout.Button("载入", EditorStyles.toolbarButton, GUILayout.Width(40f)))
+                        LoadPreset();
+                    if (GUILayout.Button("删除", EditorStyles.toolbarButton, GUILayout.Width(40f)))
+                        DeletePreset();
+                }
+                GUILayout.FlexibleSpace();
             }
         }
 
@@ -297,13 +366,41 @@ namespace VNEffects.EditorTools
         void HandleCanvasInput(Rect rect)
         {
             var e = Event.current;
+
+            if (e.type == EventType.MouseUp)
+            {
+                _dragMode = DragMode.None;
+                return;
+            }
             if (!rect.Contains(e.mousePosition)) return;
+
+            bool hasSelection = _list.index >= 0 && _list.index < _points.Count;
 
             if (e.type == EventType.MouseDown && e.button == 0)
             {
                 var click = GuiToCanvas(rect, e.mousePosition);
 
-                // 先尝试选中最近的路径点（取景中心 60px 内）
+                // 1) 选中路径点的取景框四角（GUI 12px 内）→ 拖角改 zoom
+                if (hasSelection)
+                {
+                    var st = TargetState(_points[_list.index]);
+                    var center = -st.offset / st.zoom;
+                    var half = CanvasHalf / st.zoom;
+                    for (int cx = -1; cx <= 1; cx += 2)
+                    for (int cy = -1; cy <= 1; cy += 2)
+                    {
+                        var cornerGui = CanvasToGui(rect,
+                            center + new Vector2(half.x * cx, half.y * cy));
+                        if (Vector2.Distance(cornerGui, e.mousePosition) < 12f)
+                        {
+                            _dragMode = DragMode.Corner;
+                            e.Use();
+                            return;
+                        }
+                    }
+                }
+
+                // 2) 任意取景中心 60 画布单位内 → 选中该点并可拖动
                 int nearest = -1;
                 float best = 60f;
                 for (int i = 0; i < _points.Count; i++)
@@ -315,26 +412,188 @@ namespace VNEffects.EditorTools
                 if (nearest >= 0)
                 {
                     _list.index = nearest;
+                    _dragMode = DragMode.Center;
                 }
-                else if (_list.index >= 0 && _list.index < _points.Count)
+                else if (hasSelection)
                 {
-                    // 空白处点击 = 给选中点设坐标
+                    // 3) 空白处点击 = 给选中点设坐标
                     var w = _points[_list.index];
                     w.type = PointType.Coords;
                     w.coords = Round(click);
+                    _dragMode = DragMode.Center;
                 }
                 e.Use();
                 Repaint();
             }
-            else if (e.type == EventType.MouseDrag && e.button == 0
-                     && _list.index >= 0 && _list.index < _points.Count)
+            else if (e.type == EventType.MouseDrag && e.button == 0 && hasSelection)
             {
                 var w = _points[_list.index];
-                w.type = PointType.Coords;
-                w.coords = Round(GuiToCanvas(rect, e.mousePosition));
+                if (_dragMode == DragMode.Corner)
+                {
+                    // 拖角改 zoom：以取景中心为基准，指针到中心的距离 = 新的取景半宽/半高
+                    var st = TargetState(w);
+                    var center = -st.offset / st.zoom;
+                    var mouse = GuiToCanvas(rect, e.mousePosition);
+                    var half = new Vector2(
+                        Mathf.Max(20f, Mathf.Abs(mouse.x - center.x)),
+                        Mathf.Max(12f, Mathf.Abs(mouse.y - center.y)));
+                    float zoom = Mathf.Max(CanvasHalf.x / half.x, CanvasHalf.y / half.y);
+                    w.zoom = Mathf.Clamp(zoom, 0.5f, 3f);
+                }
+                else if (_dragMode == DragMode.Center)
+                {
+                    w.type = PointType.Coords;
+                    w.coords = Round(GuiToCanvas(rect, e.mousePosition));
+                }
                 e.Use();
                 Repaint();
             }
+        }
+
+        // ==================================================================
+        // 场景内实时预览 / 捕获当前镜头
+        // ==================================================================
+
+        RectTransform FindZoomRoot()
+        {
+            var cam = Object.FindFirstObjectByType<VNCamera>();
+            if (cam != null && cam.target != null) return cam.target;
+            var go = GameObject.Find("ZoomRoot");
+            return go != null ? go.transform as RectTransform : null;
+        }
+
+        void StartScenePreview()
+        {
+            _zoomRoot = FindZoomRoot();
+            if (_zoomRoot == null)
+            {
+                ShowNotification(new GUIContent("场景里找不到 ZoomRoot（先生成剧本演示场景）"));
+                return;
+            }
+            _origPos = _zoomRoot.anchoredPosition;
+            _origScale = _zoomRoot.localScale;
+            _scenePreviewing = true;
+            ApplySceneState();
+        }
+
+        void StopScenePreview()
+        {
+            if (!_scenePreviewing) return;
+            _scenePreviewing = false;
+            if (_zoomRoot != null)
+            {
+                _zoomRoot.anchoredPosition = _origPos;
+                _zoomRoot.localScale = _origScale;
+                EditorApplication.QueuePlayerLoopUpdate();
+            }
+        }
+
+        void ApplySceneState()
+        {
+            if (_zoomRoot == null)
+            {
+                StopScenePreview();
+                return;
+            }
+            var s = StateAtTime(_scrub);
+            _zoomRoot.localScale = Vector3.one * s.zoom;
+            _zoomRoot.anchoredPosition = _origPos + s.offset;
+            EditorApplication.QueuePlayerLoopUpdate(); // 编辑态强制刷新 Game 视图
+        }
+
+        /// <summary>把 ZoomRoot 当前的实际状态反推成一个路径点（坐标类型）</summary>
+        void CaptureCurrentCamera()
+        {
+            var root = _zoomRoot != null ? _zoomRoot : FindZoomRoot();
+            if (root == null)
+            {
+                ShowNotification(new GUIContent("场景里找不到 ZoomRoot"));
+                return;
+            }
+            // 预览中用记录的基准位；否则假定基准为当前值即无偏移的 (0,0)
+            var basePos = _scenePreviewing ? _origPos : Vector2.zero;
+            float zoom = Mathf.Max(0.1f, root.localScale.x);
+            Vector2 offset = root.anchoredPosition - basePos;
+            Vector2 point = -offset / zoom;
+
+            _points.Add(new Waypoint
+            {
+                type = PointType.Coords,
+                coords = Round(point),
+                zoom = Mathf.Clamp(zoom, 0.5f, 3f),
+                duration = 0.8f,
+            });
+            _list.index = _points.Count - 1;
+            ShowNotification(new GUIContent($"已捕获：({point.x:0},{point.y:0}) ×{zoom:0.##}"));
+        }
+
+        // ==================================================================
+        // 预设库
+        // ==================================================================
+
+        VNCamseqPresetLibrary EnsureLibrary()
+        {
+            if (_library != null) return _library;
+            _library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
+            if (_library == null)
+            {
+                _library = CreateInstance<VNCamseqPresetLibrary>();
+                AssetDatabase.CreateAsset(_library, LibraryPath);
+                AssetDatabase.SaveAssets();
+            }
+            return _library;
+        }
+
+        string[] PresetNames()
+        {
+            if (_library == null)
+                _library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
+            if (_library == null || _library.presets.Count == 0)
+                return new[] { "(无预设)" };
+            var names = new string[_library.presets.Count];
+            for (int i = 0; i < names.Length; i++) names[i] = _library.presets[i].name;
+            return names;
+        }
+
+        void SavePreset()
+        {
+            if (_points.Count == 0)
+            {
+                ShowNotification(new GUIContent("没有路径点可保存"));
+                return;
+            }
+            string name = string.IsNullOrEmpty(_presetName.Trim())
+                ? $"预设{System.DateTime.Now:HHmmss}" : _presetName.Trim();
+
+            var lib = EnsureLibrary();
+            var existing = lib.presets.Find(p => p.name == name);
+            if (existing != null) existing.camseqText = GenerateText(); // 同名覆盖
+            else lib.presets.Add(new VNCamseqPresetLibrary.Preset
+                { name = name, camseqText = GenerateText() });
+
+            EditorUtility.SetDirty(lib);
+            AssetDatabase.SaveAssets();
+            _presetIndex = lib.presets.FindIndex(p => p.name == name);
+            ShowNotification(new GUIContent($"已保存预设「{name}」"));
+        }
+
+        void LoadPreset()
+        {
+            if (_library == null || _presetIndex < 0 || _presetIndex >= _library.presets.Count) return;
+            _pasteText = _library.presets[_presetIndex].camseqText;
+            ParseText();
+            _presetName = _library.presets[_presetIndex].name;
+        }
+
+        void DeletePreset()
+        {
+            if (_library == null || _presetIndex < 0 || _presetIndex >= _library.presets.Count) return;
+            string name = _library.presets[_presetIndex].name;
+            if (!EditorUtility.DisplayDialog("删除预设", $"删除「{name}」？", "删除", "取消")) return;
+            _library.presets.RemoveAt(_presetIndex);
+            _presetIndex = 0;
+            EditorUtility.SetDirty(_library);
+            AssetDatabase.SaveAssets();
         }
 
         static Vector2 Round(Vector2 v) =>
@@ -602,5 +861,21 @@ namespace VNEffects.EditorTools
                 return stage.backgroundImage.sprite;
             return null;
         }
+    }
+
+    /// <summary>
+    /// 镜头预设库：以 camseq 文本形式保存常用运镜（存/取都走文本双向通道，
+    /// 与手写剧本 100% 一致）。资产：Assets/VNEffects/CamseqPresets.asset。
+    /// </summary>
+    public class VNCamseqPresetLibrary : ScriptableObject
+    {
+        [System.Serializable]
+        public class Preset
+        {
+            public string name;
+            [TextArea(3, 10)] public string camseqText;
+        }
+
+        public List<Preset> presets = new List<Preset>();
     }
 }

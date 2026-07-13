@@ -847,7 +847,33 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 场景内编辑态实时预览（操作 ZoomRoot + 自动还原）、捕获当前镜头状态为路径点、
 画布拖角改 zoom、镜头预设库资产。
 
-## 二十四、其他问题修复记录
+## 二十四、镜头编辑器 第二批（2026-07-13，分支 `feature/camseq-editor-2`）
+
+### 24.1 场景内实时预览
+
+- 工具栏「场景预览」开关：开启时记录 ZoomRoot 的位置/缩放 →
+  拖进度条或 ▶ 播放时**直接驱动场景里的 ZoomRoot**
+  （`EditorApplication.QueuePlayerLoopUpdate()` 强制刷新）→ Game 视图看真实画面运镜
+- 三重还原保险：手动关闭还原、窗口关闭（OnDisable）还原、
+  进出 Play（playModeStateChanged）前还原——预览状态绝不会被序列化进场景或运行副本
+
+### 24.2 捕获当前镜头
+
+- 读 ZoomRoot 当前 scale/anchoredPosition，反解 `点 = -偏移/zoom`，追加为坐标路径点
+- 典型用法：Scene 视图手动摆好 ZoomRoot 构图 → 捕获 → 调时长/缓动
+
+### 24.3 画布拖角改 zoom
+
+- 画布交互升级为三模式（DragMode）：拖选中取景框**四角** = 改 zoom
+  （指针到取景中心的距离反解，取两轴较大者，0.5~3 钳制）；拖中心 = 移动；点空白 = 设坐标
+
+### 24.4 镜头预设库
+
+- `VNCamseqPresetLibrary`（`Assets/VNEffects/CamseqPresets.asset`，首次保存自动创建）：
+  **以 camseq 文本形式存预设**——存/取走既有的生成/解析双向通道，同名覆盖
+- 工具栏第二行：命名保存 / 下拉 / 载入 / 删除。常用运镜存一次到处复用
+
+## 二十五、其他问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 
