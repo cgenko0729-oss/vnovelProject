@@ -1034,3 +1034,154 @@ CameraFade 会自动创建）→ Play：眨眼转场睁眼时画面应直接在 
 - 顺带修正用户测试剧本里的 `startfade : 0.5`（冒号两边不能有空格，
   否则被拆成三个 token 参数不生效）→ `startfade:0.5`
 - 想要某个角色不显示头像：取消其资产里 showPortrait；想全程关闭：剧本开头 `portrait off`
+
+## 二十九、角色立绘与对话头像实时预览编辑器（2026-07-13，分支 `agent/character-visual-preview`）
+
+### 29.1 需求
+
+`VNCharacterDef` 的 `sizeScale / positionOffset / portraitScale / portraitOffset` 此前只能修改
+Inspector 后进入 Play，等角色登场和说出台词才能看到实际效果。不同素材的透明留白、长宽比、
+人物构图差异很大，反复 Play 校准立绘高度、脚底位置和头像裁切效率很低。
+
+### 29.2 新工具
+
+新增 `Assets/Scripts/VNEffects/Editor/VNCharacterVisualPreviewWindow.cs`，菜单：
+
+**Tools → VN Effects → Character Visual Preview**
+
+也可以在 Project 窗口选中任意 `VNCharacterDef` 后：
+
+- 右键 **VN Effects → Open Character Visual Preview**；
+- 或在角色资产 Inspector 的右键上下文菜单打开。
+
+窗口顶部可在项目中的全部角色定义之间切换；在 Project 窗口选择另一个角色资产时，预览窗口
+也会自动跟随。
+
+### 29.3 立绘实时预览
+
+- 左侧显示 **1920×1080 舞台预览**，支持 left / center / right 三个标准站位；
+- 表情下拉可检查该角色的每张表情立绘；
+- 预览严格复用运行时尺寸公式：
+  `显示高度 = VNStage.characterHeight × sizeScale`，
+  `显示位置 = 标准站位 + positionOffset`；
+- 可指定一张背景图辅助检查实际构图（仅编辑器预览，不写入角色资产）；
+- 「从场景读取尺寸」会读取当前场景 `VNStage.characterHeight`、背景图和
+  `VNDialogueBox.portraitWindowSize`；场景中没有这些组件时使用 880 / 230×300 默认值；
+- 直接在舞台拖动立绘 = 实时修改 `positionOffset`；鼠标滚轮 = 修改 `sizeScale`；
+- 同时保留精确数值输入、参数归零和当前立绘资产定位按钮。
+
+### 29.4 头像实时预览
+
+- 右侧按照 `VNDialogueBox` 的真实 **RectMask2D 顶边锚定裁切公式**显示头像窗口；
+- 头像列表优先读取 `VNCharacterDef.portraits`；列表为空时明确标注「回退立绘」，并使用
+  `expressions` 预览，与运行时 `GetPortrait()` 行为一致；
+- 直接拖动头像 = 修改 `portraitOffset`；鼠标滚轮 = 修改 `portraitScale`；
+- `showPortrait` 关闭时仍以半透明方式显示素材，方便先校准再开启，同时显示关闭提示；
+- 支持自定义预览头像窗口尺寸、参数归零和当前头像资产定位。
+
+运行时头像公式保持完全一致：宽度为
+`portraitWindowSize.x × portraitScale`，高度按 Sprite 长宽比计算；头像锚点/轴心为顶边中央，
+`portraitOffset.y` 为正时向上移动，窗口外内容被裁切。
+
+### 29.5 编辑安全与验证
+
+- 所有拖动、滚轮和数值修改均调用 Unity Undo，支持 Ctrl+Z / Ctrl+Y；
+- 修改后只标脏当前 `VNCharacterDef`，不创建临时场景物体、不修改场景；
+- 工具栏「保存角色资产」可显式保存当前资产；
+- 窗口会同步重绘 Inspector、Scene/Game 等编辑器视图；
+- 新代码仅位于 `Editor/`，不会进入玩家运行时构建；
+- `dotnet build Assembly-CSharp-Editor.csproj --no-restore` 验证通过：0 warning / 0 error。
+
+## 三十、角色预览加入完整对话 UI 与确认后写入（2026-07-13，分支 `agent/character-preview-ui-confirm`）
+
+在二十九章实时预览工具的基础上，加入更接近 Game View 的完整构图检查，并把编辑流程从
+“输入即修改角色资产”改为“先调整草稿、确认后一次写入”。二十九章分支保留不删除，随时可以
+切回原来的即时写入版本。
+
+### 30.1 完整对话画面预览
+
+- 1920×1080 舞台预览现在可叠加运行时比例的完整对话区：半透明面板、边框、姓名条、
+  正文、继续箭头与左侧裁切头像；
+- 对话框锚点、边距、姓名条位置、正文避让、箭头位置、头像窗口与头像顶边锚定公式，均按
+  `VNDialogueBox` 的运行时布局换算到编辑器预览；
+- “从场景读取尺寸”除原有舞台高度、背景与头像窗口尺寸外，还会读取当前场景
+  `VNDialogueBox.panelColor / frameColor / nameTagColor`；
+- 新增“显示完整对话 UI”开关与“预览对白”输入框，两者只影响编辑器预览，不写入任何资产；
+- `showPortrait`、头像缩放和头像偏移的草稿变化，会同步反映在右侧头像特写和左侧完整对话框，
+  姓名条与正文也会实时决定是否为头像腾出空间。
+
+### 30.2 草稿与确认流程
+
+- `sizeScale / positionOffset / showPortrait / portraitScale / portraitOffset` 全部先写入一个
+  `HideAndDontSave` 内存草稿；滑杆、数值输入、归零、舞台拖动、头像拖动与滚轮均不再直接改变
+  `VNCharacterDef`；
+- 工具栏与底部确认条会明确显示“有未确认调整”或“资产值已同步”；
+- 按“确认写入角色资产”后才用一条 Unity Undo 记录把五个草稿值写入当前角色资产，并立即保存；
+- 按“放弃未确认调整”会从角色资产重新读取五个值，不产生资产修改；
+- 草稿本身也接入 Unity Undo，因此确认前仍可 Ctrl+Z / Ctrl+Y 调整；
+- 有未确认草稿时切换角色，会弹出“确认并切换 / 取消切换 / 放弃并切换”三选一，避免无提示地
+  覆盖校准结果；直接关闭窗口则安全丢弃内存草稿，不修改角色资产。
+
+### 30.3 文件与验证
+
+- 修改 `Assets/Scripts/VNEffects/Editor/VNCharacterVisualPreviewWindow.cs`；没有修改任何运行时代码、
+  场景、角色资产或素材；
+- `dotnet build Assembly-CSharp-Editor.csproj --no-restore` 验证通过：0 warning / 0 error。
+
+## 三十一、剧本可视化编辑器 第一批（2026-07-13，分支 `feature/scenario-editor`）
+
+菜单 **Tools → VN Effects → Scenario Editor**。目标：不再手打关键字（消灭 typo），
+用下拉框编排整个剧本。**文本仍是唯一真相**：编辑器打开 .vn.txt →
+行列表 → 保存时逐行重新生成写回（格式规范化；注释/空行原样保留，往返无损）。
+
+### 31.1 文件构成（全部在 Editor 下，零运行时改动*）
+
+| 文件 | 职责 |
+|---|---|
+| `VNScenarioSchema.cs` | **命令参数模式表**（本工具核心资产）：26 个命令每个参数的类型/候选来源/默认值。UI、生成、校验的单一数据来源；加新命令补一条，界面自动长出控件 |
+| `VNScenarioDoc.cs` | 文档模型：解析（镜像运行时分词规则，含 choice `*` 行、camseq `>` 行、行尾 `@`、全半角冒号台词）→ VNRow 行列表 → 生成；label/flag 收集；校验器 |
+| `VNScenarioEditorWindow.cs` | 主窗口：工具栏（Open/Save/Save As/Reload/Refresh Sources/Go to label）、三页签（Edit/Text/Issues）、ReorderableList 行编辑、按类别分组的添加菜单、撤销、外部修改检测 |
+
+*运行时唯一改动：`VNScriptParser` 加了 `CommandKeywords` 公开只读访问器（关键字单一来源）。
+
+### 31.2 下拉数据源（自动收集，Refresh Sources 刷新）
+
+| 参数 | 来源 |
+|---|---|
+| 命令关键字 | VNScriptParser.Keywords |
+| 角色 / 表情 | 扫 VNCharacterDef 资产（表情随所选角色联动） |
+| 背景 id | 场景 VNStage.backgrounds |
+| 音频 id | 场景 VNAudio.library（se 首参附带 stop） |
+| 转场/天气/情绪/出场预设 | 枚举反射（永不过期） |
+| jump / choice 跳转目标 | 当前文档 label 列表 |
+| flag 名 | 全文档收集（选项 flag 下拉给 名+1/名-1/名 组合） |
+
+所有下拉带 "custom…" 项 → 转自由文本输入（如 at: 写数字坐标、fx focus 写角色名），
+"▾" 按钮切回下拉。
+
+### 31.3 校验器（对手写剧本同样生效）
+
+- 错误：未注册角色/背景/音频 id、jump/if/选项跳转目标不存在、label 重复、
+  数字参数非数字、if 条件含空格或格式非法、choice 无选项、孤儿 `*`/`>` 行、
+  `[fade:2]`/`xfade :` 这类冒号带空格或带方括号的可疑 token
+- 警告：未识别 token（原样保留）、camseq 无路径点、start:cut 首点时长非 0、
+  说话者未注册、表情不存在、**无名旁白首词疑似打错的命令**（编辑距离 ≤1 检测，
+  直接命中"typo 静默变旁白"这个最阴险的坑）
+- Issues 页签逐条列出，Select 定位到行；Edit 页行首红/黄圆点同步显示
+
+### 31.4 其他设计决策
+
+- choice 块：选项行内嵌编辑（文本 + flag 下拉 + 跳转下拉 + 增删）
+- camseq 块：start/end/startfade/endfade 走下拉/数字框，`>` 路径点行本批
+  以文本行内嵌编辑（增删行），下一批接镜头编辑器双向
+- 撤销：文本快照栈（约 1 秒粒度合并），Ctrl+Z / Ctrl+Y；文本框内部编辑走系统自带
+- 外部修改检测：窗口聚焦时对比文件时间戳；无本地改动静默重载，
+  有改动出横幅二选一（重载丢弃 / 保留本地待保存覆盖）
+- Text 页签 = 只读的"保存后长什么样"预览 + 一键复制（贴给 AI 协作）
+- 界面语言：英文 + 关键字原文（用户要求）
+- 验证：Assembly-CSharp / Assembly-CSharp-Editor 均 `dotnet build` 通过（0W/0E）
+
+### 31.5 已知限制（第二批候选）
+
+- camseq 路径点无可视化（先用镜头编辑器生成文本贴入）
+- 无"从选中行开始播放"调试；无多选批量操作；无跨文件 flag 收集

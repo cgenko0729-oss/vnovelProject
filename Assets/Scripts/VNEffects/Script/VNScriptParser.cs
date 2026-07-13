@@ -84,6 +84,9 @@ namespace VNEffects
             "portrait",
         };
 
+        /// <summary>命令关键字集合（剧本编辑器等工具用，与解析行为保持单一来源）</summary>
+        public static IEnumerable<string> CommandKeywords => Keywords;
+
         public static List<VNScriptCommand> Parse(string source)
         {
             var result = new List<VNScriptCommand>();
