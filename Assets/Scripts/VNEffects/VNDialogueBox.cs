@@ -49,11 +49,13 @@ namespace VNEffects
         Vector2 _basePos;
         float _arrowBaseY;
         bool _shown;
+        bool _interfaceVisible = true;
         Tween _arrowBob;
         bool _built;
 
         public bool IsShown => _shown;
         public bool IsTyping => _typer != null && _typer.IsTyping;
+        public float TextSpeed => _typer != null ? _typer.charsPerSecond : 18f;
 
         void Awake()
         {
@@ -212,6 +214,13 @@ namespace VNEffects
             if (_shown) return;
             _shown = true;
             DOTween.Kill(this);
+            _group.blocksRaycasts = _interfaceVisible;
+            if (!_interfaceVisible)
+            {
+                _group.alpha = 0f;
+                _root.anchoredPosition = _basePos;
+                return;
+            }
             _root.anchoredPosition = _basePos + new Vector2(0f, -70f);
             _group.DOFade(1f, duration * 0.7f).SetTarget(this).SetLink(gameObject);
             _root.DOAnchorPos(_basePos, duration).SetEase(Ease.OutBack, 1.2f)
@@ -223,6 +232,7 @@ namespace VNEffects
         {
             if (!_shown) return;
             _shown = false;
+            _group.blocksRaycasts = false;
             HideArrow();
             DOTween.Kill(this);
             _group.DOFade(0f, duration).SetTarget(this).SetLink(gameObject);
@@ -247,6 +257,27 @@ namespace VNEffects
 
         /// <summary>玩家催促：立即显示全部文字</summary>
         public void CompleteTyping() => _typer.Complete();
+
+        /// <summary>Config 面板设置打字速度，立即作用于当前和后续台词。</summary>
+        public void SetTextSpeed(float charsPerSecond)
+        {
+            Build();
+            _typer.charsPerSecond = Mathf.Clamp(charsPerSecond, 8f, 60f);
+        }
+
+        /// <summary>
+        /// 隐藏/恢复整个对话 UI（包含快捷功能条），不改变当前台词和打字进度。
+        /// </summary>
+        public void SetInterfaceVisible(bool visible)
+        {
+            Build();
+            if (_interfaceVisible == visible) return;
+            _interfaceVisible = visible;
+            DOTween.Kill(this);
+            _group.alpha = visible && _shown ? 1f : 0f;
+            _group.blocksRaycasts = visible && _shown;
+            if (_shown) _root.anchoredPosition = _basePos;
+        }
 
         // ------------------------------------------------------------------
         // 说话者头像
