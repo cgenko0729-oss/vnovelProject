@@ -53,15 +53,6 @@ namespace VNEffects.EditorTools
         int _frameSnapshotVersion = -1;
         double _lastUndoPush;
 
-        static readonly string[] KeywordListCache = BuildKeywordList();
-
-        static string[] BuildKeywordList()
-        {
-            var list = new List<string>();
-            foreach (var c in VNScenarioSchema.Commands) list.Add(c.keyword);
-            return list.ToArray();
-        }
-
         [MenuItem("Tools/VN Effects/Scenario Editor")]
         static void Open()
         {
@@ -527,14 +518,9 @@ namespace VNEffects.EditorTools
             float x = line0.x;
 
             // 关键字下拉
-            int kwIdx = System.Array.IndexOf(KeywordListCache, r.keyword);
-            int nkw = EditorGUI.Popup(new Rect(x, line0.y, 86f, line0.height),
-                Mathf.Max(0, kwIdx), KeywordListCache);
-            if (nkw != kwIdx && nkw >= 0)
-            {
-                MarkStructural();
-                SetKeyword(r, KeywordListCache[nkw]);
-            }
+            var keywordRect = new Rect(x, line0.y, 86f, line0.height);
+            if (GUI.Button(keywordRect, r.keyword, EditorStyles.popup))
+                ShowKeywordMenu(keywordRect, r);
             x += 90f;
 
             var def = VNScenarioSchema.Find(r.keyword);
@@ -592,6 +578,23 @@ namespace VNEffects.EditorTools
                     Bump();
                 }
             }
+        }
+
+        void ShowKeywordMenu(Rect rect, VNRow row)
+        {
+            var menu = new GenericMenu();
+            foreach (var command in VNScenarioSchema.Commands)
+            {
+                string keyword = command.keyword;
+                string path = $"{command.category}/{keyword}";
+                menu.AddItem(new GUIContent(path), keyword == row.keyword, () =>
+                {
+                    if (keyword == row.keyword) return;
+                    MarkStructural();
+                    SetKeyword(row, keyword);
+                });
+            }
+            menu.DropDown(rect);
         }
 
         void SetKeyword(VNRow r, string keyword)
