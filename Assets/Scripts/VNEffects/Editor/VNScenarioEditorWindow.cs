@@ -74,6 +74,15 @@ namespace VNEffects.EditorTools
                 { "FX", "特效" }, { "Audio", "音频" }, { "Flow", "流程" },
             };
 
+        static readonly Dictionary<string, string> TransitionTranslations =
+            new Dictionary<string, string>
+            {
+                { "NoiseDissolve", "噪声溶解" }, { "Blinds", "百叶窗" },
+                { "Tiles", "方块翻转" }, { "CircleWipe", "圆形擦除" },
+                { "InkSpread", "水墨扩散" }, { "WhiteFlash", "白色闪光" },
+                { "BokehOrbs", "光斑圆球" }, { "Eyelid", "眼睑闭合" },
+            };
+
         [MenuItem("Tools/VN Effects/Scenario Editor")]
         static void Open()
         {
@@ -721,8 +730,24 @@ namespace VNEffects.EditorTools
                 return;
             }
 
-            string nv2 = PopupString(rect, v, options, "-", (r, p.id));
+            string[] displayOptions = IsTransitionParameter(r, p)
+                ? BuildTranslatedOptions(options, TransitionTranslations) : null;
+            string nv2 = PopupString(rect, v, options, "-", (r, p.id), displayOptions);
             if (nv2 != v) r.Set(p.id, nv2);
+        }
+
+        static bool IsTransitionParameter(VNRow row, VNParamDef parameter) =>
+            (row.keyword == "bg" && parameter.id == "transition") ||
+            (row.keyword == "transition" && parameter.id == "type");
+
+        static string[] BuildTranslatedOptions(string[] options,
+            Dictionary<string, string> translations)
+        {
+            var display = new string[options.Length];
+            for (int i = 0; i < options.Length; i++)
+                display[i] = translations.TryGetValue(options[i], out string translation)
+                    ? $"{options[i]}（{translation}）" : options[i];
+            return display;
         }
 
         string[] OptionsFor(VNRow r, VNParamDef p)
@@ -751,7 +776,7 @@ namespace VNEffects.EditorTools
 
         /// <summary>下拉 + "custom…" 自由输入的通用控件。emptyLabel 对应空值。</summary>
         string PopupString(Rect rect, string value, string[] options, string emptyLabel,
-            (VNRow, string) key)
+            (VNRow, string) key, string[] displayOptions = null)
         {
             bool custom = _customEdit.Contains(key) ||
                           (!string.IsNullOrEmpty(value) &&
@@ -772,7 +797,9 @@ namespace VNEffects.EditorTools
 
             var display = new string[options.Length + 2];
             display[0] = emptyLabel;
-            for (int i = 0; i < options.Length; i++) display[i + 1] = options[i];
+            for (int i = 0; i < options.Length; i++)
+                display[i + 1] = displayOptions != null && displayOptions.Length == options.Length
+                    ? displayOptions[i] : options[i];
             display[display.Length - 1] = "custom…";
 
             int idx = string.IsNullOrEmpty(value) ? 0
