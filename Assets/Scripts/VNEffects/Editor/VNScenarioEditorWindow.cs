@@ -53,6 +53,27 @@ namespace VNEffects.EditorTools
         int _frameSnapshotVersion = -1;
         double _lastUndoPush;
 
+        static readonly Dictionary<string, string> CommandTranslations =
+            new Dictionary<string, string>
+            {
+                { "bg", "背景" }, { "weather", "天气" }, { "mood", "氛围" },
+                { "transition", "转场" }, { "show", "显示角色" }, { "hide", "隐藏角色" },
+                { "emote", "角色动作" }, { "move", "移动角色" }, { "portrait", "对话头像" },
+                { "camera", "镜头运动" }, { "camcut", "镜头切换" }, { "camto", "镜头移动" },
+                { "camseq", "镜头序列" }, { "shake", "震动" }, { "fx", "特效" },
+                { "sakura", "樱花" }, { "bgm", "背景音乐" }, { "se", "音效" },
+                { "voice", "语音" }, { "volume", "音量" }, { "wait", "等待" },
+                { "label", "标签" }, { "jump", "跳转" }, { "flag", "变量" },
+                { "if", "条件" }, { "choice", "选项" },
+            };
+
+        static readonly Dictionary<string, string> CategoryTranslations =
+            new Dictionary<string, string>
+            {
+                { "Scene", "场景" }, { "Character", "角色" }, { "Camera", "镜头" },
+                { "FX", "特效" }, { "Audio", "音频" }, { "Flow", "流程" },
+            };
+
         [MenuItem("Tools/VN Effects/Scenario Editor")]
         static void Open()
         {
@@ -518,10 +539,10 @@ namespace VNEffects.EditorTools
             float x = line0.x;
 
             // 关键字下拉
-            var keywordRect = new Rect(x, line0.y, 86f, line0.height);
-            if (GUI.Button(keywordRect, r.keyword, EditorStyles.popup))
+            var keywordRect = new Rect(x, line0.y, 128f, line0.height);
+            if (GUI.Button(keywordRect, CommandDisplayName(r.keyword), EditorStyles.popup))
                 ShowKeywordMenu(keywordRect, r);
-            x += 90f;
+            x += 132f;
 
             var def = VNScenarioSchema.Find(r.keyword);
             float asyncW = 26f;
@@ -586,7 +607,7 @@ namespace VNEffects.EditorTools
             foreach (var command in VNScenarioSchema.Commands)
             {
                 string keyword = command.keyword;
-                string path = $"{command.category}/{keyword}";
+                string path = $"{CategoryDisplayName(command.category)}/{CommandDisplayName(keyword)}";
                 menu.AddItem(new GUIContent(path), keyword == row.keyword, () =>
                 {
                     if (keyword == row.keyword) return;
@@ -596,6 +617,14 @@ namespace VNEffects.EditorTools
             }
             menu.DropDown(rect);
         }
+
+        static string CommandDisplayName(string keyword) =>
+            CommandTranslations.TryGetValue(keyword, out string translation)
+                ? $"{keyword}（{translation}）" : keyword;
+
+        static string CategoryDisplayName(string category) =>
+            CategoryTranslations.TryGetValue(category, out string translation)
+                ? $"{category}（{translation}）" : category;
 
         void SetKeyword(VNRow r, string keyword)
         {
