@@ -33,7 +33,16 @@ namespace VNEffects.EditorTools
             public float zoom = 1.4f;
             public float duration = 0.8f;
             public int easeIndex = 0;     // 0 = (默认)
+            public float fade;            // >0 = 交叉叠化到本点（xfade:秒），代替平移/瞬切
         }
+
+        /// <summary>camseq 开场衔接方式（对应 start: 选项）</summary>
+        enum StartMode { None, Cut, Fade }
+
+        static readonly string[] StartModeNames =
+        {
+            "无", "cut（接 bg 转场盖屏瞬切）", "fade（当前画面叠化到首镜头）",
+        };
 
         // ---- 与运行时一致的常量/词汇 ----
         static readonly string[] AnchorTokens =
@@ -57,6 +66,10 @@ namespace VNEffects.EditorTools
         static readonly Vector2 Overscan = new Vector2(60f, 60f);
 
         readonly List<Waypoint> _points = new List<Waypoint>();
+        StartMode _startMode;
+        float _startFade = 0.6f;
+        bool _endFade;
+        float _endFadeDur = 0.6f;
         ReorderableList _list;
         float _scrub;          // 0~总时长 的预览时间
         bool _playing;
@@ -91,7 +104,7 @@ namespace VNEffects.EditorTools
         {
             _list = new ReorderableList(_points, typeof(Waypoint), true, true, true, true)
             {
-                drawHeaderCallback = r => GUI.Label(r, "路径点（拖动左侧手柄排序 | 时长 0 = 瞬切）"),
+                drawHeaderCallback = r => GUI.Label(r, "路径点（拖手柄排序 | 时长 0 = 瞬切 | xfade>0 = 叠化到该点）"),
                 elementHeightCallback = _ => EditorGUIUtility.singleLineHeight * 2f + 10f,
                 drawElementCallback = DrawElement,
                 onAddCallback = l => _points.Add(new Waypoint()),
@@ -160,6 +173,33 @@ namespace VNEffects.EditorTools
             }
             GUILayout.Space(4f);
 
+            // 开场 / 收尾叠化选项（对应 camseq 的 start: / end: 参数）
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("开场", GUILayout.Width(30f));
+                _startMode = (StartMode)EditorGUILayout.Popup(
+                    (int)_startMode, StartModeNames, GUILayout.Width(190f));
+                if (_startMode == StartMode.Fade)
+                {
+                    GUILayout.Label("秒", GUILayout.Width(16f));
+                    _startFade = Mathf.Max(0.05f,
+                        EditorGUILayout.FloatField(_startFade, GUILayout.Width(40f)));
+                }
+                GUILayout.Space(12f);
+                _endFade = GUILayout.Toggle(_endFade, "收尾叠化回全图", GUILayout.Width(108f));
+                if (_endFade)
+                {
+                    GUILayout.Label("秒", GUILayout.Width(16f));
+                    _endFadeDur = Mathf.Max(0.05f,
+                        EditorGUILayout.FloatField(_endFadeDur, GUILayout.Width(40f)));
+                }
+                GUILayout.FlexibleSpace();
+            }
+            if (_startMode == StartMode.Cut && _points.Count > 0 && _points[0].duration > 0.001f)
+                EditorGUILayout.HelpBox(
+                    "start:cut 要求首个路径点时长为 0（瞬切），否则运行时按普通 camseq 执行",
+                    MessageType.Warning);
+
             _list.DoLayoutList();
 
             using (new EditorGUILayout.HorizontalScope())
@@ -183,12 +223,17 @@ namespace VNEffects.EditorTools
             EditorGUILayout.HelpBox(
                 "画布：点空白 = 给选中点设坐标；点取景中心 = 选中；拖动 = 移动；" +
                 "拖选中框的四角 = 改 zoom。\n" +
+                "叠化：xfade>0 的点用「截屏→瞬切→淡出」代替平移；预览时白框瞬切到新视角、" +
+                "橙色残框 = 正在淡出的旧视角。场景预览里叠化段表现为瞬切" +
+                "（真实叠化由运行时截屏完成）。\n" +
+                "开场 cut 只在剧本里紧跟带 transition 的 bg 时生效（首点时长须为 0）。\n" +
                 "场景预览：开启后拖进度条/按 ▶，Game 视图实时显示真实画面运镜，" +
                 "关闭或进出 Play 自动还原（场景可能显示未保存标记，属正常）。\n" +
                 "捕获当前镜头：把场景里 ZoomRoot 的当前状态反推成一个路径点" +
                 "（可先手动摆好 ZoomRoot 再捕获）。\n" +
                 "编辑态下「角色部位」按假定站位显示，Play 中按真实位置。" +
-                "缓动默认：单段 InOutSine；多段首 InSine / 中 Linear / 末 OutSine（与运行时一致）。",
+                "缓动默认：单段 InOutSine；多段首 InSine / 中 Linear / 末 OutSine，" +
+                "叠化段会把连续补间分成独立组（与运行时一致）。",
                 MessageType.Info);
 
             EditorGUILayout.EndScrollView();
@@ -216,7 +261,12 @@ namespace VNEffects.EditorTools
                 if (GUILayout.Button("清空", EditorStyles.toolbarButton, GUILayout.Width(50f)))
                 {
                     if (EditorUtility.DisplayDialog("清空", "确定清空全部路径点？", "清空", "取消"))
+                    {
                         _points.Clear();
+                        _startMode = StartMode.None;
+                        _endFade = false;
+                        _startFade = _endFadeDur = 0.6f;
+                    }
                 }
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"{_points.Count} 个路径点", EditorStyles.miniLabel);
@@ -296,14 +346,17 @@ namespace VNEffects.EditorTools
                     break;
             }
 
-            // 第二行：zoom / 时长 / 缓动
+            // 第二行：zoom / 时长 / 缓动 / 叠化
             x = r2.x + 26f;
             GUI.Label(new Rect(x, r2.y, 42f, line), "zoom"); x += 44f;
-            w.zoom = EditorGUI.Slider(new Rect(x, r2.y, 160f, line), w.zoom, 0.5f, 3f); x += 166f;
-            GUI.Label(new Rect(x, r2.y, 30f, line), "秒"); x += 32f;
-            w.duration = EditorGUI.FloatField(new Rect(x, r2.y, 46f, line), w.duration); x += 52f;
-            GUI.Label(new Rect(x, r2.y, 34f, line), "ease"); x += 36f;
-            w.easeIndex = EditorGUI.Popup(new Rect(x, r2.y, Mathf.Max(70f, r2.xMax - x), line), w.easeIndex, EaseNames);
+            w.zoom = EditorGUI.Slider(new Rect(x, r2.y, 130f, line), w.zoom, 0.5f, 3f); x += 136f;
+            GUI.Label(new Rect(x, r2.y, 22f, line), "秒"); x += 24f;
+            w.duration = EditorGUI.FloatField(new Rect(x, r2.y, 42f, line), w.duration); x += 48f;
+            GUI.Label(new Rect(x, r2.y, 32f, line), "ease"); x += 34f;
+            w.easeIndex = EditorGUI.Popup(new Rect(x, r2.y, 82f, line), w.easeIndex, EaseNames); x += 86f;
+            GUI.Label(new Rect(x, r2.y, 38f, line), "xfade"); x += 40f;
+            w.fade = Mathf.Max(0f, EditorGUI.FloatField(
+                new Rect(x, r2.y, Mathf.Max(36f, r2.xMax - x), line), w.fade));
         }
 
         // ==================================================================
@@ -352,12 +405,18 @@ namespace VNEffects.EditorTools
                 prevCenter = center;
             }
 
-            // 预览取景框（沿路径插值）
+            // 预览取景框（沿路径插值）；叠化时再画一个渐隐的橙色残框 = 正在淡出的旧视角
             if (_points.Count > 0)
             {
-                var s = StateAtTime(_scrub);
-                var center = -s.offset / s.zoom;
-                DrawCanvasFrame(rect, center, CanvasHalf / s.zoom, Color.white, 2.5f);
+                var ps = PreviewAtTime(_scrub);
+                var center = -ps.state.offset / ps.state.zoom;
+                DrawCanvasFrame(rect, center, CanvasHalf / ps.state.zoom, Color.white, 2.5f);
+                if (ps.fading)
+                {
+                    var gc = -ps.fadeFrom.offset / ps.fadeFrom.zoom;
+                    DrawCanvasFrame(rect, gc, CanvasHalf / ps.fadeFrom.zoom,
+                        new Color(1f, 0.6f, 0.2f, Mathf.Clamp01(ps.ghostAlpha)), 2f);
+                }
             }
 
             HandleCanvasInput(rect);
@@ -495,7 +554,8 @@ namespace VNEffects.EditorTools
                 StopScenePreview();
                 return;
             }
-            var s = StateAtTime(_scrub);
+            // 叠化段里 ZoomRoot 直接是目标状态（真实叠化由运行时的截屏覆盖层完成）
+            var s = PreviewAtTime(_scrub).state;
             _zoomRoot.localScale = Vector3.one * s.zoom;
             _zoomRoot.anchoredPosition = _origPos + s.offset;
             EditorApplication.QueuePlayerLoopUpdate(); // 编辑态强制刷新 Game 视图
@@ -683,64 +743,154 @@ namespace VNEffects.EditorTools
             };
         }
 
+        /// <summary>预览时间轴上的一段：补间段沿缓动移动；叠化段镜头瞬切、旧画面淡出</summary>
+        struct Segment
+        {
+            public CamState target;
+            public float duration;
+            public bool isFade;
+            public Ease ease;   // 补间段缓动（isFade 时无意义）
+        }
+
+        /// <summary>
+        /// 把 开场fade + 路径点(xfade 覆盖) + 收尾fade 展开成时间轴段列表。
+        /// 组内缓动默认与运行时一致：叠化段把连续补间点分成独立组，
+        /// 每组 首 InSine / 中 Linear / 末 OutSine（单段 InOutSine）。
+        /// start:cut 无需特殊段——首点本来就是时长 0 的瞬切（运行时并入 bg 转场）。
+        /// </summary>
+        List<Segment> BuildSegments()
+        {
+            var segs = new List<Segment>();
+            var pointOf = new List<int>();   // 各段对应的 _points 下标（收尾段 = -1）
+
+            int start = 0;
+            if (_points.Count > 0 && _startMode == StartMode.Fade)
+            {
+                segs.Add(new Segment
+                {
+                    target = TargetState(_points[0]),
+                    duration = Mathf.Max(0.05f, _startFade),
+                    isFade = true,
+                });
+                pointOf.Add(0);
+                start = 1;
+            }
+            for (int i = start; i < _points.Count; i++)
+            {
+                var w = _points[i];
+                if (w.fade > 0.001f)
+                    segs.Add(new Segment
+                        { target = TargetState(w), duration = w.fade, isFade = true });
+                else
+                    segs.Add(new Segment
+                        { target = TargetState(w), duration = Mathf.Max(0f, w.duration) });
+                pointOf.Add(i);
+            }
+            if (_endFade)
+            {
+                segs.Add(new Segment
+                {
+                    target = new CamState { offset = Vector2.zero, zoom = 1f },
+                    duration = Mathf.Max(0.05f, _endFadeDur),
+                    isFade = true,
+                });
+                pointOf.Add(-1);
+            }
+
+            // 按叠化段切组，组内分配默认缓动
+            int g = 0;
+            while (g < segs.Count)
+            {
+                if (segs[g].isFade) { g++; continue; }
+                int gEnd = g;
+                while (gEnd < segs.Count && !segs[gEnd].isFade) gEnd++;
+
+                int firstMove = -1, lastMove = -1, moveCount = 0;
+                for (int k = g; k < gEnd; k++)
+                {
+                    if (segs[k].duration > 0.001f)
+                    {
+                        if (firstMove < 0) firstMove = k;
+                        lastMove = k;
+                        moveCount++;
+                    }
+                }
+                for (int k = g; k < gEnd; k++)
+                {
+                    var s = segs[k];
+                    int pi = pointOf[k];
+                    if (pi >= 0 && _points[pi].easeIndex > 0 &&
+                        System.Enum.TryParse(EaseNames[_points[pi].easeIndex], true, out Ease custom))
+                        s.ease = custom;
+                    else
+                        s.ease = moveCount <= 1 ? Ease.InOutSine
+                            : k == firstMove ? Ease.InSine
+                            : k == lastMove ? Ease.OutSine
+                            : Ease.Linear;
+                    segs[k] = s;
+                }
+                g = gEnd;
+            }
+            return segs;
+        }
+
         float TotalDuration()
         {
             float t = 0f;
-            foreach (var w in _points) t += Mathf.Max(0f, w.duration);
+            foreach (var s in BuildSegments()) t += s.duration;
             return t;
         }
 
-        Ease EaseFor(int index, int firstMove, int lastMove, int moveCount)
+        /// <summary>某时刻的预览状态：镜头状态 + 叠化中的旧画面（画布上画橙色残框）</summary>
+        struct PreviewState
         {
-            var w = _points[index];
-            if (w.easeIndex > 0 &&
-                System.Enum.TryParse(EaseNames[w.easeIndex], true, out Ease custom))
-                return custom;
-            if (moveCount <= 1) return Ease.InOutSine;
-            if (index == firstMove) return Ease.InSine;
-            if (index == lastMove) return Ease.OutSine;
-            return Ease.Linear;
+            public CamState state;
+            public bool fading;
+            public CamState fadeFrom;
+            public float ghostAlpha;   // 旧画面剩余不透明度（按运行时 InOutSine 淡出）
         }
 
-        CamState StateAtTime(float time)
+        PreviewState PreviewAtTime(float time)
         {
-            var state = new CamState { offset = Vector2.zero, zoom = 1f };
-            if (_points.Count == 0) return state;
-
-            int firstMove = -1, lastMove = -1, moveCount = 0;
-            for (int i = 0; i < _points.Count; i++)
-            {
-                if (_points[i].duration > 0.001f)
-                {
-                    if (firstMove < 0) firstMove = i;
-                    lastMove = i;
-                    moveCount++;
-                }
-            }
+            var prev = new CamState { offset = Vector2.zero, zoom = 1f };
+            var ps = new PreviewState { state = prev };
+            if (_points.Count == 0) return ps;
 
             float t = time;
-            for (int i = 0; i < _points.Count; i++)
+            foreach (var s in BuildSegments())
             {
-                var target = TargetState(_points[i]);
-                float dur = _points[i].duration;
-                if (dur <= 0.001f)
+                if (s.duration <= 0.001f)
                 {
-                    state = target; // 瞬切
+                    prev = s.target; // 瞬切
+                    ps.state = prev;
                     continue;
                 }
-                if (t >= dur)
+                if (t >= s.duration)
                 {
-                    state = target;
-                    t -= dur;
+                    t -= s.duration;
+                    prev = s.target;
+                    ps.state = prev;
                     continue;
                 }
-                float eased = EaseManager.Evaluate(
-                    EaseFor(i, firstMove, lastMove, moveCount), null, t, dur, 1.70158f, 0f);
-                state.offset = Vector2.LerpUnclamped(state.offset, target.offset, eased);
-                state.zoom = Mathf.LerpUnclamped(state.zoom, target.zoom, eased);
-                return state;
+                if (s.isFade)
+                {
+                    // 叠化段：镜头开段即瞬切到目标，旧画面 InOutSine 淡出
+                    float eased = EaseManager.Evaluate(Ease.InOutSine, null, t, s.duration, 1.70158f, 0f);
+                    ps.state = s.target;
+                    ps.fading = true;
+                    ps.fadeFrom = prev;
+                    ps.ghostAlpha = 1f - eased;
+                    return ps;
+                }
+                float k = EaseManager.Evaluate(s.ease, null, t, s.duration, 1.70158f, 0f);
+                ps.state = new CamState
+                {
+                    offset = Vector2.LerpUnclamped(prev.offset, s.target.offset, k),
+                    zoom = Mathf.LerpUnclamped(prev.zoom, s.target.zoom, k),
+                };
+                return ps;
             }
-            return state;
+            return ps;
         }
 
         // ==================================================================
@@ -763,13 +913,35 @@ namespace VNEffects.EditorTools
 
         string GenerateText()
         {
-            var sb = new StringBuilder("camseq\n");
+            var sb = new StringBuilder("camseq");
+            if (_startMode == StartMode.Cut)
+            {
+                sb.Append(" start:cut");
+            }
+            else if (_startMode == StartMode.Fade)
+            {
+                sb.Append(" start:fade");
+                if (Mathf.Abs(_startFade - 0.6f) > 0.001f)
+                    sb.Append(" startfade:")
+                      .Append(_startFade.ToString("0.##", CultureInfo.InvariantCulture));
+            }
+            if (_endFade)
+            {
+                sb.Append(" end:fade");
+                if (Mathf.Abs(_endFadeDur - 0.6f) > 0.001f)
+                    sb.Append(" endfade:")
+                      .Append(_endFadeDur.ToString("0.##", CultureInfo.InvariantCulture));
+            }
+            sb.Append('\n');
+
             foreach (var w in _points)
             {
                 sb.Append("> ").Append(PointToken(w))
                   .Append(' ').Append(w.zoom.ToString("0.##", CultureInfo.InvariantCulture))
                   .Append(' ').Append(w.duration.ToString("0.##", CultureInfo.InvariantCulture));
                 if (w.easeIndex > 0) sb.Append(" ease:").Append(EaseNames[w.easeIndex]);
+                if (w.fade > 0.001f)
+                    sb.Append(" xfade:").Append(w.fade.ToString("0.##", CultureInfo.InvariantCulture));
                 sb.Append('\n');
             }
             return sb.ToString();
@@ -791,10 +963,18 @@ namespace VNEffects.EditorTools
                 return;
             }
 
+            // camseq 级 start:/end: 选项
+            string startKw = camseq.Kw("start");
+            _startMode = startKw == "cut" ? StartMode.Cut
+                       : startKw == "fade" ? StartMode.Fade : StartMode.None;
+            _startFade = camseq.KwF("startfade", 0.6f);
+            _endFade = camseq.Kw("end") == "fade";
+            _endFadeDur = camseq.KwF("endfade", 0.6f);
+
             _points.Clear();
             foreach (var def in camseq.camPoints)
             {
-                var w = new Waypoint { zoom = def.zoom, duration = def.duration };
+                var w = new Waypoint { zoom = def.zoom, duration = def.duration, fade = def.fade };
 
                 int anchor = System.Array.IndexOf(AnchorTokens, def.point.ToLower());
                 if (def.point.ToLower() == "center" || def.point.ToLower() == "origin"
