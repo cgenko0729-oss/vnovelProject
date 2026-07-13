@@ -29,6 +29,7 @@ namespace VNEffects.EditorTools
         bool _externalChanged;
         Tab _tab;
         bool _showCategoryColors;
+        bool _rebuildStateBeforePlay = true;
 
         ReorderableList _list;
         Vector2 _scroll;
@@ -553,6 +554,11 @@ namespace VNEffects.EditorTools
                             GUILayout.Width(126f)))
                         PlayFromSelectedRow();
                 }
+                bool previousChanged = GUI.changed;
+                _rebuildStateBeforePlay = GUILayout.Toggle(_rebuildStateBeforePlay,
+                    new GUIContent("重建前置状态", "播放前静默恢复目标行之前的舞台状态"),
+                    GUILayout.Width(96f));
+                GUI.changed = previousChanged;
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"{_doc.rows.Count} rows", EditorStyles.miniLabel);
             }
@@ -602,7 +608,7 @@ namespace VNEffects.EditorTools
                 return;
             }
 
-            VNPlayFromLineBridge.Request(source, sourceLine);
+            VNPlayFromLineBridge.Request(source, sourceLine, _rebuildStateBeforePlay);
         }
 
         int SourceLineForRow(int rowIndex)
@@ -1494,6 +1500,7 @@ namespace VNEffects.EditorTools
         const string PendingKey = "VNEffects.PlayFromLine.Pending";
         const string SourceKey = "VNEffects.PlayFromLine.Source";
         const string LineKey = "VNEffects.PlayFromLine.Line";
+        const string RebuildKey = "VNEffects.PlayFromLine.Rebuild";
         static int _remainingAttempts;
 
         static VNPlayFromLineBridge()
@@ -1502,11 +1509,12 @@ namespace VNEffects.EditorTools
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
 
-        public static void Request(string source, int sourceLine)
+        public static void Request(string source, int sourceLine, bool rebuildState)
         {
             SessionState.SetBool(PendingKey, true);
             SessionState.SetString(SourceKey, source);
             SessionState.SetInt(LineKey, Mathf.Max(1, sourceLine));
+            SessionState.SetBool(RebuildKey, rebuildState);
             EditorApplication.isPlaying = true;
         }
 
@@ -1534,10 +1542,10 @@ namespace VNEffects.EditorTools
             }
 
             var runner = Object.FindFirstObjectByType<VNScriptRunner>();
-            if (runner == null)
+            if (runner == null || !runner.IsInitialized)
             {
                 if (--_remainingAttempts > 0) return;
-                Debug.LogError("[VNScript] 从选中行播放失败：场景中找不到 VNScriptRunner");
+                Debug.LogError("[VNScript] 从选中行播放失败：找不到已初始化的 VNScriptRunner");
                 ClearRequest();
                 EditorApplication.update -= TryStartRunner;
                 return;
@@ -1545,9 +1553,10 @@ namespace VNEffects.EditorTools
 
             string source = SessionState.GetString(SourceKey, "");
             int line = SessionState.GetInt(LineKey, 1);
+            bool rebuildState = SessionState.GetBool(RebuildKey, true);
             ClearRequest();
             EditorApplication.update -= TryStartRunner;
-            runner.PlayFromSourceLine(source, line);
+            runner.PlayFromSourceLine(source, line, rebuildState);
         }
 
         static void ClearRequest()
@@ -1555,6 +1564,7 @@ namespace VNEffects.EditorTools
             SessionState.EraseBool(PendingKey);
             SessionState.EraseString(SourceKey);
             SessionState.EraseInt(LineKey);
+            SessionState.EraseBool(RebuildKey);
         }
     }
 }

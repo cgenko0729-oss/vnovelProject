@@ -48,6 +48,7 @@ namespace VNEffects
         public bool IsRunning => _running;
         public bool IsAuto => _auto;
         public bool IsSkipping => _skip;
+        public bool IsInitialized { get; private set; }
         public int CurrentLine =>
             _running && _index > 0 && _index <= _commands.Count ? _commands[_index - 1].line : 0;
 
@@ -60,6 +61,7 @@ namespace VNEffects
                     _backlog = new GameObject("VNBacklog").AddComponent<VNBacklog>();
             }
             if (playOnStart && script != null) Play(script);
+            IsInitialized = true;
         }
 
         // ------------------------------------------------------------------
@@ -78,7 +80,10 @@ namespace VNEffects
         /// 编辑器调试入口：从指定剧本物理行或其后的第一条有效命令开始播放。
         /// 返回实际开始的物理行；找不到可执行命令时返回 -1。
         /// </summary>
-        public int PlayFromSourceLine(string source, int sourceLine)
+        public int PlayFromSourceLine(string source, int sourceLine) =>
+            PlayFromSourceLine(source, sourceLine, false);
+
+        public int PlayFromSourceLine(string source, int sourceLine, bool rebuildState)
         {
             Prepare(source);
             int start = -1;
@@ -96,9 +101,187 @@ namespace VNEffects
             }
 
             int actualLine = _commands[start].line;
+            if (rebuildState) RebuildStateBefore(start);
             ResumeAt(start);
-            Debug.Log($"[VNScript] 调试：从第 {actualLine} 行开始播放");
+            Debug.Log($"[VNScript] 调试：从第 {actualLine} 行开始播放" +
+                      (rebuildState ? "（已重建前置状态）" : "（直接跳转）"));
             return actualLine;
+        }
+
+        void RebuildStateBefore(int exclusiveIndex)
+        {
+            if (stage == null)
+            {
+                Debug.LogError("[VNScript] 无法重建状态：VNScriptRunner.stage 未设置");
+                return;
+            }
+
+            var snapshot = new VNSaveData
+            {
+                weather = VNWeather.None.ToString(),
+                mood = VNMood.Neutral.ToString(),
+            };
+            var characters = new Dictionary<string, VNSaveData.CharSave>();
+            var loopingSe = new HashSet<string>();
+            var volumes = new Dictionary<string, float>();
+            string focus = null;
+            VNScriptCommand lastCameraCut = null;
+            bool hasBranching = false;
+
+            VNFlags.Clear();
+            for (int i = 0; i < exclusiveIndex && i < _commands.Count; i++)
+            {
+                VNScriptCommand cmd = _commands[i];
+                switch (cmd.keyword)
+                {
+                    case "bg":
+                        snapshot.backgroundId = cmd.Arg(0);
+                        break;
+                    case "weather":
+                        snapshot.weather = cmd.Arg(0, VNWeather.None.ToString());
+                        break;
+                    case "mood":
+                        snapshot.mood = cmd.Arg(0, VNMood.Neutral.ToString());
+                        break;
+                    case "portrait":
+                        snapshot.portraitOff = cmd.Arg(0, "on") == "off";
+                        break;
+                    case "show":
+                        RebuildShowState(characters, cmd);
+                        break;
+                    case "hide":
+                        characters.Remove(cmd.Arg(0));
+                        break;
+                    case "move":
+                        RebuildMoveState(characters, cmd);
+                        break;
+                    case "say":
+                        if (!string.IsNullOrEmpty(cmd.expression) &&
+                            characters.TryGetValue(cmd.speaker, out var speaking))
+                            speaking.expr = cmd.expression;
+                        break;
+                    case "bgm":
+                        snapshot.bgm = cmd.Arg(0, "play") == "stop" ? null : cmd.Arg(1);
+                        break;
+                    case "se":
+                        if (cmd.Arg(0) == "stop") loopingSe.Remove(cmd.Arg(1));
+                        else if (cmd.args.Contains("loop")) loopingSe.Add(cmd.Arg(0));
+                        break;
+                    case "volume":
+                        volumes[cmd.Arg(0, "bgm")] = cmd.ArgF(1, 1f);
+                        break;
+                    case "fx":
+                    {
+                        string name = cmd.Arg(0);
+                        string value = cmd.Arg(1);
+                        if (name == "focus") focus = value == "off" ? null : value;
+                        else if (value == "off") snapshot.fxOn.Remove(name);
+                        else if (!snapshot.fxOn.Contains(name)) snapshot.fxOn.Add(name);
+                        break;
+                    }
+                    case "flag":
+                        ApplyDebugFlag(cmd);
+                        break;
+                    case "camcut":
+                    case "camto":
+                        lastCameraCut = cmd;
+                        break;
+                    case "camera":
+                    case "camseq":
+                        lastCameraCut = null; // 动画路径状态不做推断，回到默认镜头
+                        break;
+                    case "choice":
+                    case "jump":
+                    case "if":
+                        hasBranching = true;
+                        break;
+                }
+            }
+
+            foreach (var character in characters.Values)
+                snapshot.characters.Add(character);
+
+            stage.RestoreSnapshot(snapshot, true);
+            if (stage.vnAudio != null)
+            {
+                foreach (var volume in volumes)
+                    stage.vnAudio.SetVolume(volume.Key, volume.Value);
+                foreach (string id in loopingSe)
+                    stage.vnAudio.PlaySe(id, true);
+            }
+            if (!string.IsNullOrEmpty(focus)) stage.Fx("focus", focus);
+            RestoreDebugCamera(lastCameraCut);
+
+            if (hasBranching)
+                Debug.LogWarning("[VNScript] 前置状态包含 choice/jump/if；调试重建按文件顺序处理，" +
+                                 "不会推断之前的玩家选择路径");
+        }
+
+        void RebuildShowState(Dictionary<string, VNSaveData.CharSave> characters,
+            VNScriptCommand cmd)
+        {
+            string id = cmd.Arg(0);
+            if (string.IsNullOrEmpty(id)) return;
+            string at = cmd.Kw("at");
+            VNSaveData.CharSave existing = null;
+            bool keepPosition = string.IsNullOrEmpty(at) &&
+                characters.TryGetValue(id, out existing);
+            float x;
+            if (keepPosition)
+                x = existing.x;
+            else
+                x = DebugSlotX(string.IsNullOrEmpty(at) ? "center" : at);
+            var def = stage.characters.Find(character => character != null && character.id == id);
+            if (def != null && !keepPosition)
+                x += def.positionOffset.x;
+            characters[id] = new VNSaveData.CharSave
+                { id = id, x = x, expr = cmd.Kw("expr") };
+        }
+
+        void RebuildMoveState(Dictionary<string, VNSaveData.CharSave> characters,
+            VNScriptCommand cmd)
+        {
+            if (!characters.TryGetValue(cmd.Arg(0), out var character)) return;
+            float x = DebugSlotX(cmd.Arg(1, "center"));
+            var def = stage.characters.Find(item => item != null && item.id == character.id);
+            if (def != null) x += def.positionOffset.x;
+            character.x = x;
+        }
+
+        static float DebugSlotX(string at)
+        {
+            switch (at)
+            {
+                case "left": return -380f;
+                case "right": return 380f;
+                case "center": return 0f;
+                default: return float.TryParse(at, out float x) ? x : 0f;
+            }
+        }
+
+        static void ApplyDebugFlag(VNScriptCommand cmd)
+        {
+            string name = cmd.Arg(0);
+            string value = cmd.Arg(1);
+            if (string.IsNullOrEmpty(name)) return;
+            if (string.IsNullOrEmpty(value)) VNFlags.Apply(name);
+            else if (value.StartsWith("+") || value.StartsWith("-"))
+                VNFlags.Apply(name + value);
+            else if (int.TryParse(value, out int parsed)) VNFlags.Set(name, parsed);
+        }
+
+        void RestoreDebugCamera(VNScriptCommand command)
+        {
+            if (stage.vnCamera == null) return;
+            if (command == null)
+            {
+                stage.vnCamera.SnapReset();
+                return;
+            }
+
+            var point = stage.ResolveCamPoint(command.Arg(0), command.line);
+            if (!point.HasValue) return;
+            stage.vnCamera.Cut(point.Value, command.ArgF(1, 1.5f));
         }
 
         /// <summary>解析剧本并预扫描 label 表（允许向前跳转）</summary>
