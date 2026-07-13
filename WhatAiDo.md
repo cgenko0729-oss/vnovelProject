@@ -789,7 +789,35 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 `move` / `bgm play|stop` / `se [loop]|stop` / `voice` / `volume`，
 均已写入 HowToUse.md（含免费音频素材站推荐）。
 
-## 二十二、其他问题修复记录
+## 二十二、剧本系统：自由镜头路径 camseq（2026-07-13，分支 `feature/vn-camseq`）
+
+**背景**：`camera` 五个预设只能"一次性补间到隐含目标"，无法表达任意点、纵向移动、
+角色身体部位、瞬切起手和多段连续路径（用户明确提出三个做不到的案例）。
+
+### 22.1 核心抽象：镜头状态 = (目标点, zoom)
+
+- `VNCamera` 新增三原语：`Cut(点,zoom)` 瞬切、`GoTo(点,zoom,秒,缓动)` 单段直达、
+  `PlayPath(路径点列表)` 多段路径（编成一条 Sequence）
+- "看向点 p"采用**居中语义**：偏移 = `-p × zoom`（区别于 PushIn 的"焦点保持"语义）
+- **防露边钳制**：偏移上限 = `(画布半宽+背景溢出) × zoom - 画布半宽`，默认开启可关
+- **多段默认缓动**让整条路径像一次连续运镜：首个移动段 InSine 缓起、中间 Linear
+  匀速、末段 OutSine 缓停；单段 InOutSine；每点可 `ease:` 覆盖（支持全部 DOTween Ease 名）
+
+### 22.2 剧本语法
+
+- `camseq` 块 + `> 目标点 [zoom] [时长] [ease:名]` 路径点行（复用 choice 块的解析模式，
+  `>` 前缀；时长 0 = 瞬切段）；`camto` 单段简写、`camcut` 独立瞬切
+- **目标点三种寻址**（英文词汇，按用户要求）：
+  九宫格锚点 topleft~bottomright（±620/±340）；
+  角色部位 `角色:head/chest/waist/feet/up/mid/down`（角色位置 + 立绘高度 × 部位比例，
+  head=+0.36 chest=+0.15 waist=-0.08 feet=-0.42）；
+  裸坐标 `x,y`
+- 路径点在**执行时**解析（角色移动后也能对准）；camseq 整块支持 `@` 异步
+- 旧 `camera` 五预设原样保留；与震动/荷兰角/视差天然叠加
+
+### 22.3 用户三案例的对应写法已写入 HowToUse.md（camseq 章节）
+
+## 二十三、其他问题修复记录
 
 ### 修复 1：`Particle Velocity curves must all be in the same mode`（2026-07-12）
 

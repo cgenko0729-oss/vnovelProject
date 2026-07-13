@@ -328,6 +328,91 @@ namespace VNEffects
             return c;
         }
 
+        // ------------------------------------------------------------------
+        // 镜头目标点解析（camseq / camto / camcut 用）
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 解析镜头目标点 token → 画布坐标（中心为原点，1920×1080 坐标系）。
+        /// 支持：
+        ///   九宫格锚点：topleft top topright left middle(center) right
+        ///               bottomleft bottom bottomright，origin/reset = 中心
+        ///   角色[:部位]：亚里沙 / 亚里沙:head|chest|waist|feet|up|mid|down
+        ///   裸坐标：300,200
+        /// 解析失败返回 null 并告警。
+        /// </summary>
+        public Vector2? ResolveCamPoint(string token, int line = 0)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：镜头目标点为空");
+                return null;
+            }
+
+            // 九宫格锚点
+            switch (token.ToLower())
+            {
+                case "topleft": return new Vector2(-620f, 340f);
+                case "top": return new Vector2(0f, 340f);
+                case "topright": return new Vector2(620f, 340f);
+                case "left": return new Vector2(-620f, 0f);
+                case "middle":
+                case "center":
+                case "origin":
+                case "reset": return Vector2.zero;
+                case "right": return new Vector2(620f, 0f);
+                case "bottomleft": return new Vector2(-620f, -340f);
+                case "bottom": return new Vector2(0f, -340f);
+                case "bottomright": return new Vector2(620f, -340f);
+            }
+
+            // 裸坐标 x,y
+            int comma = token.IndexOf(',');
+            if (comma > 0)
+            {
+                if (float.TryParse(token.Substring(0, comma), out float px) &&
+                    float.TryParse(token.Substring(comma + 1), out float py))
+                    return new Vector2(px, py);
+                Debug.LogWarning($"[VNScript] 第 {line} 行：坐标「{token}」格式应为 x,y");
+                return null;
+            }
+
+            // 角色[:部位]
+            string id = token;
+            string part = null;
+            int colon = token.IndexOf(':');
+            if (colon > 0)
+            {
+                id = token.Substring(0, colon);
+                part = token.Substring(colon + 1).ToLower();
+            }
+
+            var c = Get(id);
+            if (c == null)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：镜头目标「{token}」不是锚点/坐标，角色「{id}」也不在场上");
+                return null;
+            }
+
+            float frac = 0f; // 相对立绘高度的纵向偏移比例
+            switch (part)
+            {
+                case null: case "": frac = 0f; break;
+                case "head": frac = 0.36f; break;
+                case "chest": frac = 0.15f; break;
+                case "waist": frac = -0.08f; break;
+                case "feet": frac = -0.42f; break;
+                case "up": frac = 0.3f; break;
+                case "mid": frac = 0f; break;
+                case "down": frac = -0.3f; break;
+                default:
+                    Debug.LogWarning($"[VNScript] 第 {line} 行：未知身体部位「{part}」" +
+                                     "（head/chest/waist/feet/up/mid/down），使用角色中心");
+                    break;
+            }
+            return c.rect.anchoredPosition + new Vector2(0f, c.rect.sizeDelta.y * frac);
+        }
+
         /// <summary>角色显示名（未注册时原样返回，Backlog 用）</summary>
         public string GetDisplayName(string speaker)
         {

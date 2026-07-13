@@ -187,6 +187,60 @@ camera reset
 
 `focus:角色id` = 镜头朝那个角色推近。运镜通常配 `@` 异步使用（边推边说话）。
 
+### camseq / camto / camcut — 自由镜头路径 🎬
+
+`camera` 的五个预设不够用时（任意点、多段路径、精确秒数），用路径镜头：
+
+```
+camseq                          # 多段路径块：整条路径连续流畅（不会走走停停）
+> topright 1.8 0                # 路径点：目标点 [zoom] [时长]；时长 0 = 瞬切起手
+> bottom 1.8 2.5                # 2.5 秒匀速移到画面下方（zoom 保持 1.8）
+> middle 1.0 1.5                # 1.5 秒回原点并 zoom out
+
+camto 亚里沙:head 1.6 0.8       # 单段直达：目标点 [zoom] [秒] [ease:名]
+camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里"）
+```
+
+**目标点词汇表**（三种寻址方式）：
+
+| 类型 | 写法 |
+|---|---|
+| 九宫格锚点 | `topleft` `top` `topright` `left` `middle`(=center) `right` `bottomleft` `bottom` `bottomright`；`origin`/`reset` = 中心 |
+| 角色[:部位] | `亚里沙`（中心）、`亚里沙:head / chest / waist / feet / up / mid / down` |
+| 裸坐标 | `300,200`（画布坐标，中心为原点，1920×1080） |
+
+规则与技巧：
+
+- **缓动**：单段默认 InOutSine；多段路径首段 InSine 缓起、中间 Linear 匀速、末段 OutSine 缓停
+  ——整条像一次连续运镜。每个路径点可用 `ease:OutBack` 等覆盖（DOTween 全部 Ease 名可用）
+- **防露边**：高倍 zoom 对准边角时自动钳制偏移，不会把画布边缘露出来
+- 路径点在**执行时**才解析角色位置（角色刚 move 过也能对准）
+- camseq 整块可加 `@` 异步（台词与运镜同时进行）
+- 空行/注释不打断 `>` 路径点块
+
+三个典型范例：
+
+```
+# 从角色下半身推上去到头部特写，再回原点
+camseq
+> 小雪:waist 1.7 0.6
+> 小雪:head 1.7 1.2
+> middle 1.0 0.8
+
+# 背景两点间 0.45 秒快速扫过
+camseq
+> 350,180 2.0 0.15
+> -420,-120 2.0 0.15
+> middle 1.0 0.15
+
+# 边运镜边说话（异步）
+camseq @
+> topright 1.6 0
+> bottomleft 1.6 3
+> middle 1.0 1.5
+亚里沙: 这间教室……好怀念啊。
+```
+
 ### shake — 屏幕震动
 
 ```
@@ -585,7 +639,9 @@ se <id> [loop] / se stop <id>                    音效/环境音
 voice <id>                                       语音
 volume <bgm|se|voice> <0~1>                      音量
 wait <秒>                                        停顿
-camera <pushin|snapzoom|pan|dolly|reset> [...]   运镜
+camera <pushin|snapzoom|pan|dolly|reset> [...]   预设运镜
+camseq + > 目标点 [zoom] [秒] [ease:名]          多段镜头路径
+camto <目标点> [zoom] [秒] / camcut <目标点> [zoom]  单段直达/瞬切
 shake <light|medium|heavy>                       震动
 weather <Petals|Rain|Snow|Fireflies|None>        天气
 mood <Neutral|Morning|Sunset|Night|Memory|Tension|Horror>  色调
