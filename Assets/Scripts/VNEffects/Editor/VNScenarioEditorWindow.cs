@@ -544,6 +544,15 @@ namespace VNEffects.EditorTools
                         Bump();
                     }
                 }
+                using (new EditorGUI.DisabledScope(
+                    _list.index < 0 || _list.index >= _doc.rows.Count ||
+                    EditorApplication.isPlayingOrWillChangePlaymode))
+                {
+                    if (GUILayout.Button(new GUIContent("▶ 从选中行播放",
+                            "进入 Play Mode，并从当前行或下一条有效命令开始播放"),
+                            GUILayout.Width(126f)))
+                        PlayFromSelectedRow();
+                }
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"{_doc.rows.Count} rows", EditorStyles.miniLabel);
             }
@@ -563,6 +572,50 @@ namespace VNEffects.EditorTools
                 "camseq waypoint lines are kept as text in this batch " +
                 "(use Tools → VN Effects → Camera Sequence Editor and paste).",
                 MessageType.Info);
+        }
+
+        void PlayFromSelectedRow()
+        {
+            foreach (var issue in _issues)
+            {
+                if (!issue.isError) continue;
+                _tab = Tab.Issues;
+                EditorUtility.DisplayDialog("无法开始调试",
+                    "剧本仍有错误，请先在 Issues 页修正。", "确定");
+                return;
+            }
+
+            int sourceLine = SourceLineForRow(_list.index);
+            string source = _doc.GenerateText();
+            var commands = VNScriptParser.Parse(source);
+            bool found = false;
+            foreach (var command in commands)
+            {
+                if (command.line < sourceLine) continue;
+                found = true;
+                break;
+            }
+            if (!found)
+            {
+                EditorUtility.DisplayDialog("无法开始调试",
+                    $"第 {sourceLine} 行之后没有可播放的命令。", "确定");
+                return;
+            }
+
+            VNPlayFromLineBridge.Request(source, sourceLine);
+        }
+
+        int SourceLineForRow(int rowIndex)
+        {
+            int line = 1;
+            for (int i = 0; i < rowIndex && i < _doc.rows.Count; i++)
+            {
+                VNRow row = _doc.rows[i];
+                line++;
+                if (row.options != null) line += row.options.Count;
+                if (row.camLines != null) line += row.camLines.Count;
+            }
+            return line;
         }
 
         float RowHeight(VNRow r)
@@ -1432,6 +1485,76 @@ namespace VNEffects.EditorTools
                 default:
                     return r.raw.Length > 14 ? r.raw.Substring(0, 14) + "…" : r.raw;
             }
+        }
+    }
+
+    [InitializeOnLoad]
+    static class VNPlayFromLineBridge
+    {
+        const string PendingKey = "VNEffects.PlayFromLine.Pending";
+        const string SourceKey = "VNEffects.PlayFromLine.Source";
+        const string LineKey = "VNEffects.PlayFromLine.Line";
+        static int _remainingAttempts;
+
+        static VNPlayFromLineBridge()
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
+
+        public static void Request(string source, int sourceLine)
+        {
+            SessionState.SetBool(PendingKey, true);
+            SessionState.SetString(SourceKey, source);
+            SessionState.SetInt(LineKey, Mathf.Max(1, sourceLine));
+            EditorApplication.isPlaying = true;
+        }
+
+        static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.EnteredPlayMode &&
+                SessionState.GetBool(PendingKey, false))
+            {
+                _remainingAttempts = 180;
+                EditorApplication.update -= TryStartRunner;
+                EditorApplication.update += TryStartRunner;
+            }
+            else if (state == PlayModeStateChange.EnteredEditMode)
+            {
+                EditorApplication.update -= TryStartRunner;
+            }
+        }
+
+        static void TryStartRunner()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                EditorApplication.update -= TryStartRunner;
+                return;
+            }
+
+            var runner = Object.FindFirstObjectByType<VNScriptRunner>();
+            if (runner == null)
+            {
+                if (--_remainingAttempts > 0) return;
+                Debug.LogError("[VNScript] 从选中行播放失败：场景中找不到 VNScriptRunner");
+                ClearRequest();
+                EditorApplication.update -= TryStartRunner;
+                return;
+            }
+
+            string source = SessionState.GetString(SourceKey, "");
+            int line = SessionState.GetInt(LineKey, 1);
+            ClearRequest();
+            EditorApplication.update -= TryStartRunner;
+            runner.PlayFromSourceLine(source, line);
+        }
+
+        static void ClearRequest()
+        {
+            SessionState.EraseBool(PendingKey);
+            SessionState.EraseString(SourceKey);
+            SessionState.EraseInt(LineKey);
         }
     }
 }

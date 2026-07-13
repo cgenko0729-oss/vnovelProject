@@ -74,6 +74,33 @@ namespace VNEffects
             ResumeAt(0);
         }
 
+        /// <summary>
+        /// 编辑器调试入口：从指定剧本物理行或其后的第一条有效命令开始播放。
+        /// 返回实际开始的物理行；找不到可执行命令时返回 -1。
+        /// </summary>
+        public int PlayFromSourceLine(string source, int sourceLine)
+        {
+            Prepare(source);
+            int start = -1;
+            for (int i = 0; i < _commands.Count; i++)
+            {
+                if (_commands[i].line < Mathf.Max(1, sourceLine)) continue;
+                start = i;
+                break;
+            }
+
+            if (start < 0)
+            {
+                Debug.LogError($"[VNScript] 第 {sourceLine} 行之后没有可播放的命令");
+                return -1;
+            }
+
+            int actualLine = _commands[start].line;
+            ResumeAt(start);
+            Debug.Log($"[VNScript] 调试：从第 {actualLine} 行开始播放");
+            return actualLine;
+        }
+
         /// <summary>解析剧本并预扫描 label 表（允许向前跳转）</summary>
         void Prepare(string source)
         {
