@@ -63,6 +63,7 @@ namespace VNEffects
             public VNEntranceAnimator animator;
             public VNCharacterEmotes emotes;
             public VNCharacterBlink blink;
+            public VNCharacterMouth mouth;
             public string expression;
         }
 
@@ -181,6 +182,7 @@ namespace VNEffects
                 Debug.LogWarning($"[VNScript] 第 {line} 行：hide 的角色「{id}」不在场上");
                 return null;
             }
+            c.mouth?.ForceClosed();
             _active.Remove(id);
             RefreshRegistries();
 
@@ -227,11 +229,13 @@ namespace VNEffects
 
             bool isDefault = c.def.IsDefaultExpression(expr);
             c.blink?.PrepareForExpressionChange();
+            c.mouth?.PrepareForExpressionChange();
 
             if (sprite == c.image.sprite)
             {
                 c.expression = expr;
                 c.blink?.SetExpression(sprite, isDefault);
+                c.mouth?.SetExpression(expr);
                 return;
             }
 
@@ -248,6 +252,7 @@ namespace VNEffects
             float aspect = sprite.rect.width / sprite.rect.height;
             c.rect.sizeDelta = new Vector2(h * aspect, h);
             c.blink?.SetExpression(sprite, isDefault);
+            c.mouth?.SetExpression(expr);
         }
 
         /// <summary>复制一份旧表情立绘覆盖在角色上淡出（表情交叉溶解）</summary>
@@ -334,6 +339,8 @@ namespace VNEffects
             c.emotes = go.AddComponent<VNCharacterEmotes>();
             c.blink = go.AddComponent<VNCharacterBlink>();
             c.blink.Initialize(img, def);
+            c.mouth = go.AddComponent<VNCharacterMouth>();
+            c.mouth.Initialize(img, def, c.fx.Mat);
             go.AddComponent<VNFootShadow>();
 
             _active[def.id] = c;
@@ -509,6 +516,7 @@ namespace VNEffects
         /// <summary>清空舞台：销毁全部在场角色、关闭残留的选项面板</summary>
         public void ClearStage()
         {
+            StopSpeaking();
             foreach (var kv in _active)
                 if (kv.Value.go != null) Destroy(kv.Value.go);
             _active.Clear();
@@ -564,8 +572,9 @@ namespace VNEffects
         // ------------------------------------------------------------------
 
         /// <summary>说一句话：注册角色自动高亮+切表情+头像；否则名字原样显示（旁白）</summary>
-        public void Say(string speaker, string expr, string text)
+        public void Say(string speaker, string expr, string text, bool followVoice = false)
         {
+            StopSpeaking();
             var c = Get(speaker);
             if (c != null)
             {
@@ -576,6 +585,7 @@ namespace VNEffects
                     c.def.GetPortrait(string.IsNullOrEmpty(expr) ? c.expression : expr),
                     c.def.portraitScale, c.def.portraitOffset);
                 dialogue.Say(c.def.displayName, text);
+                c.mouth?.BeginSpeaking(followVoice, dialogue, vnAudio);
             }
             else
             {
@@ -584,6 +594,13 @@ namespace VNEffects
                 dialogue.SetPortrait(null); // 旁白/未注册角色不显示头像
                 dialogue.Say(speaker, text); // speaker 为空 = 无名牌旁白
             }
+        }
+
+        /// <summary>强制所有在场角色恢复闭嘴；新台词、退场、读档和停止剧本都会调用。</summary>
+        public void StopSpeaking()
+        {
+            foreach (var kv in _active)
+                kv.Value.mouth?.ForceClosed();
         }
 
         /// <summary>对话头像全局开关（剧本 portrait on/off，进存档快照）</summary>

@@ -51,6 +51,7 @@ namespace VNEffects
         bool _auto;
         bool _skip;
         bool _waitingAtSay;   // 只有停在台词上时才允许存档
+        bool _voicePendingForNextSay; // voice 命令一次性绑定到下一句对白的口型
         int _currentSayIndex; // 正在显示的台词命令索引（存档恢复点）
         string _lastSayText = "";
 
@@ -340,6 +341,8 @@ namespace VNEffects
             _co = null;
             _running = false;
             _waitingAtSay = false;
+            _voicePendingForNextSay = false;
+            stage?.StopSpeaking();
         }
 
         void JumpTo(string label, int fromLine)
@@ -659,6 +662,8 @@ namespace VNEffects
             }
             _running = false;
             SetSkip(false);
+            _voicePendingForNextSay = false;
+            stage?.StopSpeaking();
             Debug.Log("[VNScript] 剧本播放结束");
         }
 
@@ -774,7 +779,8 @@ namespace VNEffects
                 }
 
                 case "voice":
-                    stage.vnAudio?.PlayVoice(cmd.Arg(0), cmd.line);
+                    _voicePendingForNextSay = stage.vnAudio != null &&
+                        stage.vnAudio.PlayVoice(cmd.Arg(0), cmd.line);
                     return null;
 
                 case "volume":
@@ -839,7 +845,9 @@ namespace VNEffects
 
         IEnumerator SayCo(VNScriptCommand cmd)
         {
-            stage.Say(cmd.speaker, cmd.expression, cmd.text);
+            bool followVoice = _voicePendingForNextSay;
+            _voicePendingForNextSay = false;
+            stage.Say(cmd.speaker, cmd.expression, cmd.text, followVoice);
             _lastSayText = cmd.text;
             _backlog?.Record(stage.GetDisplayName(cmd.speaker), cmd.text);
 

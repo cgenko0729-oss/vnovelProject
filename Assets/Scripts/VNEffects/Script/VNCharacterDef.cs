@@ -49,6 +49,24 @@ namespace VNEffects
         [Range(0.03f, 0.5f)]
         public float blinkDuration = 0.1f;
 
+        [Header("说话口型")]
+        [Tooltip("是否允许这个角色在对白期间自动切换张嘴图。关闭后始终使用原立绘的闭嘴状态")]
+        public bool enableMouthFlap;
+
+        [Tooltip("透明背景的张嘴局部图。建议保留与默认立绘完全相同的整张透明画布，只在嘴部位置留下像素")]
+        public Sprite openMouthSprite;
+
+        [Tooltip("开启后仅默认表情使用口型，避免其他构图不同的表情出现嘴巴错位")]
+        public bool mouthDefaultExpressionOnly = true;
+
+        [Tooltip("闭嘴/张嘴切换的最短随机间隔（秒）")]
+        [Min(0.03f)]
+        public float mouthIntervalMin = 0.08f;
+
+        [Tooltip("闭嘴/张嘴切换的最长随机间隔（秒）")]
+        [Min(0.03f)]
+        public float mouthIntervalMax = 0.16f;
+
         [Header("尺寸标定（解决素材构图不统一）")]
         [Tooltip("尺寸倍率：这个角色的显示高度 = 舞台统一高度 × 此值。\n" +
                  "素材四周留白多/角色显小 → 调大（如 1.15）；近景图显大 → 调小（如 0.85）")]
