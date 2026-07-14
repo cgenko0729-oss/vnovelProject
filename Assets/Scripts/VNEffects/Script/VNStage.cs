@@ -676,6 +676,15 @@ namespace VNEffects
         static readonly string[] ToggleFxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch" };
 
+        /// <summary>章节转场用：关闭天气、情绪色调和全部持续型画面特效。</summary>
+        public void ResetEffects()
+        {
+            weather?.SetWeather(VNWeather.None, 0.8f);
+            mood?.SetMood(VNMood.Neutral, 0.8f);
+            foreach (var name in ToggleFxNames) Fx(name, "off");
+            Fx("focus", "off");
+        }
+
         /// <summary>fx 命令：fx godrays on / fx dof off / fx focus 亚里沙 / fx heartbeat on …</summary>
         public void Fx(string name, string arg, int line = 0)
         {

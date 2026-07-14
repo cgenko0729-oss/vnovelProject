@@ -159,6 +159,15 @@ namespace VNEffects
                     case "mood":
                         snapshot.mood = cmd.Arg(0, VNMood.Neutral.ToString());
                         break;
+                    case "reset":
+                        if (cmd.Arg(0) == "effects" || cmd.Arg(0) == "all")
+                        {
+                            snapshot.weather = VNWeather.None.ToString();
+                            snapshot.mood = VNMood.Neutral.ToString();
+                            snapshot.fxOn.Clear();
+                            focus = null;
+                        }
+                        break;
                     case "portrait":
                         snapshot.portraitOff = cmd.Arg(0, "on") == "off";
                         break;
@@ -753,6 +762,13 @@ namespace VNEffects
                 case "mood":
                     stage.mood?.SetMood(
                         VNScriptParser.ParseEnum(cmd.Arg(0), VNMood.Neutral, cmd.line));
+                    return null;
+
+                case "reset":
+                    if (cmd.Arg(0) == "effects" || cmd.Arg(0) == "all")
+                        stage.ResetEffects();
+                    else
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：reset 用法为「reset effects」");
                     return null;
 
                 case "shake":

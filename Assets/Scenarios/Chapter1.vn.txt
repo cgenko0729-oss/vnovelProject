@@ -90,6 +90,7 @@ label 落幕
 hide 小雪 with:fade
 hide 亚里沙 with:dissolve
 : 第一章　完
+reset effects
 chapter Chapter2
 
 # ============================================

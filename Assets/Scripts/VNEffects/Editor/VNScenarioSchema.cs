@@ -125,6 +125,8 @@ namespace VNEffects.EditorTools
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNWeather>(), "None"));
             Add("mood", "Scene", "mood <type>",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNMood>(), "Neutral"));
+            Add("reset", "Scene", "reset effects  (weather + mood + persistent VFX)",
+                Pos("target", "target", VNParamSource.Options, new[] { "effects" }, "effects"));
             Add("transition", "Scene", "transition <type>  (fullscreen, no bg change)",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNTransition>(), "NoiseDissolve"));
 

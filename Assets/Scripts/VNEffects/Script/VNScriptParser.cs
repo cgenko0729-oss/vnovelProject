@@ -77,7 +77,7 @@ namespace VNEffects
         {
             "bg", "show", "hide", "emote", "wait",
             "camera", "shake", "weather", "mood", "fx",
-            "sakura", "transition",
+            "sakura", "transition", "reset",
             "label", "jump", "flag", "if", "choice",
             "chapter",
             "move", "bgm", "se", "voice", "volume",
