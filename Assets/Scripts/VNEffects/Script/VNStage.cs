@@ -62,6 +62,7 @@ namespace VNEffects
             public VNImageEffectController fx;
             public VNEntranceAnimator animator;
             public VNCharacterEmotes emotes;
+            public VNCharacterBlink blink;
             public string expression;
         }
 
@@ -222,7 +223,17 @@ namespace VNEffects
         void ApplyExpression(ActiveCharacter c, string expr)
         {
             var sprite = c.def.GetSprite(expr);
-            if (sprite == null || sprite == c.image.sprite) return;
+            if (sprite == null) return;
+
+            bool isDefault = c.def.IsDefaultExpression(expr);
+            c.blink?.PrepareForExpressionChange();
+
+            if (sprite == c.image.sprite)
+            {
+                c.expression = expr;
+                c.blink?.SetExpression(sprite, isDefault);
+                return;
+            }
 
             // 交叉溶解：角色完全可见时，旧表情以"残像"覆盖在上面淡出（新表情立即生效）
             var group = c.go.GetComponent<CanvasGroup>();
@@ -236,6 +247,7 @@ namespace VNEffects
             float h = HeightFor(c.def);
             float aspect = sprite.rect.width / sprite.rect.height;
             c.rect.sizeDelta = new Vector2(h * aspect, h);
+            c.blink?.SetExpression(sprite, isDefault);
         }
 
         /// <summary>复制一份旧表情立绘覆盖在角色上淡出（表情交叉溶解）</summary>
@@ -320,6 +332,8 @@ namespace VNEffects
             go.AddComponent<VNGlowBackdrop>();
             c.animator = go.AddComponent<VNEntranceAnimator>();
             c.emotes = go.AddComponent<VNCharacterEmotes>();
+            c.blink = go.AddComponent<VNCharacterBlink>();
+            c.blink.Initialize(img, def);
             go.AddComponent<VNFootShadow>();
 
             _active[def.id] = c;

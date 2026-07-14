@@ -30,6 +30,25 @@ namespace VNEffects
         [Tooltip("表情立绘列表（第一个为默认表情）")]
         public List<Expression> expressions = new List<Expression>();
 
+        [Header("眨眼")]
+        [Tooltip("是否允许这个角色在默认表情时自动眨眼。关闭后即使配置了闭眼图也不会眨眼")]
+        public bool enableBlink;
+
+        [Tooltip("闭眼状态的完整全身立绘。应与默认表情使用相同画布尺寸、人物位置和 Pivot")]
+        public Sprite blinkSprite;
+
+        [Tooltip("两次眨眼之间的最短随机间隔（秒）")]
+        [Min(0.1f)]
+        public float blinkIntervalMin = 2.5f;
+
+        [Tooltip("两次眨眼之间的最长随机间隔（秒）")]
+        [Min(0.1f)]
+        public float blinkIntervalMax = 5f;
+
+        [Tooltip("每次闭眼保持时间（秒）")]
+        [Range(0.03f, 0.5f)]
+        public float blinkDuration = 0.1f;
+
         [Header("尺寸标定（解决素材构图不统一）")]
         [Tooltip("尺寸倍率：这个角色的显示高度 = 舞台统一高度 × 此值。\n" +
                  "素材四周留白多/角色显小 → 调大（如 1.15）；近景图显大 → 调小（如 0.85）")]
@@ -73,6 +92,25 @@ namespace VNEffects
 
             Debug.LogWarning($"[VNScript] 角色 {id} 没有表情「{expressionName}」，使用默认表情", this);
             return expressions[0].sprite;
+        }
+
+        /// <summary>第一张立绘是项目约定的默认表情。</summary>
+        public Sprite DefaultSprite => expressions != null && expressions.Count > 0
+            ? expressions[0].sprite : null;
+
+        /// <summary>
+        /// 判断请求最终是否显示默认表情。空表情与找不到后回退的表情都视为默认表情。
+        /// </summary>
+        public bool IsDefaultExpression(string expressionName)
+        {
+            if (expressions == null || expressions.Count == 0) return false;
+            if (string.IsNullOrEmpty(expressionName)) return true;
+
+            for (int i = 0; i < expressions.Count; i++)
+                if (expressions[i].name == expressionName)
+                    return i == 0;
+
+            return true;
         }
 
         /// <summary>

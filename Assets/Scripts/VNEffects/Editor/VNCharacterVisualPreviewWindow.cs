@@ -9,6 +9,11 @@ namespace VNEffects.EditorTools
     {
         public float sizeScale = 1f;
         public Vector2 positionOffset;
+        public bool enableBlink;
+        public Sprite blinkSprite;
+        public float blinkIntervalMin = 2.5f;
+        public float blinkIntervalMax = 5f;
+        public float blinkDuration = 0.1f;
         public bool showPortrait = true;
         public float portraitScale = 1f;
         public Vector2 portraitOffset;
@@ -17,6 +22,11 @@ namespace VNEffects.EditorTools
         {
             sizeScale = character.sizeScale;
             positionOffset = character.positionOffset;
+            enableBlink = character.enableBlink;
+            blinkSprite = character.blinkSprite;
+            blinkIntervalMin = character.blinkIntervalMin;
+            blinkIntervalMax = character.blinkIntervalMax;
+            blinkDuration = character.blinkDuration;
             showPortrait = character.showPortrait;
             portraitScale = character.portraitScale;
             portraitOffset = character.portraitOffset;
@@ -48,6 +58,7 @@ namespace VNEffects.EditorTools
         Color _dialogueFrameColor = new Color(1f, 0.85f, 0.5f, 0.9f);
         Color _dialogueNameTagColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
         bool _showDialogueUi = true;
+        bool _previewBlinkClosed;
         string _previewDialogue = "今天的晚霞真漂亮啊……整片天空都烧起来了一样。";
         int _characterIndex;
         int _expressionIndex;
@@ -153,7 +164,7 @@ namespace VNEffects.EditorTools
                 "在右侧头像窗口拖动可调整草稿 portraitOffset，滚轮调整草稿 portraitScale。\n" +
                 "立绘预览严格使用运行时公式：高度 = VNStage.characterHeight × sizeScale，" +
                 "位置 = 标准站位 + positionOffset。头像预览使用 VNDialogueBox 的顶边锚定与裁切公式。" +
-                "所有校准值只有按下“确认写入角色资产”才会保存。",
+                "闭眼图预览只在默认表情生效。所有校准值只有按下“确认写入角色资产”才会保存。",
                 MessageType.Info);
             EditorGUILayout.EndScrollView();
         }
@@ -359,6 +370,44 @@ namespace VNEffects.EditorTools
                         ChangedDraft();
                     }
 
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField("默认表情眨眼", EditorStyles.boldLabel);
+                    bool enableBlink = EditorGUILayout.Toggle("enableBlink", _draft.enableBlink);
+                    Sprite blinkSprite = (Sprite)EditorGUILayout.ObjectField(
+                        "完整闭眼立绘", _draft.blinkSprite, typeof(Sprite), false);
+                    float intervalMin = Mathf.Max(0.1f,
+                        EditorGUILayout.FloatField("最短间隔（秒）", _draft.blinkIntervalMin));
+                    float intervalMax = Mathf.Max(intervalMin,
+                        EditorGUILayout.FloatField("最长间隔（秒）", _draft.blinkIntervalMax));
+                    float duration = EditorGUILayout.Slider(
+                        "闭眼时间（秒）", _draft.blinkDuration, 0.03f, 0.5f);
+                    if (enableBlink != _draft.enableBlink || blinkSprite != _draft.blinkSprite ||
+                        !Mathf.Approximately(intervalMin, _draft.blinkIntervalMin) ||
+                        !Mathf.Approximately(intervalMax, _draft.blinkIntervalMax) ||
+                        !Mathf.Approximately(duration, _draft.blinkDuration))
+                    {
+                        RecordDraft("调整角色眨眼设置草稿");
+                        _draft.enableBlink = enableBlink;
+                        _draft.blinkSprite = blinkSprite;
+                        _draft.blinkIntervalMin = intervalMin;
+                        _draft.blinkIntervalMax = intervalMax;
+                        _draft.blinkDuration = duration;
+                        ChangedDraft();
+                    }
+
+                    bool canPreviewBlink = _expressionIndex == 0 && _draft.blinkSprite != null;
+                    using (new EditorGUI.DisabledScope(!canPreviewBlink))
+                        _previewBlinkClosed = EditorGUILayout.Toggle(
+                            "预览闭眼状态", _previewBlinkClosed);
+
+                    if (_draft.enableBlink && _draft.blinkSprite == null)
+                        EditorGUILayout.HelpBox("已开启眨眼，但尚未指定完整闭眼立绘。运行时会保持睁眼。",
+                            MessageType.Warning);
+                    else if (BlinkSpritesMisaligned())
+                        EditorGUILayout.HelpBox(
+                            "闭眼图与默认立绘的宽高比或 Pivot 不一致，眨眼时可能发生跳动。",
+                            MessageType.Warning);
+
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         if (GUILayout.Button("立绘参数归零"))
@@ -450,6 +499,11 @@ namespace VNEffects.EditorTools
             Undo.RecordObject(_character, "确认角色视觉校准");
             _character.sizeScale = _draft.sizeScale;
             _character.positionOffset = _draft.positionOffset;
+            _character.enableBlink = _draft.enableBlink;
+            _character.blinkSprite = _draft.blinkSprite;
+            _character.blinkIntervalMin = _draft.blinkIntervalMin;
+            _character.blinkIntervalMax = _draft.blinkIntervalMax;
+            _character.blinkDuration = _draft.blinkDuration;
             _character.showPortrait = _draft.showPortrait;
             _character.portraitScale = _draft.portraitScale;
             _character.portraitOffset = _draft.portraitOffset;
@@ -674,6 +728,11 @@ namespace VNEffects.EditorTools
         bool HasPendingChanges => _character != null && _draft != null &&
             (!Mathf.Approximately(_draft.sizeScale, _character.sizeScale) ||
              _draft.positionOffset != _character.positionOffset ||
+             _draft.enableBlink != _character.enableBlink ||
+             _draft.blinkSprite != _character.blinkSprite ||
+             !Mathf.Approximately(_draft.blinkIntervalMin, _character.blinkIntervalMin) ||
+             !Mathf.Approximately(_draft.blinkIntervalMax, _character.blinkIntervalMax) ||
+             !Mathf.Approximately(_draft.blinkDuration, _character.blinkDuration) ||
              _draft.showPortrait != _character.showPortrait ||
              !Mathf.Approximately(_draft.portraitScale, _character.portraitScale) ||
              _draft.portraitOffset != _character.portraitOffset);
@@ -705,6 +764,7 @@ namespace VNEffects.EditorTools
             if (index >= 0) _characterIndex = index;
             _expressionIndex = 0;
             _portraitIndex = 0;
+            _previewBlinkClosed = false;
             ClampSelectionIndices();
             Repaint();
         }
@@ -763,7 +823,24 @@ namespace VNEffects.EditorTools
             if (_character == null || _character.expressions == null ||
                 _character.expressions.Count == 0) return null;
             int index = Mathf.Clamp(_expressionIndex, 0, _character.expressions.Count - 1);
+            if (index == 0 && _previewBlinkClosed && _draft != null &&
+                _draft.blinkSprite != null)
+                return _draft.blinkSprite;
             return _character.expressions[index].sprite;
+        }
+
+        bool BlinkSpritesMisaligned()
+        {
+            if (_character == null || _character.DefaultSprite == null ||
+                _draft == null || _draft.blinkSprite == null)
+                return false;
+
+            Sprite open = _character.DefaultSprite;
+            Sprite closed = _draft.blinkSprite;
+            float openAspect = open.rect.width / Mathf.Max(1f, open.rect.height);
+            float closedAspect = closed.rect.width / Mathf.Max(1f, closed.rect.height);
+            return Mathf.Abs(openAspect - closedAspect) > 0.01f ||
+                   Vector2.Distance(open.pivot, closed.pivot) > 0.5f;
         }
 
         Sprite PortraitSprite()
