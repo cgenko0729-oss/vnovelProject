@@ -22,6 +22,9 @@ namespace VNEffects
         [Tooltip("剧本文件（.vn.txt）")]
         public TextAsset script;
 
+        [Tooltip("可通过 chapter <文件名> 切换的章节剧本")]
+        public List<TextAsset> chapters = new List<TextAsset>();
+
         [Tooltip("启动时自动播放")]
         public bool playOnStart = true;
 
@@ -301,6 +304,11 @@ namespace VNEffects
         void Prepare(string source)
         {
             Stop();
+            LoadCommands(source);
+        }
+
+        void LoadCommands(string source)
+        {
             _commands = VNScriptParser.Parse(source);
 
             _labels.Clear();
@@ -315,6 +323,48 @@ namespace VNEffects
                 else
                     _labels[name] = i;
             }
+        }
+
+        void SwitchChapter(string chapterName, int fromLine)
+        {
+            string wanted = NormalizeChapterName(chapterName);
+            TextAsset target = null;
+
+            if (script != null && NormalizeChapterName(script.name) == wanted)
+                target = script;
+
+            if (target == null)
+            {
+                foreach (var chapter in chapters)
+                {
+                    if (chapter == null || NormalizeChapterName(chapter.name) != wanted) continue;
+                    target = chapter;
+                    break;
+                }
+            }
+
+            if (target == null)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：找不到章节「{chapterName}」，请在 VNScriptRunner 的 Chapters 列表中登记该剧本");
+                return;
+            }
+
+            script = target;
+            LoadCommands(target.text);
+            _index = 0;
+            _currentSayIndex = 0;
+            Debug.Log($"[VNScript] 已切换到章节「{target.name}」");
+        }
+
+        static string NormalizeChapterName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+            string normalized = name.Trim();
+            if (normalized.EndsWith(".txt", System.StringComparison.OrdinalIgnoreCase))
+                normalized = normalized.Substring(0, normalized.Length - 4);
+            if (normalized.EndsWith(".vn", System.StringComparison.OrdinalIgnoreCase))
+                normalized = normalized.Substring(0, normalized.Length - 3);
+            return normalized.ToLowerInvariant();
         }
 
         /// <summary>从指定命令索引开始（读档恢复用）</summary>
@@ -372,6 +422,7 @@ namespace VNEffects
             var data = new VNSaveData
             {
                 commandIndex = _currentSayIndex,
+                chapter = script != null ? script.name : null,
                 lastLine = _lastSayText,
             };
             stage.CaptureSnapshot(data);
@@ -390,6 +441,8 @@ namespace VNEffects
             SetSkip(false);
             SetAuto(false);
             Stop();
+            if (!string.IsNullOrEmpty(data.chapter))
+                SwitchChapter(data.chapter, 0);
             stage.RestoreSnapshot(data);
             VNToast.Show($"已读取（槽位 {slot}）");
             ResumeAt(data.commandIndex);
@@ -797,6 +850,13 @@ namespace VNEffects
 
                 case "jump":
                     JumpTo(cmd.Arg(0), cmd.line);
+                    return null;
+
+                case "chapter":
+                    if (string.IsNullOrEmpty(cmd.Arg(0)))
+                        Debug.LogError($"[VNScript] 第 {cmd.line} 行：chapter 缺少章节文件名");
+                    else
+                        SwitchChapter(cmd.Arg(0), cmd.line);
                     return null;
 
                 case "flag":

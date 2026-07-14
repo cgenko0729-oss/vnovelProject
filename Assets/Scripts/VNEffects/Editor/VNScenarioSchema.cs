@@ -200,6 +200,8 @@ namespace VNEffects.EditorTools
                 Pos("name", "name", VNParamSource.Text));
             Add("jump", "Flow", "jump <label>",
                 Pos("label", "to", VNParamSource.Label));
+            Add("chapter", "Flow", "chapter <scenario file>",
+                Pos("chapter", "file", VNParamSource.Text));
             Add("flag", "Flow", "flag <name> [value|+1|-1]",
                 Pos("name", "flag", VNParamSource.Flag),
                 Pos("value", "value", VNParamSource.Options,

@@ -15086,7 +15086,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   stage: {fileID: 1341075929}
-  script: {fileID: 4900000, guid: 8bf8a6f6cad79d14e9d2c67584c0aee9, type: 3}
+  script: {fileID: 4900000, guid: 3dc677cd351b51d40aecfaeeede5f343, type: 3}
+  chapters:
+  - {fileID: 4900000, guid: 3dc677cd351b51d40aecfaeeede5f343, type: 3}
+  - {fileID: 4900000, guid: 8bf8a6f6cad79d14e9d2c67584c0aee9, type: 3}
   playOnStart: 1
   autoDelay: 1.4
   skipTimeScale: 4

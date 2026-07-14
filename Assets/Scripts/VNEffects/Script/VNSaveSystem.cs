@@ -9,6 +9,7 @@ namespace VNEffects
     public class VNSaveData
     {
         public int commandIndex;          // 恢复点（正在显示的那句台词的命令索引）
+        public string chapter;            // 当前章节文件名（旧存档为空时沿用场景默认章节）
         public string savedAt;            // 保存时间
         public string lastLine;           // 最后一句台词（存档预览用）
 

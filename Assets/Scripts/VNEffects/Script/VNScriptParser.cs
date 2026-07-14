@@ -79,6 +79,7 @@ namespace VNEffects
             "camera", "shake", "weather", "mood", "fx",
             "sakura", "transition",
             "label", "jump", "flag", "if", "choice",
+            "chapter",
             "move", "bgm", "se", "voice", "volume",
             "camseq", "camcut", "camto",
             "portrait",
