@@ -61,6 +61,9 @@ namespace VNEffects
         /// <summary>当前 BGM 的 id（存档用；null = 无）</summary>
         public string CurrentBgm => _currentBgm;
 
+        /// <summary>当前是否仍有角色语音在播放（口型同步用）。</summary>
+        public bool IsVoicePlaying => _voice != null && _voice.isPlaying;
+
         void Awake()
         {
             _instance = this;
@@ -214,15 +217,16 @@ namespace VNEffects
         }
 
         /// <summary>播放语音（同时只有一条，新的顶掉旧的）</summary>
-        public void PlayVoice(string id, int line = 0)
+        public bool PlayVoice(string id, int line = 0)
         {
             var clip = Find(id, line);
-            if (clip == null) return;
+            if (clip == null) return false;
             _voice.Stop();
             _voice.clip = clip;
             _voice.volume = voiceVolume;
             _voice.Play();
             SetBgmDucked(true);
+            return true;
         }
 
         float EffectiveBgmVolume => bgmVolume * (_isBgmDucked ? 1f - voiceBgmReduction : 1f);

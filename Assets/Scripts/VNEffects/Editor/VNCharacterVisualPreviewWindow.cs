@@ -14,6 +14,11 @@ namespace VNEffects.EditorTools
         public float blinkIntervalMin = 2.5f;
         public float blinkIntervalMax = 5f;
         public float blinkDuration = 0.1f;
+        public bool enableMouthFlap;
+        public Sprite openMouthSprite;
+        public bool mouthDefaultExpressionOnly = true;
+        public float mouthIntervalMin = 0.08f;
+        public float mouthIntervalMax = 0.16f;
         public bool showPortrait = true;
         public float portraitScale = 1f;
         public Vector2 portraitOffset;
@@ -27,6 +32,11 @@ namespace VNEffects.EditorTools
             blinkIntervalMin = character.blinkIntervalMin;
             blinkIntervalMax = character.blinkIntervalMax;
             blinkDuration = character.blinkDuration;
+            enableMouthFlap = character.enableMouthFlap;
+            openMouthSprite = character.openMouthSprite;
+            mouthDefaultExpressionOnly = character.mouthDefaultExpressionOnly;
+            mouthIntervalMin = character.mouthIntervalMin;
+            mouthIntervalMax = character.mouthIntervalMax;
             showPortrait = character.showPortrait;
             portraitScale = character.portraitScale;
             portraitOffset = character.portraitOffset;
@@ -59,6 +69,7 @@ namespace VNEffects.EditorTools
         Color _dialogueNameTagColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
         bool _showDialogueUi = true;
         bool _previewBlinkClosed;
+        bool _previewMouthOpen;
         string _previewDialogue = "今天的晚霞真漂亮啊……整片天空都烧起来了一样。";
         int _characterIndex;
         int _expressionIndex;
@@ -164,7 +175,7 @@ namespace VNEffects.EditorTools
                 "在右侧头像窗口拖动可调整草稿 portraitOffset，滚轮调整草稿 portraitScale。\n" +
                 "立绘预览严格使用运行时公式：高度 = VNStage.characterHeight × sizeScale，" +
                 "位置 = 标准站位 + positionOffset。头像预览使用 VNDialogueBox 的顶边锚定与裁切公式。" +
-                "闭眼图预览只在默认表情生效。所有校准值只有按下“确认写入角色资产”才会保存。",
+                "闭眼和张嘴图可以组合预览。所有校准值只有按下“确认写入角色资产”才会保存。",
                 MessageType.Info);
             EditorGUILayout.EndScrollView();
         }
@@ -262,6 +273,8 @@ namespace VNEffects.EditorTools
                 var localRect = new Rect(spriteRect.x - rect.x, spriteRect.y - rect.y,
                     spriteRect.width, spriteRect.height);
                 DrawSprite(sprite, localRect, Color.white);
+                Sprite mouth = MouthPreviewSprite();
+                if (mouth != null) DrawSprite(mouth, localRect, Color.white);
                 GUI.EndClip();
 
                 DrawRectOutline(spriteRect, new Color(0.35f, 0.85f, 1f, 0.8f), 1f);
@@ -408,6 +421,53 @@ namespace VNEffects.EditorTools
                             "闭眼图与默认立绘的宽高比或 Pivot 不一致，眨眼时可能发生跳动。",
                             MessageType.Warning);
 
+                    EditorGUILayout.Space(4f);
+                    EditorGUILayout.LabelField("说话口型", EditorStyles.boldLabel);
+                    bool enableMouth = EditorGUILayout.Toggle(
+                        "enableMouthFlap", _draft.enableMouthFlap);
+                    Sprite mouthSprite = (Sprite)EditorGUILayout.ObjectField(
+                        "透明张嘴图", _draft.openMouthSprite, typeof(Sprite), false);
+                    bool defaultOnly = EditorGUILayout.Toggle(
+                        "仅默认表情", _draft.mouthDefaultExpressionOnly);
+                    float mouthMin = Mathf.Max(0.03f,
+                        EditorGUILayout.FloatField("最短切换间隔", _draft.mouthIntervalMin));
+                    float mouthMax = Mathf.Max(mouthMin,
+                        EditorGUILayout.FloatField("最长切换间隔", _draft.mouthIntervalMax));
+                    if (enableMouth != _draft.enableMouthFlap ||
+                        mouthSprite != _draft.openMouthSprite ||
+                        defaultOnly != _draft.mouthDefaultExpressionOnly ||
+                        !Mathf.Approximately(mouthMin, _draft.mouthIntervalMin) ||
+                        !Mathf.Approximately(mouthMax, _draft.mouthIntervalMax))
+                    {
+                        RecordDraft("调整角色说话口型草稿");
+                        _draft.enableMouthFlap = enableMouth;
+                        _draft.openMouthSprite = mouthSprite;
+                        _draft.mouthDefaultExpressionOnly = defaultOnly;
+                        _draft.mouthIntervalMin = mouthMin;
+                        _draft.mouthIntervalMax = mouthMax;
+                        ChangedDraft();
+                    }
+
+                    bool mouthAllowed = _draft.openMouthSprite != null &&
+                        (!_draft.mouthDefaultExpressionOnly || _expressionIndex == 0);
+                    using (new EditorGUI.DisabledScope(!mouthAllowed))
+                        _previewMouthOpen = EditorGUILayout.Toggle(
+                            "预览张嘴状态", _previewMouthOpen);
+
+                    if (_draft.enableMouthFlap && _draft.openMouthSprite == null)
+                        EditorGUILayout.HelpBox("已开启口型，但尚未指定透明张嘴图。运行时会保持闭嘴。",
+                            MessageType.Warning);
+                    else if (MouthSpritesMisaligned())
+                        EditorGUILayout.HelpBox(
+                            "张嘴图与默认立绘的宽高比或 Pivot 不一致，嘴部叠加可能错位。",
+                            MessageType.Warning);
+
+                    if (GUILayout.Button("选中张嘴图") && _draft.openMouthSprite != null)
+                    {
+                        Selection.activeObject = _draft.openMouthSprite;
+                        EditorGUIUtility.PingObject(_draft.openMouthSprite);
+                    }
+
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         if (GUILayout.Button("立绘参数归零"))
@@ -504,6 +564,11 @@ namespace VNEffects.EditorTools
             _character.blinkIntervalMin = _draft.blinkIntervalMin;
             _character.blinkIntervalMax = _draft.blinkIntervalMax;
             _character.blinkDuration = _draft.blinkDuration;
+            _character.enableMouthFlap = _draft.enableMouthFlap;
+            _character.openMouthSprite = _draft.openMouthSprite;
+            _character.mouthDefaultExpressionOnly = _draft.mouthDefaultExpressionOnly;
+            _character.mouthIntervalMin = _draft.mouthIntervalMin;
+            _character.mouthIntervalMax = _draft.mouthIntervalMax;
             _character.showPortrait = _draft.showPortrait;
             _character.portraitScale = _draft.portraitScale;
             _character.portraitOffset = _draft.portraitOffset;
@@ -733,6 +798,11 @@ namespace VNEffects.EditorTools
              !Mathf.Approximately(_draft.blinkIntervalMin, _character.blinkIntervalMin) ||
              !Mathf.Approximately(_draft.blinkIntervalMax, _character.blinkIntervalMax) ||
              !Mathf.Approximately(_draft.blinkDuration, _character.blinkDuration) ||
+             _draft.enableMouthFlap != _character.enableMouthFlap ||
+             _draft.openMouthSprite != _character.openMouthSprite ||
+             _draft.mouthDefaultExpressionOnly != _character.mouthDefaultExpressionOnly ||
+             !Mathf.Approximately(_draft.mouthIntervalMin, _character.mouthIntervalMin) ||
+             !Mathf.Approximately(_draft.mouthIntervalMax, _character.mouthIntervalMax) ||
              _draft.showPortrait != _character.showPortrait ||
              !Mathf.Approximately(_draft.portraitScale, _character.portraitScale) ||
              _draft.portraitOffset != _character.portraitOffset);
@@ -765,6 +835,7 @@ namespace VNEffects.EditorTools
             _expressionIndex = 0;
             _portraitIndex = 0;
             _previewBlinkClosed = false;
+            _previewMouthOpen = false;
             ClampSelectionIndices();
             Repaint();
         }
@@ -841,6 +912,29 @@ namespace VNEffects.EditorTools
             float closedAspect = closed.rect.width / Mathf.Max(1f, closed.rect.height);
             return Mathf.Abs(openAspect - closedAspect) > 0.01f ||
                    Vector2.Distance(open.pivot, closed.pivot) > 0.5f;
+        }
+
+        Sprite MouthPreviewSprite()
+        {
+            if (!_previewMouthOpen || _draft == null || _draft.openMouthSprite == null)
+                return null;
+            if (_draft.mouthDefaultExpressionOnly && _expressionIndex != 0)
+                return null;
+            return _draft.openMouthSprite;
+        }
+
+        bool MouthSpritesMisaligned()
+        {
+            if (_character == null || _character.DefaultSprite == null ||
+                _draft == null || _draft.openMouthSprite == null)
+                return false;
+
+            Sprite closed = _character.DefaultSprite;
+            Sprite open = _draft.openMouthSprite;
+            float closedAspect = closed.rect.width / Mathf.Max(1f, closed.rect.height);
+            float openAspect = open.rect.width / Mathf.Max(1f, open.rect.height);
+            return Mathf.Abs(closedAspect - openAspect) > 0.01f ||
+                   Vector2.Distance(closed.pivot, open.pivot) > 0.5f;
         }
 
         Sprite PortraitSprite()
