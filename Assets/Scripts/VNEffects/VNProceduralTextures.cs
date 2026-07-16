@@ -175,6 +175,76 @@ namespace VNEffects
             return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 2147483647f;
         }
 
+        static Texture2D _meteorStreak;
+
+        /// <summary>
+        /// 流星拖尾（256×64）：右端亮头 + 向左渐隐渐细的尾迹。
+        /// 使用时把 RawImage 旋转到飞行方向（贴图 +X 即流星头朝向）。
+        /// </summary>
+        public static Texture2D MeteorStreak
+        {
+            get
+            {
+                if (_meteorStreak == null)
+                    _meteorStreak = Generate("VN_MeteorStreak", 256, 64, (dx, dy) =>
+                    {
+                        // 头部亮核：右端小光点
+                        float hx = (dx - 0.42f) / 0.07f;
+                        float hy = dy / 0.28f;
+                        float head = Mathf.Pow(
+                            Mathf.Clamp01(1f - Mathf.Sqrt(hx * hx + hy * hy)), 1.6f);
+                        // 尾迹：向左渐隐、越远越细
+                        float t = Mathf.Clamp01((dx + 0.5f) / 0.92f); // 0=尾端 1=头部
+                        float halfW = Mathf.Lerp(0.04f, 0.30f, t);
+                        float across = Mathf.Pow(
+                            Mathf.Clamp01(1f - Mathf.Abs(dy) / halfW), 1.8f);
+                        float tail = across * Mathf.Pow(t, 2.2f) * 0.85f;
+                        return Mathf.Clamp01(head + tail);
+                    });
+                return _meteorStreak;
+            }
+        }
+
+        static Texture2D _cloudPuff;
+
+        /// <summary>
+        /// 蓬松云团（256×128）：数个柔边椭圆瓣叠加、云底压平（云本体缓移用）。
+        /// </summary>
+        public static Texture2D CloudPuff
+        {
+            get
+            {
+                if (_cloudPuff == null)
+                {
+                    // 椭圆瓣：x偏移 / y偏移 / 半宽 / 半高（相对贴图归一坐标）
+                    var lobes = new[]
+                    {
+                        new Vector4(0f, 0.02f, 0.30f, 0.16f),
+                        new Vector4(-0.22f, -0.04f, 0.20f, 0.12f),
+                        new Vector4(0.20f, -0.03f, 0.22f, 0.13f),
+                        new Vector4(-0.08f, 0.10f, 0.18f, 0.11f),
+                        new Vector4(0.10f, 0.09f, 0.16f, 0.10f),
+                    };
+                    _cloudPuff = Generate("VN_CloudPuff", 256, 128, (dx, dy) =>
+                    {
+                        float a = 0f;
+                        foreach (var l in lobes)
+                        {
+                            float nx = (dx - l.x) / l.z;
+                            float ny = (dy - l.y) / l.w;
+                            float r = Mathf.Sqrt(nx * nx + ny * ny);
+                            a = Mathf.Max(a, Mathf.Pow(Mathf.Clamp01(1f - r), 1.5f));
+                        }
+                        // 云底压平：下缘更快消隐
+                        if (dy < -0.12f)
+                            a *= Mathf.Clamp01(1f - (-0.12f - dy) / 0.2f);
+                        return Mathf.Clamp01(a);
+                    });
+                }
+                return _cloudPuff;
+            }
+        }
+
         static Texture2D _ring;
 
         /// <summary>柔边圆环（点击涟漪用）</summary>

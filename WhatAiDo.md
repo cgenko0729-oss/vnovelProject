@@ -2042,3 +2042,50 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   确保手动/自动互不干扰——手动开的黑边不会被离开回忆时误撤。
 - **黑条用普通 Image 而非 CanvasGroup 淡入**：电影黑边的正确演出是"滑入"不是"淡入"，
   且纯黑不透明无需混合控制。
+
+## 四十九、夜晚偶发流星 + 云本体缓移（2026-07-17，分支 `agent/night-sky-ambience`）
+
+> 四十六章"背景氛围：飞鸟/流星点缀、补云"落地：两个天空点缀组件，
+> 全部按用户要求做成「一条 DOTween 路径 + 程序化贴图」的形态。
+
+### 49.1 计划
+
+- 流星：夜晚随机间隔划过一颗（萤火虫天气已有，流星补齐夜空氛围）；
+- 云本体：VNCloudShadows 只有地面"影"，补上天上的"云"，缓慢横移。
+
+### 49.2 文件说明
+
+- **`VNProceduralTextures.cs`（改）**：
+  - `MeteorStreak`（256×64）：右端亮头小光点 + 向左渐隐渐细的尾迹
+    （贴图 +X = 流星头朝向，旋转 RawImage 即对准飞行方向）。
+  - `CloudPuff`（256×128）：5 个柔边椭圆瓣叠加成蓬松云团，云底压平。
+- **`VNShootingStars.cs`（新）**：夜晚偶发流星。
+  - 排程：`DOVirtual.DelayedCall` 链式随机间隔（默认 2.5~7s），Hide 即停；
+  - 单颗流星：RawImage（VN/Additive 共享材质，HDR×1.6 配合 Bloom）+
+    一条 Linear `DOAnchorPos` 直线路径（起点上半屏随机、斜向下左右随机、
+    480~900px 行程、0.55~0.95s）+ 前 20% 淡入/后 45% 淡出，飞完销毁；
+  - Show/Hide/Toggle + CanvasGroup 渐显渐隐；全部 Tween `SetLink`。
+- **`VNDriftingClouds.cs`（新）**：云本体缓移。
+  - 3 朵云团（尺寸 520~950px 随机、纵向 170~430px、透明度抖动），
+    初始均匀铺开 + 随机偏移；
+  - 每朵一条 Linear `DOAnchorPosX` 横移路径：先按剩余路程等速补完第一段，
+    到右边界后回绕左侧进入整屏 `SetLoops(-1, Restart)` 无限循环（70~120s/屏）；
+    另加 9~15s 的 `DOAnchorPosY` Yoyo 轻微纵向浮动；
+  - 普通透明混合白云（非加法），夜晚可通过 tint 调暗调蓝。
+- **`VNStage.cs`（改）**：`shootingStars`/`driftingClouds` 字段 + AutoWire；
+  `ToggleFxNames` 加 `meteor`/`skycloud`；Fx() 两个新 case。
+- **`VNEffectsDemoSetup.cs`（改）**：BuildStageRig 第 12.5 步在 LayerBack 下创建
+  DriftingClouds 与 ShootingStars（背景之上、立绘之下），连线 stage/demo；
+  演示剧本：开场 `fx skycloud on`、夜晚段 `fx meteor on`，语法速查更新。
+- **`VNEffectsDemo.cs`（改）**：`/` 键流星、`;` 键云缓移，提示更新。
+- **`VNScenarioSchema.cs`（改）**：FxNames 加 `meteor`/`skycloud`。
+
+### 49.3 技术决策
+
+- **流星走排程+一次性物体**（而非粒子系统）：粒子难做"带方向的拖尾贴图对齐
+  飞行方向 + 精确淡入淡出节奏"，一颗一物体成本可忽略（几秒一颗）且完全可控。
+- **云用交错双段 Tween 实现无缝回绕**：第一段按剩余路程等比时长补到右边界，
+  再从左边界进整屏无限循环——所有云保持各自等速，开启瞬间就是"已经在飘"的状态。
+- **云影(clouds)与云本体(skycloud)独立开关**：白天有影无云、夜晚有云无影
+  等组合都是合理演出，不强制绑定。
+- 两个组件都进 `ToggleFxNames`：存档/读档/调试重建零改动支持。

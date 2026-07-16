@@ -42,6 +42,8 @@ namespace VNEffects
         public VNGodRays godRays;
         public VNSpeedLines speedLines;
         public VNLetterbox letterbox;
+        public VNShootingStars shootingStars;
+        public VNDriftingClouds driftingClouds;
         public VNHeatHaze heatHaze;
         public VNVignetteFocus vignetteFocus;
         public VNSpeakerHighlight speakerHighlight;
@@ -101,6 +103,8 @@ namespace VNEffects
             if (godRays == null) godRays = FindFirstObjectByType<VNGodRays>();
             if (speedLines == null) speedLines = FindFirstObjectByType<VNSpeedLines>();
             if (letterbox == null) letterbox = FindFirstObjectByType<VNLetterbox>();
+            if (shootingStars == null) shootingStars = FindFirstObjectByType<VNShootingStars>();
+            if (driftingClouds == null) driftingClouds = FindFirstObjectByType<VNDriftingClouds>();
             if (heatHaze == null) heatHaze = FindFirstObjectByType<VNHeatHaze>();
             if (vignetteFocus == null) vignetteFocus = FindFirstObjectByType<VNVignetteFocus>();
             if (speakerHighlight == null) speakerHighlight = FindFirstObjectByType<VNSpeakerHighlight>();
@@ -683,7 +687,7 @@ namespace VNEffects
 
         static readonly string[] ToggleFxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
-              "speedlines", "letterbox" };
+              "speedlines", "letterbox", "meteor", "skycloud" };
 
         [Tooltip("mood Memory（回忆）自动上电影黑边、离开回忆自动撤掉")]
         public bool autoMemoryLetterbox = true;
@@ -762,6 +766,14 @@ namespace VNEffects
                         backgroundFx.DOShimmerAmount(0.85f, 1f);
                     }
                     else backgroundFx.DOShimmerAmount(0f, 0.8f);
+                    break;
+                case "meteor":
+                    if (shootingStars == null) break;
+                    if (on) shootingStars.Show(); else shootingStars.Hide();
+                    break;
+                case "skycloud":
+                    if (driftingClouds == null) break;
+                    if (on) driftingClouds.Show(); else driftingClouds.Hide();
                     break;
                 case "letterbox":
                     _letterboxAuto = false;

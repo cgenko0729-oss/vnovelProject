@@ -49,6 +49,8 @@ namespace VNEffects.EditorTools
             public VNCloudShadows cloudShadows;
             public VNSpeedLines speedLines;
             public VNLetterbox letterbox;
+            public VNShootingStars shootingStars;
+            public VNDriftingClouds driftingClouds;
             public VNToneMatch toneMatch;
             public VNChoicePanel choicePanel;
             public VNMouseStardust stardust;
@@ -218,6 +220,14 @@ namespace VNEffects.EditorTools
             var cloudRect = CreateStretchRect("CloudShadows", rig.layerBack);
             rig.cloudShadows = cloudRect.gameObject.AddComponent<VNCloudShadows>();
 
+            // ---------- 12.5 云本体缓移 / 夜晚流星（背景层，立绘之下）----------
+            var skyCloudRect = CreateStretchRect("DriftingClouds", rig.layerBack);
+            rig.driftingClouds = skyCloudRect.gameObject.AddComponent<VNDriftingClouds>();
+
+            var meteorRect = CreateStretchRect("ShootingStars", rig.layerBack);
+            rig.shootingStars = meteorRect.gameObject.AddComponent<VNShootingStars>();
+            AssignSourceMaterial(rig.shootingStars, rig.additiveMat);
+
             rig.toneMatch = new GameObject("ToneMatch").AddComponent<VNToneMatch>();
             rig.toneMatch.characters = new VNImageEffectController[0];
 
@@ -357,6 +367,8 @@ namespace VNEffects.EditorTools
             demo.cloudShadows = rig.cloudShadows;
             demo.speedLines = rig.speedLines;
             demo.letterbox = rig.letterbox;
+            demo.shootingStars = rig.shootingStars;
+            demo.driftingClouds = rig.driftingClouds;
             demo.toneMatch = rig.toneMatch;
             demo.choicePanel = rig.choicePanel;
 
@@ -425,6 +437,8 @@ namespace VNEffects.EditorTools
             stage.godRays = rig.godRays;
             stage.speedLines = rig.speedLines;
             stage.letterbox = rig.letterbox;
+            stage.shootingStars = rig.shootingStars;
+            stage.driftingClouds = rig.driftingClouds;
             stage.heatHaze = rig.heatHaze;
             stage.vignetteFocus = rig.vignetteFocus;
             stage.speakerHighlight = rig.speakerHighlight;
@@ -542,7 +556,7 @@ namespace VNEffects.EditorTools
 #   wait <秒> | shake <light|medium|heavy> | sakura
 #   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
-#   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch|speedlines> <on|off>
+#   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch|speedlines|meteor|skycloud> <on|off>
 #   fx speedlines burst        漫画集中线一次性冲击（决断/惊愕瞬间）
 #   letterbox on|off [height:130] [time:0.7]   电影黑边；mood Memory 回忆自动上黑边
 #   行尾加 @ = 不等待该演出完成（异步）
@@ -565,6 +579,7 @@ namespace VNEffects.EditorTools
 bg bg1
 mood Sunset
 fx godrays on
+fx skycloud on
 weather Petals
 
 show 亚里沙 at:left with:DissolveGlow
@@ -621,7 +636,8 @@ bg bg2 transition:Eyelid
 mood Night
 weather Fireflies
 fx godrays off
-旁白: ——那天夜里，萤火虫漫天飞舞。
+fx meteor on
+旁白: ——那天夜里，萤火虫漫天飞舞，偶尔有流星划过。
 
 event map title:夜晚去哪里走走？
 * 教室 -> 教室夜话

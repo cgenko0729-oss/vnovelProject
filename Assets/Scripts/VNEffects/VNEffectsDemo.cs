@@ -73,6 +73,10 @@ namespace VNEffects
         [Header("电影黑边（agent/cinema-letterbox）")]
         public VNLetterbox letterbox;
 
+        [Header("夜空氛围（agent/night-sky-ambience）")]
+        public VNShootingStars shootingStars;
+        public VNDriftingClouds driftingClouds;
+
         static readonly string[] DemoChoices =
             { "牵起她的手", "假装没看见远处的烟火", "转身逃跑" };
 
@@ -252,6 +256,12 @@ namespace VNEffects
 
             if (kb.quoteKey.wasPressedThisFrame && letterbox != null) letterbox.Toggle();
 
+            if (kb.slashKey.wasPressedThisFrame && shootingStars != null)
+                shootingStars.Toggle();
+
+            if (kb.semicolonKey.wasPressedThisFrame && driftingClouds != null)
+                driftingClouds.Toggle();
+
             if (kb.tabKey.wasPressedThisFrame && character != null)
                 character.PlayEntrance(VNEntrancePreset.AfterimageDash)
                          .OnComplete(() => character.StartIdleEffects());
@@ -430,7 +440,7 @@ namespace VNEffects
                 $"Q 运镜循环({(_cameraIndex >= 0 ? CameraMoveNames[_cameraIndex] : "-")}) | " +
                 "A 心跳演出 | D 樱吹雪告白\n" +
                 "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）\n" +
-                ", 速度线开关 | . 速度线冲击 | ' 电影黑边";
+                ", 速度线开关 | . 速度线冲击 | ' 电影黑边 | / 流星 | ; 云缓移";
         }
     }
 }

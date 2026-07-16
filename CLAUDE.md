@@ -84,6 +84,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNGodRays / VNEdgeGlow / VNCloudShadows / VNHeatHaze / VNFakeDoF | 光束/情绪泛光/云影/热浪+雾/伪景深 |
 | VNSpeedLines | 漫画速度线/集中线 overlay（3 变体贴图闪帧，fx speedlines on/off/burst） |
 | VNLetterbox | 电影黑边上下滑入（letterbox on/off [height:][time:]，mood Memory 回忆自动联动） |
+| VNShootingStars / VNDriftingClouds | 夜晚偶发流星（fx meteor）/ 云本体缓移（fx skycloud，与云影互补） |
 | VNParallax / VNMouseStardust / VNClickRipple | 鼠标视差 / 星尘拖尾 / 点击涟漪 |
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮 |

@@ -83,7 +83,7 @@ namespace VNEffects.EditorTools
 
         public static readonly string[] FxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
-              "speedlines", "letterbox", "focus" };
+              "speedlines", "letterbox", "meteor", "skycloud", "focus" };
 
         public static readonly string[] CamAnchors =
         {
