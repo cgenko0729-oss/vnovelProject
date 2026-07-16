@@ -133,7 +133,8 @@ namespace VNEffects.EditorTools
                 if (Keywords.Contains(first))
                 {
                     ParseCommand(row, body);
-                    lastChoice = row.keyword == "choice" ? row : null;
+                    lastChoice = row.keyword == "choice" || row.keyword == "event"
+                        ? row : null;
                     lastCamseq = row.keyword == "camseq" ? row : null;
                 }
                 else
@@ -161,7 +162,8 @@ namespace VNEffects.EditorTools
             row.keyword = tokens[0];
             var def = VNScenarioSchema.Find(row.keyword);
 
-            if (row.keyword == "choice") row.options = new List<VNChoiceOptionRow>();
+            if (row.keyword == "choice" || row.keyword == "event")
+                row.options = new List<VNChoiceOptionRow>();
             if (row.keyword == "camseq") row.camLines = new List<string>();
 
             // if 特殊语法：if <cond> jump <label>
@@ -500,6 +502,11 @@ namespace VNEffects.EditorTools
                         case VNParamSource.Label:
                             CheckLabelRef(i, v, r.keyword);
                             break;
+                        case VNParamSource.EventId:
+                            if (ctx.HasEvents &&
+                                System.Array.IndexOf(ctx.eventIds, v) < 0)
+                                Err(i, $"{r.keyword}: event module \"{v}\" not in VNEventRegistry");
+                            break;
                     }
                 }
 
@@ -631,12 +638,14 @@ namespace VNEffects.EditorTools
         public string[] bgmIds = System.Array.Empty<string>();
         public string[] seIds = System.Array.Empty<string>();
         public string[] voiceIds = System.Array.Empty<string>();
+        public string[] eventIds = System.Array.Empty<string>();
 
         public bool HasCharacters => characterIds.Length > 0;
         public bool HasBackgrounds => backgroundIds.Length > 0;
         public bool HasBgm => bgmIds.Length > 0;
         public bool HasSe => seIds.Length > 0;
         public bool HasVoice => voiceIds.Length > 0;
+        public bool HasEvents => eventIds.Length > 0;
 
         public bool HasExpression(string characterId, string expr)
         {

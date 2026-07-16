@@ -54,6 +54,8 @@ namespace VNEffects
         bool _auto;
         bool _skip;
         bool _waitingAtSay;   // 只有停在台词上时才允许存档
+        bool _eventActive;    // 事件模块进行中：输入全部交给模块，禁用快捷键
+        VNEventModule _activeEventModule; // 进行中的模块（Stop 时清理用）
         bool _voicePendingForNextSay; // voice 命令一次性绑定到下一句对白的口型
         int _currentSayIndex; // 正在显示的台词命令索引（存档恢复点）
         string _lastSayText = "";
@@ -221,6 +223,7 @@ namespace VNEffects
                     case "choice":
                     case "jump":
                     case "if":
+                    case "event": // 事件结果无法推断，不重放，同分支处理
                         hasBranching = true;
                         break;
                 }
@@ -241,8 +244,8 @@ namespace VNEffects
             RestoreDebugCamera(lastCameraCut);
 
             if (hasBranching)
-                Debug.LogWarning("[VNScript] 前置状态包含 choice/jump/if；调试重建按文件顺序处理，" +
-                                 "不会推断之前的玩家选择路径");
+                Debug.LogWarning("[VNScript] 前置状态包含 choice/jump/if/event；调试重建按文件顺序处理，" +
+                                 "不会推断之前的玩家选择路径与事件结果");
         }
 
         void RebuildShowState(Dictionary<string, VNSaveData.CharSave> characters,
@@ -404,7 +407,24 @@ namespace VNEffects
             _running = false;
             _waitingAtSay = false;
             _voicePendingForNextSay = false;
+            CleanupActiveEvent();
             stage?.StopSpeaking();
+        }
+
+        /// <summary>剧本中断时清理进行中的事件模块（正常结束由 EventCo 自己收尾）</summary>
+        void CleanupActiveEvent()
+        {
+            if (_activeEventModule != null)
+            {
+                _activeEventModule.CancelForDebug();
+                Destroy(_activeEventModule.gameObject);
+                _activeEventModule = null;
+            }
+            if (_eventActive)
+            {
+                _eventActive = false;
+                stage?.dialogue?.Show();
+            }
         }
 
         void JumpTo(string label, int fromLine)
@@ -633,6 +653,8 @@ namespace VNEffects
             var kb = Keyboard.current;
             var mouse = Mouse.current;
             if (kb == null) return;
+
+            if (_eventActive) return; // 事件模块进行中：输入全部交给模块
 
             // 隐藏 UI 后，第一次操作只恢复界面，不会顺便推进台词。
             if (_uiHidden)
@@ -914,6 +936,9 @@ namespace VNEffects
                 case "choice":
                     return ChoiceCo(cmd);
 
+                case "event":
+                    return EventCo(cmd);
+
                 default:
                     Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：未知命令「{cmd.keyword}」");
                     return null;
@@ -1000,6 +1025,72 @@ namespace VNEffects
             if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
             if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
             // 无跳转目标 = 顺序继续（choice 块后的下一条命令）
+        }
+
+        /// <summary>
+        /// event 命令：暂停剧本 → 调起事件模块（地图/战斗/迷你游戏）→ 按结果分支。
+        /// 结果名匹配「* 结果行」跳转；整数结果同时写入 flag「事件结果」；
+        /// 事件期间禁用全部剧本快捷键，存档天然被"仅台词处可存"挡住。
+        /// </summary>
+        IEnumerator EventCo(VNScriptCommand cmd)
+        {
+            string id = cmd.Arg(0);
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：event 需要模块 id");
+                yield break;
+            }
+            if (stage == null || stage.eventRegistry == null)
+            {
+                Debug.LogError($"[VNScript] 第 {cmd.line} 行：VNStage 未连线 eventRegistry，" +
+                               "无法执行 event（重建剧本演示场景或手动挂 VNEventRegistry）");
+                yield break;
+            }
+
+            var canvas = stage.characterLayer != null
+                ? stage.characterLayer.GetComponentInParent<Canvas>() : null;
+            if (canvas != null) canvas = canvas.rootCanvas;
+
+            SetSkip(false); // 到玩法必停，同 choice
+            SetAuto(false);
+
+            var module = stage.eventRegistry.Create(id, canvas, cmd.line);
+            if (module == null) yield break; // 模块缺失：告警后顺序继续
+
+            _eventActive = true;
+            _activeEventModule = module;
+            stage.dialogue?.HideBox();
+
+            var ctx = new VNEventContext
+            {
+                eventId = id,
+                stage = stage,
+                kwargs = cmd.kwargs,
+                line = cmd.line,
+            };
+            string result = null;
+            module.Launch(ctx, r => result = r ?? "");
+            while (result == null) yield return null;
+
+            _activeEventModule = null;
+            Destroy(module.gameObject);
+            stage.dialogue?.Show();
+            _eventActive = false;
+
+            _backlog?.Record("事件", $"{id} → {result}");
+            if (int.TryParse(result, out int numeric))
+                VNFlags.Set("事件结果", numeric);
+
+            if (cmd.options == null || cmd.options.Count == 0) yield break;
+            foreach (var opt in cmd.options)
+            {
+                if (opt.text != result) continue;
+                if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
+                if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
+                yield break;
+            }
+            Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：事件「{id}」返回结果" +
+                             $"「{result}」没有对应的「* 结果行」，顺序继续");
         }
 
         IEnumerator CameraCo(VNScriptCommand cmd)

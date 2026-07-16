@@ -83,6 +83,7 @@ namespace VNEffects
             "move", "bgm", "se", "voice", "volume",
             "camseq", "camcut", "camto",
             "portrait",
+            "event",
         };
 
         /// <summary>命令关键字集合（剧本编辑器等工具用，与解析行为保持单一来源）</summary>
@@ -136,7 +137,8 @@ namespace VNEffects
                 else
                     ParseSay(cmd, raw);
 
-                if (cmd.keyword == "choice")
+                // event 复用 choice 的「* 附属行」机制：结果名 → 跳转标签
+                if (cmd.keyword == "choice" || cmd.keyword == "event")
                 {
                     cmd.options = new List<VNChoiceOption>();
                     lastChoice = cmd;

@@ -414,6 +414,15 @@ namespace VNEffects.EditorTools
             stage.choicePanel = rig.choicePanel;
             stage.vnAudio = new GameObject("VNAudio").AddComponent<VNAudio>();
 
+            // ---------- 事件模块注册表（含 QTE 连打示例） ----------
+            var registry = new GameObject("VNEventRegistry").AddComponent<VNEventRegistry>();
+            var qteGo = new GameObject("QteTemplate", typeof(RectTransform));
+            qteGo.transform.SetParent(registry.transform, false);
+            qteGo.SetActive(false); // 模板保持禁用，运行时 Instantiate 后才激活
+            var qte = qteGo.AddComponent<VNQteModule>();
+            registry.modules.Add(new VNEventRegistry.Entry { id = "qte", template = qte });
+            stage.eventRegistry = registry;
+
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
@@ -489,6 +498,10 @@ namespace VNEffects.EditorTools
 #   if <条件> jump <名字>       条件不能有空格：勇气 / !勇气 / 好感度>=2
 #   choice                       下一行起用 * 列出选项：
 #   * 选项文本 [flag:名字+1] [-> 标签]   （无 -> = 顺序继续）
+# ---- 事件（玩法接口）----
+#   event <模块id> [key:value…]      调起 VNEventRegistry 登记的玩法模块
+#   * 结果名 [flag:名字+1] [-> 标签]   按模块返回的结果分支（同 choice 写法）
+#                                     整数结果会同时写入 flag「事件结果」
 # ============================================
 
 bg bg1
@@ -512,11 +525,16 @@ fx heartbeat on
 亚里沙: 我一直……有件事想告诉你。
 
 choice
-* 鼓起勇气说出来 flag:好感度+2 -> 告白线
+* 鼓起勇气说出来 -> 告白线
 * 还是算了…… -> 退缩线
 
 label 告白线
 camera snapzoom 1.1 focus:亚里沙 @
+event qte time:3 target:12 title:鼓起勇气连打！
+* success flag:好感度+2 -> 告白成功
+* fail -> 退缩线
+
+label 告白成功
 sakura
 亚里沙: 小雪……我喜欢你！从很久以前开始就是！
 emote 小雪 Surprise

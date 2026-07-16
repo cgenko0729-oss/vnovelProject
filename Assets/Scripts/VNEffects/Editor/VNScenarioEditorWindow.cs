@@ -70,7 +70,8 @@ namespace VNEffects.EditorTools
                 { "sakura", "樱花" }, { "bgm", "背景音乐" }, { "se", "音效" },
                 { "voice", "语音" }, { "volume", "音量" }, { "wait", "等待" },
                 { "label", "标签" }, { "jump", "跳转" }, { "flag", "变量" },
-                { "if", "条件" }, { "choice", "选项" },
+                { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
+                { "chapter", "章节" },
             };
 
         static readonly Dictionary<string, string> CategoryTranslations =
@@ -213,6 +214,11 @@ namespace VNEffects.EditorTools
                 _ctx.seIds = System.Array.Empty<string>();
                 _ctx.voiceIds = System.Array.Empty<string>();
             }
+
+            var eventRegistry = FindFirstObjectByType<VNEventRegistry>();
+            _ctx.eventIds = eventRegistry != null
+                ? new List<string>(eventRegistry.Ids).ToArray()
+                : System.Array.Empty<string>();
 
             _validatedVersion = -1; // 数据源变了要重新校验
         }
@@ -1047,6 +1053,7 @@ namespace VNEffects.EditorTools
                     }
                     return _ctx.seIds;
                 case VNParamSource.AudioVoice: return _ctx.voiceIds;
+                case VNParamSource.EventId: return _ctx.eventIds;
                 case VNParamSource.Label: return _labels.ToArray();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框

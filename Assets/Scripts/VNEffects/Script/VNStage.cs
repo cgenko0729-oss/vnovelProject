@@ -46,6 +46,7 @@ namespace VNEffects
         public VNToneMatch toneMatch;
         public VNChoicePanel choicePanel;
         public VNAudio vnAudio;
+        public VNEventRegistry eventRegistry;
 
         [Tooltip("表情切换的交叉溶解时长（0 = 瞬间切换）")]
         public float expressionCrossfade = 0.25f;

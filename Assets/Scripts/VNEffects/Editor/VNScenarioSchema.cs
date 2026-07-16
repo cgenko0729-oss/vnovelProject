@@ -17,6 +17,7 @@ namespace VNEffects.EditorTools
         AudioVoice,  // 语音 id（场景 VNAudio.voiceLibrary + 旧 library）
         Label,       // 跳转目标（当前文档的 label 列表）
         Flag,        // flag 名（当前文档收集）
+        EventId,     // 事件模块 id（场景 VNEventRegistry.modules）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -218,6 +219,10 @@ namespace VNEffects.EditorTools
                 Pos("target", "jump", VNParamSource.Label));
             Add("choice", "Flow", "choice + '*' option lines");
             ByKeyword["choice"].blockChoice = true;
+            Add("event", "Flow", "event <module id> [key:value…] + '*' outcome lines\n" +
+                "运行 VNEventRegistry 登记的玩法模块（地图/战斗/迷你游戏），按结果分支",
+                Pos("id", "id", VNParamSource.EventId));
+            ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
 
             Debug.Assert(Commands.Count > 0);
         }
