@@ -10,7 +10,10 @@ namespace VNEffects
     ///   SE    —— 一次性音效（PlayOneShot）+ 循环环境音（每个循环音独立 AudioSource）
     ///   Voice —— 语音通道（同时只放一条，新语音顶掉旧的）
     ///   打字音 —— 指定 typingTick 后打字机自动"哒哒哒"（带节流与随机音高）
-    /// 音频库：id → AudioClip，在 Inspector 的 library 列表登记后剧本即可引用。
+    /// 音频库：id → AudioClip，按通道分为 bgmLibrary / seLibrary / voiceLibrary 三个库，
+    /// 每个条目带独立基准音量（素材响度不齐时在库里标定一次，所有引用处生效）。
+    /// 旧的混合 library 保留兼容：三个通道都找得到里面的条目，建议逐步迁移。
+    /// 最终音量 = 条目基准音量 × 剧本 vol 参数 × 通道音量。
     /// 当前 BGM 随存档保存。
     /// </summary>
     public class VNAudio : MonoBehaviour
@@ -21,9 +24,20 @@ namespace VNEffects
             [Tooltip("剧本中引用的 id（可中文，如 黄昏之歌 / 雨声）")]
             public string id;
             public AudioClip clip;
+            [Tooltip("该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身")]
+            [Range(0f, 1f)] public float volume = 1f;
         }
 
-        [Tooltip("音频库：剧本里 bgm/se/voice 命令用 id 引用这里的条目")]
+        [Header("音频库（按通道分开管理）")]
+        [Tooltip("BGM 库：剧本 bgm 命令用 id 引用")]
+        public List<AudioEntry> bgmLibrary = new List<AudioEntry>();
+        [Tooltip("SE 库：剧本 se 命令用 id 引用")]
+        public List<AudioEntry> seLibrary = new List<AudioEntry>();
+        [Tooltip("语音库：剧本 voice 命令用 id 引用")]
+        public List<AudioEntry> voiceLibrary = new List<AudioEntry>();
+
+        [Header("旧版混合库（兼容保留，建议迁移到上面对应库）")]
+        [Tooltip("旧场景登记的条目仍能被 bgm/se/voice 三个通道找到，找不到 id 时才提示")]
         public List<AudioEntry> library = new List<AudioEntry>();
 
         [Header("音量")]
@@ -48,18 +62,31 @@ namespace VNEffects
         AudioSource _bgmA, _bgmB;
         bool _usingA;
         string _currentBgm;
+        float _currentBgmGain = 1f;      // 条目基准 × 剧本 vol，PlayBgm 时确定
+        float _currentBgmScriptVol = 1f; // 仅剧本 vol 参数（存档用，基准音量读档时从库里重新取）
 
         AudioSource _seOneShot;
         AudioSource _voice;
         AudioSource _tick;
         bool _isBgmDucked;
-        readonly Dictionary<string, AudioSource> _loopingSe =
-            new Dictionary<string, AudioSource>();
+        float _currentVoiceGain = 1f;
+
+        /// <summary>一个正在循环播放的 SE 及其增益（通道音量变化时按增益重算）</summary>
+        class LoopingSe
+        {
+            public AudioSource source;
+            public float gain;
+        }
+        readonly Dictionary<string, LoopingSe> _loopingSe =
+            new Dictionary<string, LoopingSe>();
         float _lastTickTime;
         float _initialBgmVolume, _initialSeVolume, _initialVoiceVolume;
 
         /// <summary>当前 BGM 的 id（存档用；null = 无）</summary>
         public string CurrentBgm => _currentBgm;
+
+        /// <summary>当前 BGM 的剧本 vol 参数（存档用；读档时传回 PlayBgm）</summary>
+        public float CurrentBgmVol => _currentBgmScriptVol;
 
         /// <summary>当前是否仍有角色语音在播放（口型同步用）。</summary>
         public bool IsVoicePlaying => _voice != null && _voice.isPlaying;
@@ -87,14 +114,17 @@ namespace VNEffects
                 source.Stop();
                 source.clip = null;
             }
-            foreach (var source in _loopingSe.Values)
+            foreach (var looping in _loopingSe.Values)
             {
-                if (source == null) continue;
-                source.DOKill();
-                Destroy(source.gameObject);
+                if (looping?.source == null) continue;
+                looping.source.DOKill();
+                Destroy(looping.source.gameObject);
             }
             _loopingSe.Clear();
             _currentBgm = null;
+            _currentBgmGain = 1f;
+            _currentBgmScriptVol = 1f;
+            _currentVoiceGain = 1f;
             _usingA = false;
             _isBgmDucked = false;
             bgmVolume = _initialBgmVolume;
@@ -125,34 +155,46 @@ namespace VNEffects
             return src;
         }
 
-        AudioClip Find(string id, int line = 0)
+        static AudioEntry FindIn(List<AudioEntry> lib, string id)
         {
-            foreach (var e in library)
-                if (e.id == id) return e.clip;
-            Debug.LogWarning($"[VNAudio] 第 {line} 行：音频库里没有「{id}」（在 VNAudio.library 登记）");
+            if (lib == null) return null;
+            foreach (var e in lib)
+                if (e != null && e.id == id && e.clip != null) return e;
             return null;
+        }
+
+        /// <summary>先查通道专属库，再查旧混合库；都没有则告警。</summary>
+        AudioEntry Find(List<AudioEntry> channelLib, string libName, string id, int line)
+        {
+            var entry = FindIn(channelLib, id) ?? FindIn(library, id);
+            if (entry == null)
+                Debug.LogWarning($"[VNAudio] 第 {line} 行：音频库里没有「{id}」" +
+                                 $"（在 VNAudio.{libName} 登记）");
+            return entry;
         }
 
         // ------------------------------------------------------------------
         // BGM
         // ------------------------------------------------------------------
 
-        /// <summary>播放/切换 BGM（交叉淡入淡出）</summary>
-        public void PlayBgm(string id, float fade = 1.5f, int line = 0)
+        /// <summary>播放/切换 BGM（交叉淡入淡出）。vol = 剧本音量乘数（叠加条目基准音量）</summary>
+        public void PlayBgm(string id, float fade = 1.5f, float vol = 1f, int line = 0)
         {
             if (id == _currentBgm) return;
-            var clip = Find(id, line);
-            if (clip == null) return;
+            var entry = Find(bgmLibrary, "bgmLibrary", id, line);
+            if (entry == null) return;
 
             var fadeIn = _usingA ? _bgmB : _bgmA;   // 换到闲置的那个源
             var fadeOut = _usingA ? _bgmA : _bgmB;
             _usingA = !_usingA;
             _currentBgm = id;
+            _currentBgmScriptVol = Mathf.Clamp01(vol);
+            _currentBgmGain = entry.volume * _currentBgmScriptVol;
 
             fadeIn.DOKill();
             fadeOut.DOKill();
 
-            fadeIn.clip = clip;
+            fadeIn.clip = entry.clip;
             fadeIn.volume = 0f;
             fadeIn.Play();
             fadeIn.DOFade(EffectiveBgmVolume, Mathf.Max(0.01f, fade)).SetLink(gameObject);
@@ -166,6 +208,8 @@ namespace VNEffects
         public void StopBgm(float fade = 1.5f)
         {
             _currentBgm = null;
+            _currentBgmGain = 1f;
+            _currentBgmScriptVol = 1f;
             foreach (var src in new[] { _bgmA, _bgmB })
             {
                 if (!src.isPlaying) continue;
@@ -179,57 +223,61 @@ namespace VNEffects
         // SE / Voice
         // ------------------------------------------------------------------
 
-        /// <summary>播放音效（loop = 循环环境音，如雨声）</summary>
-        public void PlaySe(string id, bool loop = false, int line = 0)
+        /// <summary>播放音效（loop = 循环环境音，如雨声）。vol = 剧本音量乘数</summary>
+        public void PlaySe(string id, bool loop = false, float vol = 1f, int line = 0)
         {
-            var clip = Find(id, line);
-            if (clip == null) return;
+            var entry = Find(seLibrary, "seLibrary", id, line);
+            if (entry == null) return;
+            float gain = entry.volume * Mathf.Clamp01(vol);
 
             if (!loop)
             {
-                _seOneShot.PlayOneShot(clip, seVolume);
+                _seOneShot.PlayOneShot(entry.clip, seVolume * gain);
                 return;
             }
 
-            if (_loopingSe.TryGetValue(id, out var existing) && existing != null)
+            if (_loopingSe.TryGetValue(id, out var existing) && existing?.source != null)
                 return; // 已在循环播放
 
             var src = CreateSource($"SE_Loop_{id}", true);
-            src.clip = clip;
+            src.clip = entry.clip;
             src.volume = 0f;
             src.Play();
-            src.DOFade(seVolume, 0.8f).SetLink(gameObject);
-            _loopingSe[id] = src;
+            src.DOFade(seVolume * gain, 0.8f).SetLink(gameObject);
+            _loopingSe[id] = new LoopingSe { source = src, gain = gain };
         }
 
         /// <summary>停止某个循环音效（淡出后销毁）</summary>
         public void StopSe(string id, float fade = 0.8f)
         {
-            if (!_loopingSe.TryGetValue(id, out var src) || src == null)
+            if (!_loopingSe.TryGetValue(id, out var looping) || looping?.source == null)
             {
                 _loopingSe.Remove(id);
                 return;
             }
             _loopingSe.Remove(id);
+            var src = looping.source;
             src.DOKill();
             src.DOFade(0f, Mathf.Max(0.01f, fade)).SetLink(gameObject)
                .OnComplete(() => Destroy(src.gameObject));
         }
 
-        /// <summary>播放语音（同时只有一条，新的顶掉旧的）</summary>
-        public bool PlayVoice(string id, int line = 0)
+        /// <summary>播放语音（同时只有一条，新的顶掉旧的）。vol = 剧本音量乘数</summary>
+        public bool PlayVoice(string id, float vol = 1f, int line = 0)
         {
-            var clip = Find(id, line);
-            if (clip == null) return false;
+            var entry = Find(voiceLibrary, "voiceLibrary", id, line);
+            if (entry == null) return false;
+            _currentVoiceGain = entry.volume * Mathf.Clamp01(vol);
             _voice.Stop();
-            _voice.clip = clip;
-            _voice.volume = voiceVolume;
+            _voice.clip = entry.clip;
+            _voice.volume = voiceVolume * _currentVoiceGain;
             _voice.Play();
             SetBgmDucked(true);
             return true;
         }
 
-        float EffectiveBgmVolume => bgmVolume * (_isBgmDucked ? 1f - voiceBgmReduction : 1f);
+        float EffectiveBgmVolume =>
+            bgmVolume * _currentBgmGain * (_isBgmDucked ? 1f - voiceBgmReduction : 1f);
 
         void SetBgmDucked(bool ducked)
         {
@@ -248,7 +296,7 @@ namespace VNEffects
         // 音量
         // ------------------------------------------------------------------
 
-        /// <summary>设置通道音量（bgm / se / voice），立即作用于正在播放的声音</summary>
+        /// <summary>设置通道音量（bgm / se / voice），立即作用于正在播放的声音（保留各自增益）</summary>
         public void SetVolume(string channel, float volume, int line = 0)
         {
             volume = Mathf.Clamp01(volume);
@@ -266,11 +314,12 @@ namespace VNEffects
                 case "se":
                     seVolume = volume;
                     foreach (var kv in _loopingSe)
-                        if (kv.Value != null) kv.Value.volume = volume;
+                        if (kv.Value?.source != null)
+                            kv.Value.source.volume = volume * kv.Value.gain;
                     break;
                 case "voice":
                     voiceVolume = volume;
-                    _voice.volume = volume;
+                    _voice.volume = volume * _currentVoiceGain;
                     break;
                 default:
                     Debug.LogWarning($"[VNAudio] 第 {line} 行：未知音量通道「{channel}」（bgm/se/voice）");

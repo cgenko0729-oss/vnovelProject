@@ -12,7 +12,9 @@ namespace VNEffects.EditorTools
         Character,   // 角色 id（扫 VNCharacterDef 资产）
         Expression,  // 表情名（依赖同行的角色参数，见 dependsOn）
         Background,  // 背景 id（场景 VNStage.backgrounds）
-        Audio,       // 音频 id（场景 VNAudio.library）
+        AudioBgm,    // BGM id（场景 VNAudio.bgmLibrary + 旧 library）
+        AudioSe,     // SE id（场景 VNAudio.seLibrary + 旧 library）
+        AudioVoice,  // 语音 id（场景 VNAudio.voiceLibrary + 旧 library）
         Label,       // 跳转目标（当前文档的 label 列表）
         Flag,        // flag 名（当前文档收集）
     }
@@ -182,15 +184,18 @@ namespace VNEffects.EditorTools
             Add("sakura", "FX", "sakura  (petal burst combo)");
 
             // ---- Audio ----
-            Add("bgm", "Audio", "bgm play <id> [fade:sec] / bgm stop [fade:sec]",
+            Add("bgm", "Audio", "bgm play <id> [fade:sec] [vol:0..1] / bgm stop [fade:sec]",
                 Pos("op", "", VNParamSource.Options, new[] { "play", "stop" }, "play"),
-                Pos("id", "id", VNParamSource.Audio),
-                Kw("fade", "fade", VNParamSource.Number, def: "1.5", weight: 0.5f));
-            Add("se", "Audio", "se <id> [loop] / se stop <id>",
-                Pos("a", "id/stop", VNParamSource.Audio),
-                Pos("b", "loop/id", VNParamSource.Options, new[] { "loop" }));
-            Add("voice", "Audio", "voice <id>",
-                Pos("id", "id", VNParamSource.Audio));
+                Pos("id", "id", VNParamSource.AudioBgm),
+                Kw("fade", "fade", VNParamSource.Number, def: "1.5", weight: 0.5f),
+                Kw("vol", "vol", VNParamSource.Number, def: "1", weight: 0.5f));
+            Add("se", "Audio", "se <id> [loop] [vol:0..1] / se stop <id>",
+                Pos("a", "id/stop", VNParamSource.AudioSe),
+                Pos("b", "loop/id", VNParamSource.Options, new[] { "loop" }),
+                Kw("vol", "vol", VNParamSource.Number, def: "1", weight: 0.5f));
+            Add("voice", "Audio", "voice <id> [vol:0..1]",
+                Pos("id", "id", VNParamSource.AudioVoice),
+                Kw("vol", "vol", VNParamSource.Number, def: "1", weight: 0.5f));
             Add("volume", "Audio", "volume bgm|se|voice <0..1>",
                 Pos("channel", "", VNParamSource.Options, new[] { "bgm", "se", "voice" }, "bgm"),
                 Pos("value", "vol", VNParamSource.Number, def: "1", weight: 0.5f));

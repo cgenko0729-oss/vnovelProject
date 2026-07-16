@@ -452,6 +452,7 @@ namespace VNEffects
             data.weather = weather != null ? weather.Current.ToString() : null;
             data.mood = mood != null ? mood.Current.ToString() : null;
             data.bgm = vnAudio != null ? vnAudio.CurrentBgm : null;
+            data.bgmVol = vnAudio != null ? vnAudio.CurrentBgmVol : 1f;
             data.portraitOff = _portraitOff;
 
             data.fxOn.Clear();
@@ -503,7 +504,8 @@ namespace VNEffects
             {
                 if (instant) vnAudio.ResetForDebug();
                 float fade = instant ? 0.01f : 0.6f;
-                if (!string.IsNullOrEmpty(data.bgm)) vnAudio.PlayBgm(data.bgm, fade);
+                if (!string.IsNullOrEmpty(data.bgm))
+                    vnAudio.PlayBgm(data.bgm, fade, data.bgmVol > 0f ? data.bgmVol : 1f);
                 else vnAudio.StopBgm(fade);
             }
 

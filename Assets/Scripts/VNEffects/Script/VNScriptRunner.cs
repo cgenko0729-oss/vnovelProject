@@ -138,7 +138,7 @@ namespace VNEffects
                 mood = VNMood.Neutral.ToString(),
             };
             var characters = new Dictionary<string, VNSaveData.CharSave>();
-            var loopingSe = new HashSet<string>();
+            var loopingSe = new Dictionary<string, float>(); // id → 剧本 vol 参数
             var volumes = new Dictionary<string, float>();
             string focus = null;
             VNScriptCommand lastCameraCut = null;
@@ -186,11 +186,14 @@ namespace VNEffects
                             speaking.expr = cmd.expression;
                         break;
                     case "bgm":
-                        snapshot.bgm = cmd.Arg(0, "play") == "stop" ? null : cmd.Arg(1);
+                        bool bgmStop = cmd.Arg(0, "play") == "stop";
+                        snapshot.bgm = bgmStop ? null : cmd.Arg(1);
+                        snapshot.bgmVol = bgmStop ? 1f : cmd.KwF("vol", 1f);
                         break;
                     case "se":
                         if (cmd.Arg(0) == "stop") loopingSe.Remove(cmd.Arg(1));
-                        else if (cmd.args.Contains("loop")) loopingSe.Add(cmd.Arg(0));
+                        else if (cmd.args.Contains("loop"))
+                            loopingSe[cmd.Arg(0)] = cmd.KwF("vol", 1f);
                         break;
                     case "volume":
                         volumes[cmd.Arg(0, "bgm")] = cmd.ArgF(1, 1f);
@@ -231,8 +234,8 @@ namespace VNEffects
             {
                 foreach (var volume in volumes)
                     stage.vnAudio.SetVolume(volume.Key, volume.Value);
-                foreach (string id in loopingSe)
-                    stage.vnAudio.PlaySe(id, true);
+                foreach (var se in loopingSe)
+                    stage.vnAudio.PlaySe(se.Key, true, se.Value);
             }
             if (!string.IsNullOrEmpty(focus)) stage.Fx("focus", focus);
             RestoreDebugCamera(lastCameraCut);
@@ -827,29 +830,31 @@ namespace VNEffects
 
                 case "bgm":
                 {
-                    // bgm play 黄昏之歌 [fade:2] / bgm stop [fade:3]
+                    // bgm play 黄昏之歌 [fade:2] [vol:0.6] / bgm stop [fade:3]
                     string sub = cmd.Arg(0, "play");
                     float fade = 1.5f;
                     if (float.TryParse(cmd.Kw("fade"), out float f)) fade = f;
                     if (sub == "stop") stage.vnAudio?.StopBgm(fade);
-                    else if (sub == "play") stage.vnAudio?.PlayBgm(cmd.Arg(1), fade, cmd.line);
+                    else if (sub == "play")
+                        stage.vnAudio?.PlayBgm(cmd.Arg(1), fade, cmd.KwF("vol", 1f), cmd.line);
                     else Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：bgm 用法为 bgm play <id> 或 bgm stop");
                     return null;
                 }
 
                 case "se":
                 {
-                    // se 雨声 loop / se 心跳 / se stop 雨声
+                    // se 雨声 loop [vol:0.5] / se 心跳 [vol:0.3] / se stop 雨声
                     if (cmd.Arg(0) == "stop")
                         stage.vnAudio?.StopSe(cmd.Arg(1));
                     else
-                        stage.vnAudio?.PlaySe(cmd.Arg(0), cmd.args.Contains("loop"), cmd.line);
+                        stage.vnAudio?.PlaySe(cmd.Arg(0), cmd.args.Contains("loop"),
+                            cmd.KwF("vol", 1f), cmd.line);
                     return null;
                 }
 
                 case "voice":
                     _voicePendingForNextSay = stage.vnAudio != null &&
-                        stage.vnAudio.PlayVoice(cmd.Arg(0), cmd.line);
+                        stage.vnAudio.PlayVoice(cmd.Arg(0), cmd.KwF("vol", 1f), cmd.line);
                     return null;
 
                 case "volume":

@@ -482,10 +482,20 @@ namespace VNEffects.EditorTools
                                 System.Array.IndexOf(ctx.backgroundIds, v) < 0)
                                 Err(i, $"{r.keyword}: background \"{v}\" not registered on VNStage");
                             break;
-                        case VNParamSource.Audio:
-                            if (ctx.HasAudio && v != "stop" &&
-                                System.Array.IndexOf(ctx.audioIds, v) < 0)
-                                Err(i, $"{r.keyword}: audio id \"{v}\" not in VNAudio.library");
+                        case VNParamSource.AudioBgm:
+                            if (ctx.HasBgm && v != "stop" &&
+                                System.Array.IndexOf(ctx.bgmIds, v) < 0)
+                                Err(i, $"{r.keyword}: audio id \"{v}\" not in VNAudio.bgmLibrary");
+                            break;
+                        case VNParamSource.AudioSe:
+                            if (ctx.HasSe && v != "stop" &&
+                                System.Array.IndexOf(ctx.seIds, v) < 0)
+                                Err(i, $"{r.keyword}: audio id \"{v}\" not in VNAudio.seLibrary");
+                            break;
+                        case VNParamSource.AudioVoice:
+                            if (ctx.HasVoice && v != "stop" &&
+                                System.Array.IndexOf(ctx.voiceIds, v) < 0)
+                                Err(i, $"{r.keyword}: audio id \"{v}\" not in VNAudio.voiceLibrary");
                             break;
                         case VNParamSource.Label:
                             CheckLabelRef(i, v, r.keyword);
@@ -618,11 +628,15 @@ namespace VNEffects.EditorTools
         public string[] characterIds = System.Array.Empty<string>();
         public Dictionary<string, string[]> expressions = new Dictionary<string, string[]>();
         public string[] backgroundIds = System.Array.Empty<string>();
-        public string[] audioIds = System.Array.Empty<string>();
+        public string[] bgmIds = System.Array.Empty<string>();
+        public string[] seIds = System.Array.Empty<string>();
+        public string[] voiceIds = System.Array.Empty<string>();
 
         public bool HasCharacters => characterIds.Length > 0;
         public bool HasBackgrounds => backgroundIds.Length > 0;
-        public bool HasAudio => audioIds.Length > 0;
+        public bool HasBgm => bgmIds.Length > 0;
+        public bool HasSe => seIds.Length > 0;
+        public bool HasVoice => voiceIds.Length > 0;
 
         public bool HasExpression(string characterId, string expr)
         {

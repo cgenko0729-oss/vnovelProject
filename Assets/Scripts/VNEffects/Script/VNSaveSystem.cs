@@ -20,6 +20,7 @@ namespace VNEffects
         public string weather;
         public string mood;
         public string bgm;
+        public float bgmVol = 1f;         // bgm 命令的 vol: 参数（旧存档缺省 = 1）
         public bool portraitOff;                       // 对话头像被 portrait off 关闭
         public List<string> fxOn = new List<string>(); // 处于开启状态的 fx 名
 

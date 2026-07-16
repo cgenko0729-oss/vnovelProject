@@ -202,14 +202,35 @@ namespace VNEffects.EditorTools
             var audio = FindFirstObjectByType<VNAudio>();
             if (audio != null)
             {
-                var au = new List<string>();
-                foreach (var e in audio.library)
-                    if (e != null && !string.IsNullOrEmpty(e.id)) au.Add(e.id);
-                _ctx.audioIds = au.ToArray();
+                // 旧混合库的条目三个通道都能用，因此并入每个候选列表
+                _ctx.bgmIds = CollectAudioIds(audio.bgmLibrary, audio.library);
+                _ctx.seIds = CollectAudioIds(audio.seLibrary, audio.library);
+                _ctx.voiceIds = CollectAudioIds(audio.voiceLibrary, audio.library);
             }
-            else _ctx.audioIds = System.Array.Empty<string>();
+            else
+            {
+                _ctx.bgmIds = System.Array.Empty<string>();
+                _ctx.seIds = System.Array.Empty<string>();
+                _ctx.voiceIds = System.Array.Empty<string>();
+            }
 
             _validatedVersion = -1; // 数据源变了要重新校验
+        }
+
+        /// <summary>通道专属库 + 旧混合库合并去重后的 id 列表（保持登记顺序）</summary>
+        static string[] CollectAudioIds(List<VNAudio.AudioEntry> channelLib,
+            List<VNAudio.AudioEntry> legacyLib)
+        {
+            var ids = new List<string>();
+            var seen = new HashSet<string>();
+            foreach (var lib in new[] { channelLib, legacyLib })
+            {
+                if (lib == null) continue;
+                foreach (var e in lib)
+                    if (e != null && !string.IsNullOrEmpty(e.id) && seen.Add(e.id))
+                        ids.Add(e.id);
+            }
+            return ids.ToArray();
         }
 
         void ValidateIfNeeded()
@@ -1016,14 +1037,16 @@ namespace VNEffects.EditorTools
                     return _ctx.expressions.TryGetValue(r.Get(p.dependsOn), out var e)
                         ? e : System.Array.Empty<string>();
                 case VNParamSource.Background: return _ctx.backgroundIds;
-                case VNParamSource.Audio:
+                case VNParamSource.AudioBgm: return _ctx.bgmIds;
+                case VNParamSource.AudioSe:
                     if (r.keyword == "se" && p.id == "a")
                     {
                         var withStop = new List<string> { "stop" };
-                        withStop.AddRange(_ctx.audioIds);
+                        withStop.AddRange(_ctx.seIds);
                         return withStop.ToArray();
                     }
-                    return _ctx.audioIds;
+                    return _ctx.seIds;
+                case VNParamSource.AudioVoice: return _ctx.voiceIds;
                 case VNParamSource.Label: return _labels.ToArray();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框
