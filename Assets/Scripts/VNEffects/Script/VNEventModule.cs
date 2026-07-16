@@ -10,7 +10,13 @@ namespace VNEffects
         public string eventId;                       // 剧本里引用的模块 id
         public VNStage stage;                        // 舞台（约定：模块只读，不直接改演出）
         public Dictionary<string, string> kwargs;    // 剧本行的 key:value 参数
+        public List<string> outcomes;                // 剧本「* 结果行」的结果名（可为空；
+                                                     // 模块可据此只开放本次剧情接住的分支）
         public int line;                             // 源文件行号（报错定位用）
+
+        /// <summary>剧本是否用「* 结果行」接住了该结果名（无结果行 = 全部放行）</summary>
+        public bool AcceptsOutcome(string name) =>
+            outcomes == null || outcomes.Count == 0 || outcomes.Contains(name);
 
         public string Kw(string key, string def = null) =>
             kwargs != null && kwargs.TryGetValue(key, out var v) ? v : def;

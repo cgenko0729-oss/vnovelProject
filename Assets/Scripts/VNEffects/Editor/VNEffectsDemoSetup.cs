@@ -422,6 +422,19 @@ namespace VNEffects.EditorTools
             qteGo.SetActive(false); // 模板保持禁用，运行时 Instantiate 后才激活
             var qte = qteGo.AddComponent<VNQteModule>();
             registry.modules.Add(new VNEventRegistry.Entry { id = "qte", template = qte });
+
+            var mapGo = new GameObject("MapTemplate", typeof(RectTransform));
+            mapGo.transform.SetParent(registry.transform, false);
+            mapGo.SetActive(false);
+            var mapModule = mapGo.AddComponent<VNMapModule>();
+            mapModule.mapSprite = rig.bgSprite; // 演示用背景当地图底图
+            mapModule.locations.Add(new VNMapModule.Location
+                { name = "教室", position = new Vector2(0.28f, 0.55f) });
+            mapModule.locations.Add(new VNMapModule.Location
+                { name = "图书馆", position = new Vector2(0.68f, 0.6f) });
+            mapModule.locations.Add(new VNMapModule.Location
+                { name = "天台", position = new Vector2(0.5f, 0.82f), condition = "好感度>=2" });
+            registry.modules.Add(new VNEventRegistry.Entry { id = "map", template = mapModule });
             stage.eventRegistry = registry;
 
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------
@@ -524,6 +537,8 @@ namespace VNEffects.EditorTools
 #   event <模块id> [key:value…]      调起 VNEventRegistry 登记的玩法模块
 #   * 结果名 [flag:名字+1] [-> 标签]   按模块返回的结果分支（同 choice 写法）
 #                                     整数结果会同时写入 flag「事件结果」
+#   示例模块：qte（连打条 time:/target:/title:）
+#            map（地图选地点 title:/bg:，地点选中自动 flag 去过_<地点>+1）
 # ---- 任务 ----
 #   quest start|stage|done|fail <id> [阶段]   状态存 flag「任务_<id>」，J 键看日志
 # ============================================
@@ -589,6 +604,25 @@ weather Fireflies
 fx godrays off
 旁白: ——那天夜里，萤火虫漫天飞舞。
 
+event map title:夜晚去哪里走走？
+* 教室 -> 教室夜话
+* 图书馆 -> 图书馆夜话
+* 天台 -> 天台夜话
+
+label 教室夜话
+: （夜晚的教室安安静静，只有月光落在课桌上。）
+jump 结算
+
+label 图书馆夜话
+: （月光洒在书架之间，白天的喧嚣仿佛很遥远。）
+jump 结算
+
+label 天台夜话
+: （晚风拂面，萤火虫绕着两人打转。）
+小雪: 原来你也会来天台啊。……陪我看一会儿星星吧。
+jump 结算
+
+label 结算
 if 好感度>=2 jump 好结局
 亚里沙: （总有一天，我一定会说出口的。）
 jump 落幕

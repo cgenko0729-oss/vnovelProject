@@ -1098,11 +1098,15 @@ namespace VNEffects
             _activeEventModule = module;
             stage.dialogue?.HideBox();
 
+            var outcomes = new List<string>();
+            if (cmd.options != null)
+                foreach (var opt in cmd.options) outcomes.Add(opt.text);
             var ctx = new VNEventContext
             {
                 eventId = id,
                 stage = stage,
                 kwargs = cmd.kwargs,
+                outcomes = outcomes,
                 line = cmd.line,
             };
             string result = null;
