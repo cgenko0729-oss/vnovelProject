@@ -71,7 +71,7 @@ namespace VNEffects.EditorTools
                 { "voice", "语音" }, { "volume", "音量" }, { "wait", "等待" },
                 { "label", "标签" }, { "jump", "跳转" }, { "flag", "变量" },
                 { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
-                { "chapter", "章节" },
+                { "chapter", "章节" }, { "quest", "任务" },
             };
 
         static readonly Dictionary<string, string> CategoryTranslations =
@@ -219,6 +219,16 @@ namespace VNEffects.EditorTools
             _ctx.eventIds = eventRegistry != null
                 ? new List<string>(eventRegistry.Ids).ToArray()
                 : System.Array.Empty<string>();
+
+            var questIds = new List<string>();
+            foreach (var guid in AssetDatabase.FindAssets("t:VNQuestDef"))
+            {
+                var quest = AssetDatabase.LoadAssetAtPath<VNQuestDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (quest != null && !string.IsNullOrEmpty(quest.id))
+                    questIds.Add(quest.id);
+            }
+            _ctx.questIds = questIds.ToArray();
 
             _validatedVersion = -1; // 数据源变了要重新校验
         }
@@ -1054,6 +1064,7 @@ namespace VNEffects.EditorTools
                     return _ctx.seIds;
                 case VNParamSource.AudioVoice: return _ctx.voiceIds;
                 case VNParamSource.EventId: return _ctx.eventIds;
+                case VNParamSource.QuestId: return _ctx.questIds;
                 case VNParamSource.Label: return _labels.ToArray();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框

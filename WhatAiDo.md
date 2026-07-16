@@ -1789,3 +1789,44 @@ event qte time:3 target:12 title:鼓起勇气连打！
 验证：临时把三个新脚本加入 `Assembly-CSharp.csproj` 编译清单（Unity 未刷新 csproj），
 `dotnet build Assembly-CSharp-Editor.csproj --no-restore --nologo` **0 error** 后立刻还原。
 .meta 按既有格式手写（随机 GUID）。
+
+## 四十三、任务系统 P2：quest 命令 + 任务定义资产 + J 键日志面板（2026-07-16，分支 `agent/vn-quest-system`）
+
+实现第四十一章规划的 P2。核心设计：**任务状态全部落在 VNFlags**（flag 名 =
+`任务_<id>`），存档、`if 任务_xx>=2` 分支、调试重建全部复用现有设施零改动；
+组件只负责写状态时弹 Toast 与渲染日志。
+
+### 43.1 剧本语法与阶段约定
+
+```
+quest start 告白大作战        # 阶段 1 + Toast「新任务：…」（可 quest start id 2 从阶段 2 起）
+quest stage 告白大作战 2      # 推进阶段 + Toast 显示该阶段文案
+quest done 告白大作战         # = 100 + Toast「任务完成」
+quest fail 告白大作战         # = -1  + Toast「任务失败」
+```
+
+阶段号约定：0 未接取 / 1..n 进行中 / 100 完成 / -1 失败（`VNQuestLog` 常量）。
+
+### 43.2 新文件（Script/）
+
+| 文件 | 职责 |
+|---|---|
+| VNQuestDef.cs | ScriptableObject（CreateAssetMenu「VN/Quest Definition」）：id/标题/描述/各阶段文案。**纯显示文案**，与状态分离；没有资产的任务照常运作（id 当标题） |
+| VNQuestLog.cs | 场景组件：定义资产列表 + `Apply(op,id,stage,silent,line)` 执行命令（写 flag + VNToast）+ J 键日志面板。面板全程序化（Overlay Canvas 600，与回想同构：暗底点击关、滚动列表），进行中/已完成/已失败三栏分色，进行中显示「▶ 当前阶段文案」；无定义资产的活动 `任务_` flag 也会兜底显示 |
+
+### 43.3 集成点
+
+- Runner：Start 查找/自建 VNQuestLog；`quest` 命令分发；J 键开关日志（互斥逻辑与
+  回想面板同构，打开期间不推进剧情、Esc 可关）；`RequestQuestLog()` 公开给工具条。
+- 调试重建：`case "quest"` 静默重放（silent=true 只写状态不弹 Toast），
+  从中间行播放时任务状态正确。
+- 快捷功能条：Log 和 Config 之间新增「任务」按钮，工具条总宽 616→693。
+- 场景生成器：创建 VNQuestLog + 示例任务资产 `Assets/VNEffects/Quests/告白大作战.asset`
+  （两阶段文案）；演示剧本插入完整任务线（开场 start → 心跳处 stage 2 →
+  告白成功 done / 退缩线 fail）；提示文字加「J 任务日志」。
+- 编辑器：`VNParamSource.QuestId`（扫项目 VNQuestDef 资产做下拉），quest 命令入
+  schema（中文名「任务」）；校验用 **Warn 而非 Err**——无定义资产是合法用法，
+  只提醒缺标题/阶段文案。
+
+验证：两个新脚本临时加入 csproj 后 `dotnet build Assembly-CSharp-Editor.csproj`
+**0 error**，随即还原。体验需重建剧本演示场景（并删除旧 Demo.vn.txt 重新生成）。

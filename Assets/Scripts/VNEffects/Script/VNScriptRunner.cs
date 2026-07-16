@@ -46,6 +46,7 @@ namespace VNEffects
         VNSaveLoadPanel _saveLoadPanel;
         VNConfigPanel _configPanel;
         VNQuickToolbar _quickToolbar;
+        VNQuestLog _questLog;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
@@ -74,6 +75,12 @@ namespace VNEffects
                 _backlog = FindFirstObjectByType<VNBacklog>();
                 if (_backlog == null)
                     _backlog = new GameObject("VNBacklog").AddComponent<VNBacklog>();
+            }
+            if (_questLog == null)
+            {
+                _questLog = FindFirstObjectByType<VNQuestLog>();
+                if (_questLog == null) // 没有登记定义资产也能工作（id 当标题）
+                    _questLog = new GameObject("VNQuestLog").AddComponent<VNQuestLog>();
             }
             EnsureSaveLoadPanel();
             EnsureQuickToolbar();
@@ -211,6 +218,10 @@ namespace VNEffects
                     }
                     case "flag":
                         ApplyDebugFlag(cmd);
+                        break;
+                    case "quest": // 静默重放（写状态不弹 Toast）
+                        _questLog?.Apply(cmd.Arg(0, "start"), cmd.Arg(1),
+                            (int)cmd.ArgF(2, 0f), true, cmd.line);
                         break;
                     case "camcut":
                     case "camto":
@@ -546,6 +557,12 @@ namespace VNEffects
             _backlog.Open();
         }
 
+        public void RequestQuestLog()
+        {
+            if (_questLog == null || _eventActive) return;
+            _questLog.Toggle();
+        }
+
         public void RequestConfigPanel()
         {
             EnsureConfigPanel();
@@ -690,10 +707,24 @@ namespace VNEffects
                 return;
             }
 
+            // 任务日志打开期间：只处理关闭，不推进剧情
+            if (_questLog != null && _questLog.IsOpen)
+            {
+                if (kb.jKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                    _questLog.Close();
+                return;
+            }
+
             if (kb.hKey.wasPressedThisFrame ||
                 (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
             {
                 _backlog?.Open();
+                return;
+            }
+
+            if (kb.jKey.wasPressedThisFrame)
+            {
+                _questLog?.Open();
                 return;
             }
 
@@ -938,6 +969,12 @@ namespace VNEffects
 
                 case "event":
                     return EventCo(cmd);
+
+                case "quest":
+                    // quest start|stage|done|fail <id> [阶段]
+                    _questLog?.Apply(cmd.Arg(0, "start"), cmd.Arg(1),
+                        (int)cmd.ArgF(2, 0f), false, cmd.line);
+                    return null;
 
                 default:
                     Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：未知命令「{cmd.keyword}」");

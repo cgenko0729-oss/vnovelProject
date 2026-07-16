@@ -507,6 +507,13 @@ namespace VNEffects.EditorTools
                                 System.Array.IndexOf(ctx.eventIds, v) < 0)
                                 Err(i, $"{r.keyword}: event module \"{v}\" not in VNEventRegistry");
                             break;
+                        case VNParamSource.QuestId:
+                            // 没有定义资产的任务也能运作（id 当标题），所以只是提醒
+                            if (ctx.HasQuests &&
+                                System.Array.IndexOf(ctx.questIds, v) < 0)
+                                Warn(i, $"{r.keyword}: quest \"{v}\" has no VNQuestDef asset " +
+                                        "(works, but no title/stage text)");
+                            break;
                     }
                 }
 
@@ -639,6 +646,7 @@ namespace VNEffects.EditorTools
         public string[] seIds = System.Array.Empty<string>();
         public string[] voiceIds = System.Array.Empty<string>();
         public string[] eventIds = System.Array.Empty<string>();
+        public string[] questIds = System.Array.Empty<string>();
 
         public bool HasCharacters => characterIds.Length > 0;
         public bool HasBackgrounds => backgroundIds.Length > 0;
@@ -646,6 +654,7 @@ namespace VNEffects.EditorTools
         public bool HasSe => seIds.Length > 0;
         public bool HasVoice => voiceIds.Length > 0;
         public bool HasEvents => eventIds.Length > 0;
+        public bool HasQuests => questIds.Length > 0;
 
         public bool HasExpression(string characterId, string expr)
         {

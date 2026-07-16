@@ -19,6 +19,7 @@ namespace VNEffects.EditorTools
     {
         const string MaterialsDir = "Assets/VNEffects/Materials";
         const string CharactersDir = "Assets/VNEffects/Characters";
+        const string QuestsDir = "Assets/VNEffects/Quests";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -423,6 +424,11 @@ namespace VNEffects.EditorTools
             registry.modules.Add(new VNEventRegistry.Entry { id = "qte", template = qte });
             stage.eventRegistry = registry;
 
+            // ---------- 任务系统（示例任务定义 + 日志组件） ----------
+            EnsureFolder(QuestsDir);
+            var questLog = new GameObject("VNQuestLog").AddComponent<VNQuestLog>();
+            questLog.quests.Add(EnsureQuestDef());
+
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
@@ -433,7 +439,7 @@ namespace VNEffects.EditorTools
             // ---------- 极简提示 ----------
             var hint = CreateHintText(rig.canvasGo.transform, 70f);
             hint.text = "Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进\n" +
-                        "F5 存档界面 | F9 读档界面";
+                        "F5 存档界面 | F9 读档界面 | J 任务日志";
 
             // ---------- 保存 ----------
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);
@@ -446,6 +452,22 @@ namespace VNEffects.EditorTools
         // ==================================================================
         // 剧本系统辅助
         // ==================================================================
+
+        static VNQuestDef EnsureQuestDef()
+        {
+            string path = $"{QuestsDir}/告白大作战.asset";
+            var def = AssetDatabase.LoadAssetAtPath<VNQuestDef>(path);
+            if (def != null) return def;
+
+            def = ScriptableObject.CreateInstance<VNQuestDef>();
+            def.id = "告白大作战";
+            def.title = "告白大作战";
+            def.description = "在晚霞下把心意传达给小雪。";
+            def.stages.Add("和小雪一起看晚霞");
+            def.stages.Add("鼓起勇气说出心意");
+            AssetDatabase.CreateAsset(def, path);
+            return def;
+        }
 
         static VNCharacterDef EnsureCharacterDef(string id, Color nameColor, Sprite sprite)
         {
@@ -502,6 +524,8 @@ namespace VNEffects.EditorTools
 #   event <模块id> [key:value…]      调起 VNEventRegistry 登记的玩法模块
 #   * 结果名 [flag:名字+1] [-> 标签]   按模块返回的结果分支（同 choice 写法）
 #                                     整数结果会同时写入 flag「事件结果」
+# ---- 任务 ----
+#   quest start|stage|done|fail <id> [阶段]   状态存 flag「任务_<id>」，J 键看日志
 # ============================================
 
 bg bg1
@@ -513,6 +537,7 @@ show 亚里沙 at:left with:DissolveGlow
 wait 0.4
 show 小雪 at:right with:FadeSlideUp
 
+quest start 告白大作战
 亚里沙: 今天的晚霞真漂亮啊……整片天空都烧起来了一样。
 小雪: 是啊。你看，连云的边缘都镶上了金色。
 
@@ -522,6 +547,7 @@ emote 小雪 Surprise
 小雪: 怎、怎么了？突然这么严肃。
 
 fx heartbeat on
+quest stage 告白大作战 2
 亚里沙: 我一直……有件事想告诉你。
 
 choice
@@ -541,6 +567,7 @@ emote 小雪 Surprise
 wait 0.5
 emote 小雪 Shy
 小雪: ……笨蛋。怎么突然、说这种话啦。
+quest done 告白大作战
 jump 夜晚
 
 label 退缩线
@@ -549,6 +576,7 @@ emote 亚里沙 Dejected
 亚里沙: ……没、没什么！忘了吧！
 emote 小雪 HeadShake
 小雪: 什么嘛，真是的。
+quest fail 告白大作战
 emote 亚里沙 Recover
 jump 夜晚
 

@@ -1,0 +1,35 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace VNEffects
+{
+    /// <summary>
+    /// 任务定义资产：只管显示文案，进行状态全部存 VNFlags（flag 名 = 任务_&lt;id&gt;，
+    /// 随存档免费保存，剧本可直接 if 任务_xx>=2 判断）。
+    /// 阶段号约定：0=未接取，1..n=进行中（stages[阶段-1] 为当前目标文案），
+    /// 100=完成，-1=失败（见 VNQuestLog 常量）。
+    /// 没有定义资产的任务也能正常运作，只是日志/Toast 用 id 当标题、无阶段文案。
+    /// </summary>
+    [CreateAssetMenu(menuName = "VN/Quest Definition", fileName = "NewQuest")]
+    public class VNQuestDef : ScriptableObject
+    {
+        [Tooltip("剧本 quest 命令引用的 id（可中文，如 告白大作战）")]
+        public string id;
+
+        [Tooltip("任务日志显示的标题；留空 = 直接用 id")]
+        public string title;
+
+        [TextArea]
+        [Tooltip("任务总描述（日志里显示在标题下，可留空）")]
+        public string description;
+
+        [Tooltip("各阶段目标文案：第 1 项对应阶段 1（quest start 后的初始阶段）")]
+        public List<string> stages = new List<string>();
+
+        public string Title => string.IsNullOrEmpty(title) ? id : title;
+
+        /// <summary>阶段目标文案（阶段号从 1 起；越界返回空串）</summary>
+        public string StageText(int stage) =>
+            stage >= 1 && stage <= stages.Count ? stages[stage - 1] : "";
+    }
+}

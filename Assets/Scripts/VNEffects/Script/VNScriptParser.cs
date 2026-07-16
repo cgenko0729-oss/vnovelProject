@@ -83,7 +83,7 @@ namespace VNEffects
             "move", "bgm", "se", "voice", "volume",
             "camseq", "camcut", "camto",
             "portrait",
-            "event",
+            "event", "quest",
         };
 
         /// <summary>命令关键字集合（剧本编辑器等工具用，与解析行为保持单一来源）</summary>

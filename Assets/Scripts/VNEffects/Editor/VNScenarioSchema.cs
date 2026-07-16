@@ -18,6 +18,7 @@ namespace VNEffects.EditorTools
         Label,       // 跳转目标（当前文档的 label 列表）
         Flag,        // flag 名（当前文档收集）
         EventId,     // 事件模块 id（场景 VNEventRegistry.modules）
+        QuestId,     // 任务 id（项目中的 VNQuestDef 资产）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -223,6 +224,12 @@ namespace VNEffects.EditorTools
                 "运行 VNEventRegistry 登记的玩法模块（地图/战斗/迷你游戏），按结果分支",
                 Pos("id", "id", VNParamSource.EventId));
             ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
+            Add("quest", "Flow", "quest start|stage|done|fail <id> [阶段]\n" +
+                "状态存 flag「任务_<id>」：1..n 进行中 / 100 完成 / -1 失败，J 键看日志",
+                Pos("op", "", VNParamSource.Options,
+                    new[] { "start", "stage", "done", "fail" }, "start"),
+                Pos("id", "id", VNParamSource.QuestId),
+                Pos("stage", "阶段", VNParamSource.Number, weight: 0.5f));
 
             Debug.Assert(Commands.Count > 0);
         }
