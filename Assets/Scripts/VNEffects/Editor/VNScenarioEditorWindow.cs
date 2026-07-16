@@ -71,7 +71,7 @@ namespace VNEffects.EditorTools
                 { "voice", "语音" }, { "volume", "音量" }, { "wait", "等待" },
                 { "label", "标签" }, { "jump", "跳转" }, { "flag", "变量" },
                 { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
-                { "chapter", "章节" }, { "quest", "任务" },
+                { "chapter", "章节" }, { "quest", "任务" }, { "letterbox", "电影黑边" },
             };
 
         static readonly Dictionary<string, string> CategoryTranslations =

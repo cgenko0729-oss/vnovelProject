@@ -48,6 +48,7 @@ namespace VNEffects.EditorTools
             public VNFakeDoF fakeDoF;
             public VNCloudShadows cloudShadows;
             public VNSpeedLines speedLines;
+            public VNLetterbox letterbox;
             public VNToneMatch toneMatch;
             public VNChoicePanel choicePanel;
             public VNMouseStardust stardust;
@@ -169,6 +170,11 @@ namespace VNEffects.EditorTools
             speedLinesGo.transform.SetParent(canvasGo.transform, false);
             rig.speedLines = speedLinesGo.AddComponent<VNSpeedLines>();
             AssignSourceMaterial(rig.speedLines, rig.additiveMat);
+
+            // ---------- 8.6 电影 Letterbox 黑边 ----------
+            var letterboxGo = new GameObject("Letterbox", typeof(RectTransform));
+            letterboxGo.transform.SetParent(canvasGo.transform, false);
+            rig.letterbox = letterboxGo.AddComponent<VNLetterbox>();
 
             // ---------- 9. 聚焦渐晕（挂在 Volume 上）----------
             rig.vignetteFocus = volGo.AddComponent<VNVignetteFocus>();
@@ -350,6 +356,7 @@ namespace VNEffects.EditorTools
             demo.fakeDoF = rig.fakeDoF;
             demo.cloudShadows = rig.cloudShadows;
             demo.speedLines = rig.speedLines;
+            demo.letterbox = rig.letterbox;
             demo.toneMatch = rig.toneMatch;
             demo.choicePanel = rig.choicePanel;
 
@@ -417,6 +424,7 @@ namespace VNEffects.EditorTools
             stage.cloudShadows = rig.cloudShadows;
             stage.godRays = rig.godRays;
             stage.speedLines = rig.speedLines;
+            stage.letterbox = rig.letterbox;
             stage.heatHaze = rig.heatHaze;
             stage.vignetteFocus = rig.vignetteFocus;
             stage.speakerHighlight = rig.speakerHighlight;
@@ -536,6 +544,7 @@ namespace VNEffects.EditorTools
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
 #   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch|speedlines> <on|off>
 #   fx speedlines burst        漫画集中线一次性冲击（决断/惊愕瞬间）
+#   letterbox on|off [height:130] [time:0.7]   电影黑边；mood Memory 回忆自动上黑边
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----
 #   label <名字> / jump <名字>

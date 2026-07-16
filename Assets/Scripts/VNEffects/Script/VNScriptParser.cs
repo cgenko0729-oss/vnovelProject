@@ -84,6 +84,7 @@ namespace VNEffects
             "camseq", "camcut", "camto",
             "portrait",
             "event", "quest",
+            "letterbox",
         };
 
         /// <summary>命令关键字集合（剧本编辑器等工具用，与解析行为保持单一来源）</summary>

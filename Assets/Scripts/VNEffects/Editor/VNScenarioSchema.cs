@@ -83,7 +83,7 @@ namespace VNEffects.EditorTools
 
         public static readonly string[] FxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
-              "speedlines", "focus" };
+              "speedlines", "letterbox", "focus" };
 
         public static readonly string[] CamAnchors =
         {
@@ -185,6 +185,11 @@ namespace VNEffects.EditorTools
                 Pos("name", "fx", VNParamSource.Options, FxNames),
                 Pos("value", "", VNParamSource.Options, new[] { "on", "off", "burst" }, "on"));
             Add("sakura", "FX", "sakura  (petal burst combo)");
+            Add("letterbox", "FX", "letterbox on|off [height:px] [time:sec]\n" +
+                "电影黑边上下滑入；mood Memory（回忆）会自动上黑边",
+                Pos("value", "", VNParamSource.Options, new[] { "on", "off" }, "on"),
+                Kw("height", "height", VNParamSource.Number, def: "130", weight: 0.5f),
+                Kw("time", "time", VNParamSource.Number, def: "0.7", weight: 0.5f));
 
             // ---- Audio ----
             Add("bgm", "Audio", "bgm play <id> [fade:sec] [vol:0..1] / bgm stop [fade:sec]",

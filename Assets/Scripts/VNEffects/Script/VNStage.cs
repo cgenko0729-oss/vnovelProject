@@ -41,6 +41,7 @@ namespace VNEffects
         public VNCloudShadows cloudShadows;
         public VNGodRays godRays;
         public VNSpeedLines speedLines;
+        public VNLetterbox letterbox;
         public VNHeatHaze heatHaze;
         public VNVignetteFocus vignetteFocus;
         public VNSpeakerHighlight speakerHighlight;
@@ -99,6 +100,7 @@ namespace VNEffects
             if (cloudShadows == null) cloudShadows = FindFirstObjectByType<VNCloudShadows>();
             if (godRays == null) godRays = FindFirstObjectByType<VNGodRays>();
             if (speedLines == null) speedLines = FindFirstObjectByType<VNSpeedLines>();
+            if (letterbox == null) letterbox = FindFirstObjectByType<VNLetterbox>();
             if (heatHaze == null) heatHaze = FindFirstObjectByType<VNHeatHaze>();
             if (vignetteFocus == null) vignetteFocus = FindFirstObjectByType<VNVignetteFocus>();
             if (speakerHighlight == null) speakerHighlight = FindFirstObjectByType<VNSpeakerHighlight>();
@@ -494,14 +496,15 @@ namespace VNEffects
                 weather.SetWeather(
                     VNScriptParser.ParseEnum(data.weather, VNWeather.None, 0),
                     instant ? 0.01f : 0.1f);
+            var restoredMood = VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0);
             if (mood != null)
-                mood.SetMood(
-                    VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0),
-                    instant ? 0.01f : 0.3f);
+                mood.SetMood(restoredMood, instant ? 0.01f : 0.3f);
 
             // 先全部关掉可开关 fx，再打开存档里记录的
             foreach (var name in ToggleFxNames) Fx(name, "off");
             foreach (var name in data.fxOn) Fx(name, "on");
+            // 黑边若与回忆色调同时恢复，视为自动黑边（之后离开回忆会自动撤掉）
+            _letterboxAuto = restoredMood == VNMood.Memory && data.fxOn.Contains("letterbox");
 
             if (vnAudio != null)
             {
@@ -679,7 +682,46 @@ namespace VNEffects
         readonly Dictionary<string, bool> _fxStates = new Dictionary<string, bool>();
 
         static readonly string[] ToggleFxNames =
-            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch", "speedlines" };
+            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
+              "speedlines", "letterbox" };
+
+        [Tooltip("mood Memory（回忆）自动上电影黑边、离开回忆自动撤掉")]
+        public bool autoMemoryLetterbox = true;
+
+        bool _letterboxAuto; // 当前黑边是否由回忆色调自动打开（离开回忆时才自动撤）
+
+        /// <summary>mood 命令入口：切换情绪色调 + 回忆自动黑边联动</summary>
+        public void SetMood(VNMood m, float duration = -1f)
+        {
+            if (mood != null)
+            {
+                if (duration > 0f) mood.SetMood(m, duration);
+                else mood.SetMood(m);
+            }
+            if (!autoMemoryLetterbox || letterbox == null) return;
+            if (m == VNMood.Memory && !letterbox.IsShown)
+            {
+                letterbox.Show();
+                _fxStates["letterbox"] = true;
+                _letterboxAuto = true;
+            }
+            else if (m != VNMood.Memory && _letterboxAuto)
+            {
+                letterbox.Hide();
+                _fxStates["letterbox"] = false;
+                _letterboxAuto = false;
+            }
+        }
+
+        /// <summary>letterbox 命令入口：手动控制会接管自动黑边</summary>
+        public void SetLetterbox(bool on, float height = -1f, float duration = -1f)
+        {
+            _letterboxAuto = false;
+            _fxStates["letterbox"] = on;
+            if (letterbox == null) return;
+            if (on) letterbox.Show(height, duration);
+            else letterbox.Hide(duration);
+        }
 
         /// <summary>章节转场用：关闭天气、情绪色调和全部持续型画面特效。</summary>
         public void ResetEffects()
@@ -720,6 +762,11 @@ namespace VNEffects
                         backgroundFx.DOShimmerAmount(0.85f, 1f);
                     }
                     else backgroundFx.DOShimmerAmount(0f, 0.8f);
+                    break;
+                case "letterbox":
+                    _letterboxAuto = false;
+                    if (letterbox == null) break;
+                    if (on) letterbox.Show(); else letterbox.Hide();
                     break;
                 case "speedlines":
                     if (speedLines == null) break;

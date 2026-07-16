@@ -152,6 +152,7 @@ namespace VNEffects
             string focus = null;
             VNScriptCommand lastCameraCut = null;
             bool hasBranching = false;
+            bool autoLetterbox = false; // 回忆自动黑边的重放状态
 
             VNFlags.Clear();
             for (int i = 0; i < exclusiveIndex && i < _commands.Count; i++)
@@ -166,7 +167,31 @@ namespace VNEffects
                         snapshot.weather = cmd.Arg(0, VNWeather.None.ToString());
                         break;
                     case "mood":
+                    {
                         snapshot.mood = cmd.Arg(0, VNMood.Neutral.ToString());
+                        // 回忆自动黑边的静默重放（与运行时 VNStage.SetMood 逻辑一致）
+                        if (stage.autoMemoryLetterbox)
+                        {
+                            bool isMemory = VNScriptParser.ParseEnum(
+                                snapshot.mood, VNMood.Neutral, 0) == VNMood.Memory;
+                            if (isMemory && !snapshot.fxOn.Contains("letterbox"))
+                            {
+                                snapshot.fxOn.Add("letterbox");
+                                autoLetterbox = true;
+                            }
+                            else if (!isMemory && autoLetterbox)
+                            {
+                                snapshot.fxOn.Remove("letterbox");
+                                autoLetterbox = false;
+                            }
+                        }
+                        break;
+                    }
+                    case "letterbox":
+                        autoLetterbox = false;
+                        if (cmd.Arg(0, "on") == "off") snapshot.fxOn.Remove("letterbox");
+                        else if (!snapshot.fxOn.Contains("letterbox"))
+                            snapshot.fxOn.Add("letterbox");
                         break;
                     case "reset":
                         if (cmd.Arg(0) == "effects" || cmd.Arg(0) == "all")
@@ -175,6 +200,7 @@ namespace VNEffects
                             snapshot.mood = VNMood.Neutral.ToString();
                             snapshot.fxOn.Clear();
                             focus = null;
+                            autoLetterbox = false;
                         }
                         break;
                     case "portrait":
@@ -816,8 +842,15 @@ namespace VNEffects
                     return null;
 
                 case "mood":
-                    stage.mood?.SetMood(
+                    // 走 VNStage 包装：Memory（回忆）色调自动联动电影黑边
+                    stage.SetMood(
                         VNScriptParser.ParseEnum(cmd.Arg(0), VNMood.Neutral, cmd.line));
+                    return null;
+
+                case "letterbox":
+                    // letterbox on|off [height:130] [time:0.7]
+                    stage.SetLetterbox(cmd.Arg(0, "on") != "off",
+                        cmd.KwF("height", -1f), cmd.KwF("time", -1f));
                     return null;
 
                 case "reset":

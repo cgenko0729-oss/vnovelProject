@@ -1993,3 +1993,52 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   暗背景失效。颜色仍暴露为 Inspector 字段可调。
 - **接入 ToggleFxNames** 让存档/读档/编辑器"从选中行播放"的状态重建零改动
   自动支持（fx 关键字在 RebuildStateBefore 里本就是通用处理）。
+
+## 四十八、电影 Letterbox 黑边 + 回忆自动联动（2026-07-17，分支 `agent/cinema-letterbox`）
+
+> 四十六章第二梯队第二件：宽银幕黑边演出，独立剧本命令 + mood Memory 自动联动。
+
+### 48.1 计划
+
+- 上下两条纯黑横条从屏幕外滑入/滑出（DOTween）；新增一等剧本命令 `letterbox`；
+  切到回忆色调（mood Memory）时自动上黑边、离开时自动撤掉；进存档/调试重建体系。
+
+### 48.2 文件说明
+
+- **`VNLetterbox.cs`（新）**：黑边组件。
+  - 结构：嵌套 Canvas（`sortingOrder = 35`：盖过舞台/粒子/速度线 25，低于对话框 40）+
+    两条 Image 黑条（锚定上/下边缘，pivot 贴边，横向左右各溢出 20px 防荷兰角/震动露缝）。
+  - 动画：`DOAnchorPosY` 滑入（OutCubic）/滑出（InCubic），默认高 130px（≈2.35:1 宽银幕）、
+    时长 0.7s，均可被参数覆盖；Tween 全部 `SetLink`。
+  - API：`Show(height, duration)/Hide(duration)/Toggle()`、`IsShown`。
+- **`VNStage.cs`（改）**：
+  - 新增 `letterbox` 字段 + AutoWire；`ToggleFxNames` 加 `"letterbox"`（存档自动覆盖）。
+  - 新增 `SetMood(VNMood, duration)` 包装：切色调 + 回忆自动黑边联动
+    （`autoMemoryLetterbox` 开关，默认开）。自动上的黑边打 `_letterboxAuto` 标记，
+    只有自动上的才会在离开 Memory 时自动撤；手动 letterbox/fx 命令会接管（清标记）。
+  - 新增 `SetLetterbox(on, height, duration)`：letterbox 命令入口，写 `_fxStates`。
+  - `Fx()` 加 case `letterbox`（`fx letterbox on|off` 同样可用，读档恢复走这里）。
+  - `RestoreSnapshot`：恢复后若「回忆色调 + 黑边」同时成立则视为自动黑边。
+- **`VNScriptRunner.cs`（改）**：
+  - Dispatch 的 mood case 改走 `stage.SetMood`（联动入口统一）。
+  - 新增 `letterbox on|off [height:130] [time:0.7]` 命令 case。
+  - `RebuildStateBefore`（编辑器"从选中行播放"重建）：新增 letterbox 关键字重放 +
+    mood 关键字里静默重放回忆自动黑边逻辑（与运行时一致），reset 时清标记。
+- **`VNScriptParser.cs`（改）**：Keywords 加 `letterbox`。
+- **`VNScenarioSchema.cs`（改）**：FX 分类新增 letterbox 命令（on/off + height/time kwargs）；
+  FxNames 加 `letterbox`。
+- **`VNScenarioEditorWindow.cs`（改）**：命令中文翻译表加「letterbox → 电影黑边」。
+- **`VNEffectsDemoSetup.cs`（改）**：BuildStageRig 第 8.6 步创建 Letterbox 物体并连线
+  stage/demo；演示剧本头部语法速查补 letterbox 说明。
+- **`VNEffectsDemo.cs`（改）**：`'`（引号）键开关黑边，提示文字更新。
+
+### 48.3 技术决策
+
+- **黑边做成一等命令而非只有 fx 开关**：需要 height/time 参数（fx 语法只有 on/off），
+  且"letterbox on"在剧本里可读性远高于"fx letterbox on"。两种写法都支持，
+  存档状态统一记在 `_fxStates["letterbox"]`。
+- **自动黑边挂在 mood Memory 上**（而非新增"回忆模式"命令）：Memory 色调本就是
+  回忆专用（褪色暖黄+胶片颗粒+暗角），黑边是它的天然搭配；`_letterboxAuto` 标记
+  确保手动/自动互不干扰——手动开的黑边不会被离开回忆时误撤。
+- **黑条用普通 Image 而非 CanvasGroup 淡入**：电影黑边的正确演出是"滑入"不是"淡入"，
+  且纯黑不透明无需混合控制。
