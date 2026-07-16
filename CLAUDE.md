@@ -1,6 +1,7 @@
 # CLAUDE.md — 视觉小说项目（vnovelProject）
 
-> 本文件是给 Claude（AI 助手）的项目说明书。所有开发过程的详细记录在 `WhatAiDo.md`。
+> 本文件是给 Claude（AI 助手）的项目说明书。所有开发过程的详细记录在 `WhatAiDo.md`；
+> 逐脚本的代码指南（职责/用法/扩展/维护）在 `ProjectCodeGuide.md`，改代码前先查它。
 
 ## 项目概况
 
@@ -86,6 +87,10 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技 |
+| VNCharacterBlink / VNCharacterMouth | 默认表情自动眨眼 / 说话口型（透明画布叠加层） |
+| VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
+| VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
+| VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 
 ### 演示场景
 
@@ -104,9 +109,20 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 分支语法（P1，已完成）：`label/jump`、`flag 名字 [+1|数值]`（VNFlags 全局整型字典）、
   `if 条件 jump 标签`（条件无空格：`好感度>=2`）、`choice` + `* 文本 [flag:op] [-> 标签]`
 - P2（已完成）：F5/F9 打开 20 槽存读档界面（JSON 快照+PNG 截图缩略图+时间+末句台词，仅台词处可存）、
-  对话框快捷功能条（Save/Load/Auto/Skip/Log/Config/隐藏 UI）、H/滚轮 回想、A 自动、
+  对话框快捷功能条（Save/Load/Auto/Skip/Log/任务/Config/隐藏 UI）、H/滚轮 回想、A 自动、
   S 快进（DOTween.timeScale 全局加速）、VNToast 提示
-- **路线图**：P0/P1/P2 完成 → P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令
+- 音频（已完成）：三通道独立库（bgmLibrary/seLibrary/voiceLibrary，旧 library 兼容回退）+
+  每条目基准音量标定；`bgm/se/voice` 均支持 `vol:` 参数，公式=条目基准×剧本 vol×通道音量
+- 玩法事件接口（已完成，四十一章规划的 P1~P3）：`event <模块id> [key:value…]` +
+  `* 结果名 [flag:op] [-> 标签]` 结果行（复用 choice 解析）；VNEventModule 基类 +
+  VNEventRegistry 注册表；事件期间快捷键全禁、不可存档、调试重建视为分支点；
+  模块三铁律=不碰舞台/unscaled 计时+SetUpdate(true)/全部 SetLink。
+  示例模块：qte（连打条）、map（地图选地点，条件显隐+`去过_<地点>` flag）
+- 任务系统（已完成）：`quest start|stage|done|fail <id> [阶段]`，状态=flag`任务_<id>`
+  （0 未接取/1..n 进行中/100 完成/-1 失败），VNQuestDef 资产只管文案（无资产照常运作），
+  J 键日志面板；存档/if 分支/调试重建零改动复用 flags 设施
+- **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
+  战斗示例模块（事件接口 P4）待动工；已知技术债清单见 ProjectCodeGuide 第十二节
 
 ## 剧本可视化编辑器（当前状态）
 
