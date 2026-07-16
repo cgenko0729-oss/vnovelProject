@@ -82,7 +82,8 @@ namespace VNEffects.EditorTools
             { "Surprise", "Angry", "Shy", "Dejected", "Recover", "Nod", "HeadShake" };
 
         public static readonly string[] FxNames =
-            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch", "focus" };
+            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
+              "speedlines", "focus" };
 
         public static readonly string[] CamAnchors =
         {
@@ -180,9 +181,9 @@ namespace VNEffects.EditorTools
             Add("shake", "FX", "shake light|medium|heavy",
                 Pos("level", "", VNParamSource.Options,
                     new[] { "light", "medium", "heavy" }, "medium"));
-            Add("fx", "FX", "fx <name> on|off  (fx focus <char>)",
+            Add("fx", "FX", "fx <name> on|off  (fx focus <char> / fx speedlines burst)",
                 Pos("name", "fx", VNParamSource.Options, FxNames),
-                Pos("value", "", VNParamSource.Options, new[] { "on", "off" }, "on"));
+                Pos("value", "", VNParamSource.Options, new[] { "on", "off", "burst" }, "on"));
             Add("sakura", "FX", "sakura  (petal burst combo)");
 
             // ---- Audio ----

@@ -122,6 +122,59 @@ namespace VNEffects
             }
         }
 
+        static Texture2D[] _speedLines;
+
+        /// <summary>集中线贴图的变体数量（VNSpeedLines 轮换这些变体实现"闪帧"）</summary>
+        public const int SpeedLineVariantCount = 3;
+
+        /// <summary>
+        /// 漫画集中线/速度线（512px）：从四周边缘向中心收拢的楔形放射线，
+        /// 中心留空、各线内端参差、疏密不均，模拟手绘效果。
+        /// 不同 variant 用不同随机种子 → 轮换播放即为逐帧闪化。
+        /// </summary>
+        public static Texture2D SpeedLines(int variant)
+        {
+            if (_speedLines == null) _speedLines = new Texture2D[SpeedLineVariantCount];
+            int idx = Mathf.Abs(variant) % SpeedLineVariantCount;
+            if (_speedLines[idx] == null)
+            {
+                int seed = idx * 7919 + 31;
+                _speedLines[idx] = Generate($"VN_SpeedLines_{idx}", 512, (dx, dy) =>
+                {
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (r < 0.12f) return 0f; // 中心留白
+
+                    const int rayCount = 110;
+                    float a = (Mathf.Atan2(dy, dx) / (Mathf.PI * 2f) + 0.5f) * rayCount;
+                    int ray = Mathf.FloorToInt(a) % rayCount;
+                    float frac = a - Mathf.Floor(a) - 0.5f; // 扇区内偏移 [-0.5, 0.5]
+
+                    float h1 = Hash01(ray * 3 + seed);
+                    if (h1 < 0.3f) return 0f; // 三成扇区留空 → 疏密不均更像手绘
+                    float h2 = Hash01(ray * 3 + 1 + seed);
+                    float h3 = Hash01(ray * 3 + 2 + seed);
+
+                    // 楔形线条：外缘宽、向中心收成尖，各线内端半径参差
+                    float inner = Mathf.Lerp(0.15f, 0.32f, h3);
+                    float taper = Mathf.InverseLerp(inner, 0.72f, r);
+                    if (taper <= 0f) return 0f;
+                    float halfWidth = Mathf.Lerp(0.06f, 0.34f, h2) * taper;
+                    float edge = 1f - Mathf.Clamp01(
+                        (Mathf.Abs(frac) - halfWidth * 0.55f) /
+                        Mathf.Max(halfWidth * 0.45f, 1e-4f));
+                    return Mathf.Clamp01(edge);
+                });
+            }
+            return _speedLines[idx];
+        }
+
+        /// <summary>整数散列 → [0,1] 伪随机（贴图生成期确定性抖动用）</summary>
+        static float Hash01(int n)
+        {
+            n = (n << 13) ^ n;
+            return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 2147483647f;
+        }
+
         static Texture2D _ring;
 
         /// <summary>柔边圆环（点击涟漪用）</summary>

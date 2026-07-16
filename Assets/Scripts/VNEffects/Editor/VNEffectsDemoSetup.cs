@@ -47,6 +47,7 @@ namespace VNEffects.EditorTools
             public VNSakuraBurst sakura;
             public VNFakeDoF fakeDoF;
             public VNCloudShadows cloudShadows;
+            public VNSpeedLines speedLines;
             public VNToneMatch toneMatch;
             public VNChoicePanel choicePanel;
             public VNMouseStardust stardust;
@@ -162,6 +163,12 @@ namespace VNEffects.EditorTools
             edgeGlowGo.transform.SetParent(canvasGo.transform, false);
             rig.edgeGlow = edgeGlowGo.AddComponent<VNEdgeGlow>();
             AssignSourceMaterial(rig.edgeGlow, rig.additiveMat);
+
+            // ---------- 8.5 漫画速度线/集中线 ----------
+            var speedLinesGo = new GameObject("SpeedLines", typeof(RectTransform));
+            speedLinesGo.transform.SetParent(canvasGo.transform, false);
+            rig.speedLines = speedLinesGo.AddComponent<VNSpeedLines>();
+            AssignSourceMaterial(rig.speedLines, rig.additiveMat);
 
             // ---------- 9. 聚焦渐晕（挂在 Volume 上）----------
             rig.vignetteFocus = volGo.AddComponent<VNVignetteFocus>();
@@ -342,6 +349,7 @@ namespace VNEffects.EditorTools
             demo.sakura = rig.sakura;
             demo.fakeDoF = rig.fakeDoF;
             demo.cloudShadows = rig.cloudShadows;
+            demo.speedLines = rig.speedLines;
             demo.toneMatch = rig.toneMatch;
             demo.choicePanel = rig.choicePanel;
 
@@ -408,6 +416,7 @@ namespace VNEffects.EditorTools
             stage.fakeDoF = rig.fakeDoF;
             stage.cloudShadows = rig.cloudShadows;
             stage.godRays = rig.godRays;
+            stage.speedLines = rig.speedLines;
             stage.heatHaze = rig.heatHaze;
             stage.vignetteFocus = rig.vignetteFocus;
             stage.speakerHighlight = rig.speakerHighlight;
@@ -525,7 +534,8 @@ namespace VNEffects.EditorTools
 #   wait <秒> | shake <light|medium|heavy> | sakura
 #   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
-#   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch> <on|off>
+#   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch|speedlines> <on|off>
+#   fx speedlines burst        漫画集中线一次性冲击（决断/惊愕瞬间）
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----
 #   label <名字> / jump <名字>

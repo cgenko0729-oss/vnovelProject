@@ -67,6 +67,9 @@ namespace VNEffects
         public VNToneMatch toneMatch;
         public VNChoicePanel choicePanel;
 
+        [Header("漫画速度线（agent/manga-speed-lines）")]
+        public VNSpeedLines speedLines;
+
         static readonly string[] DemoChoices =
             { "牵起她的手", "假装没看见远处的烟火", "转身逃跑" };
 
@@ -239,6 +242,10 @@ namespace VNEffects
 
             if (kb.rightBracketKey.wasPressedThisFrame && cloudShadows != null)
                 cloudShadows.Toggle();
+
+            if (kb.commaKey.wasPressedThisFrame && speedLines != null) speedLines.Toggle();
+
+            if (kb.periodKey.wasPressedThisFrame && speedLines != null) speedLines.Burst();
 
             if (kb.tabKey.wasPressedThisFrame && character != null)
                 character.PlayEntrance(VNEntrancePreset.AfterimageDash)
@@ -417,7 +424,8 @@ namespace VNEffects
                 "J/K/L 震动 | Enter 对话 | O 视差 | I 荷兰角 | F 眨眼转场 | 点击=涟漪\n" +
                 $"Q 运镜循环({(_cameraIndex >= 0 ? CameraMoveNames[_cameraIndex] : "-")}) | " +
                 "A 心跳演出 | D 樱吹雪告白\n" +
-                "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）";
+                "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）\n" +
+                ", 速度线开关 | . 速度线冲击";
         }
     }
 }

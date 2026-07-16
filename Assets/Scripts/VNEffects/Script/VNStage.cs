@@ -40,6 +40,7 @@ namespace VNEffects
         public VNFakeDoF fakeDoF;
         public VNCloudShadows cloudShadows;
         public VNGodRays godRays;
+        public VNSpeedLines speedLines;
         public VNHeatHaze heatHaze;
         public VNVignetteFocus vignetteFocus;
         public VNSpeakerHighlight speakerHighlight;
@@ -97,6 +98,7 @@ namespace VNEffects
             if (fakeDoF == null) fakeDoF = FindFirstObjectByType<VNFakeDoF>();
             if (cloudShadows == null) cloudShadows = FindFirstObjectByType<VNCloudShadows>();
             if (godRays == null) godRays = FindFirstObjectByType<VNGodRays>();
+            if (speedLines == null) speedLines = FindFirstObjectByType<VNSpeedLines>();
             if (heatHaze == null) heatHaze = FindFirstObjectByType<VNHeatHaze>();
             if (vignetteFocus == null) vignetteFocus = FindFirstObjectByType<VNVignetteFocus>();
             if (speakerHighlight == null) speakerHighlight = FindFirstObjectByType<VNSpeakerHighlight>();
@@ -677,7 +679,7 @@ namespace VNEffects
         readonly Dictionary<string, bool> _fxStates = new Dictionary<string, bool>();
 
         static readonly string[] ToggleFxNames =
-            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch" };
+            { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch", "speedlines" };
 
         /// <summary>章节转场用：关闭天气、情绪色调和全部持续型画面特效。</summary>
         public void ResetEffects()
@@ -718,6 +720,12 @@ namespace VNEffects
                         backgroundFx.DOShimmerAmount(0.85f, 1f);
                     }
                     else backgroundFx.DOShimmerAmount(0f, 0.8f);
+                    break;
+                case "speedlines":
+                    if (speedLines == null) break;
+                    if (arg == "burst") speedLines.Burst(); // 一次性冲击，不记录开关状态
+                    else if (on) speedLines.Show();
+                    else speedLines.Hide();
                     break;
                 case "heartbeat":
                     if (heartbeat == null) break;
