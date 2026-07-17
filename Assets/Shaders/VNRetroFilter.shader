@@ -112,10 +112,11 @@ Shader "VN/RetroFilter"
                         float seed = ft * 3.7 + i * 17.31;
                         float x = hash21(float2(seed, 4.7 + i));
                         float visible = step(0.55, hash21(float2(seed, 91.3)));
-                        float line = 1.0 - smoothstep(0.0, 0.0022,
-                            abs(uv.x - x)) ;
+                        // 注意：line 是 HLSL 保留字，不能用作变量名
+                        float scratch = 1.0 - smoothstep(0.0, 0.0022,
+                            abs(uv.x - x));
                         float isBright = step(0.5, hash21(float2(seed, 55.1)));
-                        float w = line * visible * _ScratchAmount
+                        float w = scratch * visible * _ScratchAmount
                                 * (0.6 + 0.4 * hash21(float2(seed, uv.y * 3.0 + i)));
                         bright += w * isBright * 0.5;
                         dark += w * (1.0 - isBright) * 0.6;

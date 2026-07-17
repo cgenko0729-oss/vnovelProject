@@ -2242,3 +2242,10 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   特效若不种子，存档读回来会被"先全关再开 fxOn 列表"的恢复流程误关。
   已知一个可接受的边缘：本功能之前的旧存档不含 kenburns，读档后漂移是关的，
   下一条 `fx kenburns on` 或新开局即恢复。
+
+### 51.4 修复记录（分支 `agent/fix-retrofilter-shader`）
+
+- **d3d11 编译错误 `unexpected token 'line'`**：胶片划痕循环里把变量命名为
+  `line`——它是 HLSL 保留字（图元类型），d3d11 编译器直接报语法错误。
+  改名 `scratch` 即可。教训：shader 变量避开 `line/point/triangle/sample/matrix`
+  等 HLSL 保留字。
