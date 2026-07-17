@@ -17,22 +17,22 @@ namespace VNEffects
     {
         static readonly int IdTintColor = Shader.PropertyToID("_TintColor");
 
-        [Tooltip("渲染排序（盖过粒子 10~31 与情绪泛光 20，低于对话框 40）")]
+        [Header("渲染排序（盖过粒子 10~31 与情绪泛光 20，低于对话框 40）")]
         public int sortingOrder = 25;
 
-        [Tooltip("线条颜色（alpha 为整体强度）")]
+        [Header("线条颜色（alpha 为整体强度）")]
         public Color color = new Color(1f, 1f, 1f, 0.8f);
 
-        [Tooltip("HDR 强度倍率，>1 时配合 Bloom 产生辉光")]
+        [Header("HDR 强度倍率，>1 时配合 Bloom 产生辉光")]
         public float hdrIntensity = 1.25f;
 
-        [Tooltip("闪帧间隔（秒）：每隔这么久换一张贴图变体并抖动角度")]
+        [Header("闪帧间隔（秒）：每隔这么久换一张贴图变体并抖动角度")]
         public float flickerInterval = 0.09f;
 
-        [Tooltip("闪帧时的随机旋转抖动幅度（度）")]
+        [Header("闪帧时的随机旋转抖动幅度（度）")]
         public float rotationJitter = 4f;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         RawImage _img;

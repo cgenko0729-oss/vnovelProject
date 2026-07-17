@@ -11,7 +11,7 @@ namespace VNEffects
     /// </summary>
     public class VNBacklog : MonoBehaviour
     {
-        [Tooltip("最多保留的台词条数")]
+        [Header("最多保留的台词条数")]
         public int maxEntries = 200;
 
         struct Entry

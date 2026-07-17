@@ -13,13 +13,13 @@ namespace VNEffects
     /// </summary>
     public class VNVignetteFocus : MonoBehaviour
     {
-        [Tooltip("目标 Volume；留空则取本物体上的 Volume 组件")]
+        [Header("目标 Volume；留空则取本物体上的 Volume 组件")]
         public Volume volume;
 
-        [Tooltip("聚焦时的暗角强度")]
+        [Header("聚焦时的暗角强度")]
         [Range(0f, 1f)] public float focusIntensity = 0.46f;
 
-        [Tooltip("聚焦时的暗角平滑度")]
+        [Header("聚焦时的暗角平滑度")]
         [Range(0.01f, 1f)] public float focusSmoothness = 0.6f;
 
         Camera _cam;

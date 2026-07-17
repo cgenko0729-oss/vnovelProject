@@ -16,23 +16,23 @@ namespace VNEffects
     /// </summary>
     public class VNScriptRunner : MonoBehaviour
     {
-        [Tooltip("舞台管理器")]
+        [Header("舞台管理器")]
         public VNStage stage;
 
-        [Tooltip("剧本文件（.vn.txt）")]
+        [Header("剧本文件（.vn.txt）")]
         public TextAsset script;
 
-        [Tooltip("可通过 chapter <文件名> 切换的章节剧本")]
+        [Header("可通过 chapter <文件名> 切换的章节剧本")]
         public List<TextAsset> chapters = new List<TextAsset>();
 
-        [Tooltip("启动时自动播放")]
+        [Header("启动时自动播放")]
         public bool playOnStart = true;
 
         [Header("Auto / Skip")]
-        [Tooltip("自动模式：打字完后的基础等待秒数（另按字数追加）")]
+        [Header("自动模式：打字完后的基础等待秒数（另按字数追加）")]
         public float autoDelay = 1.4f;
 
-        [Tooltip("快进时的演出加速倍率（DOTween 全局 timeScale）")]
+        [Header("快进时的演出加速倍率（DOTween 全局 timeScale）")]
         public float skipTimeScale = 4f;
 
         List<VNScriptCommand> _commands;

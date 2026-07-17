@@ -12,19 +12,19 @@ namespace VNEffects
     [RequireComponent(typeof(ParticleSystem))]
     public class VNMouseStardust : MonoBehaviour
     {
-        [Tooltip("星尘颜色")]
+        [Header("星尘颜色")]
         public Color tint = new Color(1f, 0.9f, 0.55f);
 
-        [Tooltip("HDR 增益，>1 时被 Bloom 泛光")]
+        [Header("HDR 增益，>1 时被 Bloom 泛光")]
         public float hdrBoost = 2f;
 
-        [Tooltip("每移动 1 世界单位发射的星尘数")]
+        [Header("每移动 1 世界单位发射的星尘数")]
         public float emitPerUnit = 7f;
 
-        [Tooltip("渲染排序（要高于 UI 与粒子，低于全屏转场）")]
+        [Header("渲染排序（要高于 UI 与粒子，低于全屏转场）")]
         public int sortingOrder = 30;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         ParticleSystem _ps;

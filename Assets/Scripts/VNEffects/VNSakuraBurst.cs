@@ -12,13 +12,13 @@ namespace VNEffects
     /// </summary>
     public class VNSakuraBurst : MonoBehaviour
     {
-        [Tooltip("可选：预制的 VN/Additive 材质资产")]
+        [Header("可选：预制的 VN/Additive 材质资产")]
         public Material additiveMaterial;
 
-        [Tooltip("联动的心跳演出（可空）")]
+        [Header("联动的心跳演出（可空）")]
         public VNHeartbeat heartbeat;
 
-        [Tooltip("花瓣颜色")]
+        [Header("花瓣颜色")]
         public Color petalColor = new Color(1f, 0.68f, 0.8f);
 
         VNAmbientParticles _petals;

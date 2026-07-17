@@ -15,13 +15,13 @@ namespace VNEffects
     /// </summary>
     public class VNWeatherController : MonoBehaviour
     {
-        [Tooltip("可选：预制的 VN/Additive 材质资产，传给创建的粒子系统")]
+        [Header("可选：预制的 VN/Additive 材质资产，传给创建的粒子系统")]
         public Material additiveMaterial;
 
-        [Tooltip("受天气调色联动影响的图片控制器（背景、立绘）")]
+        [Header("受天气调色联动影响的图片控制器（背景、立绘）")]
         public VNImageEffectController[] moodTargets;
 
-        [Tooltip("切换天气时是否自动对 moodTargets 做亮度/饱和度联动")]
+        [Header("切换天气时是否自动对 moodTargets 做亮度/饱和度联动")]
         public bool applyMoodGrading = true;
 
         readonly Dictionary<VNWeather, VNAmbientParticles> _systems =

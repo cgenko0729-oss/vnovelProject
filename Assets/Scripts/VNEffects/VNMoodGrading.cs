@@ -29,7 +29,7 @@ namespace VNEffects
     /// </summary>
     public class VNMoodGrading : MonoBehaviour
     {
-        [Tooltip("默认过渡时长（秒）")]
+        [Header("默认过渡时长（秒）")]
         public float defaultTransition = 2f;
 
         class Layer

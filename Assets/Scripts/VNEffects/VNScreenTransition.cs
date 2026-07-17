@@ -44,10 +44,10 @@ namespace VNEffects
         static readonly int IdRectMinMax = Shader.PropertyToID("_RectMinMax");
         static readonly int IdScatter = Shader.PropertyToID("_Scatter");
 
-        [Tooltip("渲染排序（要盖住一切，包括粒子和边缘泛光）")]
+        [Header("渲染排序（要盖住一切，包括粒子和边缘泛光）")]
         public int sortingOrder = 100;
 
-        [Tooltip("可选：预制的 VN/ScreenTransition 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/ScreenTransition 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         RawImage _img;

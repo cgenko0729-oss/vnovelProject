@@ -18,7 +18,7 @@ namespace VNEffects
         public const int StageFailed = -1;
         public const string FlagPrefix = "任务_";
 
-        [Tooltip("任务定义资产（标题/描述/阶段文案）；未登记的任务用 id 当标题照常工作")]
+        [Header("任务定义资产（标题/描述/阶段文案）；未登记的任务用 id 当标题照常工作")]
         public List<VNQuestDef> quests = new List<VNQuestDef>();
 
         Canvas _canvas;

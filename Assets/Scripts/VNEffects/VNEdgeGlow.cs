@@ -25,10 +25,10 @@ namespace VNEffects
     {
         static readonly int IdTintColor = Shader.PropertyToID("_TintColor");
 
-        [Tooltip("渲染排序（要高于氛围粒子的 sortingOrder）")]
+        [Header("渲染排序（要高于氛围粒子的 sortingOrder）")]
         public int sortingOrder = 20;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         RawImage _img;

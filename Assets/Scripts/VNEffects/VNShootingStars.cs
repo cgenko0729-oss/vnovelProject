@@ -16,19 +16,19 @@ namespace VNEffects
     {
         static readonly int IdTintColor = Shader.PropertyToID("_TintColor");
 
-        [Tooltip("两颗流星的随机间隔范围（秒）")]
+        [Header("两颗流星的随机间隔范围（秒）")]
         public Vector2 intervalRange = new Vector2(2.5f, 7f);
 
-        [Tooltip("流星颜色（alpha 为峰值透明度）")]
+        [Header("流星颜色（alpha 为峰值透明度）")]
         public Color color = new Color(0.85f, 0.95f, 1f, 0.9f);
 
-        [Tooltip("HDR 强度倍率，>1 时配合 Bloom 产生辉光")]
+        [Header("HDR 强度倍率，>1 时配合 Bloom 产生辉光")]
         public float hdrIntensity = 1.6f;
 
-        [Tooltip("单颗流星的飞行时长范围（秒）")]
+        [Header("单颗流星的飞行时长范围（秒）")]
         public Vector2 durationRange = new Vector2(0.55f, 0.95f);
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         Material _mat;

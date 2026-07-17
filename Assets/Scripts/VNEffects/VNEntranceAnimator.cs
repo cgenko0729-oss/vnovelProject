@@ -29,10 +29,10 @@ namespace VNEffects
     [RequireComponent(typeof(VNImageEffectController))]
     public class VNEntranceAnimator : MonoBehaviour
     {
-        [Tooltip("出场时星光爆发的粒子颜色")]
+        [Header("出场时星光爆发的粒子颜色")]
         public Color burstColor = new Color(1f, 0.92f, 0.6f, 1f);
 
-        [Tooltip("是否在出场时触发星光爆发粒子")]
+        [Header("是否在出场时触发星光爆发粒子")]
         public bool useParticleBurst = true;
 
         VNImageEffectController _fx;

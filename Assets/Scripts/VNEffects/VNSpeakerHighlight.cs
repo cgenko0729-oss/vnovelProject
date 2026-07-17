@@ -12,19 +12,22 @@ namespace VNEffects
     /// </summary>
     public class VNSpeakerHighlight : MonoBehaviour
     {
-        [Tooltip("参与对话的立绘控制器（场景生成器自动填，或运行时 Register()）")]
+        [Header("参与对话的立绘控制器（场景生成器自动填，或运行时 Register()）")]
         public List<VNImageEffectController> characters = new List<VNImageEffectController>();
 
         [Header("说话者")]
         public float speakerScale = 1.03f;
+        [Header("说话者亮度（1 = 原亮度）")]
         public float speakerBrightness = 1f;
 
         [Header("旁听者")]
         public float dimBrightness = 0.6f;
+        [Header("旁听者饱和度保留比例")]
         public float dimSaturation = 0.85f;
+        [Header("旁听者缩小倍率")]
         public float dimScale = 0.97f;
 
-        [Tooltip("过渡时长（秒）")]
+        [Header("过渡时长（秒）")]
         public float transition = 0.35f;
 
         VNImageEffectController _speaker;

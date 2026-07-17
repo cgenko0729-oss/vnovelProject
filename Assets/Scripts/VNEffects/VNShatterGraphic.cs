@@ -11,8 +11,11 @@ namespace VNEffects
     /// </summary>
     public class VNShatterGraphic : MaskableGraphic
     {
+        [Header("被碎裂的图片")]
         [SerializeField] Sprite sprite;
+        [Header("碎片列数")]
         [Min(2)] public int columns = 14;
+        [Header("碎片行数")]
         [Min(2)] public int rows = 8;
 
         public Sprite Sprite

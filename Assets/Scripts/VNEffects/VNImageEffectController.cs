@@ -36,7 +36,7 @@ namespace VNEffects
 
         const string ShaderName = "VN/ImageEffect";
 
-        [Tooltip("可选：预先做好的 VN/ImageEffect 材质资产；留空则运行时自动创建")]
+        [Header("可选：预先做好的 VN/ImageEffect 材质资产；留空则运行时自动创建")]
         [SerializeField] Material sourceMaterial;
 
         MaskableGraphic _graphic;

@@ -20,7 +20,7 @@ namespace VNEffects
     /// </summary>
     public class VNScreenShake : MonoBehaviour
     {
-        [Tooltip("被震动的容器（场景生成器自动指向 SceneRoot）")]
+        [Header("被震动的容器（场景生成器自动指向 SceneRoot）")]
         public RectTransform target;
 
         Vector2 _basePos;

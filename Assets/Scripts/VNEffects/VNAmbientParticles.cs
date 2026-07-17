@@ -25,25 +25,25 @@ namespace VNEffects
             Mist,      // 雾气/蒸汽：大团柔雾从下方缓缓升起（温泉/热浪配套）
         }
 
-        [Tooltip("粒子风格预设")]
+        [Header("粒子风格预设")]
         public Preset preset = Preset.Sparkles;
 
-        [Tooltip("粒子颜色（HDR 强度由 hdrBoost 提供）")]
+        [Header("粒子颜色（HDR 强度由 hdrBoost 提供）")]
         public Color tint = new Color(1f, 0.95f, 0.75f, 1f);
 
-        [Tooltip("颜色 HDR 增益，>1 时粒子会被 Bloom 泛光")]
+        [Header("颜色 HDR 增益，>1 时粒子会被 Bloom 泛光")]
         public float hdrBoost = 1.8f;
 
-        [Tooltip("发射区域（世界单位）。为 0 时自动匹配主相机可见范围")]
+        [Header("发射区域（世界单位）。为 0 时自动匹配主相机可见范围")]
         public Vector2 area = Vector2.zero;
 
-        [Tooltip("发射速率倍率")]
+        [Header("发射速率倍率")]
         public float rateMultiplier = 1f;
 
-        [Tooltip("渲染排序（需要高于 Canvas 的 sortingOrder 才会显示在 UI 之上）")]
+        [Header("渲染排序（需要高于 Canvas 的 sortingOrder 才会显示在 UI 之上）")]
         public int sortingOrder = 10;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         ParticleSystem _ps;

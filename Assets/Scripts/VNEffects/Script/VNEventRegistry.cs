@@ -15,13 +15,13 @@ namespace VNEffects
         [System.Serializable]
         public class Entry
         {
-            [Tooltip("剧本 event 命令引用的 id（可中文，如 地图 / 史莱姆战）")]
+            [Header("剧本 event 命令引用的 id（可中文，如 地图 / 史莱姆战）")]
             public string id;
-            [Tooltip("模块模板：预制体或场景内禁用状态的物体（运行时 Instantiate）")]
+            [Header("模块模板：预制体或场景内禁用状态的物体（运行时 Instantiate）")]
             public VNEventModule template;
         }
 
-        [Tooltip("事件模块库：剧本 event <id> 调起这里登记的模块")]
+        [Header("事件模块库：剧本 event <id> 调起这里登记的模块")]
         public List<Entry> modules = new List<Entry>();
 
         public const int LayerSortingOrder = 60;

@@ -21,40 +21,44 @@ namespace VNEffects
         [System.Serializable]
         public class AudioEntry
         {
-            [Tooltip("剧本中引用的 id（可中文，如 黄昏之歌 / 雨声）")]
+            [Header("剧本中引用的 id（可中文，如 黄昏之歌 / 雨声）")]
             public string id;
+            [Header("音频素材")]
             public AudioClip clip;
-            [Tooltip("该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身")]
+            [Header("该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身")]
             [Range(0f, 1f)] public float volume = 1f;
         }
 
         [Header("音频库（按通道分开管理）")]
-        [Tooltip("BGM 库：剧本 bgm 命令用 id 引用")]
+        [Header("BGM 库：剧本 bgm 命令用 id 引用")]
         public List<AudioEntry> bgmLibrary = new List<AudioEntry>();
-        [Tooltip("SE 库：剧本 se 命令用 id 引用")]
+        [Header("SE 库：剧本 se 命令用 id 引用")]
         public List<AudioEntry> seLibrary = new List<AudioEntry>();
-        [Tooltip("语音库：剧本 voice 命令用 id 引用")]
+        [Header("语音库：剧本 voice 命令用 id 引用")]
         public List<AudioEntry> voiceLibrary = new List<AudioEntry>();
 
         [Header("旧版混合库（兼容保留，建议迁移到上面对应库）")]
-        [Tooltip("旧场景登记的条目仍能被 bgm/se/voice 三个通道找到，找不到 id 时才提示")]
+        [Header("旧场景登记的条目仍能被 bgm/se/voice 三个通道找到，找不到 id 时才提示")]
         public List<AudioEntry> library = new List<AudioEntry>();
 
         [Header("音量")]
+        [Header("BGM 通道音量")]
         [Range(0f, 1f)] public float bgmVolume = 0.75f;
+        [Header("音效通道音量")]
         [Range(0f, 1f)] public float seVolume = 1f;
+        [Header("语音通道音量")]
         [Range(0f, 1f)] public float voiceVolume = 1f;
 
         [Header("语音时压低 BGM")]
-        [Tooltip("播放语音时 BGM 降低的比例。0.2 = 降低 20%，即保留原音量的 80%。")]
+        [Header("播放语音时 BGM 降低的比例。0.2 = 降低 20%，即保留原音量的 80%。")]
         [Range(0f, 1f)] public float voiceBgmReduction = 0.2f;
-        [Tooltip("BGM 压低和恢复所需的淡入淡出时间（秒）")]
+        [Header("BGM 压低和恢复所需的淡入淡出时间（秒）")]
         [Min(0f)] public float voiceBgmFadeDuration = 0.25f;
 
         [Header("打字音（可选）")]
-        [Tooltip("打字机逐字音效；留空 = 无打字音")]
+        [Header("打字机逐字音效；留空 = 无打字音")]
         public AudioClip typingTick;
-        [Tooltip("打字音最小间隔（秒），防止连音刺耳")]
+        [Header("打字音最小间隔（秒），防止连音刺耳")]
         public float typingTickInterval = 0.055f;
 
         static VNAudio _instance;

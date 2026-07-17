@@ -13,23 +13,23 @@ namespace VNEffects
     {
         static readonly int IdTintColor = Shader.PropertyToID("_TintColor");
 
-        [Tooltip("光环颜色（配合 Bloom 时可给出 >1 的 HDR 强度）")]
+        [Header("光环颜色（配合 Bloom 时可给出 >1 的 HDR 强度）")]
         public Color glowColor = new Color(1.0f, 0.85f, 0.55f, 0.35f);
 
-        [Tooltip("光环相对本图片矩形的尺寸倍率")]
+        [Header("光环相对本图片矩形的尺寸倍率")]
         public float sizeScale = 1.45f;
 
-        [Tooltip("HDR 强度倍率，>1 时更容易触发 Bloom 泛光")]
+        [Header("HDR 强度倍率，>1 时更容易触发 Bloom 泛光")]
         public float hdrIntensity = 1.6f;
 
-        [Tooltip("呼吸脉动周期（秒），0 = 不脉动")]
+        [Header("呼吸脉动周期（秒），0 = 不脉动")]
         public float pulsePeriod = 3.5f;
 
         [Range(0f, 1f)]
-        [Tooltip("脉动幅度（相对基础亮度的比例）")]
+        [Header("脉动幅度（相对基础亮度的比例）")]
         public float pulseStrength = 0.45f;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         RawImage _halo;

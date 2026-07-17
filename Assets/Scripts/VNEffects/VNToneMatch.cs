@@ -12,14 +12,14 @@ namespace VNEffects
     /// </summary>
     public class VNToneMatch : MonoBehaviour
     {
-        [Tooltip("被染色的立绘控制器")]
+        [Header("被染色的立绘控制器")]
         public VNImageEffectController[] characters;
 
         [Range(0f, 0.3f)]
-        [Tooltip("染色强度（0.05~0.12 为宜，太高会明显变色）")]
+        [Header("染色强度（0.05~0.12 为宜，太高会明显变色）")]
         public float strength = 0.09f;
 
-        [Tooltip("染色过渡时长")]
+        [Header("染色过渡时长")]
         public float transition = 1.2f;
 
         /// <summary>匹配到某张背景 Sprite 的平均色</summary>

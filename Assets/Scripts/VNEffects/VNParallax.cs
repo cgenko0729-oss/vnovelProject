@@ -14,16 +14,17 @@ namespace VNEffects
         [System.Serializable]
         public class Layer
         {
+            [Header("被视差驱动的层容器")]
             public RectTransform rect;
-            [Tooltip("视差强度（像素）：越大越靠近观众")]
+            [Header("视差强度（像素）：越大越靠近观众")]
             public float strength = 10f;
             [HideInInspector] public Vector2 basePos;
         }
 
-        [Tooltip("视差层（场景生成器自动填：远景/中景/近景）")]
+        [Header("视差层（场景生成器自动填：远景/中景/近景）")]
         public List<Layer> layers = new List<Layer>();
 
-        [Tooltip("跟随平滑度（越大跟得越紧）")]
+        [Header("跟随平滑度（越大跟得越紧）")]
         public float damping = 5f;
 
         bool _enabled = true;

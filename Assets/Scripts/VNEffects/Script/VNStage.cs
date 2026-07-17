@@ -19,43 +19,74 @@ namespace VNEffects
         [System.Serializable]
         public class BackgroundEntry
         {
+            [Header("剧本 bg 命令引用的背景 id")]
             public string id;
+            [Header("背景图")]
             public Sprite sprite;
         }
         public List<BackgroundEntry> backgrounds = new List<BackgroundEntry>();
 
         [Header("舞台引用（生成器自动连线）")]
+        [Header("立绘层容器（LayerFront）")]
         public RectTransform characterLayer; // LayerFront
+        [Header("背景 Image")]
         public Image backgroundImage;
+        [Header("背景特效控制器")]
         public VNImageEffectController backgroundFx;
+        [Header("对话框")]
         public VNDialogueBox dialogue;
+        [Header("全屏转场")]
         public VNScreenTransition transition;
+        [Header("天气控制器")]
         public VNWeatherController weather;
+        [Header("情绪色调")]
         public VNMoodGrading mood;
+        [Header("运镜（驱动 ZoomRoot）")]
         public VNCamera vnCamera;
+        [Header("画面震动（驱动 SceneRoot）")]
         public VNScreenShake screenShake;
+        [Header("荷兰角（驱动 TiltRoot）")]
         public VNDutchAngle dutchAngle;
+        [Header("心跳脉动")]
         public VNHeartbeat heartbeat;
+        [Header("樱吹雪组合技")]
         public VNSakuraBurst sakura;
+        [Header("伪景深")]
         public VNFakeDoF fakeDoF;
+        [Header("地面云影")]
         public VNCloudShadows cloudShadows;
+        [Header("斜射光束")]
         public VNGodRays godRays;
+        [Header("漫画速度线")]
         public VNSpeedLines speedLines;
+        [Header("全屏情绪水波")]
         public VNScreenShockwave shockwave;
+        [Header("胶片/CRT 复古滤镜")]
         public VNRetroFilter retroFilter;
+        [Header("背景 Ken Burns 漂移")]
         public VNKenBurns kenBurns;
+        [Header("电影黑边")]
         public VNLetterbox letterbox;
+        [Header("夜晚流星")]
         public VNShootingStars shootingStars;
+        [Header("云本体缓移")]
         public VNDriftingClouds driftingClouds;
+        [Header("热浪扭曲")]
         public VNHeatHaze heatHaze;
+        [Header("聚焦渐晕")]
         public VNVignetteFocus vignetteFocus;
+        [Header("说话者高亮")]
         public VNSpeakerHighlight speakerHighlight;
+        [Header("立绘色调匹配背景")]
         public VNToneMatch toneMatch;
+        [Header("选项面板")]
         public VNChoicePanel choicePanel;
+        [Header("音频管理器（BGM/SE/语音三通道）")]
         public VNAudio vnAudio;
+        [Header("玩法事件注册表（event 命令）")]
         public VNEventRegistry eventRegistry;
 
-        [Tooltip("表情切换的交叉溶解时长（0 = 瞬间切换）")]
+        [Header("表情切换的交叉溶解时长（0 = 瞬间切换）")]
         public float expressionCrossfade = 0.25f;
 
         [Header("角色生成参数")]
@@ -703,10 +734,10 @@ namespace VNEffects
               "speedlines", "letterbox", "meteor", "skycloud", "filmgrain", "crt",
               "kenburns" };
 
-        [Tooltip("mood Memory（回忆）自动上电影黑边、离开回忆自动撤掉")]
+        [Header("mood Memory（回忆）自动上电影黑边、离开回忆自动撤掉")]
         public bool autoMemoryLetterbox = true;
 
-        [Tooltip("mood Memory（回忆）自动上胶片滤镜、mood Dream（梦境）自动上 CRT 滤镜")]
+        [Header("mood Memory（回忆）自动上胶片滤镜、mood Dream（梦境）自动上 CRT 滤镜")]
         public bool autoMoodRetroFilter = true;
 
         bool _letterboxAuto; // 当前黑边是否由回忆色调自动打开（离开回忆时才自动撤）

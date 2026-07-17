@@ -2265,3 +2265,26 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   Bloom 对 UI 失效）、Sprite 必须 Full Rect、LayerFront/Background 命名被
   AutoWire 依赖、事件模板必须禁用等。
 - **`CLAUDE.md`（改）**：文档头部补 SetUpGuide.md 指引。
+
+## 五十四、Inspector 中文说明全量改造（2026-07-18，分支 `agent/inspector-chinese-headers`）
+
+> 用户要求：所有 Inspector 可调变量直接显示中文说明（[Header]），不用悬停
+> 才能看到的 [Tooltip]。
+
+- **批量转换（脚本完成）**：运行时脚本（Editor/ 除外）里 191 处单行
+  `[Tooltip("中文说明")]` 全部机械替换为 `[Header("中文说明")]`；
+  VNCharacterDef 里 4 处多行拼接 Tooltip 手动压缩成单行 Header
+  （Header 只渲染一行，过长会被截断）。
+- **补漏（82 处）**：扫描所有 public/[SerializeField] 字段中没有任何说明的，
+  逐个补中文 Header——包括 VNStage 全部 28 个舞台引用（"全屏转场"“运镜
+  （驱动 ZoomRoot）"等）、VNEffectsDemo 的演示引用（附对应按键）、
+  VNAudio 三通道音量、VNRetroFilter 颗粒/划痕强度、VNShatterGraphic、
+  VNFakeDoF/VNSpeakerHighlight/VNChoicePanel/VNDialogueBox 的裸参数、
+  嵌套可序列化类字段（VNAudio.Entry.clip、VNCharacterDef.Expression.sprite、
+  VNParallax.Layer.rect、VNStage.BackgroundEntry）等。
+- **排除项**：运行时数据类（VNScriptParser/VNSaveSystem/VNEventModule 的
+  数据结构、各组件私有 runtime class）不在 Inspector 显示，不加；
+  `System.Action` 等不可序列化字段不加。
+- 原有的分组 Header（如"胶片参数"）保留，与字段说明 Header 叠放显示
+  （Unity 的 DecoratorDrawer 支持同字段多个 Header 上下排列）。
+- 验证：转换后全目录 Tooltip 余量 0；扫描器确认无遗漏 Inspector 字段。

@@ -13,17 +13,17 @@ namespace VNEffects
     [RequireComponent(typeof(VNImageEffectController))]
     public class VNFootShadow : MonoBehaviour
     {
-        [Tooltip("影子宽度 = 立绘宽度 × 此比例")]
+        [Header("影子宽度 = 立绘宽度 × 此比例")]
         public float widthRatio = 0.52f;
 
-        [Tooltip("影子高宽比（扁度）")]
+        [Header("影子高宽比（扁度）")]
         public float heightRatio = 0.22f;
 
         [Range(0f, 1f)]
-        [Tooltip("基础透明度")]
+        [Header("基础透明度")]
         public float baseAlpha = 0.38f;
 
-        [Tooltip("相对脚底的位置偏移")]
+        [Header("相对脚底的位置偏移")]
         public Vector2 offset = new Vector2(0f, 6f);
 
         VNImageEffectController _fx;

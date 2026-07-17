@@ -14,25 +14,25 @@ namespace VNEffects
     /// </summary>
     public class VNKenBurns : MonoBehaviour
     {
-        [Tooltip("被漂移的背景（留空 = 本物体的 RectTransform）")]
+        [Header("被漂移的背景（留空 = 本物体的 RectTransform）")]
         public RectTransform target;
 
-        [Tooltip("缩放下限（1 = 原始大小）")]
+        [Header("缩放下限（1 = 原始大小）")]
         public float minScale = 1.0f;
 
-        [Tooltip("缩放上限（背景四边有 60px 溢出余量，1.06 内安全）")]
+        [Header("缩放上限（背景四边有 60px 溢出余量，1.06 内安全）")]
         public float maxScale = 1.06f;
 
-        [Tooltip("平移幅度（像素，单方向最大偏移）")]
+        [Header("平移幅度（像素，单方向最大偏移）")]
         public float panRange = 40f;
 
-        [Tooltip("单段航点时长下限（秒）；一去一回 ≈ 完整周期 60~90 秒")]
+        [Header("单段航点时长下限（秒）；一去一回 ≈ 完整周期 60~90 秒")]
         public float legDurationMin = 30f;
 
-        [Tooltip("单段航点时长上限（秒）")]
+        [Header("单段航点时长上限（秒）")]
         public float legDurationMax = 45f;
 
-        [Tooltip("启动即开始漂移（永不静止）")]
+        [Header("启动即开始漂移（永不静止）")]
         public bool playOnAwake = true;
 
         RectTransform Rect => target != null ? target : (RectTransform)transform;

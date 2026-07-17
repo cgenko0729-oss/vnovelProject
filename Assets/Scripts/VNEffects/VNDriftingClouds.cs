@@ -13,16 +13,16 @@ namespace VNEffects
     [RequireComponent(typeof(RectTransform))]
     public class VNDriftingClouds : MonoBehaviour
     {
-        [Tooltip("云朵数量")]
+        [Header("云朵数量")]
         public int cloudCount = 3;
 
-        [Tooltip("云色（alpha 为基础透明度；夜晚场景可调暗调蓝）")]
+        [Header("云色（alpha 为基础透明度；夜晚场景可调暗调蓝）")]
         public Color tint = new Color(1f, 1f, 1f, 0.4f);
 
-        [Tooltip("横穿一屏耗时范围（秒，越大越慢）")]
+        [Header("横穿一屏耗时范围（秒，越大越慢）")]
         public Vector2 driftSecondsRange = new Vector2(70f, 120f);
 
-        [Tooltip("云朵分布的纵向范围（Canvas 像素，画面上部）")]
+        [Header("云朵分布的纵向范围（Canvas 像素，画面上部）")]
         public Vector2 heightRange = new Vector2(170f, 430f);
 
         const float WrapX = 1400f; // 出界回绕的横向边界

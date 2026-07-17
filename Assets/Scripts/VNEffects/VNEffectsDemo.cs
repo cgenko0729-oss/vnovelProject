@@ -22,49 +22,70 @@ namespace VNEffects
     public class VNEffectsDemo : MonoBehaviour
     {
         [Header("引用（由 Demo 场景生成器自动填好）")]
+        [Header("立绘 A 出场动画器")]
         public VNEntranceAnimator character;
+        [Header("立绘 A 特效控制器")]
         public VNImageEffectController characterFx;
+        [Header("背景特效控制器")]
         public VNImageEffectController backgroundFx;
+        [Header("氛围粒子列表（P 键开关）")]
         public VNAmbientParticles[] ambientParticles;
+        [Header("底部按键提示文字")]
         public Text hintText;
 
         [Header("氛围特效（feature/atmosphere-effects）")]
         public VNGodRays godRays;
+        [Header("聚焦渐晕（V 键）")]
         public VNVignetteFocus vignetteFocus;
+        [Header("情绪边缘泛光（E 键循环）")]
         public VNEdgeGlow edgeGlow;
+        [Header("天气控制器（W 键循环）")]
         public VNWeatherController weather;
 
         [Header("色调/动作/转场（feature/mood-emotes-transitions）")]
         public VNMoodGrading mood;
+        [Header("全屏转场（T/F 键）")]
         public VNScreenTransition transition;
+        [Header("立绘 A 情绪动作（6~0/N 键）")]
         public VNCharacterEmotes emotes;
-        [Tooltip("转场时轮换的背景图")]
+        [Header("转场时轮换的背景图")]
         public Sprite[] backgroundVariants;
 
         [Header("星尘/热浪/轮廓光（feature/breathing-rim-stardust-haze）")]
         public VNMouseStardust stardust;
+        [Header("热浪扭曲（Z 键）")]
         public VNHeatHaze heatHaze;
 
         [Header("说话者/波光/震动/对话框（feature/speaker-highlight）")]
         public VNEntranceAnimator characterB;
+        [Header("立绘 B 特效控制器")]
         public VNImageEffectController characterBFx;
+        [Header("说话者高亮（Y 键循环）")]
         public VNSpeakerHighlight speakerHighlight;
+        [Header("画面震动（J/K/L 键）")]
         public VNScreenShake screenShake;
+        [Header("对话框（Enter 键推进）")]
         public VNDialogueBox dialogue;
 
         [Header("视差/荷兰角（feature/parallax-ripple-eyelid-dutch）")]
         public VNParallax parallax;
+        [Header("荷兰角（I 键）")]
         public VNDutchAngle dutchAngle;
 
         [Header("镜头/心跳/樱吹雪（feature/camera-heartbeat-sakura）")]
         public VNCamera vnCamera;
+        [Header("心跳脉动（A 键）")]
         public VNHeartbeat heartbeat;
+        [Header("樱吹雪（D 键）")]
         public VNSakuraBurst sakura;
 
         [Header("景深/云影/色调匹配/选项（feature/depth-polish-choices）")]
         public VNFakeDoF fakeDoF;
+        [Header("云影（] 键）")]
         public VNCloudShadows cloudShadows;
+        [Header("立绘色调匹配")]
         public VNToneMatch toneMatch;
+        [Header("选项面板（退格键）")]
         public VNChoicePanel choicePanel;
 
         [Header("漫画速度线（agent/manga-speed-lines）")]
@@ -84,6 +105,7 @@ namespace VNEffects
 
         [Header("夜空氛围（agent/night-sky-ambience）")]
         public VNShootingStars shootingStars;
+        [Header("云本体缓移（; 键）")]
         public VNDriftingClouds driftingClouds;
 
         static readonly string[] DemoChoices =

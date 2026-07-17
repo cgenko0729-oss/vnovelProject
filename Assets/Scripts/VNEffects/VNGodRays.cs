@@ -17,45 +17,45 @@ namespace VNEffects
         static readonly int IdTintColor = Shader.PropertyToID("_TintColor");
 
         [Header("光束外观")]
-        [Tooltip("光束数量")]
+        [Header("光束数量")]
         public int beamCount = 3;
 
-        [Tooltip("光束颜色（alpha 为基础透明度）")]
+        [Header("光束颜色（alpha 为基础透明度）")]
         public Color color = new Color(1f, 0.95f, 0.78f, 0.22f);
 
-        [Tooltip("HDR 强度倍率，>1 时配合 Bloom 产生柔光")]
+        [Header("HDR 强度倍率，>1 时配合 Bloom 产生柔光")]
         public float hdrIntensity = 1.35f;
 
-        [Tooltip("光束倾斜基准角度（度，正值向左下方斜）")]
+        [Header("光束倾斜基准角度（度，正值向左下方斜）")]
         public float baseAngle = 26f;
 
-        [Tooltip("每道光束在基准角度上的随机偏差（度）")]
+        [Header("每道光束在基准角度上的随机偏差（度）")]
         public float angleSpread = 7f;
 
-        [Tooltip("光束宽度随机范围（Canvas 像素）")]
+        [Header("光束宽度随机范围（Canvas 像素）")]
         public Vector2 widthRange = new Vector2(130f, 300f);
 
-        [Tooltip("光束长度（Canvas 像素，要足够长贯穿画面）")]
+        [Header("光束长度（Canvas 像素，要足够长贯穿画面）")]
         public float beamLength = 1800f;
 
-        [Tooltip("光束顶端沿画面顶边分布的 X 范围（相对画面中心，Canvas 像素）")]
+        [Header("光束顶端沿画面顶边分布的 X 范围（相对画面中心，Canvas 像素）")]
         public Vector2 topOffsetRange = new Vector2(-150f, 800f);
 
         [Header("动态")]
-        [Tooltip("摆动幅度（度）")]
+        [Header("摆动幅度（度）")]
         public float swayDegrees = 2.2f;
 
-        [Tooltip("摆动周期（秒）")]
+        [Header("摆动周期（秒）")]
         public float swayPeriod = 8f;
 
         [Range(0f, 1f)]
-        [Tooltip("透明度呼吸幅度")]
+        [Header("透明度呼吸幅度")]
         public float alphaPulseStrength = 0.45f;
 
-        [Tooltip("透明度呼吸周期（秒）")]
+        [Header("透明度呼吸周期（秒）")]
         public float alphaPulsePeriod = 5f;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         readonly List<RawImage> _beams = new List<RawImage>();

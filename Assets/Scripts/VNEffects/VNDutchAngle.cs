@@ -11,16 +11,16 @@ namespace VNEffects
     /// </summary>
     public class VNDutchAngle : MonoBehaviour
     {
-        [Tooltip("被倾斜的容器（场景生成器自动指向 TiltRoot）")]
+        [Header("被倾斜的容器（场景生成器自动指向 TiltRoot）")]
         public RectTransform target;
 
-        [Tooltip("默认倾斜角度（度）")]
+        [Header("默认倾斜角度（度）")]
         public float angle = 3f;
 
-        [Tooltip("倾斜过渡时长（秒）")]
+        [Header("倾斜过渡时长（秒）")]
         public float duration = 1.4f;
 
-        [Tooltip("画面宽高比（用于计算防露角的放大量）")]
+        [Header("画面宽高比（用于计算防露角的放大量）")]
         public float aspect = 16f / 9f;
 
         bool _tilted;

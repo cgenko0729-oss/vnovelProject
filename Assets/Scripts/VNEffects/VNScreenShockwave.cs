@@ -21,25 +21,28 @@ namespace VNEffects
         static readonly int IdCenter = Shader.PropertyToID("_Center");
         static readonly int IdAspect = Shader.PropertyToID("_Aspect");
 
-        [Tooltip("渲染排序（盖过粒子与速度线 25，低于黑边 35 / 对话框 40）")]
+        [Header("渲染排序（盖过粒子与速度线 25，低于黑边 35 / 对话框 40）")]
         public int sortingOrder = 26;
 
-        [Tooltip("单次波纹扩散时长（秒）")]
+        [Header("单次波纹扩散时长（秒）")]
         public float duration = 0.95f;
 
-        [Tooltip("被波纹扭曲的图片（通常只放背景；立绘不加可避免脸部扭曲）")]
+        [Header("被波纹扭曲的图片（通常只放背景；立绘不加可避免脸部扭曲）")]
         public VNImageEffectController[] targets;
 
-        [Tooltip("扭曲脉冲峰值（UV 偏移量，strength=1 时）")]
+        [Header("扭曲脉冲峰值（UV 偏移量，strength=1 时）")]
         public float waveAmount = 0.014f;
+        [Header("扭曲流速")]
         public float waveSpeed = 26f;
+        [Header("扭曲频率（越大波纹越密）")]
         public float waveFrequency = 30f;
 
-        [Tooltip("可选：联动轻震动强化受击感")]
+        [Header("可选：联动轻震动强化受击感")]
         public VNScreenShake screenShake;
+        [Header("是否联动画面震动")]
         public bool withShake = true;
 
-        [Tooltip("可选：预制的 VN/Shockwave 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Shockwave 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         RawImage _img;

@@ -23,10 +23,10 @@ namespace VNEffects
             NoFlip,    // 强制不翻转
         }
 
-        [Tooltip("渲染排序（对话框 40 之上、全屏转场 100 之下）")]
+        [Header("渲染排序（对话框 40 之上、全屏转场 100 之下）")]
         public int sortingOrder = 90;
 
-        [Tooltip("截图上下颠倒时改这里（Auto 已按平台自动判断）")]
+        [Header("截图上下颠倒时改这里（Auto 已按平台自动判断）")]
         public FlipMode flip = FlipMode.Auto;
 
         RawImage _img;

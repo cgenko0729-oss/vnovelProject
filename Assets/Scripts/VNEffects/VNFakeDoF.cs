@@ -11,17 +11,21 @@ namespace VNEffects
     /// </summary>
     public class VNFakeDoF : MonoBehaviour
     {
-        [Tooltip("背景的特效控制器")]
+        [Header("背景的特效控制器")]
         public VNImageEffectController backgroundFx;
 
-        [Tooltip("背景所在的视差层（缩放它而不是背景图，避开 Ken Burns 的缩放动画）")]
+        [Header("背景所在的视差层（缩放它而不是背景图，避开 Ken Burns 的缩放动画）")]
         public RectTransform backLayer;
 
         [Header("特写参数")]
         public float blurRadius = 0.006f;
+        [Header("背景压暗亮度（1 = 不变暗）")]
         public float dimBrightness = 0.86f;
+        [Header("背景饱和度保留比例")]
         public float saturation = 0.9f;
+        [Header("背景层微放大倍率（拉开纵深）")]
         public float layerZoom = 1.035f;
+        [Header("开/关过渡时长（秒）")]
         public float transition = 0.7f;
 
         bool _focused;

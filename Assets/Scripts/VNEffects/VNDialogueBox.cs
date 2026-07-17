@@ -17,15 +17,18 @@ namespace VNEffects
     [RequireComponent(typeof(RectTransform))]
     public class VNDialogueBox : MonoBehaviour
     {
-        [Tooltip("渲染排序（高于氛围粒子，低于全屏转场）")]
+        [Header("渲染排序（高于氛围粒子，低于全屏转场）")]
         public int sortingOrder = 40;
 
+        [Header("对话框面板底色")]
         public Color panelColor = new Color(0.05f, 0.07f, 0.13f, 0.78f);
+        [Header("流光边框颜色")]
         public Color frameColor = new Color(1f, 0.85f, 0.5f, 0.9f);
+        [Header("名牌默认底色（角色定义里的 nameColor 优先）")]
         public Color nameTagColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
 
         [Header("头像")]
-        [Tooltip("头像窗口尺寸（像素）：窗口外的部分被裁掉，窗口可高出面板顶边（半身像效果）")]
+        [Header("头像窗口尺寸（像素）：窗口外的部分被裁掉，窗口可高出面板顶边（半身像效果）")]
         public Vector2 portraitWindowSize = new Vector2(230f, 300f);
 
         RectTransform _root;

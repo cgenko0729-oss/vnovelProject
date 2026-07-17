@@ -12,14 +12,14 @@ namespace VNEffects
     [RequireComponent(typeof(RectTransform))]
     public class VNCloudShadows : MonoBehaviour
     {
-        [Tooltip("云影数量")]
+        [Header("云影数量")]
         public int cloudCount = 3;
 
         [Range(0f, 0.5f)]
-        [Tooltip("云影深度（透明度）")]
+        [Header("云影深度（透明度）")]
         public float shadowAlpha = 0.16f;
 
-        [Tooltip("横穿一屏的速度范围（像素/秒）")]
+        [Header("横穿一屏的速度范围（像素/秒）")]
         public Vector2 speedRange = new Vector2(30f, 55f);
 
         class Cloud

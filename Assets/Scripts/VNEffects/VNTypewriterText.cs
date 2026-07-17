@@ -12,13 +12,13 @@ namespace VNEffects
     [RequireComponent(typeof(Text))]
     public class VNTypewriterText : BaseMeshEffect
     {
-        [Tooltip("每秒显示字数")]
+        [Header("每秒显示字数")]
         public float charsPerSecond = 18f;
 
-        [Tooltip("每个字上浮的高度（像素）")]
+        [Header("每个字上浮的高度（像素）")]
         public float riseHeight = 10f;
 
-        [Tooltip("每个字淡入动画跨越的字数（越大越绵柔）")]
+        [Header("每个字淡入动画跨越的字数（越大越绵柔）")]
         public float fadeSpanChars = 2.5f;
 
         /// <summary>整段文字显示完毕时回调</summary>

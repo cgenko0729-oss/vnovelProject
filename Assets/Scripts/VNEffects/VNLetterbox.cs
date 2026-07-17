@@ -14,13 +14,13 @@ namespace VNEffects
     [RequireComponent(typeof(RectTransform))]
     public class VNLetterbox : MonoBehaviour
     {
-        [Tooltip("渲染排序（盖过舞台与速度线 25，低于对话框 40）")]
+        [Header("渲染排序（盖过舞台与速度线 25，低于对话框 40）")]
         public int sortingOrder = 35;
 
-        [Tooltip("默认黑边高度（Canvas 像素；130 ≈ 2.35:1 宽银幕）")]
+        [Header("默认黑边高度（Canvas 像素；130 ≈ 2.35:1 宽银幕）")]
         public float defaultHeight = 130f;
 
-        [Tooltip("默认滑入/滑出时长（秒）")]
+        [Header("默认滑入/滑出时长（秒）")]
         public float defaultDuration = 0.7f;
 
         RectTransform _top;

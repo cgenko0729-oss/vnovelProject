@@ -17,9 +17,9 @@ namespace VNEffects
     public class VNQteModule : VNEventModule
     {
         [Header("默认参数（剧本 kwargs 可覆盖）")]
-        [Tooltip("限时（秒），剧本 time: 覆盖")]
+        [Header("限时（秒），剧本 time: 覆盖")]
         public float duration = 4f;
-        [Tooltip("目标点击次数，剧本 target: 覆盖")]
+        [Header("目标点击次数，剧本 target: 覆盖")]
         public int targetCount = 15;
 
         static readonly Color PanelColor = new Color(0.08f, 0.09f, 0.14f, 0.92f);

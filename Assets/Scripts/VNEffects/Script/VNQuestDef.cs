@@ -13,17 +13,17 @@ namespace VNEffects
     [CreateAssetMenu(menuName = "VN/Quest Definition", fileName = "NewQuest")]
     public class VNQuestDef : ScriptableObject
     {
-        [Tooltip("剧本 quest 命令引用的 id（可中文，如 告白大作战）")]
+        [Header("剧本 quest 命令引用的 id（可中文，如 告白大作战）")]
         public string id;
 
-        [Tooltip("任务日志显示的标题；留空 = 直接用 id")]
+        [Header("任务日志显示的标题；留空 = 直接用 id")]
         public string title;
 
         [TextArea]
-        [Tooltip("任务总描述（日志里显示在标题下，可留空）")]
+        [Header("任务总描述（日志里显示在标题下，可留空）")]
         public string description;
 
-        [Tooltip("各阶段目标文案：第 1 项对应阶段 1（quest start 后的初始阶段）")]
+        [Header("各阶段目标文案：第 1 项对应阶段 1（quest start 后的初始阶段）")]
         public List<string> stages = new List<string>();
 
         public string Title => string.IsNullOrEmpty(title) ? id : title;

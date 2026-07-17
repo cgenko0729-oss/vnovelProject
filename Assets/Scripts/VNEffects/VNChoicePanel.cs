@@ -17,11 +17,14 @@ namespace VNEffects
     [RequireComponent(typeof(RectTransform))]
     public class VNChoicePanel : MonoBehaviour
     {
-        [Tooltip("渲染排序（高于对话框 40，低于全屏转场 100）")]
+        [Header("渲染排序（高于对话框 40，低于全屏转场 100）")]
         public int sortingOrder = 45;
 
+        [Header("选项按钮底色")]
         public Color buttonColor = new Color(0.07f, 0.09f, 0.16f, 0.88f);
+        [Header("按钮尺寸（像素）")]
         public Vector2 buttonSize = new Vector2(560f, 84f);
+        [Header("按钮纵向间距（像素）")]
         public float buttonSpacing = 26f;
 
         class Entry

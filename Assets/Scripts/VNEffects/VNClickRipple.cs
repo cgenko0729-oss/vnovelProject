@@ -11,22 +11,22 @@ namespace VNEffects
     [RequireComponent(typeof(ParticleSystem))]
     public class VNClickRipple : MonoBehaviour
     {
-        [Tooltip("涟漪/星光颜色")]
+        [Header("涟漪/星光颜色")]
         public Color tint = new Color(1f, 0.92f, 0.65f);
 
-        [Tooltip("HDR 增益（>1 配合 Bloom 泛光）")]
+        [Header("HDR 增益（>1 配合 Bloom 泛光）")]
         public float hdrBoost = 1.8f;
 
-        [Tooltip("涟漪最大直径（世界单位）")]
+        [Header("涟漪最大直径（世界单位）")]
         public float rippleSize = 1.3f;
 
-        [Tooltip("每次点击附带的星光数量")]
+        [Header("每次点击附带的星光数量")]
         public int sparkleCount = 3;
 
-        [Tooltip("渲染排序（高于 UI 粒子层）")]
+        [Header("渲染排序（高于 UI 粒子层）")]
         public int sortingOrder = 31;
 
-        [Tooltip("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         ParticleSystem _ps;

@@ -17,10 +17,10 @@ namespace VNEffects
     /// </summary>
     public class VNCamera : MonoBehaviour
     {
-        [Tooltip("镜头容器（场景生成器自动指向 ZoomRoot）")]
+        [Header("镜头容器（场景生成器自动指向 ZoomRoot）")]
         public RectTransform target;
 
-        [Tooltip("Dolly Zoom 时做反向缩放补偿的立绘")]
+        [Header("Dolly Zoom 时做反向缩放补偿的立绘")]
         public List<VNImageEffectController> dollyCharacters = new List<VNImageEffectController>();
 
         Vector2 _basePos;
@@ -107,16 +107,16 @@ namespace VNEffects
         // ------------------------------------------------------------------
 
         [Header("路径镜头")]
-        [Tooltip("自动钳制偏移量，防止高倍缩放对准边角时露出画布边缘")]
+        [Header("自动钳制偏移量，防止高倍缩放对准边角时露出画布边缘")]
         public bool clampToCanvas = true;
 
-        [Tooltip("画布半尺寸（1920×1080 的一半）")]
+        [Header("画布半尺寸（1920×1080 的一半）")]
         public Vector2 canvasHalf = new Vector2(960f, 540f);
 
-        [Tooltip("背景图的四边溢出量（生成器默认 60px）")]
+        [Header("背景图的四边溢出量（生成器默认 60px）")]
         public Vector2 overscan = new Vector2(60f, 60f);
 
-        [Tooltip("镜头交叉淡化组件（留空则首次使用时自动创建在 Canvas 下）")]
+        [Header("镜头交叉淡化组件（留空则首次使用时自动创建在 Canvas 下）")]
         public VNCameraFade cameraFade;
 
         /// <summary>一个镜头路径点</summary>

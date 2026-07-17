@@ -24,21 +24,21 @@ namespace VNEffects
         [System.Serializable]
         public class Location
         {
-            [Tooltip("地点名 = 返回给剧本的结果名（对应「* 结果行」）")]
+            [Header("地点名 = 返回给剧本的结果名（对应「* 结果行」）")]
             public string name;
-            [Tooltip("在地图上的归一化坐标（0,0 左下 ～ 1,1 右上）")]
+            [Header("在地图上的归一化坐标（0,0 左下 ～ 1,1 右上）")]
             public Vector2 position = new Vector2(0.5f, 0.5f);
-            [Tooltip("显示条件（VNFlags 表达式，如 好感度>=2；留空 = 总是显示）")]
+            [Header("显示条件（VNFlags 表达式，如 好感度>=2；留空 = 总是显示）")]
             public string condition;
-            [Tooltip("可选自定义图标；留空 = 程序化光点")]
+            [Header("可选自定义图标；留空 = 程序化光点")]
             public Sprite icon;
         }
 
-        [Tooltip("地图底图；剧本 bg:<背景id> 参数可临时换用舞台背景库里的图")]
+        [Header("地图底图；剧本 bg:<背景id> 参数可临时换用舞台背景库里的图")]
         public Sprite mapSprite;
-        [Tooltip("地点列表（结果名/坐标/条件）")]
+        [Header("地点列表（结果名/坐标/条件）")]
         public List<Location> locations = new List<Location>();
-        [Tooltip("选中地点后自动 flag「去过_<地点>」+1")]
+        [Header("选中地点后自动 flag「去过_<地点>」+1")]
         public bool markVisited = true;
 
         static readonly Color MarkerColor = new Color(0.5f, 0.9f, 1f, 1f);

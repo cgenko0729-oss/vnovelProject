@@ -28,27 +28,29 @@ namespace VNEffects
         static readonly int IdScratch = Shader.PropertyToID("_ScratchAmount");
         static readonly int IdTint = Shader.PropertyToID("_Tint");
 
-        [Tooltip("渲染排序（盖过舞台与水波 26，低于黑边 35 / 对话框 40）")]
+        [Header("渲染排序（盖过舞台与水波 26，低于黑边 35 / 对话框 40）")]
         public int sortingOrder = 34;
 
         [Header("胶片参数")]
-        [Tooltip("胶片总强度（0~1）")]
+        [Header("胶片总强度（0~1）")]
         public float filmIntensity = 1f;
+        [Header("颗粒强度")]
         [Range(0f, 1f)] public float grainAmount = 0.55f;
+        [Header("划痕强度")]
         [Range(0f, 1f)] public float scratchAmount = 0.7f;
-        [Tooltip("胶片色调（微暖泛黄的放映光）")]
+        [Header("胶片色调（微暖泛黄的放映光）")]
         public Color filmTint = new Color(1f, 0.96f, 0.86f, 1f);
 
         [Header("CRT 参数（柔和版）")]
-        [Tooltip("CRT 总强度（0~1；梦境用建议偏低更柔）")]
+        [Header("CRT 总强度（0~1；梦境用建议偏低更柔）")]
         public float crtIntensity = 0.8f;
-        [Tooltip("CRT 荧光色调（偏冷的屏幕光）")]
+        [Header("CRT 荧光色调（偏冷的屏幕光）")]
         public Color crtTint = new Color(0.85f, 0.95f, 1.1f, 1f);
 
-        [Tooltip("默认淡入/淡出时长（秒）")]
+        [Header("默认淡入/淡出时长（秒）")]
         public float defaultFade = 0.8f;
 
-        [Tooltip("可选：预制的 VN/RetroFilter 材质资产；留空则运行时创建")]
+        [Header("可选：预制的 VN/RetroFilter 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
 
         RawImage _img;

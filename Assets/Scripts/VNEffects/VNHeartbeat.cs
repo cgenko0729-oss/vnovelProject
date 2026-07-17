@@ -10,14 +10,14 @@ namespace VNEffects
     /// </summary>
     public class VNHeartbeat : MonoBehaviour
     {
-        [Tooltip("被脉动的容器（场景生成器自动指向 SceneRoot）")]
+        [Header("被脉动的容器（场景生成器自动指向 SceneRoot）")]
         public RectTransform target;
 
-        [Tooltip("联动的边缘泛光（自动切到 HeartBeat 粉色预设）")]
+        [Header("联动的边缘泛光（自动切到 HeartBeat 粉色预设）")]
         public VNEdgeGlow edgeGlow;
 
         [Range(0.002f, 0.05f)]
-        [Tooltip("缩放脉动幅度")]
+        [Header("缩放脉动幅度")]
         public float strength = 0.014f;
 
         Sequence _seq;
