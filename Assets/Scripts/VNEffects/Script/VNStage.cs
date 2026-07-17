@@ -41,6 +41,7 @@ namespace VNEffects
         public VNCloudShadows cloudShadows;
         public VNGodRays godRays;
         public VNSpeedLines speedLines;
+        public VNScreenShockwave shockwave;
         public VNLetterbox letterbox;
         public VNShootingStars shootingStars;
         public VNDriftingClouds driftingClouds;
@@ -102,6 +103,7 @@ namespace VNEffects
             if (cloudShadows == null) cloudShadows = FindFirstObjectByType<VNCloudShadows>();
             if (godRays == null) godRays = FindFirstObjectByType<VNGodRays>();
             if (speedLines == null) speedLines = FindFirstObjectByType<VNSpeedLines>();
+            if (shockwave == null) shockwave = FindFirstObjectByType<VNScreenShockwave>();
             if (letterbox == null) letterbox = FindFirstObjectByType<VNLetterbox>();
             if (shootingStars == null) shootingStars = FindFirstObjectByType<VNShootingStars>();
             if (driftingClouds == null) driftingClouds = FindFirstObjectByType<VNDriftingClouds>();
@@ -785,6 +787,10 @@ namespace VNEffects
                     if (arg == "burst") speedLines.Burst(); // 一次性冲击，不记录开关状态
                     else if (on) speedLines.Show();
                     else speedLines.Hide();
+                    break;
+                case "shockwave": // 一次性演出，不记录开关状态
+                    if (shockwave == null) break;
+                    shockwave.Play(arg == "heavy" ? 1.4f : arg == "light" ? 0.6f : 1f);
                     break;
                 case "heartbeat":
                     if (heartbeat == null) break;

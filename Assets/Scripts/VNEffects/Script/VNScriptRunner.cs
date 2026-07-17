@@ -238,6 +238,8 @@ namespace VNEffects
                         string name = cmd.Arg(0);
                         string value = cmd.Arg(1);
                         if (name == "focus") focus = value == "off" ? null : value;
+                        // 一次性演出（shockwave / speedlines burst）不属于持续状态，重建时跳过
+                        else if (name == "shockwave" || value == "burst") { }
                         else if (value == "off") snapshot.fxOn.Remove(name);
                         else if (!snapshot.fxOn.Contains(name)) snapshot.fxOn.Add(name);
                         break;

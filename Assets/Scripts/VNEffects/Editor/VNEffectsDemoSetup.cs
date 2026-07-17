@@ -48,6 +48,7 @@ namespace VNEffects.EditorTools
             public VNFakeDoF fakeDoF;
             public VNCloudShadows cloudShadows;
             public VNSpeedLines speedLines;
+            public VNScreenShockwave shockwave;
             public VNLetterbox letterbox;
             public VNShootingStars shootingStars;
             public VNDriftingClouds driftingClouds;
@@ -173,6 +174,14 @@ namespace VNEffects.EditorTools
             rig.speedLines = speedLinesGo.AddComponent<VNSpeedLines>();
             AssignSourceMaterial(rig.speedLines, rig.additiveMat);
 
+            // ---------- 8.55 全屏情绪水波 ----------
+            var shockwaveGo = new GameObject("ScreenShockwave", typeof(RectTransform));
+            shockwaveGo.transform.SetParent(canvasGo.transform, false);
+            rig.shockwave = shockwaveGo.AddComponent<VNScreenShockwave>();
+            rig.shockwave.targets = rig.bgFx != null
+                ? new[] { rig.bgFx } : new VNImageEffectController[0];
+            // screenShake 在步骤 11 创建后回填
+
             // ---------- 8.6 电影 Letterbox 黑边 ----------
             var letterboxGo = new GameObject("Letterbox", typeof(RectTransform));
             letterboxGo.transform.SetParent(canvasGo.transform, false);
@@ -199,6 +208,7 @@ namespace VNEffects.EditorTools
             // ---------- 11. 震动 / 视差 / 荷兰角 / 涟漪 ----------
             rig.screenShake = new GameObject("ScreenShake").AddComponent<VNScreenShake>();
             rig.screenShake.target = rig.sceneRoot;
+            rig.shockwave.screenShake = rig.screenShake;
 
             rig.parallax = new GameObject("Parallax").AddComponent<VNParallax>();
             rig.parallax.layers.Add(new VNParallax.Layer { rect = rig.layerBack, strength = 8f });
@@ -366,6 +376,7 @@ namespace VNEffects.EditorTools
             demo.fakeDoF = rig.fakeDoF;
             demo.cloudShadows = rig.cloudShadows;
             demo.speedLines = rig.speedLines;
+            demo.shockwave = rig.shockwave;
             demo.letterbox = rig.letterbox;
             demo.shootingStars = rig.shootingStars;
             demo.driftingClouds = rig.driftingClouds;
@@ -436,6 +447,7 @@ namespace VNEffects.EditorTools
             stage.cloudShadows = rig.cloudShadows;
             stage.godRays = rig.godRays;
             stage.speedLines = rig.speedLines;
+            stage.shockwave = rig.shockwave;
             stage.letterbox = rig.letterbox;
             stage.shootingStars = rig.shootingStars;
             stage.driftingClouds = rig.driftingClouds;
@@ -558,6 +570,7 @@ namespace VNEffects.EditorTools
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
 #   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch|speedlines|meteor|skycloud> <on|off>
 #   fx speedlines burst        漫画集中线一次性冲击（决断/惊愕瞬间）
+#   fx shockwave [light|heavy] 全屏情绪水波：受击/震惊时整个画面荡一圈波纹
 #   letterbox on|off [height:130] [time:0.7]   电影黑边；mood Memory 回忆自动上黑边
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----

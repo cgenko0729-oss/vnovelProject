@@ -83,7 +83,7 @@ namespace VNEffects.EditorTools
 
         public static readonly string[] FxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
-              "speedlines", "letterbox", "meteor", "skycloud", "focus" };
+              "speedlines", "shockwave", "letterbox", "meteor", "skycloud", "focus" };
 
         public static readonly string[] CamAnchors =
         {
@@ -181,9 +181,11 @@ namespace VNEffects.EditorTools
             Add("shake", "FX", "shake light|medium|heavy",
                 Pos("level", "", VNParamSource.Options,
                     new[] { "light", "medium", "heavy" }, "medium"));
-            Add("fx", "FX", "fx <name> on|off  (fx focus <char> / fx speedlines burst)",
+            Add("fx", "FX", "fx <name> on|off  (fx focus <char> / fx speedlines burst /\n" +
+                "fx shockwave [light|heavy] 全屏水波一次性冲击)",
                 Pos("name", "fx", VNParamSource.Options, FxNames),
-                Pos("value", "", VNParamSource.Options, new[] { "on", "off", "burst" }, "on"));
+                Pos("value", "", VNParamSource.Options,
+                    new[] { "on", "off", "burst", "light", "heavy" }, "on"));
             Add("sakura", "FX", "sakura  (petal burst combo)");
             Add("letterbox", "FX", "letterbox on|off [height:px] [time:sec]\n" +
                 "电影黑边上下滑入；mood Memory（回忆）会自动上黑边",

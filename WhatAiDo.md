@@ -2089,3 +2089,51 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
 - **云影(clouds)与云本体(skycloud)独立开关**：白天有影无云、夜晚有云无影
   等组合都是合理演出，不强制绑定。
 - 两个组件都进 `ToggleFxNames`：存档/读档/调试重建零改动支持。
+
+## 五十、全屏情绪水波（2026-07-17，分支 `agent/screen-shockwave`）
+
+> 玩法清单第 45 条落地：点击涟漪的全屏版——受击/震惊时整个画面荡开一圈波纹。
+
+### 50.1 计划
+
+- 一次性冲击演出（同 `fx speedlines burst` 定位），剧本 `fx shockwave [light|heavy]`；
+- UI 不写深度缓冲、URP 下 uGUI 拿不到屏幕纹理（无 GrabPass），不能做真·屏幕空间折射，
+  改用"三件套合成"方案：可见波纹环 overlay + 背景 UV 扭曲脉冲 + 轻震动。
+
+### 50.2 文件说明
+
+- **`Shaders/VNShockwave.shader`（新）**：`VN/Shockwave` 透明 overlay。
+  - `_Progress` 0→1 = 波纹从 `_Center` 扩散到扫过全屏（半径 ×1.55 保证覆盖最远角）；
+  - 三层构成：HDR 主波峰环（平方锐化，配合 Bloom 辉光）+ 波峰后方尾随衰减涟漪
+    （`cos` 环 ×wake 带）+ 波峰内侧微暗波谷（"水面下压"体积感）；
+  - 快进快出包络：前 7% 迅速点亮、扩散过半后随 `_Progress` 淡出；
+  - 亮/暗部按占比混合出 rgb，单 Pass alpha 混合，不遮挡画面。
+- **`VNScreenShockwave.cs`（新）**：组件总控。
+  - 嵌套 Canvas 排序 26（盖过粒子/速度线 25，低于黑边 35/对话框 40），
+    RawImage 全屏覆盖层平时禁用，零美术资源；
+  - `Play(strength, viewportCenter)`：`_Progress` 0→1 OutQuad（默认 0.95s，水波减速感）；
+  - 画面真的在"荡"：`targets`（生成器只连背景，避免立绘脸部扭曲）的
+    `SetWave` 扭曲脉冲——`DOVirtual.Float` 包络前 15% 拉满、其余缓慢归零，
+    `OnKill` 兜底归零防中断残留；
+  - 可选联动 `VNScreenShake`（strength≥1.2 用 Medium，否则 Light）；
+  - `PlayFrom(Transform)` 支持从受击角色位置荡开；全部 Tween `SetLink`。
+- **`VNStage.cs`（改）**：`shockwave` 字段 + AutoWire；`Fx()` 新 case：
+  `fx shockwave` 标准 / `light` 0.6 / `heavy` 1.4 倍强度；一次性演出不进 `ToggleFxNames`。
+- **`VNScriptRunner.cs`（改）**：调试重建的 fx 汇总跳过一次性演出
+  （`shockwave` 与 `speedlines burst`）——顺手修掉旧 bug：从选中行播放时
+  `fx speedlines burst` 会被误还原成持续开启的速度线。
+- **`VNEffectsDemoSetup.cs`（改）**：BuildStageRig 第 8.55 步创建 ScreenShockwave
+  （targets=背景 fx；screenShake 在第 11 步创建后回填），连线 stage/demo；
+  演示剧本头部语法速查补 shockwave 行。
+- **`VNEffectsDemo.cs`（改）**：`-`（减号）键触发全屏水波，提示更新。
+- **`VNScenarioSchema.cs`（改）**：FxNames 加 `shockwave`，fx 值选项加 `light/heavy`。
+
+### 50.3 技术决策
+
+- **不做屏幕空间折射**：URP + uGUI 组合拿不到屏幕纹理（无 GrabPass、
+  _CameraOpaqueTexture 不含透明队列的 UI），伪装方案 = 可见环 overlay 叠在画面上 +
+  背景材质自己的波浪 UV 扭曲同步脉冲，视觉上等效"画面在荡"。
+- **一次性 fx 不记录状态**：与 speedlines burst 同规则；并让调试重建把这类
+  命令整体跳过，避免"重建后画面莫名多了持续特效"。
+- **波谷微暗环**：纯加亮的环看起来像"光圈"不像"水波"，波峰内侧压一圈暗带
+  之后才有水面起伏的体积感（参考转场 Mode 9 的经验）。
