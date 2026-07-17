@@ -49,6 +49,7 @@ namespace VNEffects.EditorTools
             public VNCloudShadows cloudShadows;
             public VNSpeedLines speedLines;
             public VNScreenShockwave shockwave;
+            public VNRetroFilter retroFilter;
             public VNLetterbox letterbox;
             public VNShootingStars shootingStars;
             public VNDriftingClouds driftingClouds;
@@ -181,6 +182,11 @@ namespace VNEffects.EditorTools
             rig.shockwave.targets = rig.bgFx != null
                 ? new[] { rig.bgFx } : new VNImageEffectController[0];
             // screenShake 在步骤 11 创建后回填
+
+            // ---------- 8.58 胶片颗粒/CRT 复古滤镜 ----------
+            var retroGo = new GameObject("RetroFilter", typeof(RectTransform));
+            retroGo.transform.SetParent(canvasGo.transform, false);
+            rig.retroFilter = retroGo.AddComponent<VNRetroFilter>();
 
             // ---------- 8.6 电影 Letterbox 黑边 ----------
             var letterboxGo = new GameObject("Letterbox", typeof(RectTransform));
@@ -377,6 +383,7 @@ namespace VNEffects.EditorTools
             demo.cloudShadows = rig.cloudShadows;
             demo.speedLines = rig.speedLines;
             demo.shockwave = rig.shockwave;
+            demo.retroFilter = rig.retroFilter;
             demo.letterbox = rig.letterbox;
             demo.shootingStars = rig.shootingStars;
             demo.driftingClouds = rig.driftingClouds;
@@ -448,6 +455,7 @@ namespace VNEffects.EditorTools
             stage.godRays = rig.godRays;
             stage.speedLines = rig.speedLines;
             stage.shockwave = rig.shockwave;
+            stage.retroFilter = rig.retroFilter;
             stage.letterbox = rig.letterbox;
             stage.shootingStars = rig.shootingStars;
             stage.driftingClouds = rig.driftingClouds;
@@ -571,6 +579,8 @@ namespace VNEffects.EditorTools
 #   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch|speedlines|meteor|skycloud> <on|off>
 #   fx speedlines burst        漫画集中线一次性冲击（决断/惊愕瞬间）
 #   fx shockwave [light|heavy] 全屏情绪水波：受击/震惊时整个画面荡一圈波纹
+#   fx filmgrain on|off        胶片滤镜（颗粒+划痕）；mood Memory 回忆自动上
+#   fx crt on|off              CRT 滤镜（扫描线，柔和）；mood Dream 梦境自动上
 #   letterbox on|off [height:130] [time:0.7]   电影黑边；mood Memory 回忆自动上黑边
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----

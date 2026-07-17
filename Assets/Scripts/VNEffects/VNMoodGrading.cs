@@ -15,6 +15,7 @@ namespace VNEffects
         Memory,  // 回忆：褪色暖黄 + 胶片颗粒 + 暗角
         Tension, // 紧张：高对比偏绿
         Horror,  // 恐怖：去饱和 + 颗粒 + 暗角加深
+        Dream,   // 梦境：偏亮低对比柔紫粉 + 轻暗角（配 CRT 柔和滤镜）
     }
 
     /// <summary>
@@ -119,7 +120,8 @@ namespace VNEffects
         /// <summary>循环切换到下一种情绪（演示用）</summary>
         public VNMood CycleNext(float duration = -1f)
         {
-            var next = (VNMood)(((int)_current + 1) % 7);
+            int count = System.Enum.GetValues(typeof(VNMood)).Length;
+            var next = (VNMood)(((int)_current + 1) % count);
             SetMood(next, duration);
             return next;
         }
@@ -206,6 +208,14 @@ namespace VNEffects
                     s.temperature = -10f;
                     s.grainIntensity = 0.4f;
                     s.vignetteIntensity = 0.48f;
+                    break;
+                case VNMood.Dream: // 梦境：偏亮低对比柔紫粉，轻飘朦胧
+                    s.exposure = 0.35f; s.contrast = -24f; s.saturation = -14f;
+                    s.filter = new Color(1.04f, 0.95f, 1.1f);
+                    s.temperature = -6f; s.tint = 14f;
+                    s.lift = new Vector4(1.05f, 1.0f, 1.08f, 0f);
+                    s.gamma = new Vector4(1.02f, 0.99f, 1.05f, 0f);
+                    s.vignetteIntensity = 0.22f;
                     break;
             }
             return s;

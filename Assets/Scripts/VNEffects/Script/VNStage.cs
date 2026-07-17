@@ -42,6 +42,7 @@ namespace VNEffects
         public VNGodRays godRays;
         public VNSpeedLines speedLines;
         public VNScreenShockwave shockwave;
+        public VNRetroFilter retroFilter;
         public VNLetterbox letterbox;
         public VNShootingStars shootingStars;
         public VNDriftingClouds driftingClouds;
@@ -104,6 +105,7 @@ namespace VNEffects
             if (godRays == null) godRays = FindFirstObjectByType<VNGodRays>();
             if (speedLines == null) speedLines = FindFirstObjectByType<VNSpeedLines>();
             if (shockwave == null) shockwave = FindFirstObjectByType<VNScreenShockwave>();
+            if (retroFilter == null) retroFilter = FindFirstObjectByType<VNRetroFilter>();
             if (letterbox == null) letterbox = FindFirstObjectByType<VNLetterbox>();
             if (shootingStars == null) shootingStars = FindFirstObjectByType<VNShootingStars>();
             if (driftingClouds == null) driftingClouds = FindFirstObjectByType<VNDriftingClouds>();
@@ -511,6 +513,9 @@ namespace VNEffects
             foreach (var name in data.fxOn) Fx(name, "on");
             // 黑边若与回忆色调同时恢复，视为自动黑边（之后离开回忆会自动撤掉）
             _letterboxAuto = restoredMood == VNMood.Memory && data.fxOn.Contains("letterbox");
+            // 复古滤镜同理：与对应 mood 同时恢复视为自动滤镜
+            _retroAuto = (restoredMood == VNMood.Memory && data.fxOn.Contains("filmgrain")) ||
+                         (restoredMood == VNMood.Dream && data.fxOn.Contains("crt"));
 
             if (vnAudio != null)
             {
@@ -689,14 +694,18 @@ namespace VNEffects
 
         static readonly string[] ToggleFxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
-              "speedlines", "letterbox", "meteor", "skycloud" };
+              "speedlines", "letterbox", "meteor", "skycloud", "filmgrain", "crt" };
 
         [Tooltip("mood Memory（回忆）自动上电影黑边、离开回忆自动撤掉")]
         public bool autoMemoryLetterbox = true;
 
-        bool _letterboxAuto; // 当前黑边是否由回忆色调自动打开（离开回忆时才自动撤）
+        [Tooltip("mood Memory（回忆）自动上胶片滤镜、mood Dream（梦境）自动上 CRT 滤镜")]
+        public bool autoMoodRetroFilter = true;
 
-        /// <summary>mood 命令入口：切换情绪色调 + 回忆自动黑边联动</summary>
+        bool _letterboxAuto; // 当前黑边是否由回忆色调自动打开（离开回忆时才自动撤）
+        bool _retroAuto;     // 当前复古滤镜是否由 mood 自动打开（离开对应 mood 时才自动撤）
+
+        /// <summary>mood 命令入口：切换情绪色调 + 回忆黑边/复古滤镜自动联动</summary>
         public void SetMood(VNMood m, float duration = -1f)
         {
             if (mood != null)
@@ -704,18 +713,42 @@ namespace VNEffects
                 if (duration > 0f) mood.SetMood(m, duration);
                 else mood.SetMood(m);
             }
-            if (!autoMemoryLetterbox || letterbox == null) return;
-            if (m == VNMood.Memory && !letterbox.IsShown)
+            if (autoMemoryLetterbox && letterbox != null)
             {
-                letterbox.Show();
-                _fxStates["letterbox"] = true;
-                _letterboxAuto = true;
+                if (m == VNMood.Memory && !letterbox.IsShown)
+                {
+                    letterbox.Show();
+                    _fxStates["letterbox"] = true;
+                    _letterboxAuto = true;
+                }
+                else if (m != VNMood.Memory && _letterboxAuto)
+                {
+                    letterbox.Hide();
+                    _fxStates["letterbox"] = false;
+                    _letterboxAuto = false;
+                }
             }
-            else if (m != VNMood.Memory && _letterboxAuto)
+            if (autoMoodRetroFilter && retroFilter != null)
             {
-                letterbox.Hide();
-                _fxStates["letterbox"] = false;
-                _letterboxAuto = false;
+                if (m == VNMood.Memory && !retroFilter.IsShown)
+                {
+                    retroFilter.ShowFilm();
+                    _fxStates["filmgrain"] = true;
+                    _retroAuto = true;
+                }
+                else if (m == VNMood.Dream && !retroFilter.IsShown)
+                {
+                    retroFilter.ShowCrt();
+                    _fxStates["crt"] = true;
+                    _retroAuto = true;
+                }
+                else if (m != VNMood.Memory && m != VNMood.Dream && _retroAuto)
+                {
+                    retroFilter.Hide();
+                    _fxStates["filmgrain"] = false;
+                    _fxStates["crt"] = false;
+                    _retroAuto = false;
+                }
             }
         }
 
@@ -791,6 +824,18 @@ namespace VNEffects
                 case "shockwave": // 一次性演出，不记录开关状态
                     if (shockwave == null) break;
                     shockwave.Play(arg == "heavy" ? 1.4f : arg == "light" ? 0.6f : 1f);
+                    break;
+                case "filmgrain": // 与 crt 互斥：手动控制会接管 mood 自动滤镜
+                    _retroAuto = false;
+                    if (on) _fxStates["crt"] = false;
+                    if (retroFilter == null) break;
+                    if (on) retroFilter.ShowFilm(); else retroFilter.Hide();
+                    break;
+                case "crt":
+                    _retroAuto = false;
+                    if (on) _fxStates["filmgrain"] = false;
+                    if (retroFilter == null) break;
+                    if (on) retroFilter.ShowCrt(); else retroFilter.Hide();
                     break;
                 case "heartbeat":
                     if (heartbeat == null) break;

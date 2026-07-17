@@ -78,12 +78,13 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNCharacterEmotes | 情绪动作：惊讶/生气/害羞/沮丧(+Recover)/点头/摇头 |
 | VNAmbientParticles | 粒子预设×8：尘埃/星光/光斑/花瓣/雨(+溅落)/雪/萤火虫/雾 + PlaySparkleBurst |
 | VNWeatherController | 天气切换 + 调色联动 |
-| VNMoodGrading | 七种情绪色调（双 Volume 权重交叉过渡） |
+| VNMoodGrading | 八种情绪色调（双 Volume 权重交叉过渡，含 Dream 梦境） |
 | VNScreenTransition | 全屏转场×8：噪声溶解/百叶窗/瓦片/圆扩散/水墨/爆闪/光斑/眨眼 |
 | VNCamera / VNScreenShake / VNDutchAngle / VNHeartbeat | 运镜×5 / 三级震动 / 荷兰角 / 心跳脉动 |
 | VNGodRays / VNEdgeGlow / VNCloudShadows / VNHeatHaze / VNFakeDoF | 光束/情绪泛光/云影/热浪+雾/伪景深 |
 | VNSpeedLines | 漫画速度线/集中线 overlay（3 变体贴图闪帧，fx speedlines on/off/burst） |
 | VNScreenShockwave | 全屏情绪水波（fx shockwave [light\|heavy]：波峰环 overlay + 背景波浪脉冲 + 轻震动） |
+| VNRetroFilter | 胶片/CRT 复古滤镜（fx filmgrain/crt；mood Memory 自动胶片、Dream 自动 CRT） |
 | VNLetterbox | 电影黑边上下滑入（letterbox on/off [height:][time:]，mood Memory 回忆自动联动） |
 | VNShootingStars / VNDriftingClouds | 夜晚偶发流星（fx meteor）/ 云本体缓移（fx skycloud，与云影互补） |
 | VNParallax / VNMouseStardust / VNClickRipple | 鼠标视差 / 星尘拖尾 / 点击涟漪 |

@@ -2137,3 +2137,60 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   命令整体跳过，避免"重建后画面莫名多了持续特效"。
 - **波谷微暗环**：纯加亮的环看起来像"光圈"不像"水波"，波峰内侧压一圈暗带
   之后才有水面起伏的体积感（参考转场 Mode 9 的经验）。
+
+## 五十一、胶片颗粒/CRT 复古滤镜（2026-07-17，分支 `agent/retro-film-filter`）
+
+> 玩法清单第 46 条落地：回忆用胶片颗粒+划痕、梦境用 CRT（柔和版）。
+
+### 51.1 计划
+
+- 一个 shader 一个组件承载两种风格（同 VNScreenTransition 的 `_Mode` 复用思路）；
+- 剧本 `fx filmgrain on|off` / `fx crt on|off`（互斥，开一个自动顶掉另一个）；
+- mood 联动：Memory（回忆）自动上胶片；新增 **Dream（梦境）** 色调自动上 CRT。
+
+### 51.2 文件说明
+
+- **`Shaders/VNRetroFilter.shader`（新）**：`VN/RetroFilter` 透明 overlay，
+  `_Mode` 0=胶片 / 1=CRT，`_Intensity` 总强度做淡入淡出。
+  - 胶片模式（12fps 帧量化，每"帧"整体跳变复刻放映机质感）：
+    细密亮/暗颗粒 + 3 条随帧跳位置随机隐现的竖向划痕（亮痕暗痕交替）+
+    大格随机偶发尘点暗斑 + 整屏放映亮度抖动 + 较重暗角；
+  - CRT 模式（柔和版，梦境不刺眼）：横向扫描暗线（低对比）+
+    RGB 三色相位荫罩条纹（像素感彩色微光）+ 缓慢下扫的滚动亮带 +
+    40fps 帧量化微闪烁 + 轻暗角与横向弧面压暗；
+  - 亮/暗部按占比混合出 rgb，单 Pass alpha 叠加，无需屏幕纹理。
+- **`VNRetroFilter.cs`（新）**：组件总控，`VNRetroMode { None, Film, Crt }`。
+  - 嵌套 Canvas 排序 34（盖过舞台/速度线 25/水波 26，低于黑边 35/对话框 40）；
+  - `SetMode(mode, fade)` 统一入口：None=淡出后禁用；Film/Crt 先配参数
+    （颗粒/划痕强度、胶片暖黄 tint / CRT 冷蓝荧光 tint）再 `_Intensity` 淡入，
+    两种滤镜互切时直接换风格补强度；`ShowFilm`/`ShowCrt`/`Hide`/`CycleNext` 快捷方法；
+  - 材质 Tween `SetTarget(_mat)`+`SetLink`，OnDestroy 前 DOKill 防泄漏。
+- **`VNMoodGrading.cs`（改）**：`VNMood` 新增 **Dream（梦境）**——偏亮低对比
+  柔紫粉（曝光+0.35、对比-24、品红 tint+14、紫粉 lift/gamma、轻暗角）；
+  `CycleNext` 的硬编码 `% 7` 改为按枚举长度取模（修掉加枚举会漏最后一项的隐患）。
+- **`VNStage.cs`（改）**：`retroFilter` 字段 + AutoWire；`ToggleFxNames` 加
+  `filmgrain`/`crt`（存档/读档/调试重建零改动支持）；`Fx()` 两个新 case
+  （互斥：开一个清另一个的状态，手动控制会接管自动滤镜）；
+  `SetMood` 联动重构：Memory→黑边+胶片、Dream→CRT，`_retroAuto` 标记
+  确保手动/自动互不干扰；`RestoreSnapshot` 按 mood+fx 组合恢复自动标记。
+- **`VNScriptRunner.cs`（改）**：调试重建（从选中行播放）静默重放补齐——
+  mood 命令按 `autoMoodRetroFilter` 重放自动胶片/CRT（与黑边同款逻辑）；
+  fx 命令处理 filmgrain/crt 互斥与手动接管，保证重建状态与运行时一致。
+- **`VNEffectsDemoSetup.cs`（改）**：BuildStageRig 第 8.58 步创建 RetroFilter，
+  连线 stage/demo；演示剧本头部语法速查补 filmgrain/crt 两行。
+- **`VNEffectsDemo.cs`（改）**：`=`（等号）键循环 无→胶片→CRT，提示显示当前模式。
+- **`VNScenarioSchema.cs`（改）**：FxNames 加 `filmgrain`/`crt`；
+  mood 下拉自动长出 Dream（选项来自 `EnumNames<VNMood>()`，零改动）。
+
+### 51.3 技术决策
+
+- **overlay 而非后处理**：URP FilmGrain（Memory 色调里已有轻颗粒）做不了划痕/
+  尘点/扫描线；自定义全屏 Pass 需要改 Renderer Feature 且影响移动端管线资产。
+  uGUI overlay 零管线侵入，且能精确插在"舞台之上、黑边/对话框之下"的排序层。
+- **划痕不用贴图**：3 条候选竖线按帧 hash 跳位置+随机隐现，比静态贴图更像
+  真实胶片的随机损伤，且零美术资源（延续全程序化贴图的项目约定）。
+- **新增 Dream 色调而非复用现有 mood**：梦境是视觉小说高频场景，
+  CRT 滤镜需要一个语义明确的自动触发点；调色（柔紫粉朦胧）与滤镜（扫描线）
+  分层各管各的，单开 mood Dream 不开 crt 也成立。
+- **互斥用状态清理实现**：同一 overlay 同时只能一种风格，`fx filmgrain on`
+  直接 `_fxStates["crt"]=false`，存档里永远只会记录其一。

@@ -153,6 +153,7 @@ namespace VNEffects
             VNScriptCommand lastCameraCut = null;
             bool hasBranching = false;
             bool autoLetterbox = false; // 回忆自动黑边的重放状态
+            bool autoRetro = false;     // 回忆自动胶片/梦境自动 CRT 的重放状态
 
             VNFlags.Clear();
             for (int i = 0; i < exclusiveIndex && i < _commands.Count; i++)
@@ -169,11 +170,12 @@ namespace VNEffects
                     case "mood":
                     {
                         snapshot.mood = cmd.Arg(0, VNMood.Neutral.ToString());
+                        var moodValue = VNScriptParser.ParseEnum(
+                            snapshot.mood, VNMood.Neutral, 0);
                         // 回忆自动黑边的静默重放（与运行时 VNStage.SetMood 逻辑一致）
                         if (stage.autoMemoryLetterbox)
                         {
-                            bool isMemory = VNScriptParser.ParseEnum(
-                                snapshot.mood, VNMood.Neutral, 0) == VNMood.Memory;
+                            bool isMemory = moodValue == VNMood.Memory;
                             if (isMemory && !snapshot.fxOn.Contains("letterbox"))
                             {
                                 snapshot.fxOn.Add("letterbox");
@@ -183,6 +185,29 @@ namespace VNEffects
                             {
                                 snapshot.fxOn.Remove("letterbox");
                                 autoLetterbox = false;
+                            }
+                        }
+                        // 回忆自动胶片 / 梦境自动 CRT 的静默重放
+                        if (stage.autoMoodRetroFilter)
+                        {
+                            bool hasRetro = snapshot.fxOn.Contains("filmgrain") ||
+                                            snapshot.fxOn.Contains("crt");
+                            if (moodValue == VNMood.Memory && !hasRetro)
+                            {
+                                snapshot.fxOn.Add("filmgrain");
+                                autoRetro = true;
+                            }
+                            else if (moodValue == VNMood.Dream && !hasRetro)
+                            {
+                                snapshot.fxOn.Add("crt");
+                                autoRetro = true;
+                            }
+                            else if (moodValue != VNMood.Memory &&
+                                     moodValue != VNMood.Dream && autoRetro)
+                            {
+                                snapshot.fxOn.Remove("filmgrain");
+                                snapshot.fxOn.Remove("crt");
+                                autoRetro = false;
                             }
                         }
                         break;
@@ -242,6 +267,13 @@ namespace VNEffects
                         else if (name == "shockwave" || value == "burst") { }
                         else if (value == "off") snapshot.fxOn.Remove(name);
                         else if (!snapshot.fxOn.Contains(name)) snapshot.fxOn.Add(name);
+                        // 复古滤镜互斥 + 手动接管（与运行时 VNStage.Fx 逻辑一致）
+                        if (name == "filmgrain" || name == "crt")
+                        {
+                            autoRetro = false;
+                            if (value != "off")
+                                snapshot.fxOn.Remove(name == "filmgrain" ? "crt" : "filmgrain");
+                        }
                         break;
                     }
                     case "flag":

@@ -73,6 +73,9 @@ namespace VNEffects
         [Header("全屏情绪水波（agent/screen-shockwave）")]
         public VNScreenShockwave shockwave;
 
+        [Header("胶片/CRT 复古滤镜（agent/retro-film-filter）")]
+        public VNRetroFilter retroFilter;
+
         [Header("电影黑边（agent/cinema-letterbox）")]
         public VNLetterbox letterbox;
 
@@ -261,6 +264,12 @@ namespace VNEffects
 
             if (kb.minusKey.wasPressedThisFrame && shockwave != null) shockwave.Play();
 
+            if (kb.equalsKey.wasPressedThisFrame && retroFilter != null)
+            {
+                retroFilter.CycleNext();
+                UpdateHint();
+            }
+
             if (kb.slashKey.wasPressedThisFrame && shootingStars != null)
                 shootingStars.Toggle();
 
@@ -445,7 +454,8 @@ namespace VNEffects
                 $"Q 运镜循环({(_cameraIndex >= 0 ? CameraMoveNames[_cameraIndex] : "-")}) | " +
                 "A 心跳演出 | D 樱吹雪告白\n" +
                 "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）\n" +
-                ", 速度线开关 | . 速度线冲击 | ' 电影黑边 | / 流星 | ; 云缓移 | - 全屏水波";
+                ", 速度线开关 | . 速度线冲击 | ' 电影黑边 | / 流星 | ; 云缓移 | - 全屏水波\n" +
+                $"= 复古滤镜循环({(retroFilter != null ? retroFilter.Mode.ToString() : "-")}：无→胶片→CRT)";
         }
     }
 }
