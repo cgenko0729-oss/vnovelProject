@@ -2249,3 +2249,19 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   `line`——它是 HLSL 保留字（图元类型），d3d11 编译器直接报语法错误。
   改名 `scratch` 即可。教训：shader 变量避开 `line/point/triangle/sample/matrix`
   等 HLSL 保留字。
+
+## 五十三、从零手动搭建场景指南 SetUpGuide.md（2026-07-17，分支 `agent/setup-guide`）
+
+- **`SetUpGuide.md`（新）**：假设 Hierarchy 全空、纯手动从第一个物体搭出完整
+  剧本演示场景的教程，内容与 `VNEffectsDemoSetup.BuildStageRig / CreateScriptDemoScene`
+  的实际产物逐项对齐（参数值直接取自生成器代码）。
+- 结构：第 0 章三个核心概念（HDR+Bloom 发光契约 / 每种整屏运动独占容器层 /
+  嵌套 Canvas sortingOrder 排序体系）→ 项目级准备（导入设置/材质资产/Volume
+  Profile 及每个数值的依据）→ 相机与后处理 → Canvas 与容器层级 → 背景与舞台 →
+  全屏 overlay 排序总表 → 场外管理器与粒子连线表 → 对话框/EventSystem →
+  剧本系统接线（VNStage 引用清单/角色资产/剧本/音频/事件/任务）→
+  运行验证清单 + 常见坑速查表；附录 A 键盘演示场景差异、附录 B 完整层级树。
+- 特别标注了手动搭建的高危点：Canvas 必须 Screen Space - Camera（Overlay 会让
+  Bloom 对 UI 失效）、Sprite 必须 Full Rect、LayerFront/Background 命名被
+  AutoWire 依赖、事件模板必须禁用等。
+- **`CLAUDE.md`（改）**：文档头部补 SetUpGuide.md 指引。

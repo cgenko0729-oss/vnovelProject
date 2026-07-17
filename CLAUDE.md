@@ -1,7 +1,8 @@
 # CLAUDE.md — 视觉小说项目（vnovelProject）
 
 > 本文件是给 Claude（AI 助手）的项目说明书。所有开发过程的详细记录在 `WhatAiDo.md`；
-> 逐脚本的代码指南（职责/用法/扩展/维护）在 `ProjectCodeGuide.md`，改代码前先查它。
+> 逐脚本的代码指南（职责/用法/扩展/维护）在 `ProjectCodeGuide.md`，改代码前先查它；
+> 从空场景手动搭建舞台的完整教程（含层级/排序/参数依据）在 `SetUpGuide.md`。
 
 ## 项目概况
 
