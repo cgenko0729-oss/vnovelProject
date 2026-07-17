@@ -76,6 +76,9 @@ namespace VNEffects
         [Header("胶片/CRT 复古滤镜（agent/retro-film-filter）")]
         public VNRetroFilter retroFilter;
 
+        [Header("背景 Ken Burns 漂移（agent/kenburns-drift）")]
+        public VNKenBurns kenBurns;
+
         [Header("电影黑边（agent/cinema-letterbox）")]
         public VNLetterbox letterbox;
 
@@ -115,11 +118,14 @@ namespace VNEffects
         {
             if (backgroundFx != null)
             {
-                // 背景：轻微 Ken Burns 缓慢缩放 + 微弱亮度呼吸，让画面不死板
-                backgroundFx.transform.DOScale(1.06f, 14f)
-                    .SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
-                    .SetLink(backgroundFx.gameObject);
+                // 背景微弱亮度呼吸；缓慢缩放+平移交给 VNKenBurns（旧场景自愈补挂）
                 backgroundFx.StartBreathingGlow(new Color(0.9f, 0.95f, 1f), 0.05f, 6f);
+                if (kenBurns == null)
+                {
+                    kenBurns = backgroundFx.GetComponent<VNKenBurns>();
+                    if (kenBurns == null)
+                        kenBurns = backgroundFx.gameObject.AddComponent<VNKenBurns>();
+                }
             }
 
             PlayCurrent();
@@ -269,6 +275,8 @@ namespace VNEffects
                 retroFilter.CycleNext();
                 UpdateHint();
             }
+
+            if (kb.backslashKey.wasPressedThisFrame && kenBurns != null) kenBurns.Toggle();
 
             if (kb.slashKey.wasPressedThisFrame && shootingStars != null)
                 shootingStars.Toggle();
@@ -455,7 +463,8 @@ namespace VNEffects
                 "A 心跳演出 | D 樱吹雪告白\n" +
                 "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）\n" +
                 ", 速度线开关 | . 速度线冲击 | ' 电影黑边 | / 流星 | ; 云缓移 | - 全屏水波\n" +
-                $"= 复古滤镜循环({(retroFilter != null ? retroFilter.Mode.ToString() : "-")}：无→胶片→CRT)";
+                $"= 复古滤镜循环({(retroFilter != null ? retroFilter.Mode.ToString() : "-")}：无→胶片→CRT) | " +
+                "\\ 背景 Ken Burns 漂移";
         }
     }
 }

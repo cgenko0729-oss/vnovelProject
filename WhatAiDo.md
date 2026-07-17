@@ -2194,3 +2194,51 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   分层各管各的，单开 mood Dream 不开 crt 也成立。
 - **互斥用状态清理实现**：同一 overlay 同时只能一种风格，`fx filmgrain on`
   直接 `_fxStates["crt"]=false`，存档里永远只会记录其一。
+
+## 五十二、背景 Ken Burns 漂移（2026-07-17，分支 `agent/kenburns-drift`）
+
+> 玩法清单落地：静止背景以 60~90 秒周期极缓慢缩放 1.0→1.06 + 平移几十像素，
+> 画面永不静止——商业 VN 标配的"活着的背景"。
+
+### 52.1 计划
+
+- 之前只有键盘演示场景 Start 里一条粗糙的 14 秒 DOScale Yoyo（只缩放、无平移、
+  周期太快、剧本场景完全没有）；升级为正式组件，两个场景统一走它；
+- 剧本 `fx kenburns on|off`，**默认开启**；off 用于需要完全定格的画面（如 CG 特写）。
+
+### 52.2 文件说明
+
+- **`VNKenBurns.cs`（新）**：核心组件，挂在背景 Image 上。
+  - 实现：无限链式随机航点——每段随机取目标缩放（1.0~1.06）、随机平移
+    （`Random.insideUnitCircle × 40px`，椭圆内取点防斜角偏出余量）、
+    随机时长（30~45 秒，一去一回 ≈ 完整周期 60~90 秒）；
+  - `InOutSine` 缓动让每段首尾速度归零：段间无停顿也无折角，永远在极缓慢地动；
+  - `SetPlaying(false)` 用 2.5 秒缓慢归位（位置+缩放回基准）而非急停；
+  - 基准位置/缩放首次使用时捕获（`CaptureBase`），Awake 即开始（`playOnAwake`）；
+  - 与 VNCamera（缩放 ZoomRoot）、VNParallax（移层容器）、VNFakeDoF（缩放 LayerBack）
+    作用于不同节点，全部可叠加；所有 Tween `SetLink`。
+- **`VNStage.cs`（改）**：`kenBurns` 字段 + AutoWire（找不到时**自动补挂**到背景
+  Image 上，旧场景不重新生成也能生效）；`ToggleFxNames` 加 `kenburns`；
+  Fx() 新 case；**默认开启的存档语义**：AutoWire 时把 `_fxStates["kenburns"]`
+  种为 true，存档才能正确记录"仍开着"，`fx kenburns off` 后的存档则不含它；
+  `ResetEffects()` 末尾把 kenburns 重置回默认开（章节重置不该让画面死掉）。
+- **`VNScriptRunner.cs`（改）**：调试重建快照初始种入 `kenburns`；
+  `reset effects` 重放时清空 fxOn 后同样补种（与运行时 ResetEffects 一致）；
+  顺带补上 reset 重放漏掉的 `autoRetro = false`（上一功能的小疏漏）。
+- **`VNEffectsDemoSetup.cs`（改）**：BuildStageRig 第 6 步创建背景时直接
+  `AddComponent<VNKenBurns>()`，连线 stage/demo；演示剧本头部语法速查补一行。
+- **`VNEffectsDemo.cs`（改）**：删掉 Start 里的粗糙 DOScale（亮度呼吸保留），
+  改为引用/自愈补挂 VNKenBurns；`\`（反斜杠）键开关，提示更新。
+- **`VNScenarioSchema.cs`（改）**：FxNames 加 `kenburns`。
+
+### 52.3 技术决策
+
+- **随机航点链而非固定 Yoyo 循环**：固定往返几分钟后就能被玩家"看穿"节奏；
+  每段随机方向/幅度/时长的漂移无周期感，更接近纪录片运镜的呼吸感。
+- **动背景 Image 而非 ZoomRoot/VNCamera**：ZoomRoot 是运镜的领地，Ken Burns
+  若与 pushin/snapzoom 抢同一节点会互相覆盖；背景自身的 60px 溢出余量
+  正是为此预留的（生成器注释"给 Ken Burns / 视差留余量"至此兑现）。
+- **默认开启 + 状态表种子**：`_fxStates` 只记录被 Fx() 碰过的名字，默认开的
+  特效若不种子，存档读回来会被"先全关再开 fxOn 列表"的恢复流程误关。
+  已知一个可接受的边缘：本功能之前的旧存档不含 kenburns，读档后漂移是关的，
+  下一条 `fx kenburns on` 或新开局即恢复。

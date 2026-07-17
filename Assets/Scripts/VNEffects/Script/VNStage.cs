@@ -43,6 +43,7 @@ namespace VNEffects
         public VNSpeedLines speedLines;
         public VNScreenShockwave shockwave;
         public VNRetroFilter retroFilter;
+        public VNKenBurns kenBurns;
         public VNLetterbox letterbox;
         public VNShootingStars shootingStars;
         public VNDriftingClouds driftingClouds;
@@ -133,6 +134,11 @@ namespace VNEffects
             }
             if (backgroundFx == null && backgroundImage != null)
                 backgroundFx = backgroundImage.GetComponent<VNImageEffectController>();
+            if (kenBurns == null) kenBurns = FindFirstObjectByType<VNKenBurns>();
+            if (kenBurns == null && backgroundImage != null) // 旧场景自愈：自动补挂
+                kenBurns = backgroundImage.gameObject.AddComponent<VNKenBurns>();
+            // Ken Burns 默认开启：种入 fx 状态表，存档才能正确记录"仍开着"
+            _fxStates["kenburns"] = kenBurns != null && kenBurns.playOnAwake;
         }
 
         // ------------------------------------------------------------------
@@ -694,7 +700,8 @@ namespace VNEffects
 
         static readonly string[] ToggleFxNames =
             { "godrays", "dof", "clouds", "haze", "shimmer", "heartbeat", "dutch",
-              "speedlines", "letterbox", "meteor", "skycloud", "filmgrain", "crt" };
+              "speedlines", "letterbox", "meteor", "skycloud", "filmgrain", "crt",
+              "kenburns" };
 
         [Tooltip("mood Memory（回忆）自动上电影黑边、离开回忆自动撤掉")]
         public bool autoMemoryLetterbox = true;
@@ -769,6 +776,8 @@ namespace VNEffects
             mood?.SetMood(VNMood.Neutral, 0.8f);
             foreach (var name in ToggleFxNames) Fx(name, "off");
             Fx("focus", "off");
+            // Ken Burns 是默认开启的常驻氛围（"永不静止"），重置回默认开而非关
+            if (kenBurns != null && kenBurns.playOnAwake) Fx("kenburns", "on");
         }
 
         /// <summary>fx 命令：fx godrays on / fx dof off / fx focus 亚里沙 / fx heartbeat on …</summary>
@@ -836,6 +845,9 @@ namespace VNEffects
                     if (on) _fxStates["filmgrain"] = false;
                     if (retroFilter == null) break;
                     if (on) retroFilter.ShowCrt(); else retroFilter.Hide();
+                    break;
+                case "kenburns":
+                    if (kenBurns != null) kenBurns.SetPlaying(on);
                     break;
                 case "heartbeat":
                     if (heartbeat == null) break;

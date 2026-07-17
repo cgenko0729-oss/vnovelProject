@@ -33,6 +33,7 @@ namespace VNEffects.EditorTools
             public RectTransform sceneRoot, zoomRoot, tiltRoot, layerBack, layerMid, layerFront;
             public VNImageEffectController bgFx;
             public Image bgImage;
+            public VNKenBurns kenBurns;
             public VNGodRays godRays;
             public VNEdgeGlow edgeGlow;
             public VNVignetteFocus vignetteFocus;
@@ -145,6 +146,7 @@ namespace VNEffects.EditorTools
                 rig.bgImage = bgGo.GetComponent<Image>();
                 rig.bgFx = bgGo.AddComponent<VNImageEffectController>();
                 AssignSourceMaterial(rig.bgFx, rig.imageMat);
+                rig.kenBurns = bgGo.AddComponent<VNKenBurns>(); // 背景永不静止
             }
 
             // ---------- 6.5 God Rays（背景之后、立绘之前）----------
@@ -384,6 +386,7 @@ namespace VNEffects.EditorTools
             demo.speedLines = rig.speedLines;
             demo.shockwave = rig.shockwave;
             demo.retroFilter = rig.retroFilter;
+            demo.kenBurns = rig.kenBurns;
             demo.letterbox = rig.letterbox;
             demo.shootingStars = rig.shootingStars;
             demo.driftingClouds = rig.driftingClouds;
@@ -456,6 +459,7 @@ namespace VNEffects.EditorTools
             stage.speedLines = rig.speedLines;
             stage.shockwave = rig.shockwave;
             stage.retroFilter = rig.retroFilter;
+            stage.kenBurns = rig.kenBurns;
             stage.letterbox = rig.letterbox;
             stage.shootingStars = rig.shootingStars;
             stage.driftingClouds = rig.driftingClouds;
@@ -581,6 +585,7 @@ namespace VNEffects.EditorTools
 #   fx shockwave [light|heavy] 全屏情绪水波：受击/震惊时整个画面荡一圈波纹
 #   fx filmgrain on|off        胶片滤镜（颗粒+划痕）；mood Memory 回忆自动上
 #   fx crt on|off              CRT 滤镜（扫描线，柔和）；mood Dream 梦境自动上
+#   fx kenburns on|off         背景 Ken Burns 缓慢漂移（默认开启，off 可定格画面）
 #   letterbox on|off [height:130] [time:0.7]   电影黑边；mood Memory 回忆自动上黑边
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----

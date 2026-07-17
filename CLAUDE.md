@@ -85,6 +85,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNSpeedLines | 漫画速度线/集中线 overlay（3 变体贴图闪帧，fx speedlines on/off/burst） |
 | VNScreenShockwave | 全屏情绪水波（fx shockwave [light\|heavy]：波峰环 overlay + 背景波浪脉冲 + 轻震动） |
 | VNRetroFilter | 胶片/CRT 复古滤镜（fx filmgrain/crt；mood Memory 自动胶片、Dream 自动 CRT） |
+| VNKenBurns | 背景 Ken Burns 漂移（60~90s 随机航点缓慢缩放+平移，默认开启永不静止，fx kenburns on/off） |
 | VNLetterbox | 电影黑边上下滑入（letterbox on/off [height:][time:]，mood Memory 回忆自动联动） |
 | VNShootingStars / VNDriftingClouds | 夜晚偶发流星（fx meteor）/ 云本体缓移（fx skycloud，与云影互补） |
 | VNParallax / VNMouseStardust / VNClickRipple | 鼠标视差 / 星尘拖尾 / 点击涟漪 |

@@ -146,6 +146,8 @@ namespace VNEffects
                 weather = VNWeather.None.ToString(),
                 mood = VNMood.Neutral.ToString(),
             };
+            // Ken Burns 默认开启：先种入再按剧本重放，重建结果才与真实运行一致
+            snapshot.fxOn.Add("kenburns");
             var characters = new Dictionary<string, VNSaveData.CharSave>();
             var loopingSe = new Dictionary<string, float>(); // id → 剧本 vol 参数
             var volumes = new Dictionary<string, float>();
@@ -224,8 +226,10 @@ namespace VNEffects
                             snapshot.weather = VNWeather.None.ToString();
                             snapshot.mood = VNMood.Neutral.ToString();
                             snapshot.fxOn.Clear();
+                            snapshot.fxOn.Add("kenburns"); // 重置回默认开（与 ResetEffects 一致）
                             focus = null;
                             autoLetterbox = false;
+                            autoRetro = false;
                         }
                         break;
                     case "portrait":
