@@ -163,6 +163,20 @@
 **维护注意**：给舞台加新的"有开关状态"的效果时，记得 ①`Fx()` 路由
 ②`_fxStates`/`ToggleFxNames` ③快照存取，三处一起，否则存档读回来状态飘。
 
+### CG 系统（VNStage.ShowCg/HideCg + VNCgUnlocks.cs，`Script/`）
+
+- 剧本 `cg <id> [transition:] [chars:keep] [fx:keep]` / `cg off`；素材在
+  `Assets/CG/`（文件名 = id），生成器灌入 `VNStage.cgLibrary`（CgEntry.group
+  为 P2 差分组预留字段）。
+- 显示复用背景管线：`SwapStageImage`（背景/CG 共用的换图+转场私有方法）。
+  立绘隐藏 = characterLayer 整层 CanvasGroup 淡出（GO 保持活跃，协程/Tween
+  不断）；环境特效暂停清单 = `CgAmbientFxNames` + 天气，`cg off` 时恢复。
+- **VNCgUnlocks**：全局解锁 JSON（persistentDataPath/vn_cg_unlocks.json）。
+  铁律：**解锁状态永远不进 VNFlags/存档**（生命周期不同，读旧档会覆盖 flags）。
+- 扩展：加 CG = 往 Assets/CG 放图 + 重新生成场景（或手动往 cgLibrary 加条目）；
+  改"哪些特效算环境特效" = 改 VNStage.CgAmbientFxNames。
+- 存档字段 `cgId/cgKeepChars/cgKeepFx`；恢复顺序 = 先常规摆台最后 ShowCg(instant)。
+
 ### VNCharacterDef.cs（`Script/`）
 
 - **职责**：角色定义 ScriptableObject（`Assets/VNEffects/Characters/*.asset`）。

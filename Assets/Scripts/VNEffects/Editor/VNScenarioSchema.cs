@@ -12,6 +12,7 @@ namespace VNEffects.EditorTools
         Character,   // 角色 id（扫 VNCharacterDef 资产）
         Expression,  // 表情名（依赖同行的角色参数，见 dependsOn）
         Background,  // 背景 id（场景 VNStage.backgrounds）
+        Cg,          // CG id（场景 VNStage.cgLibrary，或 off）
         AudioBgm,    // BGM id（场景 VNAudio.bgmLibrary + 旧 library）
         AudioSe,     // SE id（场景 VNAudio.seLibrary + 旧 library）
         AudioVoice,  // 语音 id（场景 VNAudio.voiceLibrary + 旧 library）
@@ -127,6 +128,11 @@ namespace VNEffects.EditorTools
             Add("bg", "Scene", "bg <id> [transition:Type]",
                 Pos("id", "bg", VNParamSource.Background),
                 Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()));
+            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep]",
+                Pos("id", "cg", VNParamSource.Cg),
+                Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
+                Kw("chars", "chars", VNParamSource.Options, new[] { "keep" }),
+                Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }));
             Add("weather", "Scene", "weather <type>",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNWeather>(), "None"));
             Add("mood", "Scene", "mood <type>",

@@ -26,6 +26,19 @@ namespace VNEffects
         }
         public List<BackgroundEntry> backgrounds = new List<BackgroundEntry>();
 
+        [System.Serializable]
+        public class CgEntry
+        {
+            [Header("剧本 cg 命令引用的 CG id")]
+            public string id;
+            [Header("CG 一枚绘")]
+            public Sprite sprite;
+            [Header("差分组名（同组 CG 在鉴赏画廊里归为一格翻页；留空 = 独立）")]
+            public string group;
+        }
+        [Header("CG 库（生成器从 Assets/CG 自动灌入，文件名 = id）")]
+        public List<CgEntry> cgLibrary = new List<CgEntry>();
+
         [Header("舞台引用（生成器自动连线）")]
         [Header("立绘层容器（LayerFront）")]
         public RectTransform characterLayer; // LayerFront
@@ -499,15 +512,23 @@ namespace VNEffects
         public void CaptureSnapshot(VNSaveData data)
         {
             data.backgroundId = CurrentBackgroundId;
-            data.weather = weather != null ? weather.Current.ToString() : null;
+            // CG 暂停环境特效期间：存的是"CG 背后"的天气与 fx（读档重放 CG 时会再次暂停）
+            data.weather = _cgFxPaused && _cgSavedWeather != VNWeather.None
+                ? _cgSavedWeather.ToString()
+                : weather != null ? weather.Current.ToString() : null;
             data.mood = mood != null ? mood.Current.ToString() : null;
             data.bgm = vnAudio != null ? vnAudio.CurrentBgm : null;
             data.bgmVol = vnAudio != null ? vnAudio.CurrentBgmVol : 1f;
             data.portraitOff = _portraitOff;
+            data.cgId = CurrentCgId;
+            data.cgKeepChars = _cgKeepChars;
+            data.cgKeepFx = _cgKeepFx;
 
             data.fxOn.Clear();
             foreach (var kv in _fxStates)
                 if (kv.Value) data.fxOn.Add(kv.Key);
+            foreach (var name in _cgPausedFx)
+                if (!data.fxOn.Contains(name)) data.fxOn.Add(name);
 
             data.characters.Clear();
             foreach (var kv in _active)
@@ -567,12 +588,17 @@ namespace VNEffects
 
             foreach (var cs in data.characters)
                 ShowInstant(cs.id, cs.x, cs.expr);
+
+            // CG 最后重放：立绘/天气/fx 已就位，ShowCg 会按 keep 参数再次隐藏/暂停
+            if (!string.IsNullOrEmpty(data.cgId))
+                ShowCg(data.cgId, null, data.cgKeepChars, data.cgKeepFx, 0, true);
         }
 
         /// <summary>清空舞台：销毁全部在场角色、关闭残留的选项面板</summary>
         public void ClearStage()
         {
             StopSpeaking();
+            ResetCgState(); // CG 状态清零（立绘层复显；天气/fx 由随后的恢复流程接管）
             foreach (var kv in _active)
                 if (kv.Value.go != null) Destroy(kv.Value.go);
             _active.Clear();
@@ -679,6 +705,7 @@ namespace VNEffects
         /// 切换背景（可选全屏转场），返回可等待的 Sequence（无转场时为 null）。
         /// onCovered：转场盖住画面瞬间额外执行的动作
         /// （camseq start:cut 的首镜头瞬切走这里，与换图同帧，睁眼即是新视角）。
+        /// CG 显示期间只更新底层背景记录，不动画面；cg off 时按新背景恢复。
         /// </summary>
         public Sequence SetBackground(string id, string transitionName, int line = 0,
             System.Action onCovered = null)
@@ -691,35 +718,170 @@ namespace VNEffects
             }
 
             CurrentBackgroundId = id;
+            if (CurrentCgId != null) return null; // CG 盖着：只记账，画面等 cg off 再换
+            return SwapStageImage(entry.sprite, transitionName, line, onCovered);
+        }
+
+        /// <summary>舞台主图切换（背景与 CG 共用）：可选全屏转场，含直接背景转场快路径</summary>
+        Sequence SwapStageImage(Sprite sprite, string transitionName, int line,
+            System.Action onCovered = null)
+        {
             if (!string.IsNullOrEmpty(transitionName) && transition != null)
             {
                 var type = VNScriptParser.ParseEnum(transitionName, VNTransition.NoiseDissolve, line);
-                if (VNScreenTransition.SupportsDirectBackground(type) &&
+                if (VNScreenTransition.SupportsDirectBackground(type) && sprite != null &&
                     backgroundImage != null && backgroundImage.sprite != null)
                 {
-                    var directSequence = transition.PlayBackground(type, backgroundImage, entry.sprite, () =>
+                    var directSequence = transition.PlayBackground(type, backgroundImage, sprite, () =>
                     {
-                        if (toneMatch != null) toneMatch.MatchTo(entry.sprite);
+                        if (toneMatch != null) toneMatch.MatchTo(sprite);
                         onCovered?.Invoke();
                     });
                     if (directSequence != null) return directSequence;
-                    // 直接转场 Shader 不可用时安全退回原全屏转场，确保背景仍会切换。
+                    // 直接转场 Shader 不可用时安全退回原全屏转场，确保画面仍会切换。
                 }
                 return transition.Play(type, () =>
                 {
-                    ApplyBackground(entry.sprite);
+                    ApplyBackground(sprite);
                     onCovered?.Invoke();
                 });
             }
 
-            ApplyBackground(entry.sprite);
+            ApplyBackground(sprite);
             return null;
         }
 
         void ApplyBackground(Sprite sprite)
         {
             if (backgroundImage != null) backgroundImage.sprite = sprite;
-            if (toneMatch != null) toneMatch.MatchTo(sprite);
+            if (toneMatch != null && sprite != null) toneMatch.MatchTo(sprite);
+        }
+
+        // ------------------------------------------------------------------
+        // CG（一枚绘）
+        // ------------------------------------------------------------------
+
+        /// <summary>当前显示中的 CG id（null = 没有 CG，进存档快照）</summary>
+        public string CurrentCgId { get; private set; }
+
+        bool _cgKeepChars;                 // 本次 CG 是否保留立绘（chars:keep）
+        bool _cgKeepFx;                    // 本次 CG 是否保留环境特效（fx:keep）
+        bool _cgFxPaused;                  // 环境特效当前被 CG 暂停中
+        readonly List<string> _cgPausedFx = new List<string>(); // 被暂停的 fx 名（恢复用）
+        VNWeather _cgSavedWeather = VNWeather.None;             // 被暂停的天气（恢复用）
+        CanvasGroup _charLayerGroup;       // 立绘层整体显隐（保持 GO 活跃，状态无损）
+
+        /// <summary>CG 期间被暂停的环境特效集合（演出类 fx 如黑边/滤镜/心跳不受影响）</summary>
+        static readonly string[] CgAmbientFxNames =
+            { "godrays", "clouds", "haze", "shimmer", "meteor", "skycloud" };
+
+        public bool CgKeepChars => _cgKeepChars;
+        public bool CgKeepFx => _cgKeepFx;
+
+        /// <summary>
+        /// 显示 CG：默认隐藏立绘层 + 暂停环境特效（keepChars/keepFx 按需保留），
+        /// 并记入全局鉴赏解锁。CG 之间可直接切换（差分/连续演出）。
+        /// instant 供读档/调试重建静默摆台。
+        /// </summary>
+        public Sequence ShowCg(string id, string transitionName, bool keepChars, bool keepFx,
+            int line = 0, bool instant = false)
+        {
+            var entry = cgLibrary.Find(c => c.id == id);
+            if (entry == null || entry.sprite == null)
+            {
+                Debug.LogError($"[VNScript] 第 {line} 行：未注册的 CG「{id}」（检查 VNStage.cgLibrary）");
+                return null;
+            }
+
+            VNCgUnlocks.Unlock(id);
+            CurrentCgId = id;
+            _cgKeepChars = keepChars;
+            _cgKeepFx = keepFx;
+
+            FadeCharLayer(keepChars ? 1f : 0f, instant);
+            if (!keepFx) PauseCgAmbientFx(instant);
+            else if (_cgFxPaused) ResumeCgAmbientFx(instant); // cg A → cg B fx:keep 的切换
+
+            return SwapStageImage(entry.sprite, instant ? null : transitionName, line);
+        }
+
+        /// <summary>关闭 CG：恢复立绘层、环境特效与底层背景</summary>
+        public Sequence HideCg(string transitionName, int line = 0)
+        {
+            if (CurrentCgId == null)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：cg off 时没有显示中的 CG");
+                return null;
+            }
+
+            CurrentCgId = null;
+            FadeCharLayer(1f, false);
+            if (_cgFxPaused) ResumeCgAmbientFx(false);
+
+            Sprite bgSprite = null;
+            if (!string.IsNullOrEmpty(CurrentBackgroundId))
+                bgSprite = backgrounds.Find(b => b.id == CurrentBackgroundId)?.sprite;
+            return SwapStageImage(bgSprite, transitionName, line);
+        }
+
+        void PauseCgAmbientFx(bool instant)
+        {
+            if (_cgFxPaused) return;
+            _cgFxPaused = true;
+            _cgPausedFx.Clear();
+            foreach (var name in CgAmbientFxNames)
+            {
+                if (_fxStates.TryGetValue(name, out bool on) && on)
+                {
+                    _cgPausedFx.Add(name);
+                    Fx(name, "off");
+                }
+            }
+            _cgSavedWeather = weather != null ? weather.Current : VNWeather.None;
+            if (weather != null && _cgSavedWeather != VNWeather.None)
+                weather.SetWeather(VNWeather.None, instant ? 0.01f : 0.6f);
+        }
+
+        void ResumeCgAmbientFx(bool instant)
+        {
+            if (!_cgFxPaused) return;
+            _cgFxPaused = false;
+            foreach (var name in _cgPausedFx) Fx(name, "on");
+            _cgPausedFx.Clear();
+            if (weather != null && _cgSavedWeather != VNWeather.None)
+                weather.SetWeather(_cgSavedWeather, instant ? 0.01f : 0.6f);
+            _cgSavedWeather = VNWeather.None;
+        }
+
+        /// <summary>
+        /// 立绘层整体淡入淡出：走 CanvasGroup 而非 SetActive，
+        /// GO 保持活跃（口型/眨眼协程、悬浮 Tween 都不中断），恢复零成本。
+        /// </summary>
+        void FadeCharLayer(float alpha, bool instant)
+        {
+            if (_charLayerGroup == null && characterLayer != null)
+            {
+                _charLayerGroup = characterLayer.GetComponent<CanvasGroup>();
+                if (_charLayerGroup == null)
+                    _charLayerGroup = characterLayer.gameObject.AddComponent<CanvasGroup>();
+            }
+            if (_charLayerGroup == null) return;
+            _charLayerGroup.DOKill();
+            if (instant) _charLayerGroup.alpha = alpha;
+            else _charLayerGroup.DOFade(alpha, 0.35f)
+                                .SetLink(_charLayerGroup.gameObject);
+        }
+
+        /// <summary>把 CG 状态恢复到"无 CG"的中性值（读档/清场用，不做动画不碰画面）</summary>
+        void ResetCgState()
+        {
+            CurrentCgId = null;
+            _cgKeepChars = false;
+            _cgKeepFx = false;
+            _cgFxPaused = false;
+            _cgPausedFx.Clear();
+            _cgSavedWeather = VNWeather.None;
+            FadeCharLayer(1f, true);
         }
 
         // ------------------------------------------------------------------
@@ -803,6 +965,9 @@ namespace VNEffects
         /// <summary>章节转场用：关闭天气、情绪色调和全部持续型画面特效。</summary>
         public void ResetEffects()
         {
+            // CG 期间 reset effects：暂停恢复清单一并作废，cg off 后不再回放旧特效/天气
+            _cgPausedFx.Clear();
+            _cgSavedWeather = VNWeather.None;
             weather?.SetWeather(VNWeather.None, 0.8f);
             mood?.SetMood(VNMood.Neutral, 0.8f);
             foreach (var name in ToggleFxNames) Fx(name, "off");

@@ -104,6 +104,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
+| VNCgUnlocks | CG 鉴赏全局解锁存储（独立 JSON，与存档槽分离；CG 显示逻辑在 VNStage.ShowCg/HideCg） |
 
 ### 演示场景
 
@@ -134,6 +135,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 任务系统（已完成）：`quest start|stage|done|fail <id> [阶段]`，状态=flag`任务_<id>`
   （0 未接取/1..n 进行中/100 完成/-1 失败），VNQuestDef 资产只管文案（无资产照常运作），
   J 键日志面板；存档/if 分支/调试重建零改动复用 flags 设施
+- CG 系统 P1（已完成）：`cg <id> [transition:] [chars:keep] [fx:keep]` / `cg off`；
+  素材放 `Assets/CG/`（文件名=id，生成器自动灌入 VNStage.cgLibrary）；默认藏立绘
+  （整层 CanvasGroup）+ 停环境特效，keep 参数按需保留；解锁记录在 VNCgUnlocks
+  全局 JSON（与存档分离，勿用 flags 存解锁）；存档/调试重建已集成；
+  P2 鉴赏画廊待做（详见 WhatAiDo.md 五十六章）
 - **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
   战斗示例模块（事件接口 P4）待动工；已知技术债清单见 ProjectCodeGuide 第十二节
 

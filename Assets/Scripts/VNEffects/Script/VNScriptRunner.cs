@@ -166,6 +166,15 @@ namespace VNEffects
                     case "bg":
                         snapshot.backgroundId = cmd.Arg(0);
                         break;
+                    case "cg":
+                        if (cmd.Arg(0) == "off") snapshot.cgId = null;
+                        else
+                        {
+                            snapshot.cgId = cmd.Arg(0);
+                            snapshot.cgKeepChars = cmd.Kw("chars") == "keep";
+                            snapshot.cgKeepFx = cmd.Kw("fx") == "keep";
+                        }
+                        break;
                     case "weather":
                         snapshot.weather = cmd.Arg(0, VNWeather.None.ToString());
                         break;
@@ -866,6 +875,13 @@ namespace VNEffects
                 case "bg":
                     return WaitTween(stage.SetBackground(
                         cmd.Arg(0), cmd.Kw("transition"), cmd.line, PrecutFor(cmd)));
+
+                case "cg":
+                    // cg <id> [transition:Type] [chars:keep] [fx:keep] / cg off [transition:Type]
+                    if (cmd.Arg(0) == "off")
+                        return WaitTween(stage.HideCg(cmd.Kw("transition"), cmd.line));
+                    return WaitTween(stage.ShowCg(cmd.Arg(0), cmd.Kw("transition"),
+                        cmd.Kw("chars") == "keep", cmd.Kw("fx") == "keep", cmd.line));
 
                 case "show":
                     return WaitTween(stage.Show(cmd.Arg(0), cmd.Kw("at"),
