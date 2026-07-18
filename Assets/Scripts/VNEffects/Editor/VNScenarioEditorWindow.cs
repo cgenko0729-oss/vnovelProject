@@ -157,15 +157,20 @@ namespace VNEffects.EditorTools
         {
             _list = new ReorderableList(_doc.rows, typeof(VNRow), true, false, true, true)
             {
+                multiSelect = true,   // Shift=连选 / Ctrl=点选，拖动整体移动
                 elementHeightCallback = i => RowHeight(_doc.rows[i]),
                 drawElementCallback = DrawRow,
                 onAddDropdownCallback = (rect, list) => ShowAddMenu(),
                 onRemoveCallback = list =>
                 {
-                    if (list.index < 0 || list.index >= _doc.rows.Count) return;
+                    var selected = SelectedRowIndices();
+                    if (selected.Count == 0) return;
                     MarkStructural();
-                    _doc.rows.RemoveAt(list.index);
-                    list.index = Mathf.Clamp(list.index, 0, _doc.rows.Count - 1);
+                    for (int i = selected.Count - 1; i >= 0; i--)
+                        _doc.rows.RemoveAt(selected[i]);
+                    list.ClearSelection();
+                    list.index = _doc.rows.Count == 0 ? -1
+                        : Mathf.Clamp(selected[0], 0, _doc.rows.Count - 1);
                     Bump();
                 },
                 onReorderCallback = list => { PushUndo(_frameSnapshot); Bump(); },
@@ -176,6 +181,18 @@ namespace VNEffects.EditorTools
         {
             BuildList();
             _customEdit.Clear();
+        }
+
+        /// <summary>当前多选的行号（升序、已过滤越界）；没有多选时退回单选 index</summary>
+        List<int> SelectedRowIndices()
+        {
+            var selected = new List<int>();
+            foreach (int i in _list.selectedIndices)
+                if (i >= 0 && i < _doc.rows.Count) selected.Add(i);
+            if (selected.Count == 0 && _list.index >= 0 && _list.index < _doc.rows.Count)
+                selected.Add(_list.index);
+            selected.Sort();
+            return selected;
         }
 
         // ------------------------------------------------------------------
@@ -628,12 +645,24 @@ namespace VNEffects.EditorTools
                 using (new EditorGUI.DisabledScope(
                     _list.index < 0 || _list.index >= _doc.rows.Count))
                 {
-                    if (GUILayout.Button("Duplicate", GUILayout.Width(72f)))
+                    if (GUILayout.Button(new GUIContent("Duplicate",
+                            "复制选中行（支持 Shift/Ctrl 多选，整块插到选区之后）"),
+                            GUILayout.Width(72f)))
                     {
-                        MarkStructural();
-                        _doc.rows.Insert(_list.index + 1, _doc.rows[_list.index].Clone());
-                        _list.index++;
-                        Bump();
+                        var selected = SelectedRowIndices();
+                        if (selected.Count > 0)
+                        {
+                            MarkStructural();
+                            int insertAt = selected[selected.Count - 1] + 1;
+                            for (int i = 0; i < selected.Count; i++)
+                                _doc.rows.Insert(insertAt + i,
+                                    _doc.rows[selected[i]].Clone());
+                            _list.ClearSelection();
+                            for (int i = 0; i < selected.Count; i++)
+                                _list.Select(insertAt + i, true);
+                            _list.index = insertAt + selected.Count - 1;
+                            Bump();
+                        }
                     }
                 }
                 using (new EditorGUI.DisabledScope(
@@ -666,6 +695,8 @@ namespace VNEffects.EditorTools
             EditorGUILayout.EndScrollView();
 
             EditorGUILayout.HelpBox(
+                "Shift+click = select range, Ctrl+click = toggle select; " +
+                "drag moves all selected rows, [-] / Duplicate act on the whole selection. " +
                 "Drag handle to reorder. [+] adds after selection. \"@\" = async (do not wait). " +
                 "Popups list registered ids; pick \"custom…\" to type a free value. " +
                 "camseq waypoint lines are kept as text in this batch " +
