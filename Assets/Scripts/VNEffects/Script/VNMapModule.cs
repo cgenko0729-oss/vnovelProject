@@ -25,14 +25,34 @@ namespace VNEffects
         [System.Serializable]
         public class Location
         {
-            [Header("地点名 = 返回给剧本的结果名（对应「* 结果行」）")]
+            [Header("地点名 = 返回给剧本的结果名（对应「* 结果行」，永远不翻译）")]
             public string name;
+            [Header("英文显示名（本地化；留空 = 显示地点名）")]
+            public string displayNameEn;
+            [Header("日文显示名（本地化；留空 = 显示地点名）")]
+            public string displayNameJa;
             [Header("在地图上的归一化坐标（0,0 左下 ～ 1,1 右上）")]
             public Vector2 position = new Vector2(0.5f, 0.5f);
             [Header("显示条件（VNFlags 表达式，如 好感度>=2；留空 = 总是显示）")]
             public string condition;
             [Header("可选自定义图标；留空 = 程序化光点")]
             public Sprite icon;
+
+            /// <summary>当前语言的显示名；逻辑（结果匹配、去过_xx flag）永远用 name</summary>
+            public string DisplayName
+            {
+                get
+                {
+                    switch (VNLocale.Language)
+                    {
+                        case VNLanguage.English:
+                            return string.IsNullOrEmpty(displayNameEn) ? name : displayNameEn;
+                        case VNLanguage.Japanese:
+                            return string.IsNullOrEmpty(displayNameJa) ? name : displayNameJa;
+                        default: return name;
+                    }
+                }
+            }
         }
 
         [Header("地图底图；剧本 bg:<背景id> 参数可临时换用舞台背景库里的图")]
@@ -145,9 +165,9 @@ namespace VNEffects
                 core.GetComponent<Image>().raycastTarget = false;
             }
 
-            // 地点名（标记下方）
+            // 地点名（标记下方，显示当前语言译名）
             var label = CreateText("Label", rect, 30, Color.white,
-                visited ? loc.name + " ✓" : loc.name);
+                visited ? loc.DisplayName + " ✓" : loc.DisplayName);
             var labelRect = (RectTransform)label.transform;
             labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0f);
             labelRect.anchoredPosition = new Vector2(0f, -26f);

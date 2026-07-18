@@ -537,6 +537,15 @@ namespace VNEffects.EditorTools
             def.description = "在晚霞下把心意传达给小雪。";
             def.stages.Add("和小雪一起看晚霞");
             def.stages.Add("鼓起勇气说出心意");
+            // 本地化演示文案（id 与 flag 名保持中文不动）
+            def.titleEn = "Operation: Confession";
+            def.descriptionEn = "Tell Koyuki how you feel under the sunset.";
+            def.stagesEn.Add("Watch the sunset with Koyuki");
+            def.stagesEn.Add("Gather your courage and confess");
+            def.titleJa = "告白大作戦";
+            def.descriptionJa = "夕焼けの下で、小雪に想いを伝えよう。";
+            def.stagesJa.Add("小雪と一緒に夕焼けを見る");
+            def.stagesJa.Add("勇気を出して想いを伝える");
             AssetDatabase.CreateAsset(def, path);
             return def;
         }
@@ -550,6 +559,9 @@ namespace VNEffects.EditorTools
             def = ScriptableObject.CreateInstance<VNCharacterDef>();
             def.id = id;
             def.displayName = id;
+            // 演示角色的名牌译名（正式角色请在 .asset 的 Inspector 里填）
+            if (id.StartsWith("亚里沙")) { def.displayNameEn = "Arisa"; def.displayNameJa = "亜里沙"; }
+            else if (id.StartsWith("小雪")) { def.displayNameEn = "Koyuki"; def.displayNameJa = "小雪"; }
             def.nameColor = nameColor;
             def.expressions.Add(new VNCharacterDef.Expression { name = "默认", sprite = sprite });
             AssetDatabase.CreateAsset(def, path);

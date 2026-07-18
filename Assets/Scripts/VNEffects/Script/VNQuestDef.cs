@@ -26,10 +26,61 @@ namespace VNEffects
         [Header("各阶段目标文案：第 1 项对应阶段 1（quest start 后的初始阶段）")]
         public List<string> stages = new List<string>();
 
-        public string Title => string.IsNullOrEmpty(title) ? id : title;
+        [Header("—— English 文案（本地化；留空的项回退中文）——")]
+        public string titleEn;
+        [TextArea]
+        public string descriptionEn;
+        [Header("英文阶段文案：与中文 stages 一一对应，缺项回退中文")]
+        public List<string> stagesEn = new List<string>();
 
-        /// <summary>阶段目标文案（阶段号从 1 起；越界返回空串）</summary>
-        public string StageText(int stage) =>
-            stage >= 1 && stage <= stages.Count ? stages[stage - 1] : "";
+        [Header("—— 日本語 文案（本地化；留空的项回退中文）——")]
+        public string titleJa;
+        [TextArea]
+        public string descriptionJa;
+        [Header("日文阶段文案：与中文 stages 一一对应，缺项回退中文")]
+        public List<string> stagesJa = new List<string>();
+
+        /// <summary>当前语言的任务标题（译名留空回退中文 title，再回退 id）</summary>
+        public string Title
+        {
+            get
+            {
+                string localized = Pick(titleEn, titleJa);
+                if (!string.IsNullOrEmpty(localized)) return localized;
+                return string.IsNullOrEmpty(title) ? id : title;
+            }
+        }
+
+        /// <summary>当前语言的任务总描述（留空回退中文）</summary>
+        public string LocalizedDescription
+        {
+            get
+            {
+                string localized = Pick(descriptionEn, descriptionJa);
+                return string.IsNullOrEmpty(localized) ? description : localized;
+            }
+        }
+
+        /// <summary>当前语言的阶段目标文案（阶段号从 1 起；缺译/越界回退中文，再回退空串）</summary>
+        public string StageText(int stage)
+        {
+            if (stage < 1) return "";
+            var localizedList = VNLocale.Language == VNLanguage.English ? stagesEn
+                : VNLocale.Language == VNLanguage.Japanese ? stagesJa : null;
+            if (localizedList != null && stage <= localizedList.Count &&
+                !string.IsNullOrEmpty(localizedList[stage - 1]))
+                return localizedList[stage - 1];
+            return stage <= stages.Count ? stages[stage - 1] : "";
+        }
+
+        static string Pick(string en, string ja)
+        {
+            switch (VNLocale.Language)
+            {
+                case VNLanguage.English: return en;
+                case VNLanguage.Japanese: return ja;
+                default: return null;
+            }
+        }
     }
 }

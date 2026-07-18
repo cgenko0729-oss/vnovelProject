@@ -16,8 +16,32 @@ namespace VNEffects
         [Header("对话框名牌上显示的名字")]
         public string displayName;
 
+        [Header("名牌译名（本地化）：英文；留空 = 回退上面的 displayName")]
+        public string displayNameEn;
+
+        [Header("名牌译名（本地化）：日文；留空 = 回退 displayName")]
+        public string displayNameJa;
+
         [Header("名牌底色")]
         public Color nameColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
+
+        /// <summary>当前语言的名牌显示名（译名留空回退中文 displayName）。
+        /// 注意剧本引用的角色 id 永远不翻译。</summary>
+        public string LocalizedDisplayName
+        {
+            get
+            {
+                switch (VNLocale.Language)
+                {
+                    case VNLanguage.English:
+                        return string.IsNullOrEmpty(displayNameEn) ? displayName : displayNameEn;
+                    case VNLanguage.Japanese:
+                        return string.IsNullOrEmpty(displayNameJa) ? displayName : displayNameJa;
+                    default:
+                        return displayName;
+                }
+            }
+        }
 
         [System.Serializable]
         public class Expression
