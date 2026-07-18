@@ -372,6 +372,7 @@ namespace VNEffects
             var text = CreateText(rect, "Label", fontSize, TextAlignmentOptions.Center);
             Stretch(text.rectTransform);
             text.fontStyle = FontStyles.Bold;
+            text.text = label; // TMP 迁移时曾漏掉这行：按钮全部无字
             return go;
         }
 

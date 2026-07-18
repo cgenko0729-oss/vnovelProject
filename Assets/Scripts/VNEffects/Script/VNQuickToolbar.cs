@@ -54,7 +54,7 @@ namespace VNEffects
             rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 0f);
             rect.anchoredPosition = new Vector2(-18f, 9f);
-            rect.sizeDelta = new Vector2(693f, 42f); // 七个固定宽按钮 + 任务按钮 + 间距/内边距
+            rect.sizeDelta = new Vector2(859f, 42f); // 十个固定宽按钮 + 间距/内边距
 
             // VNDialogueBox 自己是 overrideSorting 的嵌套 Canvas。工具条需要独立
             // GraphicRaycaster 才能接收按钮点击，同时提高一层排序保证文字在按钮底图之上。
@@ -79,6 +79,8 @@ namespace VNEffects
 
             CreateButton(VNLocale.T("toolbar.save"), 78f, () => _runner?.RequestSavePanel());
             CreateButton(VNLocale.T("toolbar.load"), 78f, () => _runner?.RequestLoadPanel());
+            CreateButton(VNLocale.T("toolbar.qsave"), 78f, () => _runner?.QuickSave());
+            CreateButton(VNLocale.T("toolbar.qload"), 78f, () => _runner?.QuickLoad());
             _autoImage = CreateButton(VNLocale.T("toolbar.auto"), 78f,
                 () => { if (_runner != null) _runner.SetAuto(!_runner.IsAuto); });
             _skipImage = CreateButton(VNLocale.T("toolbar.skip"), 78f,

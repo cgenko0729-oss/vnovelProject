@@ -548,7 +548,9 @@ namespace VNEffects
             SaveTo(slot, null);
         }
 
-        public void SaveTo(int slot, Texture2D thumbnail)
+        public void SaveTo(int slot, Texture2D thumbnail) => SaveTo(slot, thumbnail, false);
+
+        public void SaveTo(int slot, Texture2D thumbnail, bool quick)
         {
             if (!_waitingAtSay)
             {
@@ -563,15 +565,19 @@ namespace VNEffects
             };
             stage.CaptureSnapshot(data);
             VNSaveSystem.Save(slot, data, thumbnail);
-            VNToast.Show(VNLocale.T("runner.saved", slot));
+            VNToast.Show(quick ? VNLocale.T("runner.quickSaved")
+                               : VNLocale.T("runner.saved", slot));
         }
 
-        public void LoadFrom(int slot)
+        public void LoadFrom(int slot) => LoadFrom(slot, false);
+
+        public void LoadFrom(int slot, bool quick)
         {
             var data = VNSaveSystem.Load(slot);
             if (data == null)
             {
-                VNToast.Show(VNLocale.T("runner.slotEmpty", slot));
+                VNToast.Show(quick ? VNLocale.T("runner.noQuickSave")
+                                   : VNLocale.T("runner.slotEmpty", slot));
                 return;
             }
             SetSkip(false);
@@ -580,8 +586,58 @@ namespace VNEffects
             if (!string.IsNullOrEmpty(data.chapter))
                 SwitchChapter(data.chapter, 0);
             stage.RestoreSnapshot(data);
-            VNToast.Show(VNLocale.T("runner.loaded", slot));
+            VNToast.Show(quick ? VNLocale.T("runner.quickLoaded")
+                               : VNLocale.T("runner.loaded", slot));
             ResumeAt(data.commandIndex);
+        }
+
+        // ------------------------------------------------------------------
+        // 快速存读档（Q / L，专用槽 0，不在 20 槽面板里显示）
+        // ------------------------------------------------------------------
+
+        /// <summary>快速存档专用槽（面板网格只显示 1..SlotCount，0 不可见）</summary>
+        public const int QuickSaveSlot = 0;
+
+        Coroutine _quickSaveCo;
+
+        /// <summary>Q 键 / 快存按钮：同 F5 的截图管线，但直接落盘不开面板不暂停。</summary>
+        public void QuickSave()
+        {
+            if (!_waitingAtSay)
+            {
+                VNToast.Show(VNLocale.T("runner.cannotSaveNow"));
+                return;
+            }
+            if (_quickSaveCo != null) return; // 截图进行中，忽略连按
+            _quickSaveCo = StartCoroutine(QuickSaveCo());
+        }
+
+        /// <summary>L 键 / 快读按钮：读取快速存档；没有则提示。</summary>
+        public void QuickLoad()
+        {
+            CancelSaveCapture();
+            LoadFrom(QuickSaveSlot, true);
+        }
+
+        IEnumerator QuickSaveCo()
+        {
+            var capture = stage != null && stage.vnCamera != null
+                ? stage.vnCamera.cameraFade : null;
+            if (capture == null) capture = FindFirstObjectByType<VNCameraFade>();
+            if (capture == null)
+                capture = new GameObject("SaveThumbnailCapture").AddComponent<VNCameraFade>();
+
+            Texture2D thumbnail = null;
+            yield return capture.CaptureThumbnailCo(320, 180, texture => thumbnail = texture);
+            _quickSaveCo = null;
+
+            if (!_waitingAtSay) // 截图那一两帧里演出推进了：作废，避免存到不可恢复点
+            {
+                if (thumbnail != null) Destroy(thumbnail);
+                yield break;
+            }
+            SaveTo(QuickSaveSlot, thumbnail, true);
+            if (thumbnail != null) Destroy(thumbnail); // PNG 已落盘，纹理即可释放
         }
 
         void EnsureSaveLoadPanel()
@@ -830,6 +886,8 @@ namespace VNEffects
 
             if (kb.f5Key.wasPressedThisFrame) { RequestSavePanel(); return; }
             if (kb.f9Key.wasPressedThisFrame) { RequestLoadPanel(); return; }
+            if (kb.qKey.wasPressedThisFrame) { QuickSave(); return; }
+            if (kb.lKey.wasPressedThisFrame) { QuickLoad(); return; }
             if (kb.aKey.wasPressedThisFrame) { SetAuto(!_auto); return; }
             if (kb.sKey.wasPressedThisFrame) { SetSkip(!_skip); return; }
 

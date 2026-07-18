@@ -3,6 +3,8 @@
 # —— クイックツールバー ——
 toolbar.save = セーブ
 toolbar.load = ロード
+toolbar.qsave = Qセーブ
+toolbar.qload = Qロード
 toolbar.auto = オート
 toolbar.skip = スキップ
 toolbar.log = ログ
@@ -62,6 +64,9 @@ runner.autoOn = オートモード ON
 runner.autoOff = オートモード OFF
 runner.skipOn = スキップ ON
 runner.skipOff = スキップ OFF
+runner.quickSaved = クイックセーブしました（Q セーブ / L ロード）
+runner.quickLoaded = クイックセーブをロードしました
+runner.noQuickSave = クイックセーブがありません（Q でセーブ）
 
 # —— イベントモジュール既定文 ——
 qte.title = 連打！

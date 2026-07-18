@@ -4,6 +4,8 @@
 # —— 快捷功能条 ——
 toolbar.save = Save
 toolbar.load = Load
+toolbar.qsave = 快存
+toolbar.qload = 快读
 toolbar.auto = Auto
 toolbar.skip = Skip
 toolbar.log = Log
@@ -63,6 +65,9 @@ runner.autoOn = 自动模式 开
 runner.autoOff = 自动模式 关
 runner.skipOn = 快进 开
 runner.skipOff = 快进 关
+runner.quickSaved = 快速存档完成（Q 存 / L 读）
+runner.quickLoaded = 已读取快速存档
+runner.noQuickSave = 还没有快速存档（按 Q 快速存档）
 
 # —— 事件模块默认文案 ——
 qte.title = 连打！
