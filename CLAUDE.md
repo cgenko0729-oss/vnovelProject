@@ -63,8 +63,10 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - uGUI 自定义 shader 走传统 CGPROGRAM（Canvas 不经过 URP 光照），保留 UI 裁剪兼容
 - **UI 不写深度缓冲** → 不能用真 DoF/深度类后处理区分层，模糊在 `VNImageEffect` 里做（9-tap）
 - 文字全部用 **TextMeshPro（TextMeshProUGUI）**，字体一律取 `VNFont.Asset`（统一入口，
-  随包 Noto Sans SC 动态多图集 SDF，三级兜底见 VNFont.cs 注释）；**禁止再用 legacy Text /
-  LegacyRuntime.ttf**。编辑期创建、随场景保存的 TMP 文字必须引用
+  按 `VNLocale.Language` 返回对应字体：中/英 = Noto Sans SC，日 = Noto Sans JP，
+  均为动态多图集 SDF，三级兜底见 VNFont.cs 注释）；**禁止再用 legacy Text /
+  LegacyRuntime.ttf**。玩家可见的 UI 字符串禁止硬编码，一律 `VNLocale.T(key)` 查表
+  （表在 `Resources/VNLocale/ui.<code>.txt`；[Header]/Debug.Log 等开发者文案保持中文）。编辑期创建、随场景保存的 TMP 文字必须引用
   `VNFontAssetBuilder.EnsureFontAsset()` 的持久化资产（运行时临时资产存场景会变 Missing）。
   API 换算对照表见 WhatAiDo.md 五十五章（TextAnchor→TextAlignmentOptions、
   lineSpacing 倍率→字号百分比等）
@@ -105,6 +107,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNCgUnlocks | CG 鉴赏全局解锁存储（独立 JSON，与存档槽分离；CG 显示逻辑在 VNStage.ShowCg/HideCg） |
+| VNLocale / VNScriptLocale | 本地化（中/英/日）：语言管理+UI 字符串表 / 剧本台词翻译查表（表在 Resources/VNLocale/，抽取工具 Tools→VN Effects→Localization） |
 
 ### 演示场景
 
@@ -140,6 +143,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   （整层 CanvasGroup）+ 停环境特效，keep 参数按需保留；解锁记录在 VNCgUnlocks
   全局 JSON（与存档分离，勿用 flags 存解锁）；存档/调试重建已集成；
   P2 鉴赏画廊待做（详见 WhatAiDo.md 五十六章）
+- 本地化（已完成，五十七章）：剧本只写中文（唯一真相），翻译放旁路表
+  `Resources/VNLocale/Scenarios/<剧本名>.<lang>.txt`（key=FNV-1a(原文)+出现序号）；
+  改完剧本跑 **Tools → VN Effects → Localization → Extract**（增量合并，已译保留）
+  再 Validate 查缺译；choice 选项翻译显示、按索引匹配；**event 结果行/角色 id/
+  flag 名永远不翻译**（逻辑标识符）；名牌/任务/地图显示名在各资产的 En/Ja 字段填
 - **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
   战斗示例模块（事件接口 P4）待动工；已知技术债清单见 ProjectCodeGuide 第十二节
 
