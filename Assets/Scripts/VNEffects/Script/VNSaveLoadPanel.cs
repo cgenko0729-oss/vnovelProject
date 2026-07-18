@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -20,15 +21,14 @@ namespace VNEffects
         Canvas _canvas;
         GameObject _panel;
         RectTransform _grid;
-        Text _title;
-        Text _hint;
+        TextMeshProUGUI _title;
+        TextMeshProUGUI _hint;
         Image _saveTabImage;
         Image _loadTabImage;
         GameObject _confirm;
-        Text _confirmText;
+        TextMeshProUGUI _confirmText;
         Button _confirmYes;
         Texture2D _pendingThumbnail;
-        Font _font;
         bool _open;
         bool _saveMode;
 
@@ -91,7 +91,6 @@ namespace VNEffects
         void Build()
         {
             if (_panel != null) return;
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             if (EventSystem.current == null)
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -124,8 +123,8 @@ namespace VNEffects
             topLineRect.pivot = new Vector2(0.5f, 1f);
             topLineRect.sizeDelta = new Vector2(0f, 3f);
 
-            _title = CreateText(panelRect, "Title", 42, TextAnchor.MiddleLeft);
-            _title.fontStyle = FontStyle.Bold;
+            _title = CreateText(panelRect, "Title", 42, TextAlignmentOptions.Left);
+            _title.fontStyle = FontStyles.Bold;
             var titleRect = (RectTransform)_title.transform;
             titleRect.anchorMin = titleRect.anchorMax = new Vector2(0f, 1f);
             titleRect.pivot = new Vector2(0f, 1f);
@@ -156,7 +155,7 @@ namespace VNEffects
             layout.spacing = new Vector2(14f, 12f);
             layout.childAlignment = TextAnchor.MiddleCenter;
 
-            _hint = CreateText(panelRect, "Hint", 23, TextAnchor.MiddleCenter);
+            _hint = CreateText(panelRect, "Hint", 23, TextAlignmentOptions.Center);
             _hint.color = new Color(0.72f, 0.78f, 0.9f, 0.9f);
             var hintRect = (RectTransform)_hint.transform;
             hintRect.anchorMin = new Vector2(0f, 0f);
@@ -238,23 +237,24 @@ namespace VNEffects
             raw.color = thumbnail != null ? Color.white : new Color(0.025f, 0.035f, 0.065f, 1f);
             raw.raycastTarget = false;
 
-            var slotText = CreateText(go.transform, "SlotNumber", 24, TextAnchor.UpperLeft);
-            slotText.fontStyle = FontStyle.Bold;
+            var slotText = CreateText(go.transform, "SlotNumber", 24, TextAlignmentOptions.TopLeft);
+            slotText.fontStyle = FontStyles.Bold;
             slotText.color = occupied ? Gold : new Color(0.55f, 0.6f, 0.72f, 1f);
             SetRect(slotText.rectTransform, new Vector2(226f, -11f), new Vector2(182f, 30f));
             slotText.text = $"SLOT {slot:00}";
 
-            var timeText = CreateText(go.transform, "Time", 19, TextAnchor.UpperLeft);
+            var timeText = CreateText(go.transform, "Time", 19, TextAlignmentOptions.TopLeft);
             timeText.color = new Color(0.72f, 0.78f, 0.88f, 1f);
             SetRect(timeText.rectTransform, new Vector2(226f, -42f), new Vector2(184f, 26f));
             timeText.text = occupied && !string.IsNullOrEmpty(data.savedAt) ? data.savedAt : "— EMPTY —";
 
-            var lineText = CreateText(go.transform, "LastLine", 20, TextAnchor.UpperLeft);
+            var lineText = CreateText(go.transform, "LastLine", 20, TextAlignmentOptions.TopLeft);
             lineText.color = occupied ? new Color(0.93f, 0.94f, 1f, 0.96f)
                                       : new Color(0.5f, 0.54f, 0.64f, 0.8f);
-            lineText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            lineText.verticalOverflow = VerticalWrapMode.Truncate;
-            lineText.lineSpacing = 0.9f;
+            lineText.textWrappingMode = TextWrappingModes.Normal;
+            lineText.overflowMode = TextOverflowModes.Truncate;
+            lineText.lineSpacing = -10f; // TMP 行距为字号百分比，-10 ≈ legacy 0.9 倍
+
             SetRect(lineText.rectTransform, new Vector2(226f, -70f), new Vector2(184f, 62f));
             lineText.text = occupied ? Truncate(data.lastLine, 42) : "空槽位";
             return go;
@@ -303,7 +303,7 @@ namespace VNEffects
             image.type = Image.Type.Sliced;
             image.color = new Color(0.035f, 0.05f, 0.09f, 0.995f);
 
-            _confirmText = CreateText(rect, "Message", 29, TextAnchor.MiddleCenter);
+            _confirmText = CreateText(rect, "Message", 29, TextAlignmentOptions.Center);
             var messageRect = _confirmText.rectTransform;
             messageRect.anchorMin = new Vector2(0f, 0.42f);
             messageRect.anchorMax = new Vector2(1f, 1f);
@@ -348,9 +348,9 @@ namespace VNEffects
             image.color = new Color(0.11f, 0.14f, 0.22f, 1f);
             var button = go.GetComponent<Button>();
             if (onClick != null) button.onClick.AddListener(() => onClick());
-            var text = CreateText(rect, "Label", fontSize, TextAnchor.MiddleCenter);
+            var text = CreateText(rect, "Label", fontSize, TextAlignmentOptions.Center);
             Stretch(text.rectTransform);
-            text.fontStyle = FontStyle.Bold;
+            text.fontStyle = FontStyles.Bold;
             return go;
         }
 
@@ -364,12 +364,12 @@ namespace VNEffects
             return image;
         }
 
-        Text CreateText(Transform parent, string name, int size, TextAnchor anchor)
+        TextMeshProUGUI CreateText(Transform parent, string name, int size, TextAlignmentOptions anchor)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
-            var text = go.GetComponent<Text>();
-            text.font = _font;
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
             text.fontSize = size;
             text.alignment = anchor;
             text.color = new Color(0.95f, 0.96f, 1f, 1f);

@@ -1,4 +1,5 @@
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -33,12 +34,12 @@ namespace VNEffects
 
         RectTransform _root;
         CanvasGroup _group;
-        Text _nameText;
+        TextMeshProUGUI _nameText;
         GameObject _nameTag;
         RectTransform _tagRect;
         RectTransform _bodyRect;
         VNTypewriterText _typer;
-        Text _arrowText;
+        TextMeshProUGUI _arrowText;
         RectTransform _arrowRect;
         VNImageEffectController _frameFx;
 
@@ -83,8 +84,6 @@ namespace VNEffects
             _group.alpha = 0f;
             _group.blocksRaycasts = false;
 
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
             // ---- 半透明磨砂面板 ----
             var panel = CreateChildImage("Panel", VNProceduralTextures.RoundedRectSprite, panelColor);
             panel.type = Image.Type.Sliced;
@@ -119,17 +118,17 @@ namespace VNEffects
             tagBg.raycastTarget = false;
             _tagRect = tagRect;
 
-            _nameText = CreateChildText(tagRect, "Name", font, 26, TextAnchor.MiddleCenter);
-            _nameText.fontStyle = FontStyle.Bold;
+            _nameText = CreateChildText(tagRect, "Name", 26, TextAlignmentOptions.Center);
+            _nameText.fontStyle = FontStyles.Bold;
 
             // ---- 正文（打字机）----
-            var body = CreateChildText((RectTransform)transform, "Body", font, 28, TextAnchor.UpperLeft);
+            var body = CreateChildText((RectTransform)transform, "Body", 28, TextAlignmentOptions.TopLeft);
             var bodyRect = (RectTransform)body.transform;
             bodyRect.anchorMin = Vector2.zero;
             bodyRect.anchorMax = Vector2.one;
             bodyRect.offsetMin = new Vector2(40f, 26f);
             bodyRect.offsetMax = new Vector2(-40f, -40f);
-            body.lineSpacing = 1.25f;
+            body.lineSpacing = 25f; // TMP 行距单位为字号百分比，25 ≈ legacy 的 1.25 倍行距
             _typer = body.gameObject.AddComponent<VNTypewriterText>();
             _bodyRect = bodyRect;
 
@@ -153,7 +152,7 @@ namespace VNEffects
             winGo.SetActive(false);
 
             // ---- 继续箭头 ----
-            var arrow = CreateChildText((RectTransform)transform, "Arrow", font, 26, TextAnchor.MiddleCenter);
+            var arrow = CreateChildText((RectTransform)transform, "Arrow", 26, TextAlignmentOptions.Center);
             _arrowText = arrow;
             _arrowText.text = "▼";
             _arrowRect = (RectTransform)arrow.transform;
@@ -183,17 +182,17 @@ namespace VNEffects
             return img;
         }
 
-        Text CreateChildText(RectTransform parent, string name, Font font, int size, TextAnchor anchor)
+        TextMeshProUGUI CreateChildText(RectTransform parent, string name, int size, TextAlignmentOptions anchor)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-            var text = go.GetComponent<Text>();
-            text.font = font;
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
             text.fontSize = size;
             text.alignment = anchor;
             text.color = new Color(1f, 1f, 1f, 0.96f);

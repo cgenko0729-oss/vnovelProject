@@ -1,4 +1,5 @@
 using System;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -18,8 +19,7 @@ namespace VNEffects
         VNScriptRunner _runner;
         VNStage _stage;
         GameObject _panel;
-        Text _fullscreenLabel;
-        Font _font;
+        TextMeshProUGUI _fullscreenLabel;
         bool _open;
         bool _settingsApplied;
 
@@ -71,7 +71,6 @@ namespace VNEffects
         void Build()
         {
             if (_panel != null) return;
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (EventSystem.current == null)
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
@@ -108,9 +107,9 @@ namespace VNEffects
             windowImage.type = Image.Type.Sliced;
             windowImage.color = new Color(0.025f, 0.038f, 0.075f, 0.995f);
 
-            var title = CreateText(windowRect, "CONFIG  ·  设置", 38, TextAnchor.MiddleLeft);
+            var title = CreateText(windowRect, "CONFIG  ·  设置", 38, TextAlignmentOptions.Left);
             SetRect(title.rectTransform, new Vector2(58f, -34f), new Vector2(560f, 56f));
-            title.fontStyle = FontStyle.Bold;
+            title.fontStyle = FontStyles.Bold;
             title.color = new Color(1f, 0.78f, 0.38f, 1f);
 
             CreateButton(windowRect, "Close", "×", new Vector2(700f, -34f),
@@ -148,11 +147,11 @@ namespace VNEffects
 
             var fullscreen = CreateButton(windowRect, "Fullscreen", "", new Vector2(82f, -494f),
                 new Vector2(616f, 58f), ToggleFullscreen, 24);
-            _fullscreenLabel = fullscreen.GetComponentInChildren<Text>();
+            _fullscreenLabel = fullscreen.GetComponentInChildren<TextMeshProUGUI>();
             UpdateFullscreenLabel();
 
             var hint = CreateText(windowRect,
-                "设置会自动保存　·　Esc 或点击外部关闭", 19, TextAnchor.MiddleCenter);
+                "设置会自动保存　·　Esc 或点击外部关闭", 19, TextAlignmentOptions.Center);
             SetRect(hint.rectTransform, new Vector2(80f, -578f), new Vector2(620f, 34f));
             hint.color = new Color(0.68f, 0.74f, 0.86f, 0.9f);
             _panel.SetActive(false);
@@ -176,7 +175,7 @@ namespace VNEffects
         void CreateSettingSlider(RectTransform parent, string label, float top,
             float min, float max, float value, string format, Action<float> changed)
         {
-            var labelText = CreateText(parent, label, 24, TextAnchor.MiddleLeft);
+            var labelText = CreateText(parent, label, 24, TextAlignmentOptions.Left);
             SetRect(labelText.rectTransform, new Vector2(82f, -top), new Vector2(170f, 42f));
 
             var sliderGo = new GameObject(label + "Slider", typeof(RectTransform), typeof(Slider));
@@ -213,7 +212,7 @@ namespace VNEffects
             var handleRect = handle.rectTransform;
             handleRect.sizeDelta = new Vector2(24f, 32f);
 
-            var valueText = CreateText(parent, "", 21, TextAnchor.MiddleRight);
+            var valueText = CreateText(parent, "", 21, TextAlignmentOptions.Right);
             SetRect(valueText.rectTransform, new Vector2(614f, -top), new Vector2(84f, 42f));
 
             var slider = sliderGo.GetComponent<Slider>();
@@ -247,19 +246,19 @@ namespace VNEffects
             go.GetComponent<Button>().onClick.AddListener(action);
             if (!string.IsNullOrEmpty(label))
             {
-                var text = CreateText(rect, label, fontSize, TextAnchor.MiddleCenter);
+                var text = CreateText(rect, label, fontSize, TextAlignmentOptions.Center);
                 Stretch(text.rectTransform);
-                text.fontStyle = FontStyle.Bold;
+                text.fontStyle = FontStyles.Bold;
             }
             return go;
         }
 
-        Text CreateText(Transform parent, string value, int size, TextAnchor anchor)
+        TextMeshProUGUI CreateText(Transform parent, string value, int size, TextAlignmentOptions anchor)
         {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            var go = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
-            var text = go.GetComponent<Text>();
-            text.font = _font;
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
             text.fontSize = size;
             text.alignment = anchor;
             text.text = value;

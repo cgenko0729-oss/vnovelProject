@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -82,12 +83,11 @@ namespace VNEffects
             _group.blocksRaycasts = true;
 
             float totalH = options.Length * buttonSize.y + (options.Length - 1) * buttonSpacing;
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             for (int i = 0; i < options.Length; i++)
             {
                 float y = totalH * 0.5f - buttonSize.y * 0.5f - i * (buttonSize.y + buttonSpacing);
-                var entry = CreateButton(options[i], i, new Vector2(0f, y + 60f), font);
+                var entry = CreateButton(options[i], i, new Vector2(0f, y + 60f));
                 _entries.Add(entry);
 
                 // 错落飞入：右侧 90px 外滑入 + 淡入
@@ -100,7 +100,7 @@ namespace VNEffects
             }
         }
 
-        Entry CreateButton(string label, int index, Vector2 pos, Font font)
+        Entry CreateButton(string label, int index, Vector2 pos)
         {
             var go = new GameObject($"Choice_{index}",
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -124,17 +124,17 @@ namespace VNEffects
             fx.SetShineStyle(0.28f, 30f, new Color(1.8f, 1.6f, 1.1f, 0.7f));
 
             var text = new GameObject("Label",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             var textRect = (RectTransform)text.transform;
             textRect.SetParent(rect, false);
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
-            var t = text.GetComponent<Text>();
-            t.font = font;
+            var t = text.GetComponent<TextMeshProUGUI>();
+            t.font = VNFont.Asset;
             t.fontSize = 30;
-            t.alignment = TextAnchor.MiddleCenter;
+            t.alignment = TextAlignmentOptions.Center;
             t.color = new Color(1f, 1f, 1f, 0.95f);
             t.raycastTarget = false;
             t.text = label;

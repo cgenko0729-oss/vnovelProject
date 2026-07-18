@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -44,13 +45,10 @@ namespace VNEffects
         static readonly Color MarkerColor = new Color(0.5f, 0.9f, 1f, 1f);
         static readonly Color VisitedColor = new Color(0.65f, 0.95f, 0.75f, 1f);
 
-        Font _font;
         bool _chosen;
 
         protected override void OnLaunch(VNEventContext ctx)
         {
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
             // 可用地点 = 通过条件 且 被本次「* 结果行」接住
             var visible = new List<Location>();
             foreach (var loc in locations)
@@ -154,9 +152,9 @@ namespace VNEffects
             labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0f);
             labelRect.anchoredPosition = new Vector2(0f, -26f);
             labelRect.sizeDelta = new Vector2(300f, 40f);
-            var outline = label.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
-            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            // TMP 不走 uGUI Outline 组件，用 SDF 材质自带描边（更锐利）
+            label.outlineWidth = 0.22f;
+            label.outlineColor = new Color32(0, 0, 0, 217);
 
             go.GetComponent<Button>().onClick.AddListener(() => Choose(loc, rect));
             go.AddComponent<MarkerHover>();
@@ -216,20 +214,20 @@ namespace VNEffects
             return rect;
         }
 
-        Text CreateText(string name, RectTransform parent, int size,
+        TextMeshProUGUI CreateText(string name, RectTransform parent, int size,
             Color color, string content)
         {
             var go = new GameObject(name, typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
-            var text = go.AddComponent<Text>();
-            text.font = _font;
+            var text = go.AddComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
             text.fontSize = size;
             text.color = color;
             text.text = content;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = TextAlignmentOptions.Center;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
             text.raycastTarget = false;
             return text;
         }

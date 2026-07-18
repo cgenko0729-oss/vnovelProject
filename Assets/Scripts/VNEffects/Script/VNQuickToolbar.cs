@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -12,7 +13,6 @@ namespace VNEffects
         GameObject _root;
         Image _autoImage;
         Image _skipImage;
-        Font _font;
 
         static readonly Color Normal = new Color(0.045f, 0.06f, 0.105f, 0.94f);
         static readonly Color Active = new Color(0.92f, 0.61f, 0.18f, 0.98f);
@@ -26,7 +26,6 @@ namespace VNEffects
         void Build()
         {
             if (_root != null) return;
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             if (EventSystem.current == null)
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -89,19 +88,19 @@ namespace VNEffects
             button.onClick.AddListener(action);
 
             var textGo = new GameObject("Label", typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Text));
+                typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             var textRect = (RectTransform)textGo.transform;
             textRect.SetParent(go.transform, false);
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
-            var text = textGo.GetComponent<Text>();
-            text.font = _font;
+            var text = textGo.GetComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
             text.text = label;
             text.fontSize = 16;
-            text.fontStyle = FontStyle.Bold;
-            text.alignment = TextAnchor.MiddleCenter;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Center;
             text.color = new Color(0.94f, 0.95f, 1f, 1f);
             text.raycastTarget = false;
             return image;
