@@ -18,8 +18,18 @@ MonoBehaviour:
   expressions:
   - name: "\u9ED8\u8BA4"
     sprite: {fileID: 21300000, guid: 90436bdfb80ce304eb379df16e5979b2, type: 3}
-  sizeScale: 0.72809875
-  positionOffset: {x: 0, y: 0}
+  enableBlink: 1
+  blinkSprite: {fileID: 21300000, guid: c99f00b7a6f64ef40a76b5209a735a2c, type: 3}
+  blinkIntervalMin: 2.5
+  blinkIntervalMax: 5
+  blinkDuration: 0.1
+  enableMouthFlap: 1
+  openMouthSprite: {fileID: 21300000, guid: fa1328ad376362f43bdfc13c8a48d959, type: 3}
+  mouthDefaultExpressionOnly: 1
+  mouthIntervalMin: 0.14
+  mouthIntervalMax: 0.28
+  sizeScale: 1.9
+  positionOffset: {x: 0, y: -277}
   showPortrait: 1
   portraits:
   - name: p01

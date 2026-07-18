@@ -1,0 +1,5 @@
+﻿
+bg bg4 transition:Eyelid
+
+show 亚里沙 at:left expr:默认 with:AfterimageDash
+亚里沙: 那个……小雪。

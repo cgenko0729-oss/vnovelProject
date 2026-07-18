@@ -1,5 +1,5 @@
-mood Neutral
-bgm play b01
+
+
 bg bg1 transition:Eyelid
 # start:cut → 眨眼睁开时画面已在 top 2.05 视角；end:fade → 末镜头叠化回全图
 camseq start:cut end:fade endfade:1
@@ -7,15 +7,16 @@ camseq start:cut end:fade endfade:1
 > 34,-269 2.05 2
 > right 2 0 xfade:0.5
 > -427,0 2 3
-wait 0.3
 fx godrays on
 weather Rain
-
+letterbox on
+fx speedlines on
+fx meteor on
 show 亚里沙 at:left expr:默认 with:AfterimageDash
 wait 0.4
 show 小雪 at:right with:AfterimageDash
 voice v02
-亚里沙: 今天的晚霞真漂亮啊……整片天空都烧起来了一样。
+亚里沙: xxx今天的晚霞真漂亮啊……整片天空都烧起来了一样。
 voice v01
 亚里沙: 是啊。你看，连云的边缘都镶上了金色。
 
@@ -127,3 +128,4 @@ chapter Chapter2
 # ============================================
 
 #小雪02
+

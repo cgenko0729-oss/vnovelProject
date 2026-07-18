@@ -1105,8 +1105,444 @@ volume bgm 0.8
   - 真结局后标题中的天气改变。
   - 坏结局后标题音乐少一个乐器声部。
 
-now please think of more improvements or features you can add for this visual novel script system, as much as possible idea from various perspective please. Please anaylze for me as detailed as possible and reply in chinese:
+
+
+
+坑清单：7 条必守约定、7 个易踩的坑、5 笔已知技术债（都标了出处章节，别当 bug 修）
+
+2. 更新 CLAUDE.md —— 给 AI 的工作规则刷新到现状
+
+- 剧本系统状态补齐：音频三库 + vol 参数、事件接口（event/qte/map 及三铁律）、任务系统（quest 语法和阶段约定）
+file
+
+推送成功确认：
+
+- main 已更新到 bd00eb9（三份文档合并完成）
+- 新分支 agent/project-code-guide 已推送到 GitHub，所有分支均保留
+
+文档批次全部收尾。ProjectCodeGuide.md 已在项目根目录，随时可以打开阅读——建议从第一节"大图景"和第二节"一次台词的旅程"看
+WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
+
+## 四十六、视觉与演出美化方向全面梳理（2026-07-17，纯分析，无代码改动）
+
+> 用户要求从尽可能多的角度提出让画面/演出更美更有吸引力的想法。完整分析
+> （约 50 条，每条标注依托的现有基建与成本）在当次对话中，此处存要点与优先级。
+
+### 46.1 七大方向
+先说一个总判断
+
+你的项目特效"单件"已经非常多了（转场 12 种、粒子 8 种、运镜 5 式、单图特效 9 类……），继续堆单件的边际收益在下降。下一阶段的美感提升主要来自三件事：
+
+1. 节奏——文字停顿、镜头呼吸、转场时机（玩家感知不到"特效"，只感知"舒服"）
+2. 组合——把单件编排成名场面（VNDirector 正是为此规划的）
+3. 消灭静止——画面里任何"完全不动的东西"都是廉价感的来源
+
+文档批次完成：三份文档已提交（+528 行）、合并回 main，推送后台进行中（完成后确认）。
+
+本次交付的三份文档（分支 agent/project-code-guide）
+
+rojectCodeGuide.md —— 给你的代码教科书
+
+62 个代码文件全覆盖（运行时 20 + 特效组件 32 + 编辑器 6 + Shader 4），结构从宏观到微观：
+
+- 大图景：三层架构图（剧本层 → 舞台层 → 玩法扩展层）+ 三个最重要的设计决定（文本是唯一真相 / VNFlags 是唯一状态 / event 是唯一玩法插槽）——理解这三条就理解了整个项目
+- 一次台词的完整旅程：从 亚里沙 微笑: 今天天气真好。 这一行文本出发，跟着代码走完解析 → 执行 → 上台 → 打字 → 口型 → 存档的全路径
+- 逐文件详解：每个脚本的职责、关键 API、谁调特效组件按 6 类分组讲
+条三文档分工约定：ProjectCodeGuide 管"现状"、WhatAiDo 管"历史"、CLAUDE.md 管"AI 工作规则"——以后每批功能完成，涉及新脚本/命令/约定时三处同步。
+
+✻ Brewed for 6m 50s
+
+● Background command "Push main and docs branch to GitHub" completed (exit code 0)
+
+  Read 1 file
+
+beautiful and good feature or effects or visual improvemnet you can add or more feature you to make the presentation and visual of this visaul novel game better or more beautful or attractive ,as much as possible idea please from various perspective. Please anaylze for me as detailed as possible and reply in chinese
+
+这是纯头脑风暴分析（不改代码）。我基于现有 62 个组件的基建来提想法——每条都标注"依托什么现成设施、成本多大"，避免空中楼阁。要点会照惯例存档进 WhatAiDo.md。
+
+● Update(WhatAiDo.md)
+Added 35 lines
+维护约定：以后每完成一批功能，除 WhatAiDo 记录外，若涉及新脚本/新命令/
+新约定，应同步 ProjectCodeGuide 对
+WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
+
+## 四十六、视觉与演出美化方向全面梳理（2026-07-17，纯分析，无代码改动）
+
+   同背景早/昼/黄昏/夜四段调色 + godrays 角度联动、雷雨组合演出（闪电+延迟雷声）、
+   季节一键预设（粒子+色调+环境音组合）、前景 bokeh 光斑层、飞鸟/流星点缀。
+3. **文字演出**：P3 内嵌标记（既定）、标点自动停顿节奏、情绪字体（颤抖/弹出）、
+   对话框皮肤系统（心声/回忆/电话/系统）、关键词高亮、选项倒计时环。
+4. **转场镜头**：章节标题卡（竖排+印章）、回忆转场组合（白闪+柔焦+去饱和，
+   即 VNDirector 素材）、rack focus 双立绘虚实交替、手持镜头 perlin 微漂移、
+   漫画速度线/集中线、电影 letterbox 黑边、闪回快切序列、分屏对峙。
+5. **UI 系统美化**：动态标题画面（39 章第 26 条前置）、存读档界面章节色条、
+   自定义光标、Toast 图标横幅、成
+
+分析完成，要点已存档为 WhatAiDo.md 第四十六章（本次未改代码，记录会随下个功能分支一起提交）。以下是完整分析——每条都标注依托的现有基建和成本，因为项目已有 62 个组件，好想法的标准不是"新"而是"接得上"。
+
+---
+视觉与演出美化方向全面分析（约 50 条）
+
+先说一个总判断
+
+你的项目特效"单件"已经非常多了（转场 12 种、粒子 8 种、运镜 5 式、单图特效 9 类……），继续堆单件的边际收益在下降。下一阶段
+
+1. 节奏——文字停顿、镜头呼吸、转场时机（玩家感知不到"特效"，只感知"舒服"）
+2. 组合——把单件编排成名场面（VNDirector 正是为此规划的）
+3. 消灭静止——画面里任何"完全不动的东西"都是廉价感的来源
+
+背景 Ken Burns 漂移 静止背景以 60~90 秒周期极缓慢地放大 1.0→1.06 + 平移几十像素，永不静止。
+▸ 基建：ZoomRoot/VNCamera 现成，甚至可以只给背景 Image 做 DOTween 循环。成本半天，全游戏每一秒都受益——这是所有商业 VN 的标配。
+
+
+
+1. 背景 Ken Burns 漂移 ★★★ 强烈推荐第一个做
+静止背景以 60~90 秒周期极缓慢地放大 1.0→1.06 + 平移几十像素，永不静止。
+▸ 基建：ZoomRoot/VNCamera 现成，甚至可以只给背景 Image 做 DOTween 循环。成本半天，全游戏每一秒都受益——这是所有商业 VN 的标配。
+
+2. 同背景多时段调色
+bg bg1 time:黄昏 —— 同一张背景经 早/昼/黄昏/夜 四段色调（HSV+色温），配合 godrays 角度/颜色联动。AI 出图只需一张，时间感白送。
+▸ 基建：VNImageEffect 的 HSV 参数 + VNMoodGrading 双 Volume 过渡。成本 1~2 天。
+
+机飞鸟掠过、夜晚偶发流星（萤火虫已有）、云本体缓移（云影已有，补云）。每个都是一条 DOTween 路径 + 程序化贴图。
+
+7. 窗光光影：矩形光柱斜投（教室/室内神器），VNGodRays 的矩形变体。
+
+8. 水面反射：背景下半屏翻转 + VNImageEffect 波浪参数扭曲，湖畔/雨后地面。成本中。
+
+---
+二、立绘表现力（角色是 VN 的脸）
+
+9. 通用 overlay 叠加层 ★★★（第三十九章第 10
+自动给在场立绘开波光 shimmer（湿身高光）+ 微降明度；雪天呼气白雾粒子。▸ VNWeatherController 广播给 VNStage 即可。
+
+13. 方向性轮廓光：背景光源在左，立绘 rim light 就在左侧且用背景主色。▸ VNEdgeGlow rim + VNToneMatch 采样已有，加个方向参数。
+
+14. 眼神高光：眼部位置一颗四芒星 sparkle 每隔几秒闪一次（overlay 机制 + Sparkle 贴图）。感动/星星眼场景杀手锏。
+
+15. 说话者微透视：说话者向镜头微倾 2°+放大 1.02（highlight 已做明暗缩放，加一点 skew 更贴脸）。
+
+16. 下摆/发梢摆动：VNImageEffect 波浪参数按 呼吸动作之外的"活着"感。成本中（shader
+零剧本成本的节奏革命
+打字机遇到 。！？ 自动停 0.2s、…… 停 0.35s、、 停 0.1s。不用写任何标记，全部台词立刻有了呼吸感。
+▸ 基建：VNTypewriterText 逐字循环里查字符表。成本两小时，感知度巨大。
+
+19. P3 内嵌标记（路线图既定）：{w:0.5}{speed}{shake}{color} —— 与 18 互补，18 管默认节奏、P3 管导演级控制。
+
+20. 情绪字体演出：害怕的台词逐字颤抖、喊叫的台词字号放大加粗弹出。P3 标记的展示层：{tremble}住手……{/tremble}。
+
+21. 对话框皮肤系统 ★★
+saymode 心声（半透明无名牌斜体）/回忆（泛黄+柔角）/电话（左竖条+电流 blip）/系统（终端风）。
+▸ 基建：VNDialogueBox 已有流光边框/名牌体系 内心戏的剧本都是刚需。
+
+22. 名牌进阶：角色专属渐变色名牌 + 小徽标（VNCharacterDef 已有 nameColor，升级为渐变+图标字段）。
+
+23. 关键词高亮：台词中特定词自动金色+微光（TIPS 词典的视觉前置，先做纯演出版）。
+
+
+titlecard 第一章 邂逅：黑屏 → 竖排大字淡入 + 朱红印章"啪"盖章 + 底部英文小字 → 淡出。
+▸ 基建：全屏层 + 程序化印章贴图 + DOTween。成本一天，仪式感的最大单笔投资。
+
+27. VNDirector 名场面命令（路线图既定，这里给美化视角的清单）：
+- director 回忆：白闪入 + 去饱和 + 柔焦 + 晕影加深 + BGM 音量压低
+- director 觉醒：edge glow 金色 + 粒子上升 + 镜头缓推 + 心跳
+- director 修罗场：荷兰角 + 冷色 + 集中线 + 低频震动
+每条都是纯编排现有组件，一行命令一个名场面。
+
+28. 电影 letterbox：letterbox on 上下黑边滑 回忆自动上黑边。全屏两条黑 Image +DOTween，成本两小时，电影感立涨。
+
+29. 手持镜头微漂移：ZoomRoot 加 perlin noise 个数量级），紧张对话时开启，"呼吸的镜头"。
+
+30. 漫画速度线/集中线：全屏放射线 overlay 闪化贴图（放射线条），成本低。
+、对方 9-tap 模糊），fx focus 的双人版。▸ VNImageEffect 模糊参数已有，包装编排。
+
+32. 闪回快切：flashcut img1 img2 img3 0.15——连续快闪多张图各 0.15s + 白闪间隔，解谜/回忆杀专用。
+
+统预置演出）。
+
+40. 快进模式视觉反馈：Skip 时屏幕四角轻微流光（现在只有角标，玩家常忘了自己在快进）。
+
+---
+
+---
+七、技术底层增强（远期投资）
+
+44. Sprite 法线假光照：给立绘配法线贴图（AI  实明暗——2D 立绘质感跃升一档。成本高，远期。
+45. 全屏情绪水波：点击涟漪的全屏版——受击/震惊时整个画面荡一圈波纹（shader 已有波浪基础）。
+46. 胶片颗粒/CRT 滤镜：回忆用颗粒+划痕、梦境和版）。
+47. 2D 骨骼/Live2D：终极立绘方案，接口预留即可（VNStage.CreateCharacter 的组装点就是将来的接入点），不建议现在动。
+
+---
+优先级总表
+─────────────────────────┼───────────────────────────┤
+│ 远期                      │ 法线光照(44)、分屏(33)、Live2D(47)                     │ 等内容量证明值得          │
+└───────────────────────────┴────────────────────────────────────────────────────────┴───────────────────────────┘
+
+如果只让我挑三个立刻开工：背景 Ken Burns +   来
+
+
+.md 第五十三章。
+
+✻ Crunched for 5m 14s
+
+※ recap: Building VN effects for your Unity galgame: finished full-screen shockwave, film/CRT filters, Ken Burns drift, shader fix, and the manual SetUpGuide.md, all merged to main and pushed. Next: regenerate demo scenes in Unity, or tell me the next feature. (disable recaps in /config)ide 参数）现在只能去 Text 页手改。
+6. 一键注释/取消注释（S）：选中行 Ctrl+/ 变 # 注释——调试时临时禁用某段演出的刚需。
+7. 快捷键体系（S）：Alt+↑↓ 移动行、Ctrl+D 复制行、Del 删除——现在全靠鼠标拖 ReorderableList。
+
+二、可视化（一眼看懂剧本状态）
+
+8. 舞台状态缩略图（L，高价值）：每行左侧画一个小格：当前背景缩略图 +                f，让用户手动指定每个走哪边。这是你 CLAUDE.md 里已记录的已知限制的正解之一。
+18. 从存档快照启动（M）：选一个存档槽作为起始状态 + 从选中行播——CLAUDE.md 里写的另一个正解，存读档系统已齐备，接线成本不高。
+19. 舞台反向捕捉（L）：在 Game 视图里手调好镜头/角色位置后，点"捕捉"自动生成对应 camto/move 命令插入剧本（camseq 编辑器已有类似思路，推广到通用命令）。
+
+四、校验与质量（Issues 页扩容）
+                                                                          合并偶尔会把两个独立操作合并；改按"操作"分界，且撤销后自动选中受影响行。
+
+十、小而美 Quick Wins（半天以内一个）
+
+一、编辑手感（写剧本像打字一样流畅）
+
+1. 连续写对话模式（S）：选中 say 行按 Enter 直接在下方插入新 say 行，且自动换成对话另一方（VN 对话大多 A/B 交替，这一条能省一半鼠标操作）。
+2. 多选 + 批量操作（M）：Shift/Ctrl 多选行 → 批量删除/复制/移动/批量改说话人/批量转为注释。现在只能单行操作，重构剧本很痛苦。
+3. 行块复制粘贴（S）：Ctrl+C/V 把选中行序列化为文本片段，可跨文件粘贴——文本本来就是唯一真相，天然可行、成本极低。
+4. 片段库（Snippet）（M）：把"开场三连"（bg+bgm+show）、"回忆进入"（transition+mood Memory）等保存为命名模板一键插入，支持参数留空待填。
+5. 查找/替换（M）：搜台词内容、命令参数、说话人；"角色改名"场景（替换所有 say 的 speaker + show/hide 参数）现在只能去 Text 页手改。
+6. 一键注释/取消注释（S）：选中行 Ctrl+/ 变 # 注释——调试时临时禁用某段演出的刚需。
+7. 快捷键体系（S）：Alt+↑↓ 移动行、Ctrl+D 复制行、Del 删除——现在全靠鼠标拖 ReorderableList。
+
+二、可视化（一眼看懂剧本状态）
+
+8. 舞台状态缩略图（L，高价值）：每行左侧画一个小格：当前背景缩略图 + 在场角色的站位色块。扫一眼就知道"这行时台上有谁、背景是什么"——现在必须在脑内从头模拟。
+9. 分支流程图视图（L，高价值 /choice/if画成节点图，点节点跳到对应行。副产品：死链/永远到不了的孤岛段落直接可视化暴露。
+10. 右侧迷你地图（M）：像 VSCode minimap，一条窄带用分类颜色画整个文件结构（你已有分类颜
+色系统，直接复用），点击跳转
+11. 段落折叠（M）：label 到下一个 label 之间折叠成一行（显示 label 名 + 行数），配合折叠记忆。
+12. 台词渲染预览（M）：say 行 hover 时按真实对话框样式（名牌颜色/字体）弹出预览，包括超长台词会不会溢出。
+
+三、编辑 ↔ Play 闭环（你已有"从选中行播放"，往深做）
+
+13. 运行行高亮跟随（M，高价值）：Play 时 Runner 把当前执行行号回传编辑器，编辑器自动滚动+高亮——像调试器单步跟踪，写演出时的体验质变。
+14. 热重载（M）：Play 中保存  置继续，不用停止重进。配合 13
+就是"边看边改"。
+15. 断点（M）：行号槽点一下打红点，Play 到该行自动暂停（复用现有 Bridge 机制反向用）。
+16. Flags 监视面板（S）：Play 时编辑器里实时显示 VNFlags 全部值、可手动改——测分支不用重跑攒好感度。
+17. 分支路径选择重建（M）：现
+存档快照启动（M）：选一个存档槽作为起始状态 + 从选中行播——CLAUDE.md 里写的另一个正解，存读档系统已齐备，接线成本不高。
+19. 舞台反向捕捉（L）：在 Game 视图里手调好镜头/角色位置后，点"捕捉"自动生成对应 camto/move 命令插入剧本（camseq 编辑器已有类似思路，推广到通用命令）。
+
+四、校验与质量（Issues 页扩容）
+
+20. 引用完整性（S）：未被 jump 引用的 label（可能是废弃段落）、从未 flag 赋值就被 if 使用的变量、bgm/se/voice id 不在音频库、表情名不在 VNCharacterDef。
+21. 台词 lint（S）：超长台词（按字号估算对话框容量）、空台词、连续重复行。
+22. 死条件检测（M）：if 好感度>=2 但全文好感度最多加到 1——简单静态分析就能抓住一批剧情
+bug。
+23. 演出密度提示（S）：连续 15+ 行纯台词无任何演出命令 → 提示"干读段落"（是提醒不是错误）。
+24. 保存时自动跑校验（S）：有 Error 时保存弹确认（你播放前已拦截，保存也应提示）。
+
+五、多文件/项目级
+
+25. 剧本文件侧栏（M）：列出 Assets/Scenarios/*.vn.txt，显示各文件行数/字数/Issues 数，点击切换——现在每次都要 Open 对话框。
+26. 跨文件校验（M）：flag 全项目视角（第一章设、第三章用）；chapter 跳转目标文件存在性。
+27. 新建剧本模板（S）：New 按钮 + 章节模板（带语法速查头注释）。
+28. 最近打开列表（S）：Open 按钮旁下拉最近 5 个文件。
+
+六、文本与本地化
+
+29. 字数统计面板（S）：总字数—VN产能与配比（哪个角色戏份少）一目了然。
+30. 台词导出/导入 CSV（M）：导出全部
+say（行号/角色/台词）给校对、 号回填。这是商业 VN管线的标配。
+31. 语音覆盖率（S）：哪些台词行没有配对的 voice 命令，生成配音需求清单。
+32. 台词内演出标记辅助（M）：配合路线图 P3 的 {shake}{w:0.5} 内嵌标记，在台词输入框右键插入标记菜单——P3 落地时编辑器同步跟上。
+
+七、素材联动
+
+33. 素材清单面板（M）：当前剧本引用的全部背景/角色/音频 →
+存在性标记，缺失的就是美术/音
+34. 拖拽创建行（M）：从 Project 拖 Sprite 进列表 = 自动生成 bg/show 行；拖 AudioClip = 生成 bgm/se 行（自动注册进库）。
+35. 音频行内试听（S）：bgm/se/voice 参数旁一个 ▶ 小按钮直接播放——现在选了 id
+听不到，全凭记忆。
+36. 角色资产直达（S）：say/show 的角色下拉旁加小按钮，直接 ping/打开对应 VNCharacterDef。
+
+八、AI 辅助（贴合你的 AI 协作开发流）
+
+37. 选段 AI 润色/续写（M~L）：选中台词段落 → 调 API 生成候选（润色/扩写/换语气），diff 预览后应用。
+38. 自然语言转命令（M~L）：输入"镜头急推到亚里沙脸上，画面震动，她害羞"→ 生成 camera snapzoom + shake + emote Shy 行。Schema 表就是现成的提示词素材。
+39.
+演出自动铺底（L）：给一段纯台→惊讶、场景词→换背景建议）或AI 自动插入演出命令草稿。
+
+九、稳定性与性能
+
+40. 自动备份（S，建议尽早做）：保存时滚动 .bak（保留最近 N 份）+ 未保存内容 SessionState 暂存防编辑器崩溃——现在手滑 Reload 就没了。
+41. 大文件虚拟化（M）：ReorderableList 全量绘制，千行剧本会卡；只绘可见区。写到第三章前值得做。
+42. 撤销改进（M）：1秒时间片合并偶尔会把两个独立操作合并；改按"操作"分界，且撤销后自动选中受影响行。
+
+十、小而美 Quick Wins（半天以
+
+43. 行号显示（与 Text 页/Issues 行号对齐心智）。
+44. Go to label 下拉显示每个 label 被引用次数（0 次的标灰）。
+45. Issues 行双击 = 跳转并直
+46. 拖动排序时显示落点预览线的分类颜色。
+47. 编辑器窗口标题显示 文件名*（未保存星号——如果还没有）。
+
+---
+我的推荐优先级（价值/成本比排序）
+
+1. #40 自动备份——防丢失是地基，成本最低。
+2. #1 连续写对话 + #7 快捷键——每天都在用的手感，立竿见影。
+3. #13+14 运行行高亮跟随 + 热重载——把你已有的"从选中行播 具"变"工作台"的分水岭。
+4. #9 分支流程图——剧本越写越长后，结构可视化的价值指数上升，且死链检测免费附送。
+5. #30 台词导出 CSV——一旦考虑 式早稳定。
+附录：键盘演示场景的差异、完整层级树一页速查。                                      
+另外在 CLAUDE.md 头部加了指引（与 WhatAiDo.md、ProjectCodeGuide.md 并列），开发记录写入 WhatAiDo.md 第五十三章。
+
+✻ Crunched for 5m 14s                                                                 
+※ recap: Building VN effects for your Unity galgame: finished full-screen shockwave, film/CRT filters, Ken Burns drift, shader fix, and the manual SetUpGuide.md, all merto main and pushed. Next: reg or tell me the next feature.
+✻ Cooked for 43s
+
+❯ please give me the full guiderom start , assume that myty and i have to set up everything with hand from very beginnning , write in SetUpGuide.md and explain as detailed as possible ,also the rationale behind, write in chinese ,
+
+写这份手动搭建指南前，先把生成器里所有具体参数（后处理数值、材质、字体、层级细节）读全，保证指南与代码一致：
+
+  Read 1 file, ran 1 shell command
+
+● Write(SetUpGuide.md)
+Wrote 590 lines to SetUpGuide.md
+# SetUpGuide.md — 从零
+骤。手动搭建的价值在于：① 彻底理解系统结构；② 想自定义层级/参数
+时知道
+> 哪里能改、哪里不能动。照着做一遍，你对整个特效系统的理解会完全不同。
+---
+… +644 lines
+
+● Update(CLAUDE.md)
+Added 2 lines, removed 1 line
+# CLAUDE.md — 视觉小说项目（vnovelProject）
+
+> 本文件是给 Claude（AI 助手）的项目说明书。所有开发过程的详细记录在 `What
+AiDo.md`；
+
+
+## 项目概况
+
+
+  Committed 9fa9411, pushed to main
+
+SetUpGuide.md 已写好（项目根目录，约 600 行），分支 agent/setup-guide 已合并回 main 并推送到 GitHub，分支保留。
+
+指南假设 Hierarchy 完全为空、纯手动从第一个物体搭起，所有参数值直接取自场景生成器代码（B
+uildStageRig），保证照着搭出
+
+第 0 章 · 三个核心概念（所有搭建决策的底层逻辑）
+- 发光 = HDR 颜色(>1) + Bloom(阈值1.0)——由此推出相机必须开后处理、Canvas 必须是 Screen Space - Camera（Overlay 模式 UI 不经过后处理，发光全灭，这是头号坑）
+- 每种整屏运动独占一个容器层—嵌套的原因（DOTween
+ 六层容器层级表（每层被谁驱动、动什么、命名警告）
+4. 背景 Image（±60px 溢出余量的由来）、GodRays、云影/流星、立绘配方
+5. 全屏 overlay 渲染排序总表（0→100 所有排序号一张表，新加特效前必查）
+6. 场外管理器连线表（每个 target 指哪、为什么）+ 粒子物体
+7. 对话框精确锚点参数、为什么用 legacy Text 不用 TMP、EventSystem 注意事项
+8. 剧本系统接线：VNCharacterDef 资产、最小剧本、VNStage 全引用清单、VNAudio 三通道、事件模板为什么必须禁用、任务系统
+
+第 9 章 · 验证清单 + 常见坑速查表（13 个症状→原因→解法，包括粉红材质、发光失效、汉字方块、运镜和震动打架等）
+
+附录：键盘演示场景的差异、完
+
+另外在 CLAUDE.md 头部加了指引（与 WhatAiDo.md、ProjectCodeGuide.md 并列），开发记录写入
+WhatAiDo.md 第五十三章。
+
+✻ Crunched for 5m 14s
+
+※ recap: Building VN effects fod full-screen shockwave,, Ken Burns drift, shader fix, and the manual SetUpGuide.md, all merged to main and pushed. Next: regenerate demo scenes in Unity, or tell me the next feature. (disable recaps in /config)
+
+❯ ok, next can you please help me to think of as much ideas as possible from various perspective about how to improve or better or add features to my current Scenario Editor tool .
+
+好，这是个头脑风暴任务。先快速把编辑器现状摸一遍，确保点子贴合现实、不重复已有功能：
+
+  Searched for 2 patterns, read 1 file, ran 1 shell command
+
+S）：Ctrl+C/V 把选中行序列化为文本片段，可跨文件粘贴——文本本来就是唯一真相，天然可行、成本极低。
+4. 片段库（Snippet）（M）：把"开场三连"（bg+bgm+show）、"回忆进入"（transition+mood Memory）等保存为命名模板一键插入，支持参数留空待填。
+5. 查找/替换（M）：搜台词内容、命令参数、说话人；"角色改名"场景（替换所有 say 的 speaker + show/hide 参数）现在只能去 Text 页手改。
+6. 一键注释/取消注释（S）：选中行 Ctrl+/ 变 # 注释——调试时临时禁用某段演出的刚需。
+7. 快捷键体系（S）：Alt+↑↓ 移动行、Ctrl+D 复制行、Del 删除——现在全靠鼠标拖 ReorderableList。
+
+二、可视化（一眼看懂剧本状态）
+
+（L，高价值）：每行左侧画一个小格：当前背景缩略图 + 在场角色的站位色块。扫一眼就知道"这行时台上有谁、背景是什么"——现在必须在脑内从头模拟。
+9. 分支流程图视图（L，高价值）：用 GraphView 把 label/jump/choice/if 画成节点图，点节点跳到对应行。副产品：死链/永远到不了的孤岛段落直接可视化暴露。
+10. 右侧迷你地图（M）：像 VSCode minimap，一条窄带用分类颜色画整个文件结构（你已有分类颜色系统，直接复用），点击跳转。长剧本导航利器。
+11. 段落折叠（M）：label 到下一个 label 之间折叠成一行（显示 label 名 + 行数），配合折叠记忆。
+12. 台词渲染预览（M）：say 行 hover 时按真实对话框样式（名牌颜色/字体）弹出预览，包括超长台词会不会溢出。
+
+三、编辑 ↔ Play 闭环（你已有"
+（M）：选一个存档槽作为起始状态 + 从选中行播——CLAUDE.md 里写的另一个正解，存读档系统已齐备，接线成本不高。
+19. 舞台反向捕捉（L）：在 Game 视图里手调好镜头/角色位置后，点"捕捉"自动生成对应 camto/move 命令插入剧本（camseq 编辑器已有类似思路，推广到通用命令）。
+
+四、校验与质量（Issues 页扩容）
+
+20. 引用完整性（S）：未被 jump 引用的 label（可能是废弃段落）、从未 flag 赋值就被 if 使用的变量、bgm/se/voice id 不在音频库、表情名不在 VNCharacterDef。
+21. 台词 lint（S）：超长台词（按字号估算对话框容量）、空台词、连续重复行。
+22. 死条件检测（M）：if 好感度>=2 但全文好感度最多加到 1——简单bug。
+S）：Open 按钮旁下拉最近 5 个文件。
+
+六、文本与本地化
+
+29. 字数统计面板（S）：总字数/每角色台词字数/预计游玩时长——VN 产能与配比（哪个角色戏份少）一目了然。
+30. 台词导出/导入 CSV（M）：导出全部 say（行号/角色/台词）给校对、配音台本、翻译用，改完导回按行号回填。这是商业 VN 管线的标配。
+31. 语音覆盖率（S）：哪些台词行没有配对的 voice 命令，生成配音需求清单。
+32. 台词内演出标记辅助（M）：配合路线图 P3 的 {shake}{w:0.5} 内嵌标记，在台词输入框右键插  跟上。
+
+七、素材联动
+
+33. 素材清单面板（M）：当前剧本引用的全部背景/角色/音频 → 存在性标记，缺失的就是美术/音频需求清单，可导出。
+34. 拖拽创建行（M）：从 Project 拖 Sprite 进列表 = 自动生成 bg/show 行；拖 AudioClip = 生成 bgm/se 行（自动注册进库）。
+35. 音频行内试听（S）：bgm/se/voice 参数旁一个 ▶ 小按钮直接播放——现在选了 id 听不到，全凭记忆。
+36. 角色资产直达（S）：say/sh ping/打开对应
+
+九、稳定性与性能
+
+40. 自动备份（S，建议尽早做）：保存时滚动 .bak（保留最近 N 份）+ 未保存内容 SessionState 暂存防编辑器崩溃——现在手滑 Reload 就没了。
+41. 大文件虚拟化（M）：ReorderableList 全量绘制，千行剧本会卡；只绘可见区。写到第三章前值得做。
+42. 撤销改进（M）：1 秒时间片合并偶尔会把两个独立操作合并；改按"操作"分界，且撤销后自动选中受影响行。
+
+十、小而美 Quick Wins（半天以内一个）
+
+43. 行号显示（与 Text 页/Issues 行号对齐心智）。
+44. Go to label 下拉显示每个45. Issues 行双击 = 跳转并直
+46. 拖动排序时显示落点预览线的分类颜色。
+47. 编辑器窗口标题显示 文件名*（未保存星号——如果还没有）。
+
+---
+我的推荐优先级（价值/成本比排序）
+                           1. #40 自动备份——防丢失是地基
+2. #1 连续写对话 + #7 快捷键——每天都在用的手感，立竿见影。
+3. #13+14 运行行高亮跟随 + 热重载——把你已有的"从选中行播 具"变"工作台"的分水岭。
+4. #9 分支流程图——剧本越写越长后，结构可视化的价值指数上升，且死链检测免费附送。
+5. #30 台词导出 CSV——一旦考虑配音/校对/翻译就是刚需，早做格式早稳定。
+
+
+ now please think of more improvements or features you can add for this visual novel script system, as much as possible ideas from various perspective please. Please anaylze for me as detailed as possible and reply in chinese:
+ reply in chinese in whole section , and for what you do during this section write in WhatAiDo.md file 
 
  the current effect and result is very good for this visual novel , any more  improvemnet   you can add or more feature you can add to make this visaul novel game better,as much as possible ideas please from various perspective. Please anaylze for me as detailed as possible and reply in chinese:
 
  reply in chinese in whole section , and for each feature do , do it in a new branch and push in public github repo :https://github.com/cgenko0729-oss/vnovelProject.git. and do not delete any branch as i want to go back any time. now in my unity visual novel game dev , 
+
+
+next i want to implement a  "从选中行开始播放Play 模式"（调试神器) in the editor tool ,so i can select a line and start game and game will start from that line  , is it possible , any good way to do it ? 
+
+ok, now please also update WhatAiDo.md file and Claude.md file to include and update what you have done during this section .
+
+ reply in chinese in whole section , and for each feature do , do it in a new branch and push in public github repo
+  "D:\UnityAiProject\My project\WhatAiDo.md",   now i want to implement character blink system , only the default emote
+  will blink , other emote sprite will not blink, and my blibk image is not only the eye part , but a complete full
+  body image will eyes close , and not all character have blink image , so i want that i can choose whether it blink or
+  not , please think of the plan first , then i will decide later
+
+
+ reply in chinese in whole section , and for what you do during this section write in WhatAiDo.md file and also keep a .claude and CLAUDE.md file as usual , use kiss principle 
+
+ reply in chinese in whole section ,and for each feature do , do it in a new branch and push in public github repo :https://github.com/cgenko0729-oss/vnovelProject.git, and do not delete any branch as i want to go back any time.
+the project summary is in WhatAiDo.md and CLAUDE.md  file, now in my unity 3d visual novel game,  i want to implement THESE :
+45. 全屏情绪水波：点击涟漪的全屏版——受击/震惊时整个画面荡一圈波纹（shader 已有波浪基础）。
+46. 胶片颗粒/CRT 滤镜：回忆用颗粒+划痕、梦境和版）。
+
