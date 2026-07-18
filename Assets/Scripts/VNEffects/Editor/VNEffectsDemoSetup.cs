@@ -528,6 +528,10 @@ namespace VNEffects.EditorTools
             runner.stage = stage;
             runner.script = scriptAsset;
             runner.playOnStart = true;
+            // 养成玩法演示剧本：可用 chapter RaisingDemo.vn 切换，或在 Scenario Editor 里直接调试播放
+            var raisingDemo =
+                AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Scenarios/RaisingDemo.vn.txt");
+            if (raisingDemo != null) runner.chapters.Add(raisingDemo);
             new GameObject("VNBacklog").AddComponent<VNBacklog>();
 
             // ---------- 极简提示 ----------

@@ -50,6 +50,7 @@ namespace VNEffects
         VNQuestLog _questLog;
         VNStatsHud _statsHud;
         VNInventory _inventory;
+        VNCalendarHud _calendarHud;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
@@ -96,6 +97,12 @@ namespace VNEffects
                 _inventory = FindFirstObjectByType<VNInventory>();
                 if (_inventory == null) // 没有登记商店资产也能工作（道具 id 当名字）
                     _inventory = new GameObject("VNInventory").AddComponent<VNInventory>();
+            }
+            if (_calendarHud == null)
+            {
+                _calendarHud = FindFirstObjectByType<VNCalendarHud>();
+                if (_calendarHud == null) // 「月份」flag 不存在时它自动隐藏，常驻无害
+                    _calendarHud = new GameObject("VNCalendarHud").AddComponent<VNCalendarHud>();
             }
             EnsureSaveLoadPanel();
             EnsureQuickToolbar();
@@ -327,6 +334,9 @@ namespace VNEffects
                     case "stat": // 静默重放（钳制照做，不弹 Toast）
                         _statsHud?.Apply(cmd.Arg(0), cmd.Arg(1), true, cmd.line);
                         break;
+                    case "time": // 静默重放（月份/剩余月数/行动力回满照做，不弹 Toast）
+                        ApplyTimeCommand(cmd, true);
+                        break;
                     case "camcut":
                     case "camto":
                         lastCameraCut = cmd;
@@ -548,6 +558,60 @@ namespace VNEffects
             }
         }
 
+        /// <summary>
+        /// time 命令（养成日程）：状态全在 VNFlags（月份 / 剩余月数），日历 HUD 自动刷新。
+        ///   time set 9 [remain:36]                进入养成模式：设月份与剩余月数
+        ///   time pass [months:N] [refill:off|名]  过月：月份 +N（1~12 循环）、剩余月数 -N、
+        ///                                         行动力回满（refill:off 关闭，或指定其他属性）
+        /// silent = 调试重建静默重放（不弹 Toast）。
+        /// </summary>
+        void ApplyTimeCommand(VNScriptCommand cmd, bool silent)
+        {
+            string op = cmd.Arg(0, "pass");
+            switch (op)
+            {
+                case "set":
+                {
+                    int month = Mathf.Clamp((int)cmd.ArgF(1, 1f), 1, 12);
+                    VNFlags.Set(VNCalendarHud.MonthFlag, month);
+                    if (cmd.Kw("remain") != null)
+                        VNFlags.Set(VNCalendarHud.RemainFlag,
+                            Mathf.Max(0, (int)cmd.KwF("remain", 0f)));
+                    break;
+                }
+
+                case "pass":
+                {
+                    int months = Mathf.Max(1, (int)cmd.KwF("months", 1f));
+                    int month = VNFlags.Get(VNCalendarHud.MonthFlag);
+                    if (month <= 0) month = 1;
+                    month = (month - 1 + months) % 12 + 1;
+                    VNFlags.Set(VNCalendarHud.MonthFlag, month);
+
+                    if (VNFlags.All.ContainsKey(VNCalendarHud.RemainFlag))
+                        VNFlags.Set(VNCalendarHud.RemainFlag,
+                            Mathf.Max(0, VNFlags.Get(VNCalendarHud.RemainFlag) - months));
+
+                    // 行动力回满（有属性定义才知道满值是多少；refill:off 关闭）
+                    string refill = cmd.Kw("refill", "行动力");
+                    if (refill != "off" && _statsHud != null)
+                    {
+                        var def = _statsHud.Find(refill);
+                        if (def != null && def.useClamp)
+                            VNFlags.Set(def.id, def.maxValue);
+                    }
+
+                    if (!silent) VNToast.Show(VNLocale.T("time.toastMonth", month), 2f);
+                    break;
+                }
+
+                default:
+                    Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：未知 time 操作「{op}」" +
+                                     "（set/pass）");
+                    break;
+            }
+        }
+
         void JumpTo(string label, int fromLine)
         {
             if (_labels.TryGetValue(label, out int idx))
@@ -754,6 +818,7 @@ namespace VNEffects
             if (stage != null && stage.dialogue != null)
                 stage.dialogue.SetInterfaceVisible(!hidden);
             _statsHud?.SetHudVisible(!hidden);
+            _calendarHud?.SetVisible(!hidden);
         }
 
         IEnumerator CaptureSaveThumbnailCo(int token)
@@ -1216,6 +1281,11 @@ namespace VNEffects
                 case "stat":
                     // stat 名字 +5 / stat 名字 -3 / stat 名字 500（按 VNStatDef 钳制 + 飘字）
                     _statsHud?.Apply(cmd.Arg(0), cmd.Arg(1), false, cmd.line);
+                    return null;
+
+                case "time":
+                    // time set <月份> [remain:N] / time pass [months:N] [refill:off|属性名]
+                    ApplyTimeCommand(cmd, false);
                     return null;
 
                 case "choice":

@@ -91,6 +91,11 @@ shop.toastSell = 卖出 {0}（{1}）
 inventory.title = —— 道具 ——
 inventory.empty = （身上什么都没有）
 
+# —— 日程日历 ——
+calendar.month = {0}月
+calendar.remain = 剩余{0}个月
+time.toastMonth = 进入{0}月
+
 # —— 事件模块默认文案 ——
 qte.title = 连打！
 qte.success = 成功！

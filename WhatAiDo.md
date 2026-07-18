@@ -2784,3 +2784,71 @@ event shop id:服装店
   所以 Apply 用 silent 模式避免双重飘字。
 - dotnet build 运行时 + 编辑器程序集 0 错误。
 - **用户操作**：重建剧本演示场景后，剧本里写 `event shop id:服装店` 即可开店。
+
+## 六十六、养成 P4：time 日程命令 + 日历 HUD + 养成演示剧本（2026-07-18，分支 `agent/schedule-loop`）
+
+**目标**：养成四部曲收官——回合制日程循环（对照用户截图右下角"9月 | 1年级
+剩余36个月"）。核心洞察：**月循环本身用现有 DSL 就能拼**（label/jump/if/choice），
+代码只需要补 time 命令和日历 HUD 两块。
+
+### 剧本语法
+
+```
+time set 9 remain:36      # 进入养成模式：九月开始，倒计时 36 个月
+time pass                 # 过月：月份+1（1~12 循环）、剩余月数-1、行动力回满、Toast
+time pass months:2        # 跨多月
+time pass refill:off      # 不回满行动力（refill:<属性名> 可改回满对象）
+```
+
+状态 = flag「月份」「剩余月数」，存档/if/调试重建照旧零改动；
+月循环示例（完整见 RaisingDemo.vn.txt）：
+
+```
+label 月初
+label 行动
+if 剩余月数<=0 jump 结局
+if 行动力<=0 jump 月末
+choice
+* 去打工 cost:行动力-2 -> 打工
+…
+label 月末
+time pass
+jump 月初
+```
+
+### 文件说明
+
+- **`Script/VNScriptParser.cs`（改）**：关键字表加 `time`。
+- **`Script/VNScriptRunner.cs`（改）**：`ApplyTimeCommand(cmd, silent)`——
+  set（钳制 1~12 + 可选 remain）/ pass（月份循环递增、剩余月数存在才递减不为负、
+  行动力回满 = 属性定义的 maxValue、Toast「进入X月」）；命令分发与调试重建
+  静默重放各一个 case；`_calendarHud` 找不到自建（月份 flag 不存在时自动隐藏，
+  常驻无害）；右键隐藏 UI 联动。
+- **`Script/VNCalendarHud.cs`（新）**：右下角日历小面板（独立 Overlay Canvas 578）。
+  大字月份 + 小字剩余月数（无剩余月数 flag 时只显示月份）；VNFlags.Changed
+  标脏下帧刷新；「月份」flag 不存在时整个面板隐藏——纯剧情章节零干扰；
+  语言切换销毁重建。
+- **`Assets/Scenarios/RaisingDemo.vn.txt`（新）**：养成玩法演示剧本，串起
+  六十三～六十六全部功能：stat 初始化 → time set → 月循环（打工/学习/特训
+  （if:压力<80 条件选项）/逛服装店（event shop + 道具 flag 分支）/cost: 行动力
+  扣减）→ time pass 过月 → 剩余月数归零后按 智力/金钱 分三种结局。
+- **`Editor/VNScenarioSchema.cs`（改）**：`time` 命令入 Flow 分类
+  （op 下拉 pass/set、month 数字、remain/months/refill kwargs）。
+- **`Editor/VNEffectsDemoSetup.cs`（改）**：RaisingDemo 剧本注册进
+  runner.chapters（剧本里 `chapter RaisingDemo.vn` 可切换）。
+- **`Resources/VNLocale/ui.zh/en/ja.txt`（改）**：calendar.month/remain、
+  time.toastMonth ×3 语言。
+- **`CLAUDE.md`（改）**：组件速查表补五个新组件行；剧本系统清单补
+  "养成系统（六十三～六十六章）"总结条目。
+
+### 技术决策
+
+- **time 只管 flag 和 HUD，不管流程**：月末结算/结局判定留给剧本的 if/jump——
+  这正是自研 DSL 的甜点区，代码里写死"月末跳哪"反而限制剧本自由度。
+- **行动力回满需要属性定义**：满值 = VNStatDef.maxValue；没有定义资产时跳过
+  （不知道满值是多少，宁可不动）。
+- **日历与属性 HUD 分开组件**：日历只在养成剧本出现（按月份 flag 自动显隐），
+  属性 HUD 是常驻件；合并会让纯剧情章节多出无意义的空日历。
+- dotnet build 运行时 + 编辑器程序集 0 错误。
+- **用户操作**：重建剧本演示场景（注册 shop 模板与 chapters）后，
+  Scenario Editor 打开 RaisingDemo.vn.txt → 选中首行 → ▶ 从选中行播放 即可体验。
