@@ -18,6 +18,7 @@ namespace VNEffects
 
         VNScriptRunner _runner;
         VNStage _stage;
+        GameObject _canvasGo;
         GameObject _panel;
         TextMeshProUGUI _fullscreenLabel;
         bool _open;
@@ -74,7 +75,7 @@ namespace VNEffects
             if (EventSystem.current == null)
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
-            var canvasGo = new GameObject("VNConfigCanvas", typeof(Canvas),
+            var canvasGo = _canvasGo = new GameObject("VNConfigCanvas", typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasGo.transform.SetParent(transform, false);
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -101,13 +102,13 @@ namespace VNEffects
             windowRect.SetParent(panelRect, false);
             windowRect.anchorMin = windowRect.anchorMax = new Vector2(0.5f, 0.5f);
             windowRect.pivot = new Vector2(0.5f, 0.5f);
-            windowRect.sizeDelta = new Vector2(780f, 650f);
+            windowRect.sizeDelta = new Vector2(780f, 740f);
             var windowImage = window.GetComponent<Image>();
             windowImage.sprite = VNProceduralTextures.RoundedRectSprite;
             windowImage.type = Image.Type.Sliced;
             windowImage.color = new Color(0.025f, 0.038f, 0.075f, 0.995f);
 
-            var title = CreateText(windowRect, "CONFIG  ·  设置", 38, TextAlignmentOptions.Left);
+            var title = CreateText(windowRect, VNLocale.T("config.title"), 38, TextAlignmentOptions.Left);
             SetRect(title.rectTransform, new Vector2(58f, -34f), new Vector2(560f, 56f));
             title.fontStyle = FontStyles.Bold;
             title.color = new Color(1f, 0.78f, 0.38f, 1f);
@@ -120,39 +121,50 @@ namespace VNEffects
             float voice = _stage != null && _stage.vnAudio != null ? _stage.vnAudio.voiceVolume : 1f;
             float speed = _stage != null && _stage.dialogue != null ? _stage.dialogue.TextSpeed : 18f;
 
-            CreateSettingSlider(windowRect, "BGM 音量", 126f, 0f, 1f, bgm, "P0",
+            CreateSettingSlider(windowRect, VNLocale.T("config.bgm"), 126f, 0f, 1f, bgm,
+                v => $"{v:P0}",
                 value =>
                 {
                     _stage?.vnAudio?.SetVolume("bgm", value);
                     PlayerPrefs.SetFloat(BgmKey, value);
                 });
-            CreateSettingSlider(windowRect, "SE 音量", 212f, 0f, 1f, se, "P0",
+            CreateSettingSlider(windowRect, VNLocale.T("config.se"), 212f, 0f, 1f, se,
+                v => $"{v:P0}",
                 value =>
                 {
                     _stage?.vnAudio?.SetVolume("se", value);
                     PlayerPrefs.SetFloat(SeKey, value);
                 });
-            CreateSettingSlider(windowRect, "Voice 音量", 298f, 0f, 1f, voice, "P0",
+            CreateSettingSlider(windowRect, VNLocale.T("config.voice"), 298f, 0f, 1f, voice,
+                v => $"{v:P0}",
                 value =>
                 {
                     _stage?.vnAudio?.SetVolume("voice", value);
                     PlayerPrefs.SetFloat(VoiceKey, value);
                 });
-            CreateSettingSlider(windowRect, "文字速度", 384f, 8f, 60f, speed, "0 字/秒",
+            CreateSettingSlider(windowRect, VNLocale.T("config.textSpeed"), 384f, 8f, 60f, speed,
+                v => VNLocale.T("config.textSpeedValue", v),
                 value =>
                 {
                     _stage?.dialogue?.SetTextSpeed(value);
                     PlayerPrefs.SetFloat(TextSpeedKey, value);
                 });
 
-            var fullscreen = CreateButton(windowRect, "Fullscreen", "", new Vector2(82f, -494f),
+            var langLabel = CreateText(windowRect, VNLocale.T("config.language"), 24,
+                TextAlignmentOptions.Left);
+            SetRect(langLabel.rectTransform, new Vector2(82f, -470f), new Vector2(220f, 42f));
+            CreateLanguageButton(windowRect, VNLanguage.Chinese, 260f);
+            CreateLanguageButton(windowRect, VNLanguage.English, 408f);
+            CreateLanguageButton(windowRect, VNLanguage.Japanese, 556f);
+
+            var fullscreen = CreateButton(windowRect, "Fullscreen", "", new Vector2(82f, -584f),
                 new Vector2(616f, 58f), ToggleFullscreen, 24);
             _fullscreenLabel = fullscreen.GetComponentInChildren<TextMeshProUGUI>();
             UpdateFullscreenLabel();
 
             var hint = CreateText(windowRect,
-                "设置会自动保存　·　Esc 或点击外部关闭", 19, TextAlignmentOptions.Center);
-            SetRect(hint.rectTransform, new Vector2(80f, -578f), new Vector2(620f, 34f));
+                VNLocale.T("config.hint"), 19, TextAlignmentOptions.Center);
+            SetRect(hint.rectTransform, new Vector2(80f, -668f), new Vector2(620f, 34f));
             hint.color = new Color(0.68f, 0.74f, 0.86f, 0.9f);
             _panel.SetActive(false);
         }
@@ -169,11 +181,45 @@ namespace VNEffects
         void UpdateFullscreenLabel()
         {
             if (_fullscreenLabel != null)
-                _fullscreenLabel.text = Screen.fullScreen ? "显示模式　全屏" : "显示模式　窗口";
+                _fullscreenLabel.text = Screen.fullScreen
+                    ? VNLocale.T("config.displayFullscreen")
+                    : VNLocale.T("config.displayWindowed");
+        }
+
+        void CreateLanguageButton(RectTransform parent, VNLanguage lang, float x)
+        {
+            bool current = VNLocale.Language == lang;
+            var go = CreateButton(parent, "Lang_" + lang, VNLocale.DisplayName(lang),
+                new Vector2(x, -474f), new Vector2(140f, 50f), () => SetLanguage(lang), 22);
+            if (current)
+                go.GetComponent<Image>().color = new Color(0.92f, 0.61f, 0.18f, 0.98f);
+        }
+
+        void SetLanguage(VNLanguage lang)
+        {
+            if (VNLocale.Language == lang) return;
+            VNLocale.Language = lang; // VNFont 全场景换字体 + 各 UI 组件经 LanguageChanged 重建
+            RebuildPanel();
+        }
+
+        /// <summary>语言切换后销毁重建整个面板（所有文案在 Build 里取表，重建即刷新）</summary>
+        void RebuildPanel()
+        {
+            bool wasOpen = _open;
+            if (_canvasGo != null) Destroy(_canvasGo);
+            _canvasGo = null;
+            _panel = null;
+            _fullscreenLabel = null;
+            if (wasOpen)
+            {
+                Build();
+                RefreshValues();
+                _panel.SetActive(true);
+            }
         }
 
         void CreateSettingSlider(RectTransform parent, string label, float top,
-            float min, float max, float value, string format, Action<float> changed)
+            float min, float max, float value, Func<float, string> format, Action<float> changed)
         {
             var labelText = CreateText(parent, label, 24, TextAlignmentOptions.Left);
             SetRect(labelText.rectTransform, new Vector2(82f, -top), new Vector2(170f, 42f));
@@ -224,7 +270,7 @@ namespace VNEffects
             slider.SetValueWithoutNotify(value);
             Action<float> update = v =>
             {
-                valueText.text = format == "P0" ? $"{v:P0}" : $"{v:0} 字/秒";
+                valueText.text = format(v);
                 changed?.Invoke(v);
             };
             update(value);

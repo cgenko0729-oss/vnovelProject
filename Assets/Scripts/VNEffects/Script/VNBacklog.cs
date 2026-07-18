@@ -31,6 +31,21 @@ namespace VNEffects
 
         public bool IsOpen => _open;
 
+        void Awake() => VNLocale.LanguageChanged += OnLanguageChanged;
+
+        void OnDestroy() => VNLocale.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>语言切换：面板惰性构建，销毁缓存让下次打开用新语言重建（历史条目保持原语言）</summary>
+        void OnLanguageChanged()
+        {
+            if (_open) Close();
+            if (_canvas != null) Destroy(_canvas.gameObject);
+            _canvas = null;
+            _panel = null;
+            _content = null;
+            _scroll = null;
+        }
+
         /// <summary>记录一条台词（VNScriptRunner 在每句 say 时调用）</summary>
         public void Record(string displayName, string text)
         {
@@ -97,7 +112,7 @@ namespace VNEffects
 
             // 标题
             var title = CreateText(panelRect, 34, TextAlignmentOptions.Center);
-            title.text = "—— 回想 ——";
+            title.text = VNLocale.T("backlog.title");
             title.fontStyle = FontStyles.Bold;
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = new Vector2(0f, 1f);

@@ -43,7 +43,7 @@ namespace VNEffects
             targetCount = Mathf.Max(1, ctx.KwI("target", targetCount));
             _count = 0;
 
-            BuildUi(ctx.Kw("title", "连打！"));
+            BuildUi(ctx.Kw("title", VNLocale.T("qte.title")));
             _phase = Phase.Playing;
         }
 
@@ -73,7 +73,7 @@ namespace VNEffects
         void Finish(bool success)
         {
             _phase = Phase.Ending;
-            _title.text = success ? "成功！" : "失败…";
+            _title.text = VNLocale.T(success ? "qte.success" : "qte.fail");
             _title.color = success ? SuccessColor : FailColor;
             _title.transform.DOKill();
             _title.transform.localScale = Vector3.one * (success ? 1.4f : 1f);

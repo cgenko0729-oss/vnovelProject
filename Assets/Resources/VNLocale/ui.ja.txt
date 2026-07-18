@@ -1,0 +1,70 @@
+# VNEffects UI 文字列テーブル —— 日本語
+
+# —— クイックツールバー ——
+toolbar.save = セーブ
+toolbar.load = ロード
+toolbar.auto = オート
+toolbar.skip = スキップ
+toolbar.log = ログ
+toolbar.quest = クエスト
+toolbar.config = 設定
+toolbar.hideui = UI非表示
+
+# —— バックログ ——
+backlog.title = —— バックログ ——
+backlog.choice = 選択
+backlog.event = イベント
+
+# —— クエスト ——
+quest.title = —— クエスト日誌 ——
+quest.empty = （まだクエストを受けていません）
+quest.sectionActive = 進行中
+quest.sectionDone = 完了
+quest.sectionFailed = 失敗
+quest.toastNew = 新しいクエスト：{0}
+quest.toastUpdate = クエスト更新：{0}
+quest.toastUpdateWith = クエスト更新：{0} —— {1}
+quest.toastDone = クエスト完了：{0}
+quest.toastFail = クエスト失敗：{0}
+
+# —— セーブ / ロード ——
+save.tabSave = セーブ
+save.tabLoad = ロード
+save.titleSave = SAVE  ·  セーブ
+save.titleLoad = LOAD  ·  ロード
+save.hintSave = 空きスロットを選んで保存；上書きは確認があります　　F9 ロードへ　·　Esc 閉じる
+save.hintLoad = スロットを選んで進行を読み込みます　　F5 セーブへ　·　Esc 閉じる
+save.emptySlot = 空きスロット
+save.noLine = （セリフの記録なし）
+save.confirmOverwrite = SLOT {0:00} のセーブを上書きしますか？
+save.confirmLoad = SLOT {0:00} をロードしますか？\n未保存の進行は失われます。
+common.confirm = 決定
+common.cancel = キャンセル
+
+# —— 設定パネル ——
+config.title = CONFIG  ·  設定
+config.bgm = BGM 音量
+config.se = SE 音量
+config.voice = ボイス音量
+config.textSpeed = 文字速度
+config.textSpeedValue = {0:0} 字/秒
+config.language = 言語 / Language
+config.displayFullscreen = 画面モード　フルスクリーン
+config.displayWindowed = 画面モード　ウィンドウ
+config.hint = 設定は自動保存されます　·　Esc か外側クリックで閉じる
+
+# —— 実行時トースト ——
+runner.cannotSaveNow = 演出中はセーブできません
+runner.saved = セーブしました（スロット {0}）
+runner.slotEmpty = スロット {0} にセーブがありません
+runner.loaded = ロードしました（スロット {0}）
+runner.autoOn = オートモード ON
+runner.autoOff = オートモード OFF
+runner.skipOn = スキップ ON
+runner.skipOff = スキップ OFF
+
+# —— イベントモジュール既定文 ——
+qte.title = 連打！
+qte.success = 成功！
+qte.fail = 失敗…
+map.title = どこへ行く？

@@ -37,7 +37,30 @@ namespace VNEffects
 
         public bool IsOpen => _open;
 
-        public void Initialize(VNScriptRunner runner) => _runner = runner;
+        public void Initialize(VNScriptRunner runner)
+        {
+            _runner = runner;
+            // Initialize 会被多次调用（启动 + 每次 F5/F9），先退订保证只挂一次
+            VNLocale.LanguageChanged -= OnLanguageChanged;
+            VNLocale.LanguageChanged += OnLanguageChanged;
+        }
+
+        /// <summary>语言切换：面板是惰性构建的，销毁缓存让下次打开用新语言重建</summary>
+        void OnLanguageChanged()
+        {
+            if (_open) Close();
+            if (_canvas != null) Destroy(_canvas.gameObject);
+            _canvas = null;
+            _panel = null;
+            _title = null;
+            _hint = null;
+            _saveTabImage = null;
+            _loadTabImage = null;
+            _confirm = null;
+            _confirmText = null;
+            _confirmYes = null;
+            _slotCards.Clear();
+        }
 
         public void PrepareForSaveCapture()
         {
@@ -131,11 +154,11 @@ namespace VNEffects
             titleRect.anchoredPosition = new Vector2(82f, -30f);
             titleRect.sizeDelta = new Vector2(550f, 58f);
 
-            var saveTab = CreateButton(panelRect, "SaveTab", "保存", new Vector2(720f, -58f),
-                new Vector2(180f, 54f), () => _runner?.RequestSavePanel());
+            var saveTab = CreateButton(panelRect, "SaveTab", VNLocale.T("save.tabSave"),
+                new Vector2(720f, -58f), new Vector2(180f, 54f), () => _runner?.RequestSavePanel());
             _saveTabImage = saveTab.GetComponent<Image>();
-            var loadTab = CreateButton(panelRect, "LoadTab", "读取", new Vector2(914f, -58f),
-                new Vector2(180f, 54f), ShowLoadMode);
+            var loadTab = CreateButton(panelRect, "LoadTab", VNLocale.T("save.tabLoad"),
+                new Vector2(914f, -58f), new Vector2(180f, 54f), ShowLoadMode);
             _loadTabImage = loadTab.GetComponent<Image>();
 
             CreateButton(panelRect, "Close", "×", new Vector2(1840f, -55f),
@@ -171,10 +194,8 @@ namespace VNEffects
         void SetMode(bool saveMode)
         {
             _saveMode = saveMode;
-            _title.text = saveMode ? "SAVE  ·  保存游戏" : "LOAD  ·  读取游戏";
-            _hint.text = saveMode
-                ? "选择空槽保存；已有记录会要求确认覆盖　　F9 切换读取　·　Esc 关闭"
-                : "选择一个槽位读取进度　　F5 切换保存　·　Esc 关闭";
+            _title.text = saveMode ? VNLocale.T("save.titleSave") : VNLocale.T("save.titleLoad");
+            _hint.text = saveMode ? VNLocale.T("save.hintSave") : VNLocale.T("save.hintLoad");
             _saveTabImage.color = saveMode ? Gold : new Color(0.11f, 0.14f, 0.22f, 1f);
             _loadTabImage.color = saveMode ? new Color(0.11f, 0.14f, 0.22f, 1f) : Gold;
             RebuildSlots();
@@ -256,7 +277,7 @@ namespace VNEffects
             lineText.lineSpacing = -10f; // TMP 行距为字号百分比，-10 ≈ legacy 0.9 倍
 
             SetRect(lineText.rectTransform, new Vector2(226f, -70f), new Vector2(184f, 62f));
-            lineText.text = occupied ? Truncate(data.lastLine, 42) : "空槽位";
+            lineText.text = occupied ? Truncate(data.lastLine, 42) : VNLocale.T("save.emptySlot");
             return go;
         }
 
@@ -265,13 +286,13 @@ namespace VNEffects
             if (_saveMode)
             {
                 if (occupied)
-                    ShowConfirm($"覆盖 SLOT {slot:00} 的存档？", () => SaveSlot(slot));
+                    ShowConfirm(VNLocale.T("save.confirmOverwrite", slot), () => SaveSlot(slot));
                 else
                     SaveSlot(slot);
                 return;
             }
             if (occupied)
-                ShowConfirm($"读取 SLOT {slot:00}？\n当前未保存进度将会丢失。",
+                ShowConfirm(VNLocale.T("save.confirmLoad", slot),
                     () => _runner?.LoadFromPanel(slot));
         }
 
@@ -310,10 +331,10 @@ namespace VNEffects
             messageRect.offsetMin = new Vector2(30f, 0f);
             messageRect.offsetMax = new Vector2(-30f, -20f);
 
-            _confirmYes = CreateButton(rect, "ConfirmYes", "确认", new Vector2(205f, -198f),
-                new Vector2(180f, 54f), null).GetComponent<Button>();
-            CreateButton(rect, "ConfirmNo", "取消", new Vector2(415f, -198f),
-                new Vector2(180f, 54f), HideConfirm);
+            _confirmYes = CreateButton(rect, "ConfirmYes", VNLocale.T("common.confirm"),
+                new Vector2(205f, -198f), new Vector2(180f, 54f), null).GetComponent<Button>();
+            CreateButton(rect, "ConfirmNo", VNLocale.T("common.cancel"),
+                new Vector2(415f, -198f), new Vector2(180f, 54f), HideConfirm);
             _confirm.SetActive(false);
         }
 
@@ -395,7 +416,7 @@ namespace VNEffects
 
         static string Truncate(string value, int max)
         {
-            if (string.IsNullOrEmpty(value)) return "（无台词记录）";
+            if (string.IsNullOrEmpty(value)) return VNLocale.T("save.noLine");
             value = value.Replace('\n', ' ').Replace('\r', ' ');
             return value.Length <= max ? value : value.Substring(0, max - 1) + "…";
         }
@@ -416,6 +437,7 @@ namespace VNEffects
 
         void OnDestroy()
         {
+            VNLocale.LanguageChanged -= OnLanguageChanged;
             ClearLoadedThumbnails();
             if (_pendingThumbnail != null) Destroy(_pendingThumbnail);
         }

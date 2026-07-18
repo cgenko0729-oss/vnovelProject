@@ -1,0 +1,70 @@
+# VNEffects UI string table — English
+
+# —— Quick toolbar ——
+toolbar.save = Save
+toolbar.load = Load
+toolbar.auto = Auto
+toolbar.skip = Skip
+toolbar.log = Log
+toolbar.quest = Quests
+toolbar.config = Config
+toolbar.hideui = Hide UI
+
+# —— Backlog ——
+backlog.title = —— Backlog ——
+backlog.choice = Choice
+backlog.event = Event
+
+# —— Quests ——
+quest.title = —— Quest Journal ——
+quest.empty = (No quests accepted yet)
+quest.sectionActive = In Progress
+quest.sectionDone = Completed
+quest.sectionFailed = Failed
+quest.toastNew = New quest: {0}
+quest.toastUpdate = Quest updated: {0}
+quest.toastUpdateWith = Quest updated: {0} — {1}
+quest.toastDone = Quest completed: {0}
+quest.toastFail = Quest failed: {0}
+
+# —— Save / Load ——
+save.tabSave = Save
+save.tabLoad = Load
+save.titleSave = SAVE  ·  Save Game
+save.titleLoad = LOAD  ·  Load Game
+save.hintSave = Pick an empty slot to save; overwriting asks for confirmation　　F9 to Load　·　Esc to close
+save.hintLoad = Pick a slot to load your progress　　F5 to Save　·　Esc to close
+save.emptySlot = Empty slot
+save.noLine = (No dialogue recorded)
+save.confirmOverwrite = Overwrite the save in SLOT {0:00}?
+save.confirmLoad = Load SLOT {0:00}?\nUnsaved progress will be lost.
+common.confirm = OK
+common.cancel = Cancel
+
+# —— Config panel ——
+config.title = CONFIG  ·  Settings
+config.bgm = BGM Volume
+config.se = SE Volume
+config.voice = Voice Volume
+config.textSpeed = Text Speed
+config.textSpeedValue = {0:0} chars/s
+config.language = Language
+config.displayFullscreen = Display Mode　Fullscreen
+config.displayWindowed = Display Mode　Windowed
+config.hint = Settings save automatically　·　Esc or click outside to close
+
+# —— Runtime toasts ——
+runner.cannotSaveNow = Cannot save during a scene transition
+runner.saved = Saved (slot {0})
+runner.slotEmpty = Slot {0} is empty
+runner.loaded = Loaded (slot {0})
+runner.autoOn = Auto mode ON
+runner.autoOff = Auto mode OFF
+runner.skipOn = Skip ON
+runner.skipOff = Skip OFF
+
+# —— Event module defaults ——
+qte.title = Mash!
+qte.success = Success!
+qte.fail = Failed...
+map.title = Where to?

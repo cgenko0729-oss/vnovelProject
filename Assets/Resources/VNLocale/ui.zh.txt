@@ -1,0 +1,71 @@
+# VNEffects UI 字符串表 —— 中文（源语言）
+# 格式：key = value，# 开头为注释，value 支持 \n 换行转义与 string.Format 占位符 {0}
+
+# —— 快捷功能条 ——
+toolbar.save = Save
+toolbar.load = Load
+toolbar.auto = Auto
+toolbar.skip = Skip
+toolbar.log = Log
+toolbar.quest = 任务
+toolbar.config = Config
+toolbar.hideui = 隐藏 UI
+
+# —— 回想 ——
+backlog.title = —— 回想 ——
+backlog.choice = 选择
+backlog.event = 事件
+
+# —— 任务 ——
+quest.title = —— 任务日志 ——
+quest.empty = （还没有接到任何任务）
+quest.sectionActive = 进行中
+quest.sectionDone = 已完成
+quest.sectionFailed = 已失败
+quest.toastNew = 新任务：{0}
+quest.toastUpdate = 任务更新：{0}
+quest.toastUpdateWith = 任务更新：{0} —— {1}
+quest.toastDone = 任务完成：{0}
+quest.toastFail = 任务失败：{0}
+
+# —— 存读档 ——
+save.tabSave = 保存
+save.tabLoad = 读取
+save.titleSave = SAVE  ·  保存游戏
+save.titleLoad = LOAD  ·  读取游戏
+save.hintSave = 选择空槽保存；已有记录会要求确认覆盖　　F9 切换读取　·　Esc 关闭
+save.hintLoad = 选择一个槽位读取进度　　F5 切换保存　·　Esc 关闭
+save.emptySlot = 空槽位
+save.noLine = （无台词记录）
+save.confirmOverwrite = 覆盖 SLOT {0:00} 的存档？
+save.confirmLoad = 读取 SLOT {0:00}？\n当前未保存进度将会丢失。
+common.confirm = 确认
+common.cancel = 取消
+
+# —— 设置面板 ——
+config.title = CONFIG  ·  设置
+config.bgm = BGM 音量
+config.se = SE 音量
+config.voice = Voice 音量
+config.textSpeed = 文字速度
+config.textSpeedValue = {0:0} 字/秒
+config.language = 语言 / Language
+config.displayFullscreen = 显示模式　全屏
+config.displayWindowed = 显示模式　窗口
+config.hint = 设置会自动保存　·　Esc 或点击外部关闭
+
+# —— 运行时提示 ——
+runner.cannotSaveNow = 演出进行中，此刻不能存档
+runner.saved = 已保存（槽位 {0}）
+runner.slotEmpty = 槽位 {0} 没有存档
+runner.loaded = 已读取（槽位 {0}）
+runner.autoOn = 自动模式 开
+runner.autoOff = 自动模式 关
+runner.skipOn = 快进 开
+runner.skipOff = 快进 关
+
+# —— 事件模块默认文案 ——
+qte.title = 连打！
+qte.success = 成功！
+qte.fail = 失败…
+map.title = 要去哪里？
