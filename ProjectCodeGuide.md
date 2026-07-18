@@ -219,6 +219,34 @@
   文字必须用它**（`EnsureFontAsset()`），运行时临时资产存进场景会变 Missing。
 - 扩展：换字体 = 替换 Resources/VNFonts 下的 OTF + 重新生成预烘焙资产；
   加第二字体（如标题花体）= 照 VNFont 模式再写一个静态入口，别混进 VNFont。
+- **多语言**（五十七章）：`VNFont.Asset` 按 `VNLocale.Language` 返回字体——
+  中/英共用 Noto Sans SC，日文 Noto Sans JP（SC 挂作 fallback）。语言切换时
+  `HandleLanguageChanged` 只替换 VNFont 管理的字体，场景里手动指定的不动。
+
+### 本地化（VNLocale / VNScriptLocale，`Script/`；VNLocalizationTools，`Editor/`）
+
+- **VNLocale**：语言管理（中/英/日，PlayerPrefs 持久化）+ UI 字符串表。
+  玩家可见 UI 文案一律 `VNLocale.T("key")`（带参数用 `T(key, args)`），表在
+  `Resources/VNLocale/ui.<code>.txt`；回退链 当前语言→中文→key。
+  切语言赋值 `VNLocale.Language` 即可：先换字体，再广播 `LanguageChanged`，
+  常驻 UI（功能条）当场重建、惰性面板销毁缓存下次打开重建。
+  **订阅事件的组件若 Initialize 会被多次调用，必须先 `-=` 再 `+=`（幂等）。**
+- **VNScriptLocale**：剧本台词/选项翻译。`.vn.txt` 永远只写中文；翻译表
+  `Resources/VNLocale/Scenarios/<剧本名>.<lang>.txt`，key =
+  FNV-1a(原文)+出现序号（`NextKey/Hash` 与编辑器工具共用，**改一处必须两处同步**，
+  实际上就是同一个方法）。Runner 在 LoadCommands 后 `Apply()` 标注
+  `localizedText`，显示走 `TextOf()`，缺译回退中文。
+  **红线：event 结果行、角色 id、flag 名是逻辑标识符，永远不进翻译**；
+  choice 选项按索引匹配所以只翻显示文本是安全的。
+- **VNLocalizationTools**：Tools → VN Effects → Localization。
+  Extract = 生成/增量合并翻译表（已译按 key 保留，中文改动的旧译文挪到
+  孤儿注释区）；Validate = 缺译统计。日常工作流：改剧本 → Extract → 填表 →
+  Validate。
+- 资产文案：VNCharacterDef.displayNameEn/Ja（名牌）、VNQuestDef 英/日
+  标题/描述/阶段、VNMapModule.Location 英/日显示名——全部留空回退中文。
+- 扩展：加新语言 = VNLanguage 枚举加项（**只能追加，顺序是 PlayerPrefs 存储值**）
+  + VNLocale.Codes/DisplayName + `ui.<code>.txt` + VNLocalizationTools.TargetLanguages
+  +（可选）VNFont 新 Profile；资产类各加一个字段并进各自的取值 switch。
 
 ---
 
