@@ -114,14 +114,14 @@ namespace VNEffects
             if (_tables.TryGetValue(code, out var cached)) return cached;
             var asset = Resources.Load<TextAsset>("VNLocale/ui." + code);
             Dictionary<string, string> table = null;
-            if (asset != null) table = Parse(asset.text);
+            if (asset != null) table = ParseTable(asset.text);
             else Debug.LogWarning($"[VNLocale] 未找到 UI 字符串表 Resources/VNLocale/ui.{code}.txt");
             _tables[code] = table;
             return table;
         }
 
-        /// <summary>解析 "key = value" 表；value 中的 \n 转成换行</summary>
-        static Dictionary<string, string> Parse(string text)
+        /// <summary>解析 "key = value" 表；value 中的 \n 转成换行（剧本翻译表也用本格式）</summary>
+        public static Dictionary<string, string> ParseTable(string text)
         {
             var table = new Dictionary<string, string>();
             foreach (var raw in text.Split('\n'))

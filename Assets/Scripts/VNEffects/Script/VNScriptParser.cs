@@ -10,6 +10,10 @@ namespace VNEffects
         public string flagOp;    // 可选：flag 操作（如 勇气+1）
         public string jumpLabel; // 可选：跳转标签（空 = 顺序继续）
         public int line;
+
+        // 当前语言的译文（VNScriptLocale.Apply 标注；null/空 = 显示原文）。
+        // 只影响显示：event 结果行是逻辑标识符（结果匹配 / 去过_xx flag），不参与翻译。
+        public string localizedText;
     }
 
     /// <summary>camseq 命令的一个路径点（点位在运行时解析）</summary>
@@ -36,6 +40,9 @@ namespace VNEffects
         public string speaker;     // 说话者 id（空 = 旁白）
         public string expression;  // 可选表情
         public string text;        // 台词内容
+
+        // 当前语言的译文（VNScriptLocale.Apply 标注；null/空 = 显示原文）
+        public string localizedText;
 
         // choice 命令专用
         public List<VNChoiceOption> options;
