@@ -54,6 +54,12 @@ namespace VNEffects.EditorTools
         // 自定义值编辑状态（选了 "custom…" 的参数格）
         readonly HashSet<(VNRow, string)> _customEdit = new HashSet<(VNRow, string)>();
 
+        // 音频试听：id → AudioClip（按通道分开），_previewAudioKey = 正在播的 "通道|id"
+        readonly Dictionary<string, AudioClip> _bgmClips = new Dictionary<string, AudioClip>();
+        readonly Dictionary<string, AudioClip> _seClips = new Dictionary<string, AudioClip>();
+        readonly Dictionary<string, AudioClip> _voiceClips = new Dictionary<string, AudioClip>();
+        string _previewAudioKey;
+
         // 撤销（文本快照，约 1 秒粒度合并）
         readonly List<string> _undoStack = new List<string>();
         readonly List<string> _redoStack = new List<string>();
@@ -132,6 +138,11 @@ namespace VNEffects.EditorTools
         {
             RefreshSources();
             CheckExternalChange();
+        }
+
+        void OnDisable()
+        {
+            StopAudioPreview();
         }
 
         void BuildList()
@@ -220,15 +231,18 @@ namespace VNEffects.EditorTools
             if (audio != null)
             {
                 // 旧混合库的条目三个通道都能用，因此并入每个候选列表
-                _ctx.bgmIds = CollectAudioIds(audio.bgmLibrary, audio.library);
-                _ctx.seIds = CollectAudioIds(audio.seLibrary, audio.library);
-                _ctx.voiceIds = CollectAudioIds(audio.voiceLibrary, audio.library);
+                _ctx.bgmIds = CollectAudioIds(audio.bgmLibrary, audio.library, _bgmClips);
+                _ctx.seIds = CollectAudioIds(audio.seLibrary, audio.library, _seClips);
+                _ctx.voiceIds = CollectAudioIds(audio.voiceLibrary, audio.library, _voiceClips);
             }
             else
             {
                 _ctx.bgmIds = System.Array.Empty<string>();
                 _ctx.seIds = System.Array.Empty<string>();
                 _ctx.voiceIds = System.Array.Empty<string>();
+                _bgmClips.Clear();
+                _seClips.Clear();
+                _voiceClips.Clear();
             }
 
             var eventRegistry = FindFirstObjectByType<VNEventRegistry>();
@@ -249,10 +263,12 @@ namespace VNEffects.EditorTools
             _validatedVersion = -1; // 数据源变了要重新校验
         }
 
-        /// <summary>通道专属库 + 旧混合库合并去重后的 id 列表（保持登记顺序）</summary>
+        /// <summary>通道专属库 + 旧混合库合并去重后的 id 列表（保持登记顺序）。
+        /// clips 非空时同步填充 id → AudioClip 映射（行内试听用）。</summary>
         static string[] CollectAudioIds(List<VNAudio.AudioEntry> channelLib,
-            List<VNAudio.AudioEntry> legacyLib)
+            List<VNAudio.AudioEntry> legacyLib, Dictionary<string, AudioClip> clips = null)
         {
+            clips?.Clear();
             var ids = new List<string>();
             var seen = new HashSet<string>();
             foreach (var lib in new[] { channelLib, legacyLib })
@@ -260,7 +276,10 @@ namespace VNEffects.EditorTools
                 if (lib == null) continue;
                 foreach (var e in lib)
                     if (e != null && !string.IsNullOrEmpty(e.id) && seen.Add(e.id))
+                    {
                         ids.Add(e.id);
+                        if (clips != null && e.clip != null) clips[e.id] = e.clip;
+                    }
             }
             return ids.ToArray();
         }
@@ -1032,6 +1051,16 @@ namespace VNEffects.EditorTools
                 return;
             }
 
+            // 音频 id 参数：左侧加 ▶ 试听小按钮（编辑器内直接预览选中的素材）
+            if (p.source == VNParamSource.AudioBgm || p.source == VNParamSource.AudioSe ||
+                p.source == VNParamSource.AudioVoice)
+            {
+                var playRect = new Rect(rect.x, rect.y, 20f, rect.height);
+                rect = new Rect(playRect.xMax + 2f, rect.y,
+                    Mathf.Max(34f, rect.width - 22f), rect.height);
+                DrawAudioPreviewButton(playRect, p.source, v);
+            }
+
             if (options == null)
             {
                 // 自由文本 / 数字
@@ -1100,6 +1129,82 @@ namespace VNEffects.EditorTools
                 case VNParamSource.Label: return _labels.ToArray();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框
+            }
+        }
+
+        // ---- 音频行内试听 ----
+
+        AudioClip FindAudioClip(VNParamSource source, string id)
+        {
+            if (string.IsNullOrEmpty(id) || id == "stop") return null;
+            Dictionary<string, AudioClip> clips;
+            switch (source)
+            {
+                case VNParamSource.AudioBgm: clips = _bgmClips; break;
+                case VNParamSource.AudioSe: clips = _seClips; break;
+                case VNParamSource.AudioVoice: clips = _voiceClips; break;
+                default: return null;
+            }
+            return clips.TryGetValue(id, out var clip) ? clip : null;
+        }
+
+        void DrawAudioPreviewButton(Rect rect, VNParamSource source, string id)
+        {
+            AudioClip clip = FindAudioClip(source, id);
+            string key = source + "|" + id;
+            bool playing = _previewAudioKey == key;
+
+            // 试听按钮不能把文档标脏（同 分类颜色 开关的处理）
+            bool previousChanged = GUI.changed;
+            using (new EditorGUI.DisabledScope(clip == null || !VNEditorAudioPreview.Available))
+            {
+                var content = playing
+                    ? new GUIContent("■", "停止试听")
+                    : new GUIContent("▶", clip != null
+                        ? $"试听「{id}」（编辑器预览，不含音量标定/循环）"
+                        : "先选择一个已登记的音频 id");
+                if (GUI.Button(rect, content, EditorStyles.miniButton))
+                {
+                    if (playing) StopAudioPreview();
+                    else StartAudioPreview(key, clip);
+                }
+            }
+            GUI.changed = previousChanged;
+        }
+
+        void StartAudioPreview(string key, AudioClip clip)
+        {
+            VNEditorAudioPreview.Play(clip);
+            _previewAudioKey = key;
+            EditorApplication.update -= PollAudioPreview;
+            if (VNEditorAudioPreview.CanQueryPlaying)
+                EditorApplication.update += PollAudioPreview;
+            Repaint();
+        }
+
+        void StopAudioPreview()
+        {
+            EditorApplication.update -= PollAudioPreview;
+            if (_previewAudioKey != null)
+            {
+                _previewAudioKey = null;
+                VNEditorAudioPreview.StopAll();
+                Repaint();
+            }
+        }
+
+        void PollAudioPreview()
+        {
+            if (_previewAudioKey == null)
+            {
+                EditorApplication.update -= PollAudioPreview;
+                return;
+            }
+            if (!VNEditorAudioPreview.IsPlaying())
+            {
+                _previewAudioKey = null;
+                EditorApplication.update -= PollAudioPreview;
+                Repaint();
             }
         }
 
@@ -1571,6 +1676,69 @@ namespace VNEffects.EditorTools
                 default:
                     return r.raw.Length > 14 ? r.raw.Substring(0, 14) + "…" : r.raw;
             }
+        }
+    }
+
+    /// <summary>
+    /// 编辑器内 AudioClip 预览播放。Unity 没有公开 API，走内部类
+    /// UnityEditor.AudioUtil 的反射（与 Project 窗口点音频文件的试听同源）。
+    /// 版本兼容：新名 PlayPreviewClip/StopAllPreviewClips/IsPreviewClipPlaying，
+    /// 旧名 PlayClip/StopAllClips 兜底；全部找不到时 Available=false，按钮置灰。
+    /// </summary>
+    static class VNEditorAudioPreview
+    {
+        static bool _resolved;
+        static System.Reflection.MethodInfo _play, _stopAll, _isPlaying;
+
+        const System.Reflection.BindingFlags Flags =
+            System.Reflection.BindingFlags.Static |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic;
+
+        static void Resolve()
+        {
+            if (_resolved) return;
+            _resolved = true;
+            var type = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.AudioUtil");
+            if (type == null) return;
+            var playArgs = new[] { typeof(AudioClip), typeof(int), typeof(bool) };
+            _play = type.GetMethod("PlayPreviewClip", Flags, null, playArgs, null)
+                ?? type.GetMethod("PlayClip", Flags, null, playArgs, null);
+            _stopAll = type.GetMethod("StopAllPreviewClips", Flags, null,
+                    System.Type.EmptyTypes, null)
+                ?? type.GetMethod("StopAllClips", Flags, null, System.Type.EmptyTypes, null);
+            _isPlaying = type.GetMethod("IsPreviewClipPlaying", Flags, null,
+                System.Type.EmptyTypes, null);
+        }
+
+        public static bool Available
+        {
+            get { Resolve(); return _play != null && _stopAll != null; }
+        }
+
+        /// <summary>能否查询"还在播吗"（查不到时 UI 不自动复位，需手动点 ■）</summary>
+        public static bool CanQueryPlaying
+        {
+            get { Resolve(); return _isPlaying != null; }
+        }
+
+        public static void Play(AudioClip clip)
+        {
+            if (!Available || clip == null) return;
+            _stopAll.Invoke(null, null);
+            _play.Invoke(null, new object[] { clip, 0, false });
+        }
+
+        public static void StopAll()
+        {
+            if (Available) _stopAll.Invoke(null, null);
+        }
+
+        public static bool IsPlaying()
+        {
+            Resolve();
+            if (_isPlaying == null) return true;
+            return (bool)_isPlaying.Invoke(null, null);
         }
     }
 
