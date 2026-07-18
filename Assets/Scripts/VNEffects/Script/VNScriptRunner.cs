@@ -4,6 +4,7 @@ using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace VNEffects
 {
@@ -834,9 +835,12 @@ namespace VNEffects
 
             if (!_running) return;
 
-            bool pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            // 左键推进：整个画面都是 uGUI（背景/立绘/对话框都是 Canvas 里的 Image），
+            // IsPointerOverGameObject() 恒为 true 会把点击全部拦掉；
+            // 只有点在可交互控件（按钮/滑条等 Selectable）上才不推进。
             bool pressed = kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame ||
-                           (mouse != null && mouse.leftButton.wasPressedThisFrame && !pointerOverUi);
+                           (mouse != null && mouse.leftButton.wasPressedThisFrame &&
+                            !IsPointerOverInteractiveUi(mouse));
             if (!pressed) return;
 
             // 手动推进会顺手退出快进（惯例）
@@ -846,6 +850,28 @@ namespace VNEffects
                 stage.dialogue.CompleteTyping();
             else
                 _advance = true;
+        }
+
+        static readonly List<RaycastResult> _pointerRaycastResults = new List<RaycastResult>();
+
+        /// <summary>
+        /// 指针是否落在可交互控件上（Selectable：按钮/滑条/输入框等）。
+        /// 用射线命中链向上找 Selectable，而不是 IsPointerOverGameObject ——
+        /// 后者对任何 raycastTarget 都为 true，本项目全屏皆 UI，会拦掉一切点击。
+        /// </summary>
+        static bool IsPointerOverInteractiveUi(Mouse mouse)
+        {
+            if (EventSystem.current == null) return false;
+            var data = new PointerEventData(EventSystem.current)
+            {
+                position = mouse.position.ReadValue(),
+            };
+            _pointerRaycastResults.Clear();
+            EventSystem.current.RaycastAll(data, _pointerRaycastResults);
+            foreach (var hit in _pointerRaycastResults)
+                if (hit.gameObject.GetComponentInParent<Selectable>() != null)
+                    return true;
+            return false;
         }
 
         // ------------------------------------------------------------------
