@@ -90,6 +90,11 @@ shop.toastSell = Sold {0} ({1})
 inventory.title = —— Items ——
 inventory.empty = (You have nothing)
 
+# —— Calendar ——
+calendar.month = Month {0}
+calendar.remain = {0} months left
+time.toastMonth = A new month begins (Month {0})
+
 # —— Event module defaults ——
 qte.title = Mash!
 qte.success = Success!

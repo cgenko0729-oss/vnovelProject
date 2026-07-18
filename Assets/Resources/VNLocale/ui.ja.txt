@@ -90,6 +90,11 @@ shop.toastSell = {0} を売却（{1}）
 inventory.title = —— アイテム ——
 inventory.empty = （何も持っていません）
 
+# —— カレンダー ——
+calendar.month = {0}月
+calendar.remain = 残り{0}ヶ月
+time.toastMonth = {0}月になった
+
 # —— イベントモジュール既定文 ——
 qte.title = 連打！
 qte.success = 成功！

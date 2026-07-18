@@ -235,6 +235,14 @@ namespace VNEffects.EditorTools
                 Pos("name", "属性", VNParamSource.Flag),
                 Pos("value", "value", VNParamSource.Options,
                     new[] { "+1", "-1", "+5", "-5", "+10", "-10" }, weight: 0.5f));
+            Add("time", "Flow", "time set <月份> [remain:N] / time pass [months:N] [refill:off]\n" +
+                "养成日程：状态存 flag「月份/剩余月数」，右下日历 HUD 自动显示；\n" +
+                "pass = 过月并把行动力回满（refill:off 关闭 / refill:<属性> 改回满对象）",
+                Pos("op", "", VNParamSource.Options, new[] { "pass", "set" }, "pass"),
+                Pos("month", "月份", VNParamSource.Number, weight: 0.5f),
+                Kw("remain", "剩余月数", VNParamSource.Number, weight: 0.6f),
+                Kw("months", "跨月数", VNParamSource.Number, weight: 0.6f),
+                Kw("refill", "回满", VNParamSource.Options, new[] { "off" }, weight: 0.6f));
             Add("if", "Flow", "if <cond> jump <label>  cond has NO spaces: 勇气 / !勇气 / 好感度>=2",
                 Pos("condition", "if", VNParamSource.Text),
                 Pos("target", "jump", VNParamSource.Label));
