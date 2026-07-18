@@ -1,4 +1,5 @@
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -31,7 +32,7 @@ namespace VNEffects
         [Header("氛围粒子列表（P 键开关）")]
         public VNAmbientParticles[] ambientParticles;
         [Header("底部按键提示文字")]
-        public Text hintText;
+        public TextMeshProUGUI hintText;
 
         [Header("氛围特效（feature/atmosphere-effects）")]
         public VNGodRays godRays;

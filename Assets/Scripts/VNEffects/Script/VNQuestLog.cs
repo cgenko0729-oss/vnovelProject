@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -25,7 +26,6 @@ namespace VNEffects
         GameObject _panel;
         RectTransform _content;
         ScrollRect _scroll;
-        Font _font;
         bool _open;
 
         public bool IsOpen => _open;
@@ -133,8 +133,6 @@ namespace VNEffects
         {
             if (_panel != null) return;
 
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
             var canvasGo = new GameObject("VNQuestLogCanvas",
                 typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasGo.transform.SetParent(transform, false);
@@ -159,9 +157,9 @@ namespace VNEffects
             dimGo.GetComponent<Image>().color = new Color(0f, 0.01f, 0.02f, 0.86f);
             dimGo.GetComponent<Button>().onClick.AddListener(Close);
 
-            var title = CreateText(panelRect, 34, TextAnchor.MiddleCenter);
+            var title = CreateText(panelRect, 34, TextAlignmentOptions.Center);
             title.text = "—— 任务日志 ——";
-            title.fontStyle = FontStyle.Bold;
+            title.fontStyle = FontStyles.Bold;
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = new Vector2(0f, 1f);
             titleRect.anchorMax = new Vector2(1f, 1f);
@@ -249,7 +247,7 @@ namespace VNEffects
 
             if (entries.Count == 0)
             {
-                var empty = CreateText(_content, 28, TextAnchor.MiddleCenter);
+                var empty = CreateText(_content, 28, TextAlignmentOptions.Center);
                 empty.text = "（还没有接到任何任务）";
                 empty.color = new Color(1f, 1f, 1f, 0.55f);
                 return;
@@ -270,12 +268,12 @@ namespace VNEffects
                 if (!any)
                 {
                     any = true;
-                    var head = CreateText(_content, 26, TextAnchor.UpperLeft);
+                    var head = CreateText(_content, 26, TextAlignmentOptions.TopLeft);
                     head.text = $"<color={colorHex}>── {heading} ──</color>";
                 }
 
-                var t = CreateText(_content, 28, TextAnchor.UpperLeft);
-                t.supportRichText = true;
+                var t = CreateText(_content, 28, TextAlignmentOptions.TopLeft);
+                t.richText = true;
                 var sb = new System.Text.StringBuilder();
                 sb.Append($"<color={colorHex}><b>{e.title}</b></color>");
                 if (!string.IsNullOrEmpty(e.description))
@@ -284,22 +282,22 @@ namespace VNEffects
                     e.stage != StageFailed)
                     sb.Append($"\n▶ {e.stageText}");
                 t.text = sb.ToString();
-                t.horizontalOverflow = HorizontalWrapMode.Wrap;
-                t.verticalOverflow = VerticalWrapMode.Overflow;
+                t.textWrappingMode = TextWrappingModes.Normal;
+                t.overflowMode = TextOverflowModes.Overflow;
             }
         }
 
-        Text CreateText(Transform parent, int size, TextAnchor anchor)
+        TextMeshProUGUI CreateText(Transform parent, int size, TextAlignmentOptions anchor)
         {
             var go = new GameObject("Text",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = _font;
+            var t = go.GetComponent<TextMeshProUGUI>();
+            t.font = VNFont.Asset;
             t.fontSize = size;
             t.alignment = anchor;
             t.color = new Color(1f, 1f, 1f, 0.94f);
-            t.lineSpacing = 1.15f;
+            t.lineSpacing = 15f; // TMP 行距为字号百分比，15 ≈ legacy 1.15 倍
             t.raycastTarget = false;
             return t;
         }

@@ -1,4 +1,5 @@
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,8 +14,8 @@ namespace VNEffects
     public static class VNToast
     {
         static Canvas _canvas;
-        static Text _toast;
-        static Text _mode;
+        static TextMeshProUGUI _toast;
+        static TextMeshProUGUI _mode;
         static Tween _toastTween;
 
         static void EnsureCanvas()
@@ -31,9 +32,7 @@ namespace VNEffects
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
 
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
-            _toast = CreateText(go.transform, font, 30, TextAnchor.MiddleCenter);
+            _toast = CreateText(go.transform, 30, TextAlignmentOptions.Center);
             var tr = (RectTransform)_toast.transform;
             tr.anchorMin = tr.anchorMax = new Vector2(0.5f, 0f);
             tr.pivot = new Vector2(0.5f, 0f);
@@ -41,8 +40,8 @@ namespace VNEffects
             tr.sizeDelta = new Vector2(900f, 56f);
             SetAlpha(_toast, 0f);
 
-            _mode = CreateText(go.transform, font, 30, TextAnchor.UpperRight);
-            _mode.fontStyle = FontStyle.Bold;
+            _mode = CreateText(go.transform, 30, TextAlignmentOptions.TopRight);
+            _mode.fontStyle = FontStyles.Bold;
             var mr = (RectTransform)_mode.transform;
             mr.anchorMin = mr.anchorMax = new Vector2(1f, 1f);
             mr.pivot = new Vector2(1f, 1f);
@@ -52,13 +51,13 @@ namespace VNEffects
             _mode.text = "";
         }
 
-        static Text CreateText(Transform parent, Font font, int size, TextAnchor anchor)
+        static TextMeshProUGUI CreateText(Transform parent, int size, TextAlignmentOptions anchor)
         {
             var go = new GameObject("Text",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = font;
+            var t = go.GetComponent<TextMeshProUGUI>();
+            t.font = VNFont.Asset;
             t.fontSize = size;
             t.alignment = anchor;
             t.color = new Color(1f, 1f, 1f, 0.95f);
@@ -66,7 +65,7 @@ namespace VNEffects
             return t;
         }
 
-        static void SetAlpha(Text t, float a)
+        static void SetAlpha(TextMeshProUGUI t, float a)
         {
             var c = t.color;
             c.a = a;

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -700,10 +701,10 @@ hide 亚里沙 with:dissolve
 : 第一章　完
 ";
 
-        static Text CreateHintText(Transform canvasParent, float height)
+        static TextMeshProUGUI CreateHintText(Transform canvasParent, float height)
         {
             var hintGo = new GameObject("HintText",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             var hintRect = (RectTransform)hintGo.transform;
             hintRect.SetParent(canvasParent, false);
             hintRect.anchorMin = new Vector2(0f, 0f);
@@ -711,12 +712,14 @@ hide 亚里沙 with:dissolve
             hintRect.pivot = new Vector2(0.5f, 0f);
             hintRect.anchoredPosition = new Vector2(0f, 18f);
             hintRect.sizeDelta = new Vector2(-60f, height);
-            var hint = hintGo.GetComponent<Text>();
-            hint.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var hint = hintGo.GetComponent<TextMeshProUGUI>();
+            // 编辑期创建、随场景保存的 TMP 文字必须引用持久化字体资产，
+            // 不能用 VNFont 运行时动态创建的临时资产（保存场景后会变 Missing）
+            hint.font = VNFontAssetBuilder.EnsureFontAsset();
             hint.fontSize = 26;
-            hint.alignment = TextAnchor.LowerCenter;
+            hint.alignment = TextAlignmentOptions.Bottom;
             hint.color = new Color(1f, 1f, 1f, 0.85f);
-            hint.supportRichText = true;
+            hint.richText = true;
             hint.raycastTarget = false;
             return hint;
         }

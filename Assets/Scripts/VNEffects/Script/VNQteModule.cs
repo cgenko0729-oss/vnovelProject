@@ -1,4 +1,5 @@
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -34,7 +35,7 @@ namespace VNEffects
 
         RectTransform _panel;
         RectTransform _fill;
-        Text _title, _counter, _timer;
+        TextMeshProUGUI _title, _counter, _timer;
 
         protected override void OnLaunch(VNEventContext ctx)
         {
@@ -97,8 +98,6 @@ namespace VNEffects
 
         void BuildUi(string titleText)
         {
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-
             // 全屏暗幕（拦截点击，也是"点哪都算"的感受来源）
             var dim = CreateImage("Dim", (RectTransform)transform, null,
                 new Color(0f, 0f, 0f, 0.55f));
@@ -112,7 +111,7 @@ namespace VNEffects
             _panel.anchorMin = _panel.anchorMax = new Vector2(0.5f, 0.5f);
             _panel.sizeDelta = new Vector2(640f, 300f);
 
-            _title = CreateText("Title", _panel, font, 52, AccentColor, titleText);
+            _title = CreateText("Title", _panel, 52, AccentColor, titleText);
             var titleRect = (RectTransform)_title.transform;
             titleRect.anchorMin = titleRect.anchorMax = new Vector2(0.5f, 0.72f);
             titleRect.sizeDelta = new Vector2(600f, 70f);
@@ -132,12 +131,12 @@ namespace VNEffects
             _fill.offsetMin = Vector2.zero;
             _fill.offsetMax = Vector2.zero;
 
-            _counter = CreateText("Counter", _panel, font, 30, Color.white, "");
+            _counter = CreateText("Counter", _panel, 30, Color.white, "");
             var counterRect = (RectTransform)_counter.transform;
             counterRect.anchorMin = counterRect.anchorMax = new Vector2(0.5f, 0.2f);
             counterRect.sizeDelta = new Vector2(300f, 40f);
 
-            _timer = CreateText("Timer", _panel, font, 26,
+            _timer = CreateText("Timer", _panel, 26,
                 new Color(1f, 1f, 1f, 0.7f), "");
             var timerRect = (RectTransform)_timer.transform;
             timerRect.anchorMin = timerRect.anchorMax = new Vector2(0.88f, 0.85f);
@@ -163,20 +162,20 @@ namespace VNEffects
             return rect;
         }
 
-        static Text CreateText(string name, RectTransform parent, Font font,
+        static TextMeshProUGUI CreateText(string name, RectTransform parent,
             int size, Color color, string content)
         {
             var go = new GameObject(name, typeof(RectTransform));
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
-            var text = go.AddComponent<Text>();
-            text.font = font;
+            var text = go.AddComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
             text.fontSize = size;
             text.color = color;
             text.text = content;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = TextAlignmentOptions.Center;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
             text.raycastTarget = false;
             return text;
         }

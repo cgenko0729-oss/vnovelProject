@@ -401,6 +401,9 @@ namespace VNEffects
         {
             _commands = VNScriptParser.Parse(source);
 
+            // 剧本全文预热进 TMP 动态字体图集：光栅化成本挪到加载期，台词零卡顿
+            VNFont.Prewarm(source);
+
             _labels.Clear();
             for (int i = 0; i < _commands.Count; i++)
             {
