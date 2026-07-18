@@ -3,6 +3,8 @@
 # —— Quick toolbar ——
 toolbar.save = Save
 toolbar.load = Load
+toolbar.qsave = Q.Save
+toolbar.qload = Q.Load
 toolbar.auto = Auto
 toolbar.skip = Skip
 toolbar.log = Log
@@ -62,6 +64,9 @@ runner.autoOn = Auto mode ON
 runner.autoOff = Auto mode OFF
 runner.skipOn = Skip ON
 runner.skipOff = Skip OFF
+runner.quickSaved = Quick save complete (Q to save / L to load)
+runner.quickLoaded = Quick save loaded
+runner.noQuickSave = No quick save yet (press Q to quick save)
 
 # —— Event module defaults ——
 qte.title = Mash!
