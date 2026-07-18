@@ -38,6 +38,8 @@ namespace VNEffects.EditorTools
         readonly VNScenarioSourceContext _ctx = new VNScenarioSourceContext();
         readonly List<SpritePreviewItem> _backgroundPreviews =
             new List<SpritePreviewItem>();
+        readonly List<SpritePreviewItem> _cgPreviews =
+            new List<SpritePreviewItem>();
         readonly List<CharacterPreviewItem> _characterPreviews =
             new List<CharacterPreviewItem>();
         List<VNIssue> _issues = new List<VNIssue>();
@@ -62,7 +64,7 @@ namespace VNEffects.EditorTools
         static readonly Dictionary<string, string> CommandTranslations =
             new Dictionary<string, string>
             {
-                { "bg", "背景" }, { "weather", "天气" }, { "mood", "氛围" },
+                { "bg", "背景" }, { "cg", "CG 一枚绘" }, { "weather", "天气" }, { "mood", "氛围" },
                 { "transition", "转场" }, { "show", "显示角色" }, { "hide", "隐藏角色" },
                 { "emote", "角色动作" }, { "move", "移动角色" }, { "portrait", "对话头像" },
                 { "camera", "镜头运动" }, { "camcut", "镜头切换" }, { "camto", "镜头移动" },
@@ -187,6 +189,7 @@ namespace VNEffects.EditorTools
 
             var stage = FindFirstObjectByType<VNStage>();
             _backgroundPreviews.Clear();
+            _cgPreviews.Clear();
             if (stage != null)
             {
                 var bgs = new List<string>();
@@ -197,8 +200,21 @@ namespace VNEffects.EditorTools
                     _backgroundPreviews.Add(new SpritePreviewItem(b.id, b.sprite));
                 }
                 _ctx.backgroundIds = bgs.ToArray();
+
+                var cgs = new List<string>();
+                foreach (var c in stage.cgLibrary)
+                {
+                    if (c == null || string.IsNullOrEmpty(c.id)) continue;
+                    cgs.Add(c.id);
+                    _cgPreviews.Add(new SpritePreviewItem(c.id, c.sprite));
+                }
+                _ctx.cgIds = cgs.ToArray();
             }
-            else _ctx.backgroundIds = System.Array.Empty<string>();
+            else
+            {
+                _ctx.backgroundIds = System.Array.Empty<string>();
+                _ctx.cgIds = System.Array.Empty<string>();
+            }
 
             var audio = FindFirstObjectByType<VNAudio>();
             if (audio != null)
@@ -1002,6 +1018,20 @@ namespace VNEffects.EditorTools
                 return;
             }
 
+            if (p.source == VNParamSource.Cg)
+            {
+                // "off" 走普通文本（关闭 CG 不需要缩略图浏览器）
+                if (v == "off")
+                {
+                    string typed = EditorGUI.TextField(rect, v);
+                    if (typed != v) r.Set(p.id, typed);
+                    return;
+                }
+                string cg = CgPopup(rect, v, (r, p.id));
+                if (cg != v) r.Set(p.id, cg);
+                return;
+            }
+
             if (options == null)
             {
                 // 自由文本 / 数字
@@ -1028,6 +1058,7 @@ namespace VNEffects.EditorTools
 
         static bool IsTransitionParameter(VNRow row, VNParamDef parameter) =>
             (row.keyword == "bg" && parameter.id == "transition") ||
+            (row.keyword == "cg" && parameter.id == "transition") ||
             (row.keyword == "transition" && parameter.id == "type");
 
         static bool IsEmoteParameter(VNRow row, VNParamDef parameter) =>
@@ -1053,6 +1084,7 @@ namespace VNEffects.EditorTools
                     return _ctx.expressions.TryGetValue(r.Get(p.dependsOn), out var e)
                         ? e : System.Array.Empty<string>();
                 case VNParamSource.Background: return _ctx.backgroundIds;
+                case VNParamSource.Cg: return _ctx.cgIds;
                 case VNParamSource.AudioBgm: return _ctx.bgmIds;
                 case VNParamSource.AudioSe:
                     if (r.keyword == "se" && p.id == "a")
@@ -1118,6 +1150,11 @@ namespace VNEffects.EditorTools
             => SpritePopup(rect, value, key, _backgroundPreviews,
                 SpriteFor(_backgroundPreviews, value), "-", "未选择背景",
                 "清除选择", "没有匹配的背景", null);
+
+        string CgPopup(Rect rect, string value, (VNRow, string) key)
+            => SpritePopup(rect, value, key, _cgPreviews,
+                SpriteFor(_cgPreviews, value), "-", "未选择 CG",
+                "清除选择", "没有匹配的 CG", null);
 
         string CharacterPopup(Rect rect, string value, string expression,
             (VNRow, string) key, System.Action<string> afterSelect)

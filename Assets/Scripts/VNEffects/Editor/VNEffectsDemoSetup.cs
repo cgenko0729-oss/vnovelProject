@@ -442,6 +442,9 @@ namespace VNEffects.EditorTools
                     { id = $"bg{bgIndex++}", sprite = s });
             }
 
+            // CG 库：Assets/CG 下的图自动灌入（文件名 = id）
+            FillCgLibrary(stage);
+
             stage.characterLayer = rig.layerFront;
             stage.backgroundImage = rig.bgImage;
             stage.backgroundFx = rig.bgFx;
@@ -764,6 +767,33 @@ hide 亚里沙 with:dissolve
                     charPath2 != null ? AssetDatabase.LoadAssetAtPath<Sprite>(charPath2) : null,
                     AssetDatabase.LoadAssetAtPath<Sprite>(bgPath),
                     all);
+        }
+
+        /// <summary>把 Assets/CG 下的全部图片灌入 VNStage.cgLibrary（文件名 = 剧本 cg id）</summary>
+        static void FillCgLibrary(VNStage stage)
+        {
+            EnsureFolder("Assets/CG");
+            var guids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/CG" });
+            var paths = guids.Select(AssetDatabase.GUIDToAssetPath)
+                             .Where(p => p.EndsWith(".png") || p.EndsWith(".jpg"))
+                             .OrderBy(p => p)
+                             .ToList();
+            if (paths.Count == 0)
+            {
+                Debug.Log("[VNEffects] Assets/CG 目前是空的：放入 CG 图片后重新生成场景，" +
+                          "即可用剧本 cg 命令调用（文件名 = id）");
+                return;
+            }
+
+            foreach (var p in paths)
+            {
+                EnsureSpriteImport(p);
+                var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(p);
+                if (sprite == null) continue;
+                stage.cgLibrary.Add(new VNStage.CgEntry
+                    { id = Path.GetFileNameWithoutExtension(p), sprite = sprite });
+            }
+            Debug.Log($"[VNEffects] CG 库已灌入 {stage.cgLibrary.Count} 张（来自 Assets/CG）");
         }
 
         static void EnsureSpriteImport(string path)

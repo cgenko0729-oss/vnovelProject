@@ -22,7 +22,10 @@ namespace VNEffects
         public string bgm;
         public float bgmVol = 1f;         // bgm 命令的 vol: 参数（旧存档缺省 = 1）
         public bool portraitOff;                       // 对话头像被 portrait off 关闭
-        public List<string> fxOn = new List<string>(); // 处于开启状态的 fx 名
+        public List<string> fxOn = new List<string>(); // 处于开启状态的 fx 名（含被 CG 暂停的）
+        public string cgId;                            // 显示中的 CG（空 = 无，旧存档缺省兼容）
+        public bool cgKeepChars;                       // cg 命令的 chars:keep
+        public bool cgKeepFx;                          // cg 命令的 fx:keep
 
         [System.Serializable]
         public class CharSave

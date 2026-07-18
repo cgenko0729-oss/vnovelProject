@@ -484,6 +484,11 @@ namespace VNEffects.EditorTools
                                 System.Array.IndexOf(ctx.backgroundIds, v) < 0)
                                 Err(i, $"{r.keyword}: background \"{v}\" not registered on VNStage");
                             break;
+                        case VNParamSource.Cg:
+                            if (v != "off" && ctx.HasCgs &&
+                                System.Array.IndexOf(ctx.cgIds, v) < 0)
+                                Err(i, $"{r.keyword}: CG \"{v}\" not registered on VNStage.cgLibrary");
+                            break;
                         case VNParamSource.AudioBgm:
                             if (ctx.HasBgm && v != "stop" &&
                                 System.Array.IndexOf(ctx.bgmIds, v) < 0)
@@ -642,6 +647,7 @@ namespace VNEffects.EditorTools
         public string[] characterIds = System.Array.Empty<string>();
         public Dictionary<string, string[]> expressions = new Dictionary<string, string[]>();
         public string[] backgroundIds = System.Array.Empty<string>();
+        public string[] cgIds = System.Array.Empty<string>();
         public string[] bgmIds = System.Array.Empty<string>();
         public string[] seIds = System.Array.Empty<string>();
         public string[] voiceIds = System.Array.Empty<string>();
@@ -650,6 +656,7 @@ namespace VNEffects.EditorTools
 
         public bool HasCharacters => characterIds.Length > 0;
         public bool HasBackgrounds => backgroundIds.Length > 0;
+        public bool HasCgs => cgIds.Length > 0;
         public bool HasBgm => bgmIds.Length > 0;
         public bool HasSe => seIds.Length > 0;
         public bool HasVoice => voiceIds.Length > 0;
