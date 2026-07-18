@@ -30,6 +30,7 @@ namespace VNEffects.EditorTools
         Tab _tab;
         bool _showCategoryColors;
         bool _rebuildStateBeforePlay = true;
+        bool _stagePreview = true;
 
         ReorderableList _list;
         Vector2 _scroll;
@@ -53,6 +54,12 @@ namespace VNEffects.EditorTools
 
         // 自定义值编辑状态（选了 "custom…" 的参数格）
         readonly HashSet<(VNRow, string)> _customEdit = new HashSet<(VNRow, string)>();
+
+        // 舞台一览：逐行推算"这行时台上有谁、背景是什么"（按文件顺序，jump/choice 近似）
+        const string StagePreviewPref = "VNEffects.ScenarioEditor.StagePreview";
+        const float StageCellW = 70f;
+        readonly List<RowStageState> _stageStates = new List<RowStageState>();
+        int _stageStatesVersion = -1;
 
         // 音频试听：id → AudioClip（按通道分开），_previewAudioKey = 正在播的 "通道|id"
         readonly Dictionary<string, AudioClip> _bgmClips = new Dictionary<string, AudioClip>();
@@ -130,6 +137,7 @@ namespace VNEffects.EditorTools
         void OnEnable()
         {
             LoadCategoryColors();
+            _stagePreview = EditorPrefs.GetBool(StagePreviewPref, true);
             BuildList();
             RefreshSources();
         }
@@ -500,6 +508,15 @@ namespace VNEffects.EditorTools
                 bool previousChanged = GUI.changed;
                 _showCategoryColors = GUILayout.Toggle(_showCategoryColors, "分类颜色",
                     EditorStyles.toolbarButton, GUILayout.Width(64f));
+                bool stagePreview = GUILayout.Toggle(_stagePreview,
+                    new GUIContent("舞台一览",
+                        "每行左侧显示当前背景缩略图与在场角色的站位色块（按文件顺序推算）"),
+                    EditorStyles.toolbarButton, GUILayout.Width(64f));
+                if (stagePreview != _stagePreview)
+                {
+                    _stagePreview = stagePreview;
+                    EditorPrefs.SetBool(StagePreviewPref, stagePreview);
+                }
                 GUI.changed = previousChanged;
 
                 GUILayout.Space(8f);
@@ -637,6 +654,8 @@ namespace VNEffects.EditorTools
                 GUILayout.Label($"{_doc.rows.Count} rows", EditorStyles.miniLabel);
             }
 
+            if (_stagePreview) RebuildStageStatesIfNeeded();
+
             if (_pendingScrollY >= 0f)
             {
                 _scroll.y = _pendingScrollY;
@@ -718,6 +737,16 @@ namespace VNEffects.EditorTools
             if (_rowHasError.TryGetValue(index, out bool isErr))
                 EditorGUI.DrawRect(new Rect(rect.x + 2f, rect.y + 8f, 7f, 7f),
                     isErr ? new Color(0.95f, 0.3f, 0.25f) : new Color(0.95f, 0.75f, 0.2f));
+
+            // 舞台一览小格：当前背景缩略图 + 在场角色站位色块，其余内容整体右移
+            if (_stagePreview)
+            {
+                if (index < _stageStates.Count)
+                    DrawStageCell(new Rect(rect.x + 11f, rect.y + 4f,
+                        StageCellW - 14f, LineH2 - 6f), _stageStates[index]);
+                rect = new Rect(rect.x + StageCellW, rect.y,
+                    rect.width - StageCellW, rect.height);
+            }
 
             var line0 = SubLine(rect, 0);
             switch (r.kind)
@@ -1130,6 +1159,186 @@ namespace VNEffects.EditorTools
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框
             }
+        }
+
+        // ---- 舞台一览小格 ----
+
+        /// <summary>一行的舞台快照：该行播完后台上的背景/CG 与角色站位</summary>
+        sealed class RowStageState
+        {
+            public string bg;
+            public string cg;
+            public bool cgKeepChars;
+            public readonly List<StageChar> chars = new List<StageChar>();
+        }
+
+        struct StageChar
+        {
+            public string id;
+            public int slot;   // 0=left 1=center 2=right
+        }
+
+        static readonly Color[] StagePalette =
+        {
+            new Color(0.98f, 0.55f, 0.62f), new Color(0.45f, 0.75f, 1f),
+            new Color(0.55f, 0.88f, 0.55f), new Color(1f, 0.82f, 0.4f),
+            new Color(0.8f, 0.62f, 1f), new Color(0.45f, 0.88f, 0.85f),
+            new Color(1f, 0.68f, 0.4f), new Color(0.75f, 0.8f, 0.55f),
+        };
+
+        /// <summary>按文件顺序逐行推算舞台状态（jump/choice 分支不展开，与
+        /// "重建前置状态"调试同一近似）。仅 _version 变化时重算。</summary>
+        void RebuildStageStatesIfNeeded()
+        {
+            if (_stageStatesVersion == _version) return;
+            _stageStatesVersion = _version;
+            _stageStates.Clear();
+
+            string bg = null, cg = null;
+            bool cgKeepChars = false;
+            var chars = new List<StageChar>();
+
+            foreach (var r in _doc.rows)
+            {
+                if (r.kind == VNRowKind.Command)
+                {
+                    switch (r.keyword)
+                    {
+                        case "bg":
+                            if (!string.IsNullOrEmpty(r.Get("id"))) bg = r.Get("id");
+                            break;
+                        case "cg":
+                        {
+                            string id = r.Get("id");
+                            if (id == "off") { cg = null; cgKeepChars = false; }
+                            else if (!string.IsNullOrEmpty(id))
+                            {
+                                cg = id;
+                                cgKeepChars = r.Get("chars") == "keep";
+                            }
+                            break;
+                        }
+                        case "show": ApplyStageShow(chars, r); break;
+                        case "hide":
+                        {
+                            string id = r.Get("character");
+                            chars.RemoveAll(c => c.id == id);
+                            break;
+                        }
+                        case "move": ApplyStageMove(chars, r); break;
+                    }
+                }
+
+                var state = new RowStageState
+                    { bg = bg, cg = cg, cgKeepChars = cgKeepChars };
+                state.chars.AddRange(chars);
+                _stageStates.Add(state);
+            }
+        }
+
+        static void ApplyStageShow(List<StageChar> chars, VNRow r)
+        {
+            string id = r.Get("character");
+            if (string.IsNullOrEmpty(id)) return;
+            string at = r.Get("at");
+            int existing = chars.FindIndex(c => c.id == id);
+            if (existing >= 0)
+            {
+                // 已在场且没写 at → 原地换表情，站位不动（与运行时语义一致）
+                if (!string.IsNullOrEmpty(at))
+                    chars[existing] = new StageChar { id = id, slot = SlotIndex(at) };
+                return;
+            }
+            chars.Add(new StageChar { id = id, slot = SlotIndex(at) });
+        }
+
+        static void ApplyStageMove(List<StageChar> chars, VNRow r)
+        {
+            string id = r.Get("character");
+            int i = chars.FindIndex(c => c.id == id);
+            if (i < 0) return;
+            chars[i] = new StageChar { id = id, slot = SlotIndex(r.Get("at")) };
+        }
+
+        static int SlotIndex(string at)
+        {
+            switch (at)
+            {
+                case "left": return 0;
+                case "right": return 2;
+                case null: case "": case "center": return 1;
+                default:
+                    // 自定义 x 坐标：按左/中/右粗分桶
+                    if (float.TryParse(at, out float x))
+                        return x < -120f ? 0 : x > 120f ? 2 : 1;
+                    return 1;
+            }
+        }
+
+        Color StageCharColor(string id)
+        {
+            int i = System.Array.IndexOf(_ctx.characterIds, id);
+            if (i < 0)
+            {
+                i = 0;
+                foreach (char c in id) i = i * 31 + c;
+                i = Mathf.Abs(i);
+            }
+            return StagePalette[i % StagePalette.Length];
+        }
+
+        static string SlotName(int slot) => slot == 0 ? "左" : slot == 2 ? "右" : "中";
+
+        void DrawStageCell(Rect rect, RowStageState state)
+        {
+            // 背景（CG 显示时优先画 CG）缩略图
+            var thumbRect = new Rect(rect.x, rect.y, 30f, rect.height);
+            EditorGUI.DrawRect(thumbRect, new Color(0.08f, 0.08f, 0.08f, 1f));
+            string shownId = state.cg ?? state.bg;
+            Sprite sprite = state.cg != null
+                ? SpriteFor(_cgPreviews, state.cg)
+                : state.bg != null ? SpriteFor(_backgroundPreviews, state.bg) : null;
+            if (sprite != null)
+                DrawSpritePreview(new Rect(thumbRect.x + 1f, thumbRect.y + 1f,
+                    thumbRect.width - 2f, thumbRect.height - 2f), sprite);
+            else
+                GUI.Label(thumbRect, shownId == null ? "—" : "?",
+                    EditorStyles.centeredGreyMiniLabel);
+
+            // 三个站位格（左/中/右），有人 = 角色专属色块
+            bool dimmed = state.cg != null && !state.cgKeepChars; // CG 默认藏立绘
+            float blockW = 7f;
+            float blockH = Mathf.Min(rect.height, 13f);
+            float blockY = rect.y + (rect.height - blockH) * 0.5f;
+            float baseX = thumbRect.xMax + 4f;
+            for (int slot = 0; slot < 3; slot++)
+                EditorGUI.DrawRect(new Rect(baseX + slot * (blockW + 2f), blockY,
+                    blockW, blockH), new Color(0f, 0f, 0f, 0.28f));
+            foreach (var c in state.chars)
+            {
+                Color color = StageCharColor(c.id);
+                if (dimmed) color.a = 0.3f;
+                EditorGUI.DrawRect(new Rect(baseX + c.slot * (blockW + 2f) + 1f,
+                    blockY + 1f, blockW - 2f, blockH - 2f), color);
+            }
+
+            // 整格 tooltip：背景/CG/在场角色一览
+            var tip = new StringBuilder();
+            tip.Append("背景: ").Append(string.IsNullOrEmpty(state.bg) ? "（无）" : state.bg);
+            if (state.cg != null)
+                tip.Append("\nCG: ").Append(state.cg)
+                   .Append(state.cgKeepChars ? "（保留立绘）" : "（隐藏立绘）");
+            tip.Append("\n台上: ");
+            if (state.chars.Count == 0) tip.Append("（无人）");
+            else
+                for (int i = 0; i < state.chars.Count; i++)
+                {
+                    if (i > 0) tip.Append("、");
+                    tip.Append(state.chars[i].id)
+                       .Append('（').Append(SlotName(state.chars[i].slot)).Append('）');
+                }
+            tip.Append("\n（按文件顺序推算，jump/choice 分支不展开）");
+            GUI.Label(rect, new GUIContent("", tip.ToString()));
         }
 
         // ---- 音频行内试听 ----
