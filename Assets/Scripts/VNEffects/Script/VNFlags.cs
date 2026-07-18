@@ -16,16 +16,28 @@ namespace VNEffects
     {
         static readonly Dictionary<string, int> _values = new Dictionary<string, int>();
 
+        /// <summary>任何 flag 变化（Set/Clear/读档恢复）后触发；属性 HUD 等 UI 订阅刷新。
+        /// 读档时会连续触发多次，订阅方应做“标脏 + 下帧统一刷新”而不是立即重建。</summary>
+        public static event System.Action Changed;
+
         public static IReadOnlyDictionary<string, int> All => _values;
 
         public static int Get(string key) =>
             _values.TryGetValue(key, out var v) ? v : 0;
 
-        public static void Set(string key, int value) => _values[key] = value;
+        public static void Set(string key, int value)
+        {
+            _values[key] = value;
+            Changed?.Invoke();
+        }
 
         public static void Add(string key, int delta) => Set(key, Get(key) + delta);
 
-        public static void Clear() => _values.Clear();
+        public static void Clear()
+        {
+            _values.Clear();
+            Changed?.Invoke();
+        }
 
         /// <summary>应用一个 flag 操作串："名字"=置1、"名字+2"/"名字-1"=增减</summary>
         public static void Apply(string op)

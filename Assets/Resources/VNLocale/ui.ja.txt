@@ -9,6 +9,7 @@ toolbar.auto = オート
 toolbar.skip = スキップ
 toolbar.log = ログ
 toolbar.quest = クエスト
+toolbar.stats = ステータス
 toolbar.config = 設定
 toolbar.hideui = UI非表示
 
@@ -28,6 +29,13 @@ quest.toastUpdate = クエスト更新：{0}
 quest.toastUpdateWith = クエスト更新：{0} —— {1}
 quest.toastDone = クエスト完了：{0}
 quest.toastFail = クエスト失敗：{0}
+
+# —— ステータス ——
+stats.title = —— ステータス ——
+stats.empty = （ステータス定義が登録されていません）
+stats.toastGain = {0} +{1}
+stats.toastLose = {0} -{1}
+stats.toastSet = {0} → {1}
 
 # —— セーブ / ロード ——
 save.tabSave = セーブ

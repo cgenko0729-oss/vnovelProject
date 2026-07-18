@@ -48,6 +48,7 @@ namespace VNEffects
         VNConfigPanel _configPanel;
         VNQuickToolbar _quickToolbar;
         VNQuestLog _questLog;
+        VNStatsHud _statsHud;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
@@ -82,6 +83,12 @@ namespace VNEffects
                 _questLog = FindFirstObjectByType<VNQuestLog>();
                 if (_questLog == null) // 没有登记定义资产也能工作（id 当标题）
                     _questLog = new GameObject("VNQuestLog").AddComponent<VNQuestLog>();
+            }
+            if (_statsHud == null)
+            {
+                _statsHud = FindFirstObjectByType<VNStatsHud>();
+                if (_statsHud == null) // 没有登记定义资产也能工作（不钳制、无 HUD 条目）
+                    _statsHud = new GameObject("VNStatsHud").AddComponent<VNStatsHud>();
             }
             EnsureSaveLoadPanel();
             EnsureQuickToolbar();
@@ -309,6 +316,9 @@ namespace VNEffects
                     case "quest": // 静默重放（写状态不弹 Toast）
                         _questLog?.Apply(cmd.Arg(0, "start"), cmd.Arg(1),
                             (int)cmd.ArgF(2, 0f), true, cmd.line);
+                        break;
+                    case "stat": // 静默重放（钳制照做，不弹 Toast）
+                        _statsHud?.Apply(cmd.Arg(0), cmd.Arg(1), true, cmd.line);
                         break;
                     case "camcut":
                     case "camto":
@@ -712,6 +722,12 @@ namespace VNEffects
             _questLog.Toggle();
         }
 
+        public void RequestStatsPanel()
+        {
+            if (_statsHud == null || _eventActive) return;
+            _statsHud.Toggle();
+        }
+
         public void RequestConfigPanel()
         {
             EnsureConfigPanel();
@@ -724,6 +740,7 @@ namespace VNEffects
             _uiHidden = hidden;
             if (stage != null && stage.dialogue != null)
                 stage.dialogue.SetInterfaceVisible(!hidden);
+            _statsHud?.SetHudVisible(!hidden);
         }
 
         IEnumerator CaptureSaveThumbnailCo(int token)
@@ -865,6 +882,14 @@ namespace VNEffects
                 return;
             }
 
+            // 属性面板打开期间：只处理关闭，不推进剧情
+            if (_statsHud != null && _statsHud.IsOpen)
+            {
+                if (kb.cKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                    _statsHud.Close();
+                return;
+            }
+
             if (kb.hKey.wasPressedThisFrame ||
                 (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
             {
@@ -875,6 +900,12 @@ namespace VNEffects
             if (kb.jKey.wasPressedThisFrame)
             {
                 _questLog?.Open();
+                return;
+            }
+
+            if (kb.cKey.wasPressedThisFrame)
+            {
+                _statsHud?.Open();
                 return;
             }
 
@@ -1154,6 +1185,11 @@ namespace VNEffects
                         JumpTo(cmd.Arg(2), cmd.line);
                     return null;
                 }
+
+                case "stat":
+                    // stat 名字 +5 / stat 名字 -3 / stat 名字 500（按 VNStatDef 钳制 + 飘字）
+                    _statsHud?.Apply(cmd.Arg(0), cmd.Arg(1), false, cmd.line);
+                    return null;
 
                 case "choice":
                     return ChoiceCo(cmd);

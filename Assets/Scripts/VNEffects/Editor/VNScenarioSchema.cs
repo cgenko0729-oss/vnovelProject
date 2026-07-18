@@ -230,6 +230,11 @@ namespace VNEffects.EditorTools
                 Pos("name", "flag", VNParamSource.Flag),
                 Pos("value", "value", VNParamSource.Options,
                     new[] { "+1", "-1", "1", "0" }, weight: 0.5f));
+            Add("stat", "Flow", "stat <name> <+n|-n|value>\n" +
+                "养成属性读写：与 flag 同存 VNFlags，但按 VNStatDef 钳制范围并飘字提示",
+                Pos("name", "属性", VNParamSource.Flag),
+                Pos("value", "value", VNParamSource.Options,
+                    new[] { "+1", "-1", "+5", "-5", "+10", "-10" }, weight: 0.5f));
             Add("if", "Flow", "if <cond> jump <label>  cond has NO spaces: 勇气 / !勇气 / 好感度>=2",
                 Pos("condition", "if", VNParamSource.Text),
                 Pos("target", "jump", VNParamSource.Label));

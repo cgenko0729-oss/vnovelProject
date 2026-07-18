@@ -10,6 +10,7 @@ toolbar.auto = Auto
 toolbar.skip = Skip
 toolbar.log = Log
 toolbar.quest = 任务
+toolbar.stats = 属性
 toolbar.config = Config
 toolbar.hideui = 隐藏 UI
 
@@ -29,6 +30,13 @@ quest.toastUpdate = 任务更新：{0}
 quest.toastUpdateWith = 任务更新：{0} —— {1}
 quest.toastDone = 任务完成：{0}
 quest.toastFail = 任务失败：{0}
+
+# —— 养成属性 ——
+stats.title = —— 属性 ——
+stats.empty = （没有登记任何属性定义）
+stats.toastGain = {0} +{1}
+stats.toastLose = {0} -{1}
+stats.toastSet = {0} → {1}
 
 # —— 存读档 ——
 save.tabSave = 保存

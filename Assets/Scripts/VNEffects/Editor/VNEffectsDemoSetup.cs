@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TMPro;
@@ -21,6 +22,7 @@ namespace VNEffects.EditorTools
         const string MaterialsDir = "Assets/VNEffects/Materials";
         const string CharactersDir = "Assets/VNEffects/Characters";
         const string QuestsDir = "Assets/VNEffects/Quests";
+        const string StatsDir = "Assets/VNEffects/Stats";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -501,6 +503,11 @@ namespace VNEffects.EditorTools
             var questLog = new GameObject("VNQuestLog").AddComponent<VNQuestLog>();
             questLog.quests.Add(EnsureQuestDef());
 
+            // ---------- 养成属性系统（示例属性定义 + HUD/面板组件） ----------
+            EnsureFolder(StatsDir);
+            var statsHud = new GameObject("VNStatsHud").AddComponent<VNStatsHud>();
+            statsHud.stats.AddRange(EnsureStatDefs());
+
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
@@ -511,7 +518,7 @@ namespace VNEffects.EditorTools
             // ---------- 极简提示 ----------
             var hint = CreateHintText(rig.canvasGo.transform, 70f);
             hint.text = "Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进\n" +
-                        "F5 存档界面 | F9 读档界面 | J 任务日志";
+                        "F5 存档界面 | F9 读档界面 | J 任务日志 | C 属性面板";
 
             // ---------- 保存 ----------
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);
@@ -524,6 +531,101 @@ namespace VNEffects.EditorTools
         // ==================================================================
         // 剧本系统辅助
         // ==================================================================
+
+        /// <summary>示例属性定义：顶栏四项（金钱/行动力/压力/善恶）+ 面板四维（体力/智力/魅力/感性）</summary>
+        static List<VNStatDef> EnsureStatDefs()
+        {
+            var defs = new List<VNStatDef>();
+
+            VNStatDef Ensure(string id, System.Action<VNStatDef> setup)
+            {
+                string path = $"{StatsDir}/{id}.asset";
+                var def = AssetDatabase.LoadAssetAtPath<VNStatDef>(path);
+                if (def == null)
+                {
+                    def = ScriptableObject.CreateInstance<VNStatDef>();
+                    def.id = id;
+                    def.displayName = id;
+                    setup(def);
+                    AssetDatabase.CreateAsset(def, path);
+                }
+                defs.Add(def);
+                return def;
+            }
+
+            void Grades(VNStatDef def)
+            {
+                def.style = VNStatStyle.Grade;
+                def.useClamp = true;
+                def.minValue = 0;
+                def.maxValue = 500;
+                def.showInHud = false; // 四维属性只进 C 键面板，顶栏保持紧凑
+                def.gradeSteps.Add(new VNStatDef.GradeStep { threshold = 0, label = "E" });
+                def.gradeSteps.Add(new VNStatDef.GradeStep { threshold = 50, label = "D" });
+                def.gradeSteps.Add(new VNStatDef.GradeStep { threshold = 100, label = "C" });
+                def.gradeSteps.Add(new VNStatDef.GradeStep { threshold = 200, label = "B" });
+                def.gradeSteps.Add(new VNStatDef.GradeStep { threshold = 350, label = "A" });
+                def.gradeSteps.Add(new VNStatDef.GradeStep { threshold = 500, label = "S" });
+            }
+
+            Ensure("金钱", def =>
+            {
+                def.displayNameEn = "Money"; def.displayNameJa = "所持金";
+                def.style = VNStatStyle.Number; def.unit = "G";
+                def.useClamp = true; def.minValue = 0; def.maxValue = 999999;
+                def.initialValue = 500;
+                def.color = new Color(1f, 0.82f, 0.32f);
+            });
+            Ensure("行动力", def =>
+            {
+                def.displayNameEn = "Energy"; def.displayNameJa = "行動力";
+                def.style = VNStatStyle.OutOfMax;
+                def.useClamp = true; def.minValue = 0; def.maxValue = 10;
+                def.initialValue = 10;
+                def.color = new Color(0.45f, 0.85f, 1f);
+            });
+            Ensure("压力", def =>
+            {
+                def.displayNameEn = "Stress"; def.displayNameJa = "ストレス";
+                def.style = VNStatStyle.Percent;
+                def.useClamp = true; def.minValue = 0; def.maxValue = 100;
+                def.initialValue = 0;
+                def.color = new Color(1f, 0.55f, 0.3f);
+            });
+            Ensure("善恶", def =>
+            {
+                def.displayNameEn = "Morality"; def.displayNameJa = "善悪";
+                def.style = VNStatStyle.Percent;
+                def.useClamp = true; def.minValue = 0; def.maxValue = 100;
+                def.initialValue = 50;
+                def.color = new Color(0.75f, 0.55f, 1f);
+            });
+            Ensure("体力", def =>
+            {
+                def.displayNameEn = "Vitality"; def.displayNameJa = "体力";
+                def.initialValue = 70; def.color = new Color(1f, 0.45f, 0.45f);
+                Grades(def);
+            });
+            Ensure("智力", def =>
+            {
+                def.displayNameEn = "Intelligence"; def.displayNameJa = "知力";
+                def.initialValue = 20; def.color = new Color(0.45f, 0.65f, 1f);
+                Grades(def);
+            });
+            Ensure("魅力", def =>
+            {
+                def.displayNameEn = "Charm"; def.displayNameJa = "魅力";
+                def.initialValue = 20; def.color = new Color(1f, 0.5f, 0.85f);
+                Grades(def);
+            });
+            Ensure("感性", def =>
+            {
+                def.displayNameEn = "Sensitivity"; def.displayNameJa = "感性";
+                def.initialValue = 20; def.color = new Color(0.5f, 0.9f, 0.55f);
+                Grades(def);
+            });
+            return defs;
+        }
 
         static VNQuestDef EnsureQuestDef()
         {
