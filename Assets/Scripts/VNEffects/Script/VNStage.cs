@@ -501,7 +501,7 @@ namespace VNEffects
         public string GetDisplayName(string speaker)
         {
             var def = characters.Find(c => c.id == speaker);
-            return def != null ? def.displayName : speaker;
+            return def != null ? def.LocalizedDisplayName : speaker;
         }
 
         // ------------------------------------------------------------------
@@ -666,7 +666,7 @@ namespace VNEffects
                 dialogue.SetPortrait(
                     c.def.GetPortrait(string.IsNullOrEmpty(expr) ? c.expression : expr),
                     c.def.portraitScale, c.def.portraitOffset);
-                dialogue.Say(c.def.displayName, text);
+                dialogue.Say(c.def.LocalizedDisplayName, text);
                 c.mouth?.BeginSpeaking(followVoice, dialogue, vnAudio);
             }
             else

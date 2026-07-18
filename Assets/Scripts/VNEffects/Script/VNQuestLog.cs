@@ -247,7 +247,7 @@ namespace VNEffects
                 entries.Add(new JournalEntry
                 {
                     title = q.Title,
-                    description = q.description,
+                    description = q.LocalizedDescription,
                     stageText = q.StageText(stage),
                     stage = stage,
                 });
