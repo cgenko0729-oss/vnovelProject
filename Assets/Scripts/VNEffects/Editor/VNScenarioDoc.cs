@@ -9,8 +9,10 @@ namespace VNEffects.EditorTools
     public class VNChoiceOptionRow
     {
         public string text = "";
-        public string flagOp = "";   // 如 好感度+1
-        public string jump = "";     // 空 = 顺序继续
+        public string condition = ""; // if:条件（不满足则隐藏选项），空 = 恒显示
+        public string costOp = "";    // cost:花费（如 金钱-100），空 = 免费
+        public string flagOp = "";    // 如 好感度+1
+        public string jump = "";      // 空 = 顺序继续
     }
 
     /// <summary>
@@ -60,7 +62,10 @@ namespace VNEffects.EditorTools
                 r.options = new List<VNChoiceOptionRow>();
                 foreach (var o in options)
                     r.options.Add(new VNChoiceOptionRow
-                        { text = o.text, flagOp = o.flagOp, jump = o.jump });
+                    {
+                        text = o.text, condition = o.condition, costOp = o.costOp,
+                        flagOp = o.flagOp, jump = o.jump,
+                    });
             }
             if (camLines != null) r.camLines = new List<string>(camLines);
             return r;
@@ -242,11 +247,17 @@ namespace VNEffects.EditorTools
                 opt.jump = s.Substring(arrow + 2).Trim();
                 s = s.Substring(0, arrow).Trim();
             }
-            int fi = s.IndexOf("flag:", System.StringComparison.Ordinal);
-            if (fi >= 0)
+            // 从行尾逐个摘参数 token（与 VNScriptParser.ParseChoiceOption 保持一致）
+            while (true)
             {
-                opt.flagOp = s.Substring(fi + 5).Trim();
-                s = s.Substring(0, fi).Trim();
+                int sp = s.LastIndexOfAny(new[] { ' ', '\t' });
+                if (sp < 0) break;
+                string tail = s.Substring(sp + 1);
+                if (tail.StartsWith("flag:")) opt.flagOp = tail.Substring(5);
+                else if (tail.StartsWith("if:")) opt.condition = tail.Substring(3);
+                else if (tail.StartsWith("cost:")) opt.costOp = tail.Substring(5);
+                else break;
+                s = s.Substring(0, sp).TrimEnd();
             }
             opt.text = s;
             return opt;
@@ -334,6 +345,10 @@ namespace VNEffects.EditorTools
                         foreach (var o in row.options)
                         {
                             sb.Append("* ").Append(o.text);
+                            if (!string.IsNullOrEmpty(o.condition))
+                                sb.Append(" if:").Append(o.condition);
+                            if (!string.IsNullOrEmpty(o.costOp))
+                                sb.Append(" cost:").Append(o.costOp);
                             if (!string.IsNullOrEmpty(o.flagOp))
                                 sb.Append(" flag:").Append(o.flagOp);
                             if (!string.IsNullOrEmpty(o.jump))
@@ -373,7 +388,11 @@ namespace VNEffects.EditorTools
                 if (r.keyword == "flag") AddFlagBase(set, r.Get("name"));
                 if (r.keyword == "if") AddFlagBase(set, r.Get("condition"));
                 if (r.options != null)
-                    foreach (var o in r.options) AddFlagBase(set, o.flagOp);
+                    foreach (var o in r.options)
+                    {
+                        AddFlagBase(set, o.flagOp);
+                        AddFlagBase(set, o.costOp); // cost 引用的属性名也是 flag
+                    }
             }
             var list = new List<string>(set);
             list.Sort();
@@ -556,6 +575,13 @@ namespace VNEffects.EditorTools
                             {
                                 if (string.IsNullOrEmpty(o.text))
                                     Warn(i, "choice option has empty text");
+                                if (!string.IsNullOrEmpty(o.costOp) &&
+                                    !VNStatsHud.ParseCostOp(o.costOp, out _, out _))
+                                    Err(i, $"cost \"{o.costOp}\" is invalid " +
+                                           "(stat name ± number; e.g. 金钱-100)");
+                                if (!string.IsNullOrEmpty(o.condition) &&
+                                    o.condition.IndexOfAny(new[] { ' ', '\t' }) >= 0)
+                                    Err(i, $"option if \"{o.condition}\" must not contain spaces");
                                 CheckLabelRef(i, o.jump, "choice option");
                             }
                         break;

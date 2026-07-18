@@ -28,6 +28,14 @@ namespace VNEffects
         [Header("按钮纵向间距（像素）")]
         public float buttonSpacing = 26f;
 
+        /// <summary>一个选项的显示描述（花费/置灰是 P2 选项花费扩展）</summary>
+        public class Option
+        {
+            public string text;
+            public string costLabel;         // 右侧小字（如 -100G），null = 不显示
+            public bool interactable = true; // false = 置灰不可选（如钱不够）
+        }
+
         class Entry
         {
             public GameObject go;
@@ -73,8 +81,18 @@ namespace VNEffects
             _group.blocksRaycasts = false;
         }
 
-        /// <summary>显示一组选项，玩家选择后回调（回调在演出结束后触发）</summary>
+        /// <summary>显示一组纯文本选项，玩家选择后回调（回调在演出结束后触发）</summary>
         public void Show(string[] options, System.Action<int> onChosen)
+        {
+            if (options == null) return;
+            var wrapped = new Option[options.Length];
+            for (int i = 0; i < options.Length; i++)
+                wrapped[i] = new Option { text = options[i] };
+            Show(wrapped, onChosen);
+        }
+
+        /// <summary>显示一组带花费/置灰状态的选项</summary>
+        public void Show(Option[] options, System.Action<int> onChosen)
         {
             Build();
             if (_busy || options == null || options.Length == 0) return;
@@ -100,7 +118,7 @@ namespace VNEffects
             }
         }
 
-        Entry CreateButton(string label, int index, Vector2 pos)
+        Entry CreateButton(Option option, int index, Vector2 pos)
         {
             var go = new GameObject($"Choice_{index}",
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -114,8 +132,11 @@ namespace VNEffects
             var img = go.GetComponent<Image>();
             img.sprite = VNProceduralTextures.RoundedRectSprite;
             img.type = Image.Type.Sliced;
-            img.color = buttonColor;
-            img.raycastTarget = true;
+            img.color = option.interactable
+                ? buttonColor
+                : new Color(buttonColor.r * 0.55f, buttonColor.g * 0.55f,
+                            buttonColor.b * 0.55f, buttonColor.a * 0.8f);
+            img.raycastTarget = true; // 置灰项也接收 raycast：挡住穿透点击推进剧情
 
             var group = go.AddComponent<CanvasGroup>();
 
@@ -135,32 +156,61 @@ namespace VNEffects
             t.font = VNFont.Asset;
             t.fontSize = 30;
             t.alignment = TextAlignmentOptions.Center;
-            t.color = new Color(1f, 1f, 1f, 0.95f);
+            t.color = option.interactable
+                ? new Color(1f, 1f, 1f, 0.95f)
+                : new Color(1f, 1f, 1f, 0.45f);
             t.raycastTarget = false;
-            t.text = label;
+            t.text = option.text;
 
-            var button = go.AddComponent<Button>();
-            button.transition = Selectable.Transition.None;
-            int idx = index;
-            button.onClick.AddListener(() => Choose(idx));
+            // 右侧花费小字：可选=金色，钱不够=红色
+            if (!string.IsNullOrEmpty(option.costLabel))
+            {
+                var costGo = new GameObject("Cost",
+                    typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                var costRect = (RectTransform)costGo.transform;
+                costRect.SetParent(rect, false);
+                costRect.anchorMin = new Vector2(1f, 0f);
+                costRect.anchorMax = new Vector2(1f, 1f);
+                costRect.pivot = new Vector2(1f, 0.5f);
+                costRect.anchoredPosition = new Vector2(-18f, 0f);
+                costRect.sizeDelta = new Vector2(160f, 0f);
+                var costText = costGo.GetComponent<TextMeshProUGUI>();
+                costText.font = VNFont.Asset;
+                costText.fontSize = 22;
+                costText.alignment = TextAlignmentOptions.MidlineRight;
+                costText.fontStyle = FontStyles.Bold;
+                costText.color = option.interactable
+                    ? new Color(1f, 0.84f, 0.42f, 0.95f)
+                    : new Color(1f, 0.38f, 0.38f, 0.9f);
+                costText.raycastTarget = false;
+                costText.text = option.costLabel;
+            }
 
-            // 悬停演出：扫光掠过 + 微放大
-            var trigger = go.AddComponent<EventTrigger>();
-            var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-            enter.callback.AddListener(_ =>
+            if (option.interactable)
             {
-                if (_busy) return;
-                fx.PlayShine(0.5f);
-                rect.DOScale(1.045f, 0.15f).SetEase(Ease.OutQuad).SetLink(go);
-            });
-            trigger.triggers.Add(enter);
-            var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
-            exit.callback.AddListener(_ =>
-            {
-                if (_busy) return;
-                rect.DOScale(1f, 0.15f).SetEase(Ease.OutQuad).SetLink(go);
-            });
-            trigger.triggers.Add(exit);
+                var button = go.AddComponent<Button>();
+                button.transition = Selectable.Transition.None;
+                int idx = index;
+                button.onClick.AddListener(() => Choose(idx));
+
+                // 悬停演出：扫光掠过 + 微放大
+                var trigger = go.AddComponent<EventTrigger>();
+                var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+                enter.callback.AddListener(_ =>
+                {
+                    if (_busy) return;
+                    fx.PlayShine(0.5f);
+                    rect.DOScale(1.045f, 0.15f).SetEase(Ease.OutQuad).SetLink(go);
+                });
+                trigger.triggers.Add(enter);
+                var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+                exit.callback.AddListener(_ =>
+                {
+                    if (_busy) return;
+                    rect.DOScale(1f, 0.15f).SetEase(Ease.OutQuad).SetLink(go);
+                });
+                trigger.triggers.Add(exit);
+            }
 
             return new Entry { go = go, rect = rect, group = group, fx = fx };
         }

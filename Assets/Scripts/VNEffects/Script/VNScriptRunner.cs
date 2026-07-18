@@ -1278,16 +1278,52 @@ namespace VNEffects
 
             SetSkip(false); // 到选项必停，玩家必须亲自选
 
-            var texts = new string[cmd.options.Count];
-            for (int i = 0; i < texts.Length; i++)
-                texts[i] = VNScriptLocale.TextOf(cmd.options[i]); // 显示译文；匹配按索引，不受影响
+            // if: 条件不满足的选项直接隐藏（visible = 原始索引映射表）
+            var visible = new List<int>();
+            for (int i = 0; i < cmd.options.Count; i++)
+            {
+                var candidate = cmd.options[i];
+                if (!string.IsNullOrEmpty(candidate.condition) &&
+                    !VNFlags.Evaluate(candidate.condition, candidate.line)) continue;
+                visible.Add(i);
+            }
+            if (visible.Count == 0)
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：choice 所有选项的 if: 条件都不满足，" +
+                                 "为避免卡死改为全部显示");
+                for (int i = 0; i < cmd.options.Count; i++) visible.Add(i);
+            }
+
+            // cost: 花费展示与付得起判定（付不起 = 置灰）
+            var panelOptions = new VNChoicePanel.Option[visible.Count];
+            bool anyInteractable = false;
+            for (int k = 0; k < visible.Count; k++)
+            {
+                var candidate = cmd.options[visible[k]];
+                var po = new VNChoicePanel.Option
+                    { text = VNScriptLocale.TextOf(candidate) }; // 显示译文；匹配按索引，不受影响
+                if (!string.IsNullOrEmpty(candidate.costOp) && _statsHud != null)
+                {
+                    po.costLabel = _statsHud.FormatCostLabel(candidate.costOp);
+                    po.interactable = _statsHud.CanAfford(candidate.costOp);
+                }
+                anyInteractable |= po.interactable;
+                panelOptions[k] = po;
+            }
+            if (!anyInteractable)
+            {
+                Debug.LogError($"[VNScript] 第 {cmd.line} 行：choice 所有可见选项都付不起 cost:，" +
+                               "为避免卡死全部解禁——请给玩家留一个免费选项");
+                foreach (var po in panelOptions) po.interactable = true;
+            }
 
             int chosen = -1;
-            stage.choicePanel.Show(texts, i => chosen = i);
+            stage.choicePanel.Show(panelOptions, i => chosen = i);
             while (chosen < 0) yield return null;
 
-            var opt = cmd.options[chosen];
+            var opt = cmd.options[visible[chosen]];
             _backlog?.Record(VNLocale.T("backlog.choice"), VNScriptLocale.TextOf(opt));
+            if (!string.IsNullOrEmpty(opt.costOp)) _statsHud?.ApplyCost(opt.costOp, opt.line);
             if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
             if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
             // 无跳转目标 = 顺序继续（choice 块后的下一条命令）

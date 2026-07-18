@@ -1016,10 +1016,24 @@ namespace VNEffects.EditorTools
             GUI.Label(new Rect(x, rect.y, 12f, rect.height), "*");
             x += 14f;
 
-            float tailW = 118f + 4f + 118f + 4f + 20f; // flag + jump + delete
+            // if + cost + flag + jump + delete
+            float tailW = 16f + 66f + 4f + 16f + 66f + 4f + 118f + 4f + 118f + 4f + 20f;
             o.text = EditorGUI.TextField(
                 new Rect(x, rect.y, rect.xMax - x - tailW - 6f, rect.height), o.text);
             x = rect.xMax - tailW;
+
+            GUI.Label(new Rect(x, rect.y, 16f, rect.height),
+                new GUIContent("if", "if:条件——不满足则隐藏该选项（无空格，如 魅力>=20）"),
+                EditorStyles.miniLabel);
+            x += 16f;
+            o.condition = EditorGUI.TextField(new Rect(x, rect.y, 66f, rect.height), o.condition);
+            x += 70f;
+            GUI.Label(new Rect(x, rect.y, 16f, rect.height),
+                new GUIContent("$", "cost:花费——如 金钱-100，付不起时选项置灰，选中自动扣除并飘字"),
+                EditorStyles.miniLabel);
+            x += 16f;
+            o.costOp = EditorGUI.TextField(new Rect(x, rect.y, 66f, rect.height), o.costOp);
+            x += 70f;
 
             o.flagOp = PopupString(new Rect(x, rect.y, 118f, rect.height),
                 o.flagOp, _flagOps, "(no flag)", (r, $"opt{i}.flag"));

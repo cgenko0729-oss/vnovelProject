@@ -8,6 +8,8 @@ namespace VNEffects
     {
         public string text;      // 选项显示文本
         public string flagOp;    // 可选：flag 操作（如 勇气+1）
+        public string condition; // 可选：if:条件（不满足则不显示该选项）
+        public string costOp;    // 可选：cost:花费（如 金钱-100，不够时选项置灰）
         public string jumpLabel; // 可选：跳转标签（空 = 顺序继续）
         public int line;
 
@@ -205,7 +207,10 @@ namespace VNEffects
             camseqCmd.camPoints.Add(wp);
         }
 
-        /// <summary>解析选项行：* 文本 [flag:名字+1] [-> 标签]</summary>
+        /// <summary>
+        /// 解析选项行：* 文本 [if:条件] [cost:金钱-100] [flag:名字+1] [-> 标签]。
+        /// if/cost/flag 参数是行尾的空格分隔 token，可任意顺序；选项文本本身可含空格。
+        /// </summary>
         static void ParseChoiceOption(VNScriptCommand choiceCmd, string raw, int line)
         {
             string s = raw.Substring(1).Trim();
@@ -218,18 +223,26 @@ namespace VNEffects
                 s = s.Substring(0, arrow).Trim();
             }
 
-            string flagOp = null;
-            int fi = s.IndexOf("flag:", System.StringComparison.Ordinal);
-            if (fi >= 0)
+            // 从行尾逐个摘掉参数 token（保持旧剧本「flag: 必须在文本之后」的语义）
+            string flagOp = null, condition = null, costOp = null;
+            while (true)
             {
-                flagOp = s.Substring(fi + 5).Trim();
-                s = s.Substring(0, fi).Trim();
+                int sp = s.LastIndexOfAny(new[] { ' ', '\t' });
+                if (sp < 0) break;
+                string tail = s.Substring(sp + 1);
+                if (tail.StartsWith("flag:")) flagOp = tail.Substring(5);
+                else if (tail.StartsWith("if:")) condition = tail.Substring(3);
+                else if (tail.StartsWith("cost:")) costOp = tail.Substring(5);
+                else break;
+                s = s.Substring(0, sp).TrimEnd();
             }
 
             choiceCmd.options.Add(new VNChoiceOption
             {
                 text = s,
                 flagOp = string.IsNullOrEmpty(flagOp) ? null : flagOp,
+                condition = string.IsNullOrEmpty(condition) ? null : condition,
+                costOp = string.IsNullOrEmpty(costOp) ? null : costOp,
                 jumpLabel = string.IsNullOrEmpty(target) ? null : target,
                 line = line,
             });
