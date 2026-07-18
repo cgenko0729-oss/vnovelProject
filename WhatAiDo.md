@@ -2727,3 +2727,60 @@ choice
   condition/costOp，结果名匹配逻辑零变化。
 - **本地化 key 不受影响**：抽取工具走 VNScriptParser，opt.text 已剥掉参数。
 - dotnet build 运行时 + 编辑器程序集 0 错误。
+
+## 六十五、养成 P3：商店事件模块 + I 键物品栏（2026-07-18，分支 `agent/shop-module`）
+
+**目标**：用户需求"金币可以用来在商店买东西"。走现成的事件接口（四十二章），
+遵守模块三铁律（不碰舞台 / unscaled 计时+SetUpdate(true) / 全部 SetLink）。
+
+### 剧本用法
+
+```
+event shop id:服装店
+* 离开 -> 商店结束      ← 可选：接住"离开"结果；不写则顺序继续
+```
+
+道具发放不必开商店：`flag 道具_钥匙 +1` 即得；`if 道具_药水>=1 jump 有药`。
+
+### 文件说明
+
+- **`Script/VNShopDef.cs`（新）**：商店定义资产（CreateAssetMenu "VN/Shop
+  Definition"）。shopId（event id: 引用）、商店名（中/En/Ja）、结算属性
+  currencyStat（默认「金钱」）、商品清单 Item{ id（=flag 道具_<id>）、显示名/
+  描述（中/En/Ja）、icon、price、sellPrice（0=不收购）、maxOwned（0=不限）、
+  condition（上架条件，VNFlags 表达式）}。常量 `ItemFlagPrefix = "道具_"` +
+  `ItemFlagName()` 是道具 flag 命名的单一来源。
+- **`Script/VNShopModule.cs`（新）**：商店事件模块（继承 VNEventModule）。
+  - 模板 Inspector 登记多家商店，`event shop id:xx` 按 shopId 查找
+    （只登记一家时 id 可省略）；找不到告警后 Done("") 顺序继续。
+  - UI：暗幕 + 中央面板（弹入动画）+ 商店名 + 右上所持金（属性定义格式化，
+    如 500G）+ 购买/卖出页签 + 商品滚动列表 + 离开按钮；Esc = 离开。
+  - 商品行：图标（缺省色块）/名称/持有数/描述/价格（买得起金色、买不起红色）/
+    买卖按钮（钱不够、达上限、无持有时置灰）。
+  - 买入 = 金钱-price（走 VNStatsHud.Apply 静默钳制）+ 道具 flag+1 + Toast；
+    卖出反之；每笔交易后刷新金额与列表（含条件商品上架变化）。
+  - 结果返回"离开"：剧本可用「* 离开 -> 标签」接分支，不接就顺序继续。
+- **`Script/VNInventory.cs`（新）**：I 键物品栏面板（参照 VNQuestLog 模式）。
+  从 flags 反查 `道具_*>0` 的条目，文案/图标从登记的 VNShopDef 里找
+  （跨商店取第一个命中；未登记道具用 id 当名字照常显示）；语言切换销毁重建。
+- **`Script/VNScriptRunner.cs`（改）**：`_inventory` 字段（找不到自建）；
+  I 键开/关物品栏（打开期间不推进剧情）；`RequestInventory()`。
+- **`Script/VNQuickToolbar.cs`（改）**：新增"道具"按钮（936→1013 宽）。
+- **`Resources/VNLocale/ui.zh/en/ja.txt`（改）**：shop.* 十个 key +
+  inventory.title/empty + toolbar.inventory ×3 语言。
+- **`Editor/VNEffectsDemoSetup.cs`（改）**：`EnsureShopDef()` 生成示例商店
+  `Assets/VNEffects/Shops/服装店.asset`（蝴蝶结发饰 120G 可回售 / 洋装 300G
+  限购1 / 神秘挂坠 魅力≥50 上架）；注册表加 ShopTemplate（id="shop"，禁用模板）；
+  场景挂 VNInventory 并连商店资产；提示文字补"I 物品栏"。
+
+### 技术决策
+
+- **商店走事件模块而非独立系统**：事件期间禁快捷键/禁存档/调试重建视为分支点
+  全部现成；商店天然是"暂停剧本 → 交互 → 带结果返回"的形态。
+- **道具 = flag「道具_<id>」计数**：与任务（任务_）、地图（去过_）同一命名模式；
+  存档/分支/调试重建零改动；物品栏和商店只是这些 flag 的两种视图。
+- **金钱结算复用 stat 管线**：钳制到属性定义的 [min,max]、HUD 自动刷新
+  （VNFlags.Changed），商店内交易 Toast 由模块出（含道具名与价格），
+  所以 Apply 用 silent 模式避免双重飘字。
+- dotnet build 运行时 + 编辑器程序集 0 错误。
+- **用户操作**：重建剧本演示场景后，剧本里写 `event shop id:服装店` 即可开店。

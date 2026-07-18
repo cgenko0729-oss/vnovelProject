@@ -23,6 +23,7 @@ namespace VNEffects.EditorTools
         const string CharactersDir = "Assets/VNEffects/Characters";
         const string QuestsDir = "Assets/VNEffects/Quests";
         const string StatsDir = "Assets/VNEffects/Stats";
+        const string ShopsDir = "Assets/VNEffects/Shops";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -496,6 +497,16 @@ namespace VNEffects.EditorTools
             mapModule.locations.Add(new VNMapModule.Location
                 { name = "天台", position = new Vector2(0.5f, 0.82f), condition = "好感度>=2" });
             registry.modules.Add(new VNEventRegistry.Entry { id = "map", template = mapModule });
+
+            // 商店模块（event shop id:服装店）
+            EnsureFolder(ShopsDir);
+            var shopGo = new GameObject("ShopTemplate", typeof(RectTransform));
+            shopGo.transform.SetParent(registry.transform, false);
+            shopGo.SetActive(false);
+            var shopModule = shopGo.AddComponent<VNShopModule>();
+            var demoShop = EnsureShopDef();
+            shopModule.shops.Add(demoShop);
+            registry.modules.Add(new VNEventRegistry.Entry { id = "shop", template = shopModule });
             stage.eventRegistry = registry;
 
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------
@@ -508,6 +519,10 @@ namespace VNEffects.EditorTools
             var statsHud = new GameObject("VNStatsHud").AddComponent<VNStatsHud>();
             statsHud.stats.AddRange(EnsureStatDefs());
 
+            // ---------- 物品栏（道具文案来源 = 商店定义） ----------
+            var inventory = new GameObject("VNInventory").AddComponent<VNInventory>();
+            inventory.shops.Add(demoShop);
+
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
@@ -518,7 +533,7 @@ namespace VNEffects.EditorTools
             // ---------- 极简提示 ----------
             var hint = CreateHintText(rig.canvasGo.transform, 70f);
             hint.text = "Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进\n" +
-                        "F5 存档界面 | F9 读档界面 | J 任务日志 | C 属性面板";
+                        "F5 存档界面 | F9 读档界面 | J 任务日志 | C 属性面板 | I 物品栏";
 
             // ---------- 保存 ----------
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);
@@ -625,6 +640,51 @@ namespace VNEffects.EditorTools
                 Grades(def);
             });
             return defs;
+        }
+
+        /// <summary>示例商店：服装店（event shop id:服装店），含买入/卖出/条件商品</summary>
+        static VNShopDef EnsureShopDef()
+        {
+            string path = $"{ShopsDir}/服装店.asset";
+            var def = AssetDatabase.LoadAssetAtPath<VNShopDef>(path);
+            if (def != null) return def;
+
+            def = ScriptableObject.CreateInstance<VNShopDef>();
+            def.shopId = "服装店";
+            def.shopName = "服装店";
+            def.shopNameEn = "Boutique";
+            def.shopNameJa = "服屋";
+            def.currencyStat = "金钱";
+            def.items.Add(new VNShopDef.Item
+            {
+                id = "蝴蝶结发饰", displayName = "蝴蝶结发饰",
+                displayNameEn = "Ribbon Hairpin", displayNameJa = "リボンの髪飾り",
+                description = "可爱的蝴蝶结，送人应该会很开心。",
+                descriptionEn = "A cute ribbon. Would make a lovely gift.",
+                descriptionJa = "かわいいリボン。プレゼントに喜ばれそう。",
+                price = 120, sellPrice = 60, maxOwned = 0,
+            });
+            def.items.Add(new VNShopDef.Item
+            {
+                id = "洋装", displayName = "洋装",
+                displayNameEn = "Dress", displayNameJa = "ドレス",
+                description = "漂亮但有点贵的洋装。",
+                descriptionEn = "A pretty but pricey dress.",
+                descriptionJa = "きれいだけど少し高いドレス。",
+                price = 300, sellPrice = 150, maxOwned = 1,
+            });
+            def.items.Add(new VNShopDef.Item
+            {
+                id = "神秘挂坠", displayName = "神秘挂坠",
+                displayNameEn = "Mysterious Pendant", displayNameJa = "神秘のペンダント",
+                description = "只卖给有眼缘的客人。（魅力≥50 时上架）",
+                descriptionEn = "Only sold to special customers. (Charm ≥ 50)",
+                descriptionJa = "特別なお客様だけに。（魅力50以上）",
+                price = 200, sellPrice = 100, maxOwned = 1,
+                condition = "魅力>=50",
+            });
+            AssetDatabase.CreateAsset(def, path);
+            return def;
         }
 
         static VNQuestDef EnsureQuestDef()

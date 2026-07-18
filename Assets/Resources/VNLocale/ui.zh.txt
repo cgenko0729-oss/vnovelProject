@@ -11,6 +11,7 @@ toolbar.skip = Skip
 toolbar.log = Log
 toolbar.quest = 任务
 toolbar.stats = 属性
+toolbar.inventory = 道具
 toolbar.config = Config
 toolbar.hideui = 隐藏 UI
 
@@ -76,6 +77,19 @@ runner.skipOff = 快进 关
 runner.quickSaved = 快速存档完成（Q 存 / L 读）
 runner.quickLoaded = 已读取快速存档
 runner.noQuickSave = 还没有快速存档（按 Q 快速存档）
+
+# —— 商店 / 物品栏 ——
+shop.tabBuy = 购买
+shop.tabSell = 卖出
+shop.buy = 购买
+shop.sell = 卖出
+shop.leave = 离开
+shop.owned = 持有 {0}
+shop.empty = （没有可交易的商品）
+shop.toastBuy = 购入 {0}（{1}）
+shop.toastSell = 卖出 {0}（{1}）
+inventory.title = —— 道具 ——
+inventory.empty = （身上什么都没有）
 
 # —— 事件模块默认文案 ——
 qte.title = 连打！
