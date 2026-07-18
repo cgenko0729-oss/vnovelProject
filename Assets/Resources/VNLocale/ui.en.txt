@@ -10,6 +10,7 @@ toolbar.skip = Skip
 toolbar.log = Log
 toolbar.quest = Quests
 toolbar.stats = Stats
+toolbar.inventory = Items
 toolbar.config = Config
 toolbar.hideui = Hide UI
 
@@ -75,6 +76,19 @@ runner.skipOff = Skip OFF
 runner.quickSaved = Quick save complete (Q to save / L to load)
 runner.quickLoaded = Quick save loaded
 runner.noQuickSave = No quick save yet (press Q to quick save)
+
+# —— Shop / Inventory ——
+shop.tabBuy = Buy
+shop.tabSell = Sell
+shop.buy = Buy
+shop.sell = Sell
+shop.leave = Leave
+shop.owned = Owned {0}
+shop.empty = (Nothing to trade)
+shop.toastBuy = Bought {0} ({1})
+shop.toastSell = Sold {0} ({1})
+inventory.title = —— Items ——
+inventory.empty = (You have nothing)
 
 # —— Event module defaults ——
 qte.title = Mash!

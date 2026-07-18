@@ -10,6 +10,7 @@ toolbar.skip = スキップ
 toolbar.log = ログ
 toolbar.quest = クエスト
 toolbar.stats = ステータス
+toolbar.inventory = アイテム
 toolbar.config = 設定
 toolbar.hideui = UI非表示
 
@@ -75,6 +76,19 @@ runner.skipOff = スキップ OFF
 runner.quickSaved = クイックセーブしました（Q セーブ / L ロード）
 runner.quickLoaded = クイックセーブをロードしました
 runner.noQuickSave = クイックセーブがありません（Q でセーブ）
+
+# —— ショップ / アイテム ——
+shop.tabBuy = 購入
+shop.tabSell = 売却
+shop.buy = 購入
+shop.sell = 売却
+shop.leave = 出る
+shop.owned = 所持 {0}
+shop.empty = （取引できる商品がありません）
+shop.toastBuy = {0} を購入（{1}）
+shop.toastSell = {0} を売却（{1}）
+inventory.title = —— アイテム ——
+inventory.empty = （何も持っていません）
 
 # —— イベントモジュール既定文 ——
 qte.title = 連打！

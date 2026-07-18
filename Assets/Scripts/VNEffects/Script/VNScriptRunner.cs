@@ -49,6 +49,7 @@ namespace VNEffects
         VNQuickToolbar _quickToolbar;
         VNQuestLog _questLog;
         VNStatsHud _statsHud;
+        VNInventory _inventory;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
@@ -89,6 +90,12 @@ namespace VNEffects
                 _statsHud = FindFirstObjectByType<VNStatsHud>();
                 if (_statsHud == null) // 没有登记定义资产也能工作（不钳制、无 HUD 条目）
                     _statsHud = new GameObject("VNStatsHud").AddComponent<VNStatsHud>();
+            }
+            if (_inventory == null)
+            {
+                _inventory = FindFirstObjectByType<VNInventory>();
+                if (_inventory == null) // 没有登记商店资产也能工作（道具 id 当名字）
+                    _inventory = new GameObject("VNInventory").AddComponent<VNInventory>();
             }
             EnsureSaveLoadPanel();
             EnsureQuickToolbar();
@@ -728,6 +735,12 @@ namespace VNEffects
             _statsHud.Toggle();
         }
 
+        public void RequestInventory()
+        {
+            if (_inventory == null || _eventActive) return;
+            _inventory.Toggle();
+        }
+
         public void RequestConfigPanel()
         {
             EnsureConfigPanel();
@@ -890,6 +903,14 @@ namespace VNEffects
                 return;
             }
 
+            // 物品栏打开期间：只处理关闭，不推进剧情
+            if (_inventory != null && _inventory.IsOpen)
+            {
+                if (kb.iKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                    _inventory.Close();
+                return;
+            }
+
             if (kb.hKey.wasPressedThisFrame ||
                 (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
             {
@@ -906,6 +927,12 @@ namespace VNEffects
             if (kb.cKey.wasPressedThisFrame)
             {
                 _statsHud?.Open();
+                return;
+            }
+
+            if (kb.iKey.wasPressedThisFrame)
+            {
+                _inventory?.Open();
                 return;
             }
 
