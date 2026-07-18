@@ -15,7 +15,8 @@ namespace FrameworkSample {
 
 	/// <summary>
 	/// Game View をタイトルバー無しの ContainerWindow へ移し替えて全画面表示する Editor 拡張。
-	/// 再生開始で自動全画面化、再生終了で自動復帰する。P キー（Tools > Fullscreen Game View）で手動切替も可能。
+	/// 再生開始で自動全画面化（Tools > Fullscreen Game View On Play で無効化可能）、再生終了で自動復帰する。
+	/// Ctrl+P（Tools > Fullscreen Game View）で手動切替も可能。
 	///
 	/// 仕組み（Fullscreen Editor プラグインの方式を簡略化して移植）:
 	/// 1. 装飾無し（ShowMode.PopupMenu）の ContainerWindow + HostView を生成し、プレースホルダを載せて表示する
@@ -31,7 +32,13 @@ namespace FrameworkSample {
 	[InitializeOnLoad]
 	public static class GameViewFullscreen {
 
-		private const string _MENU_PATH = "Tools/Fullscreen Game View _p";
+		private const string _MENU_PATH = "Tools/Fullscreen Game View _F1";
+
+		// 再生開始時に自動で全画面化するかどうかのトグルメニュー（末尾スペースはショートカット無しを示す）
+		private const string _ON_PLAY_MENU_PATH = "Tools/Fullscreen Game View On Play ";
+
+		// 自動全画面化設定の EditorPrefs 保存キー（ユーザー単位で保持される）
+		private const string _ON_PLAY_PREFS_KEY = "GameViewFullscreen.FullscreenOnPlay";
 
 		// UnityEditor.ShowMode の値（internal enum のため定数で保持する）
 		private const int _SHOW_MODE_POPUP_MENU = 1;
@@ -59,6 +66,12 @@ namespace FrameworkSample {
 			get { return _FindState() != null; }
 		}
 
+		/// <summary>再生開始時に自動で全画面化するかどうか（既定: 有効）。</summary>
+		public static bool FullscreenOnPlayEnabled {
+			get { return EditorPrefs.GetBool( _ON_PLAY_PREFS_KEY, true ); }
+			set { EditorPrefs.SetBool( _ON_PLAY_PREFS_KEY, value ); }
+		}
+
 		/// <summary>全画面表示を切り替える。</summary>
 		public static void Toggle() {
 			if( IsOpen ) {
@@ -79,11 +92,22 @@ namespace FrameworkSample {
 			return true;
 		}
 
+		[MenuItem( _ON_PLAY_MENU_PATH, false, 1 )]
+		private static void _ToggleOnPlayMenuItem() {
+			FullscreenOnPlayEnabled = !FullscreenOnPlayEnabled;
+		}
+
+		[MenuItem( _ON_PLAY_MENU_PATH, true )]
+		private static bool _ToggleOnPlayMenuItemValidate() {
+			Menu.SetChecked( _ON_PLAY_MENU_PATH, FullscreenOnPlayEnabled );
+			return true;
+		}
+
 		private static void _OnPlayModeStateChanged( PlayModeStateChange state ) {
 			switch( state ) {
 			case PlayModeStateChange.EnteredPlayMode:
 				// ドメインリロード完了後に全画面化する（リロード前に開くと状態管理が複雑になるため）
-				if( !IsOpen ) {
+				if( FullscreenOnPlayEnabled && !IsOpen ) {
 					_Open();
 				}
 				break;
@@ -436,7 +460,7 @@ namespace FrameworkSample {
 	internal class GameViewFullscreenPlaceholder : EditorWindow {
 
 		private void OnGUI() {
-			EditorGUILayout.HelpBox( "Game View を全画面表示中です。\nP キーまたは Tools > Fullscreen Game View で復帰します。", MessageType.Info );
+			EditorGUILayout.HelpBox( "Game View を全画面表示中です。\nCtrl+P または Tools > Fullscreen Game View で復帰します。", MessageType.Info );
 		}
 
 	}
