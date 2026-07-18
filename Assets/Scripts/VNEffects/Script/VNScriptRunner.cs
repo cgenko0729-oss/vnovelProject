@@ -87,13 +87,26 @@ namespace VNEffects
             EnsureConfigPanel(); // 启动时应用 PlayerPrefs 中保存的音量、文字速度与显示模式
             if (playOnStart && script != null) Play(script);
             IsInitialized = true;
+            VNLocale.LanguageChanged -= OnLocaleChanged; // 幂等订阅
+            VNLocale.LanguageChanged += OnLocaleChanged;
+        }
+
+        /// <summary>语言切换：给已加载的命令重新标注译文（当前显示中的台词到下一句起生效）</summary>
+        void OnLocaleChanged()
+        {
+            if (_commands != null)
+                VNScriptLocale.Apply(_commands, script != null ? script.name : null);
         }
 
         // ------------------------------------------------------------------
         // 播放控制
         // ------------------------------------------------------------------
 
-        public void Play(TextAsset asset) => Play(asset.text);
+        public void Play(TextAsset asset)
+        {
+            if (asset != null) script = asset; // 记住剧本资产：翻译表按剧本名查找
+            Play(asset.text);
+        }
 
         public void Play(string source)
         {
@@ -412,6 +425,9 @@ namespace VNEffects
 
             // 剧本全文预热进 TMP 动态字体图集：光栅化成本挪到加载期，台词零卡顿
             VNFont.Prewarm(source);
+
+            // 非中文语言：给台词/选项标注译文（缺译回退中文，命令流不变）
+            VNScriptLocale.Apply(_commands, script != null ? script.name : null);
 
             _labels.Clear();
             for (int i = 0; i < _commands.Count; i++)
@@ -733,6 +749,7 @@ namespace VNEffects
 
         void OnDestroy()
         {
+            VNLocale.LanguageChanged -= OnLocaleChanged;
             if (_skip) DOTween.timeScale = 1f; // 别把加速留给别的场景
             if (_menuPaused) Time.timeScale = _timeScaleBeforeMenu;
         }
@@ -1080,9 +1097,10 @@ namespace VNEffects
         {
             bool followVoice = _voicePendingForNextSay;
             _voicePendingForNextSay = false;
-            stage.Say(cmd.speaker, cmd.expression, cmd.text, followVoice);
-            _lastSayText = cmd.text;
-            _backlog?.Record(stage.GetDisplayName(cmd.speaker), cmd.text);
+            string sayText = VNScriptLocale.TextOf(cmd); // 当前语言的译文（缺译回退中文）
+            stage.Say(cmd.speaker, cmd.expression, sayText, followVoice);
+            _lastSayText = sayText;
+            _backlog?.Record(stage.GetDisplayName(cmd.speaker), sayText);
 
             yield return null; // 让打字机先启动
             if (_skip && stage.dialogue != null) stage.dialogue.CompleteTyping();
@@ -1095,7 +1113,7 @@ namespace VNEffects
             _waitingAtSay = true;
             _advance = false;
             float doneTime = Time.time;
-            float autoWait = autoDelay + cmd.text.Length * 0.045f;
+            float autoWait = autoDelay + sayText.Length * 0.045f;
             while (!_advance)
             {
                 if (_backlog == null || !_backlog.IsOpen)
@@ -1141,14 +1159,15 @@ namespace VNEffects
             SetSkip(false); // 到选项必停，玩家必须亲自选
 
             var texts = new string[cmd.options.Count];
-            for (int i = 0; i < texts.Length; i++) texts[i] = cmd.options[i].text;
+            for (int i = 0; i < texts.Length; i++)
+                texts[i] = VNScriptLocale.TextOf(cmd.options[i]); // 显示译文；匹配按索引，不受影响
 
             int chosen = -1;
             stage.choicePanel.Show(texts, i => chosen = i);
             while (chosen < 0) yield return null;
 
             var opt = cmd.options[chosen];
-            _backlog?.Record(VNLocale.T("backlog.choice"), opt.text);
+            _backlog?.Record(VNLocale.T("backlog.choice"), VNScriptLocale.TextOf(opt));
             if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
             if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
             // 无跳转目标 = 顺序继续（choice 块后的下一条命令）
