@@ -238,7 +238,9 @@ namespace VNEffects.EditorTools
             Add("if", "Flow", "if <cond> jump <label>  cond has NO spaces: 勇气 / !勇气 / 好感度>=2",
                 Pos("condition", "if", VNParamSource.Text),
                 Pos("target", "jump", VNParamSource.Label));
-            Add("choice", "Flow", "choice + '*' option lines");
+            Add("choice", "Flow", "choice + '*' option lines\n" +
+                "选项行：* 文本 [if:条件] [cost:金钱-100] [flag:好感度+1] [-> 标签]\n" +
+                "if: 不满足隐藏；cost: 付不起置灰、选中自动扣（按 VNStatDef 钳制+飘字）");
             ByKeyword["choice"].blockChoice = true;
             Add("event", "Flow", "event <module id> [key:value…] + '*' outcome lines\n" +
                 "运行 VNEventRegistry 登记的玩法模块（地图/战斗/迷你游戏），按结果分支",

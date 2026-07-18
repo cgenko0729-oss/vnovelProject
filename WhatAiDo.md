@@ -2674,3 +2674,56 @@ stat 善恶 50        # 直接设值（飘字「善恶 → 50%」）
   Unity 刷新后自动重生成）。
 - **用户操作**：Unity 里重新 Tools → VN Effects → Create Script Demo Scene
   重建剧本场景（生成属性资产并挂 HUD）。
+
+## 六十四、养成 P2：选项条件显隐 + 花费（2026-07-18，分支 `agent/choice-cost`）
+
+**目标**：选选项可以花金币（用户需求"选选项的时候花费金币选"），并支持按属性
+条件显示/隐藏选项。
+
+### 剧本语法（向后兼容）
+
+```
+choice
+* 请她喝咖啡 if:魅力>=20 cost:金钱-100 flag:好感度+1 -> 咖啡厅
+* 打工赚钱 cost:行动力-1 flag:金钱+200
+* 回家休息 -> 回家
+```
+
+- `if:条件`：不满足则**隐藏**该选项（条件语法同 if 命令，无空格）；
+- `cost:属性±数值`：右侧显示价格小字（金色；有单位显示 `-100G`，无单位显示
+  `-1 行动力`）；**付不起时置灰不可点、价格标红**（判定 = 扣减后不得低于
+  VNStatDef 下限，无定义资产按 0）；选中后自动扣除（走 stat 的钳制+飘字）；
+- 参数是行尾空格分隔 token，if/cost/flag 任意顺序，选项文本本身可含空格。
+
+### 文件说明
+
+- **`Script/VNScriptParser.cs`（改）**：VNChoiceOption + `condition/costOp` 字段；
+  ParseChoiceOption 改为"从行尾逐个摘参数 token"（旧的 IndexOf("flag:") 写法
+  没法扩展到多参数；摘 token 保持旧剧本语义不变）。
+- **`Script/VNStatsHud.cs`（改）**：花费四件套 `ParseCostOp`（静态，校验共用）/
+  `CanAfford` / `FormatCostLabel` / `ApplyCost`（复用 Apply 的钳制+飘字）。
+- **`VNChoicePanel.cs`（改）**：新增 `Option { text, costLabel, interactable }` 与
+  `Show(Option[], cb)` 重载（旧 `Show(string[])` 包装转发，其他调用方零改动）。
+  置灰项：底色/文字变暗、不挂 Button 和悬停特效但保留 raycastTarget
+  （挡住穿透点击误推进剧情）；价格小字右对齐（可选=金色 / 付不起=红色）。
+- **`Script/VNScriptRunner.cs`（改）**：ChoiceCo 重写选项组装——
+  ① if: 过滤出 visible 索引映射表（回调索引 → 原始选项索引，**译文按原始索引取**，
+  本地化不受影响）；② cost: 判定付得起并生成价格标签；③ 选中后先扣费再执行
+  flag/jump。防卡死兜底：全部选项被 if: 隐藏 → 全显示 + 告警；全部可见选项
+  付不起 → 全解禁 + 报错（提醒剧本作者留免费选项）。
+- **`Editor/VNScenarioDoc.cs`（改）**：VNChoiceOptionRow + condition/costOp；
+  解析（与运行时同款摘 token）/生成（输出顺序 if: cost: flag: ->）/Clone；
+  CollectFlags 把 cost 引用的属性名也收进 flag 下拉候选；校验：cost 格式
+  （VNStatsHud.ParseCostOp 同一实现）、option if 不得含空格。
+- **`Editor/VNScenarioEditorWindow.cs`（改）**：选项行新增「if」「$」两个小字段
+  （悬停 tooltip 说明用法），与 flag/jump 下拉并排。
+- **`Editor/VNScenarioSchema.cs`（改）**：choice 命令 hint 补新语法说明。
+
+### 技术决策
+
+- **if: 是隐藏而非置灰**：条件选项通常是"资格"（魅力不够根本看不到选项），
+  与地图模块地点条件显隐同语义；cost: 才是置灰（让玩家看见"钱不够"产生动机）。
+- **事件结果行不受影响**：event 复用 * 行解析会带上新字段，但 EventCo 不读
+  condition/costOp，结果名匹配逻辑零变化。
+- **本地化 key 不受影响**：抽取工具走 VNScriptParser，opt.text 已剥掉参数。
+- dotnet build 运行时 + 编辑器程序集 0 错误。

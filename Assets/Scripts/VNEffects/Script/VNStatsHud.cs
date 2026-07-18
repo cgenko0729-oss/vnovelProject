@@ -157,6 +157,61 @@ namespace VNEffects
         }
 
         // ------------------------------------------------------------------
+        // 选项花费（choice 的 cost: 参数）
+        // ------------------------------------------------------------------
+
+        /// <summary>解析花费串「金钱-100」「行动力-1」→ (属性名, 增减量)</summary>
+        public static bool ParseCostOp(string costOp, out string name, out int delta)
+        {
+            name = null;
+            delta = 0;
+            if (string.IsNullOrEmpty(costOp)) return false;
+            costOp = costOp.Trim();
+            for (int i = 1; i < costOp.Length; i++)
+            {
+                if (costOp[i] != '+' && costOp[i] != '-') continue;
+                name = costOp.Substring(0, i).Trim();
+                return int.TryParse(costOp.Substring(i), out delta);
+            }
+            return false;
+        }
+
+        /// <summary>付得起吗？扣减后不得低于定义下限（无定义资产按 0 兜底）；增益恒真</summary>
+        public bool CanAfford(string costOp)
+        {
+            if (!ParseCostOp(costOp, out string name, out int delta)) return true;
+            if (delta >= 0) return true;
+            var def = Find(name);
+            int floor = def != null && def.useClamp ? def.minValue : 0;
+            return VNFlags.Get(name) + delta >= floor;
+        }
+
+        /// <summary>花费的显示标签：有单位「-100G」，无单位「-1 行动力」</summary>
+        public string FormatCostLabel(string costOp)
+        {
+            if (!ParseCostOp(costOp, out string name, out int delta)) return costOp;
+            var def = Find(name);
+            string sign = delta < 0 ? "-" : "+";
+            int abs = Mathf.Abs(delta);
+            if (def != null && def.style == VNStatStyle.Number && !string.IsNullOrEmpty(def.unit))
+                return $"{sign}{abs}{def.unit}";
+            string display = def != null ? def.DisplayName : name;
+            return $"{sign}{abs} {display}";
+        }
+
+        /// <summary>应用花费（复用 Apply 的钳制 + 飘字）</summary>
+        public void ApplyCost(string costOp, int line)
+        {
+            if (!ParseCostOp(costOp, out string name, out int delta))
+            {
+                Debug.LogWarning($"[VNStats] 第 {line} 行：cost 串「{costOp}」无法识别" +
+                                 "（应为 属性名±数值，如 金钱-100）");
+                return;
+            }
+            Apply(name, (delta >= 0 ? "+" : "") + delta, false, line);
+        }
+
+        // ------------------------------------------------------------------
         // 顶栏 HUD
         // ------------------------------------------------------------------
 
