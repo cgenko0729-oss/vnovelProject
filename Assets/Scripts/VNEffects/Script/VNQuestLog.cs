@@ -30,6 +30,21 @@ namespace VNEffects
 
         public bool IsOpen => _open;
 
+        void Awake() => VNLocale.LanguageChanged += OnLanguageChanged;
+
+        void OnDestroy() => VNLocale.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>语言切换：面板惰性构建，销毁缓存让下次打开用新语言重建</summary>
+        void OnLanguageChanged()
+        {
+            if (_open) Close();
+            if (_canvas != null) Destroy(_canvas.gameObject);
+            _canvas = null;
+            _panel = null;
+            _content = null;
+            _scroll = null;
+        }
+
         public static string FlagName(string id) => FlagPrefix + id;
 
         /// <summary>任务当前阶段（0 = 未接取）</summary>
@@ -62,7 +77,7 @@ namespace VNEffects
             {
                 case "start":
                     VNFlags.Set(FlagName(id), Mathf.Max(1, stage)); // 可 quest start id 2 直接从阶段 2 开始
-                    if (!silent) VNToast.Show($"新任务：{title}", 2.2f);
+                    if (!silent) VNToast.Show(VNLocale.T("quest.toastNew", title), 2.2f);
                     break;
 
                 case "stage":
@@ -77,19 +92,19 @@ namespace VNEffects
                     {
                         string text = def != null ? def.StageText(stage) : "";
                         VNToast.Show(string.IsNullOrEmpty(text)
-                            ? $"任务更新：{title}"
-                            : $"任务更新：{title} —— {text}", 2.2f);
+                            ? VNLocale.T("quest.toastUpdate", title)
+                            : VNLocale.T("quest.toastUpdateWith", title, text), 2.2f);
                     }
                     break;
 
                 case "done":
                     VNFlags.Set(FlagName(id), StageDone);
-                    if (!silent) VNToast.Show($"任务完成：{title}", 2.2f);
+                    if (!silent) VNToast.Show(VNLocale.T("quest.toastDone", title), 2.2f);
                     break;
 
                 case "fail":
                     VNFlags.Set(FlagName(id), StageFailed);
-                    if (!silent) VNToast.Show($"任务失败：{title}", 2.2f);
+                    if (!silent) VNToast.Show(VNLocale.T("quest.toastFail", title), 2.2f);
                     break;
 
                 default:
@@ -158,7 +173,7 @@ namespace VNEffects
             dimGo.GetComponent<Button>().onClick.AddListener(Close);
 
             var title = CreateText(panelRect, 34, TextAlignmentOptions.Center);
-            title.text = "—— 任务日志 ——";
+            title.text = VNLocale.T("quest.title");
             title.fontStyle = FontStyles.Bold;
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = new Vector2(0f, 1f);
@@ -248,14 +263,15 @@ namespace VNEffects
             if (entries.Count == 0)
             {
                 var empty = CreateText(_content, 28, TextAlignmentOptions.Center);
-                empty.text = "（还没有接到任何任务）";
+                empty.text = VNLocale.T("quest.empty");
                 empty.color = new Color(1f, 1f, 1f, 0.55f);
                 return;
             }
 
-            AddSection(entries, "进行中", e => e.stage > 0 && e.stage != StageDone, "#ffd27f");
-            AddSection(entries, "已完成", e => e.stage == StageDone, "#8ef5a2");
-            AddSection(entries, "已失败", e => e.stage == StageFailed, "#9a9aa5");
+            AddSection(entries, VNLocale.T("quest.sectionActive"),
+                e => e.stage > 0 && e.stage != StageDone, "#ffd27f");
+            AddSection(entries, VNLocale.T("quest.sectionDone"), e => e.stage == StageDone, "#8ef5a2");
+            AddSection(entries, VNLocale.T("quest.sectionFailed"), e => e.stage == StageFailed, "#9a9aa5");
         }
 
         void AddSection(List<JournalEntry> entries, string heading,

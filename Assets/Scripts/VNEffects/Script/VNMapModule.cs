@@ -94,7 +94,7 @@ namespace VNEffects
 
             // 标题
             var title = CreateText("Title", (RectTransform)transform, 44,
-                new Color(1f, 1f, 1f, 0.95f), ctx.Kw("title", "要去哪里？"));
+                new Color(1f, 1f, 1f, 0.95f), ctx.Kw("title", VNLocale.T("map.title")));
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = titleRect.anchorMax = new Vector2(0.5f, 0.93f);
             titleRect.sizeDelta = new Vector2(1200f, 60f);

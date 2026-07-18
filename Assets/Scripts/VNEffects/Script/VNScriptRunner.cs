@@ -535,7 +535,7 @@ namespace VNEffects
         {
             if (!_waitingAtSay)
             {
-                VNToast.Show("演出进行中，此刻不能存档");
+                VNToast.Show(VNLocale.T("runner.cannotSaveNow"));
                 return;
             }
             var data = new VNSaveData
@@ -546,7 +546,7 @@ namespace VNEffects
             };
             stage.CaptureSnapshot(data);
             VNSaveSystem.Save(slot, data, thumbnail);
-            VNToast.Show($"已保存（槽位 {slot}）");
+            VNToast.Show(VNLocale.T("runner.saved", slot));
         }
 
         public void LoadFrom(int slot)
@@ -554,7 +554,7 @@ namespace VNEffects
             var data = VNSaveSystem.Load(slot);
             if (data == null)
             {
-                VNToast.Show($"槽位 {slot} 没有存档");
+                VNToast.Show(VNLocale.T("runner.slotEmpty", slot));
                 return;
             }
             SetSkip(false);
@@ -563,7 +563,7 @@ namespace VNEffects
             if (!string.IsNullOrEmpty(data.chapter))
                 SwitchChapter(data.chapter, 0);
             stage.RestoreSnapshot(data);
-            VNToast.Show($"已读取（槽位 {slot}）");
+            VNToast.Show(VNLocale.T("runner.loaded", slot));
             ResumeAt(data.commandIndex);
         }
 
@@ -606,7 +606,7 @@ namespace VNEffects
         {
             if (!_waitingAtSay)
             {
-                VNToast.Show("演出进行中，此刻不能存档");
+                VNToast.Show(VNLocale.T("runner.cannotSaveNow"));
                 return;
             }
             EnsureSaveLoadPanel();
@@ -715,7 +715,7 @@ namespace VNEffects
             _auto = on;
             if (on) SetSkip(false);
             UpdateModeLabel();
-            VNToast.Show(on ? "自动模式 开" : "自动模式 关");
+            VNToast.Show(VNLocale.T(on ? "runner.autoOn" : "runner.autoOff"));
         }
 
         public void SetSkip(bool on)
@@ -725,7 +725,7 @@ namespace VNEffects
             if (on) _auto = false;
             DOTween.timeScale = on ? skipTimeScale : 1f;
             UpdateModeLabel();
-            VNToast.Show(on ? "快进 开" : "快进 关");
+            VNToast.Show(VNLocale.T(on ? "runner.skipOn" : "runner.skipOff"));
         }
 
         void UpdateModeLabel() =>
@@ -1148,7 +1148,7 @@ namespace VNEffects
             while (chosen < 0) yield return null;
 
             var opt = cmd.options[chosen];
-            _backlog?.Record("选择", opt.text);
+            _backlog?.Record(VNLocale.T("backlog.choice"), opt.text);
             if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
             if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
             // 无跳转目标 = 顺序继续（choice 块后的下一条命令）
@@ -1208,7 +1208,7 @@ namespace VNEffects
             stage.dialogue?.Show();
             _eventActive = false;
 
-            _backlog?.Record("事件", $"{id} → {result}");
+            _backlog?.Record(VNLocale.T("backlog.event"), $"{id} → {result}");
             if (int.TryParse(result, out int numeric))
                 VNFlags.Set("事件结果", numeric);
 

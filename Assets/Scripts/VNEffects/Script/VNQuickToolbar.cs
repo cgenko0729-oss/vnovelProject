@@ -21,6 +21,22 @@ namespace VNEffects
         {
             _runner = runner;
             Build();
+            // Initialize 可能被多次调用，先退订保证只挂一次
+            VNLocale.LanguageChanged -= OnLanguageChanged;
+            VNLocale.LanguageChanged += OnLanguageChanged;
+        }
+
+        void OnDestroy() => VNLocale.LanguageChanged -= OnLanguageChanged;
+
+        /// <summary>语言切换：功能条常驻可见，销毁重建即刷新全部按钮文案</summary>
+        void OnLanguageChanged()
+        {
+            if (_root == null) return;
+            Destroy(_root);
+            _root = null;
+            _autoImage = null;
+            _skipImage = null;
+            Build();
         }
 
         void Build()
@@ -61,16 +77,16 @@ namespace VNEffects
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
 
-            CreateButton("Save", 78f, () => _runner?.RequestSavePanel());
-            CreateButton("Load", 78f, () => _runner?.RequestLoadPanel());
-            _autoImage = CreateButton("Auto", 78f,
+            CreateButton(VNLocale.T("toolbar.save"), 78f, () => _runner?.RequestSavePanel());
+            CreateButton(VNLocale.T("toolbar.load"), 78f, () => _runner?.RequestLoadPanel());
+            _autoImage = CreateButton(VNLocale.T("toolbar.auto"), 78f,
                 () => { if (_runner != null) _runner.SetAuto(!_runner.IsAuto); });
-            _skipImage = CreateButton("Skip", 78f,
+            _skipImage = CreateButton(VNLocale.T("toolbar.skip"), 78f,
                 () => { if (_runner != null) _runner.SetSkip(!_runner.IsSkipping); });
-            CreateButton("Log", 72f, () => _runner?.RequestBacklog());
-            CreateButton("任务", 72f, () => _runner?.RequestQuestLog());
-            CreateButton("Config", 88f, () => _runner?.RequestConfigPanel());
-            CreateButton("隐藏 UI", 100f, () => _runner?.SetInterfaceHidden(true));
+            CreateButton(VNLocale.T("toolbar.log"), 72f, () => _runner?.RequestBacklog());
+            CreateButton(VNLocale.T("toolbar.quest"), 72f, () => _runner?.RequestQuestLog());
+            CreateButton(VNLocale.T("toolbar.config"), 88f, () => _runner?.RequestConfigPanel());
+            CreateButton(VNLocale.T("toolbar.hideui"), 100f, () => _runner?.SetInterfaceHidden(true));
         }
 
         Image CreateButton(string label, float width, UnityEngine.Events.UnityAction action)
