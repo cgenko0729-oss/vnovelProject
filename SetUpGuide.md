@@ -390,15 +390,18 @@ Canvas 下创建 `DialogueBox`（RectTransform），锚定底部：
 挂 `VNDialogueBox`。面板、流光边框、名牌、推进箭头、打字机文本、快捷功能条
 （Save/Load/Auto/Skip/Log/任务/Config/隐藏UI）全部由它 Awake 自动构建。
 
-**字体说明**：文本用 legacy `Text` + `LegacyRuntime.ttf`（系统字体回退链），
-中文开箱即用。**不用 TMP** 是因为其默认字体不含 CJK 字形，要自打字体图集，
-对本项目是纯负担。
+**字体说明**（2026-07-18 起）：文本全部用 **TextMeshPro（TextMeshProUGUI）**。
+运行时创建的文字由代码自动取 `VNFont.Asset`（随包 Noto Sans SC 动态 SDF，
+中文开箱即用）；手动在场景里摆的 TMP 文字请把 Font Asset 指到
+`Resources/VNFonts/NotoSansSC-Dynamic`（没有就先跑菜单
+Tools → VN Effects → Create TMP Font Asset 生成）。
 
 ### 7.2 HintText（可选）
 
-Canvas 下创建 `HintText`（Text），底部拉伸（anchorMin=(0,0)、anchorMax=(1,0)、
-pivot=(0.5,0)、pos=(0,18)、高 70），字体 LegacyRuntime.ttf、字号 26、
-颜色 (1,1,1,0.85)、`raycastTarget` 关。内容写操作提示，例如：
+Canvas 下创建 `HintText`（TextMeshProUGUI），底部拉伸（anchorMin=(0,0)、
+anchorMax=(1,0)、pivot=(0.5,0)、pos=(0,18)、高 70），Font Asset 指
+`NotoSansSC-Dynamic`、字号 26、颜色 (1,1,1,0.85)、`raycastTarget` 关。
+内容写操作提示，例如：
 
 ```
 Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进
@@ -538,7 +541,7 @@ show 亚里沙 at:center with:DissolveGlow
 | 开运镜后震动失效（或反之） | 组件 target 指到了同一个容器 | 按 0.2 的表检查各 target |
 | 立绘出现但没有溶解出场等效果 | VNImageEffectController 的 sourceMaterial 没拖或拖错 | 立绘/背景用 VNImageEffect.mat，发光体用 VNAdditive.mat |
 | 转场时背景没换 | VNStage.backgrounds 里没有对应 id | 检查 id 与剧本 `bg` 参数一致 |
-| 汉字显示为方块 | 用了 TMP 或非 CJK 字体 | 用 legacy Text + LegacyRuntime.ttf（7.1 节） |
+| 汉字显示为方块 | TMP 文字没指含 CJK 的字体资产 | Font Asset 指 NotoSansSC-Dynamic（7.1 节） |
 | 运动中背景边缘露底色 | 背景没设 ±60px 溢出 | 4.1 节 offset 设置 |
 | 修改场景后想恢复"标准答案" | — | 直接跑 Tools → VN Effects → Create Script Demo Scene 重新生成对照 |
 

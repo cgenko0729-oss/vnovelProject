@@ -2288,3 +2288,72 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
 - 原有的分组 Header（如"胶片参数"）保留，与字段说明 Header 叠放显示
   （Unity 的 DecoratorDrawer 支持同字段多个 Header 上下排列）。
 - 验证：转换后全目录 Tooltip 余量 0；扫描器确认无遗漏 Inspector 字段。
+
+## 五十五、全面迁移 TextMeshPro + 中文字体管线（2026-07-18，分支 `agent/tmp-font-pipeline` + `agent/tmp-migration`）
+
+**目标**：全项目文字从 legacy Text（LegacyRuntime.ttf 系统字体回退）迁移到
+TextMeshPro（SDF 渲染），为镜头缩放下的文字锐利度和 P3 台词内嵌演出标记
+（`{shake}{w:0.5}` 逐字特效）打地基。事前完整分析（Pro/Con/风险）见对话记录；
+核心风险 = 中文字体资产管线 + 打字机重写，两者均在本批解决。
+
+### 分支一 `agent/tmp-font-pipeline`：中文字体管线
+
+- **随包字体**：Noto Sans SC（OFL 1.1 许可，SubsetOTF 版 8.3MB）放到
+  `Assets/Resources/VNFonts/NotoSansSC-Regular.otf`，附 LICENSE-OFL.txt。
+- **`Script/VNFont.cs`（新）**：全项目 TMP 字体统一入口（静态类），取代原先
+  12 处 `Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")`。三级兜底：
+  1. 预烘焙动态字体资产（`Resources/VNFonts/NotoSansSC-Dynamic.asset`）
+  2. 随包 OTF 运行时 `TMP_FontAsset.CreateFontAsset` 动态创建
+  3. OS 中文字体（微软雅黑/PingFang/思源等候选表）
+  全部走 **Dynamic + 多图集** 模式（1024², SDFAA, 采样 64, padding 6）：
+  字形按需光栅化，生僻字零缺字。`Prewarm(text)` 把整段文本预热进图集。
+- **`Editor/VNFontAssetBuilder.cs`（新）**：菜单
+  **Tools → VN Effects → Create TMP Font Asset**。生成持久化 TMP_FontAsset
+  （材质/图集用 `AddObjectToAsset` 挂子资产）。**为什么必须预烘焙**：
+  场景生成器编辑期创建的 TMP 文字若引用运行时临时字体资产，存场景后会变
+  Missing 引用；持久化资产才能被场景安全序列化。
+
+### 分支二 `agent/tmp-migration`：全面迁移（基于分支一）
+
+- **`VNTypewriterText` 整体重写**：`BaseMeshEffect.ModifyMesh`（TMP 不走
+  uGUI 网格修改管线）→ `LateUpdate` 里 `ForceMeshUpdate` + 遍历
+  `textInfo.characterInfo` 改每字 4 顶点（位置 y + 颜色 alpha）+
+  `UpdateVertexData`。逐字上浮+淡入观感与旧版一致；对外 API
+  （`Play/Complete/IsTyping/onComplete/charsPerSecond` 等）完全不变，
+  调用方（VNDialogueBox/VNScriptRunner）零改动。**顺手修掉旧版隐患**：
+  characterInfo 已剔除富文本控制符，标签不再占"字数"（旧版按 quad 计数，
+  富文本会错位）；纯空白文本视作立即播完（旧版会卡住剧本推进）。
+  收尾一帧后 `_animating=false` 停止每帧网格重建（旧版每帧 SetVerticesDirty）。
+- **12 个运行时 UI 文件** `Text → TextMeshProUGUI`，字体统一 `VNFont.Asset`：
+  VNDialogueBox（名牌/正文/箭头）、VNChoicePanel、VNBacklog、VNQuestLog、
+  VNSaveLoadPanel、VNConfigPanel、VNQuickToolbar、VNToast、VNQteModule、
+  VNMapModule、VNEffectsDemo（hintText 字段换型）、VNScriptRunner（Prewarm 接入）。
+- **API 换算对照**（后续写代码照此办理）：
+  | legacy | TMP |
+  |---|---|
+  | `TextAnchor.MiddleCenter` 等 | `TextAlignmentOptions.Center/TopLeft/Left/Right/Bottom/TopRight` |
+  | `FontStyle.Bold` | `FontStyles.Bold` |
+  | `supportRichText` | `richText` |
+  | `horizontalOverflow = Wrap/Overflow` | `textWrappingMode = Normal/NoWrap` |
+  | `verticalOverflow = Overflow/Truncate` | `overflowMode = TextOverflowModes.Overflow/Truncate` |
+  | `lineSpacing`（倍率 1.25/1.15/0.9） | 字号百分比偏移（25/15/-10） |
+  | uGUI `Outline` 组件 | `outlineWidth/outlineColor`（SDF 材质描边，更锐利） |
+- **VNMapModule 地点名描边**改用 TMP SDF 描边（uGUI Outline 组件对 TMP 无效）。
+- **场景生成器 `CreateHintText`** 改建 TMP 并引用
+  `VNFontAssetBuilder.EnsureFontAsset()` 持久化资产（理由见分支一）。
+- **`VNScriptRunner.LoadCommands`** 解析剧本后 `VNFont.Prewarm(source)`：
+  台词字形在加载期一次性光栅化，播放期零卡顿。
+- **DOTween 兼容**：`DOFade` 走 Graphic 扩展，TextMeshProUGUI 是 Graphic
+  子类，原有淡入淡出调用全部照常工作。
+
+### 验证与遗留事项
+
+- `dotnet build` Assembly-CSharp / Assembly-CSharp-Editor 均 0 错误
+  （csproj 已确认包含两个新文件）。
+- **用户需要做的一次性操作**（Unity 编辑器内）：
+  1. Tools → VN Effects → Create TMP Font Asset（生成预烘焙字体资产）
+  2. Tools → VN Effects → Create Demo Scene / Create Script Demo Scene
+     （重建两个演示场景，替换场景里旧的 legacy Text HintText）
+- 包体影响：+8.3MB 字体 OTF；动态图集显存随用随涨（多图集 1024² 递增）。
+- 技术债：`Assets/TextMesh Pro/` Essentials 里的 EmojiOne 表情图集暂保留
+  （删除可省 ~0.3MB）；TMP `<b>` 对无粗体变体的中文字体走假粗体（观感可接受）。

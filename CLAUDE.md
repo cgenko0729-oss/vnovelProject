@@ -62,7 +62,12 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - **每张图独立材质实例**（`VNImageEffectController` 自动管理），多立绘互不串扰
 - uGUI 自定义 shader 走传统 CGPROGRAM（Canvas 不经过 URP 光照），保留 UI 裁剪兼容
 - **UI 不写深度缓冲** → 不能用真 DoF/深度类后处理区分层，模糊在 `VNImageEffect` 里做（9-tap）
-- 文字用 **legacy Text + LegacyRuntime.ttf**（系统字体回退，中文开箱即用；TMP 默认字体无 CJK）
+- 文字全部用 **TextMeshPro（TextMeshProUGUI）**，字体一律取 `VNFont.Asset`（统一入口，
+  随包 Noto Sans SC 动态多图集 SDF，三级兜底见 VNFont.cs 注释）；**禁止再用 legacy Text /
+  LegacyRuntime.ttf**。编辑期创建、随场景保存的 TMP 文字必须引用
+  `VNFontAssetBuilder.EnsureFontAsset()` 的持久化资产（运行时临时资产存场景会变 Missing）。
+  API 换算对照表见 WhatAiDo.md 五十五章（TextAnchor→TextAlignmentOptions、
+  lineSpacing 倍率→字号百分比等）
 - 所有 Tween `SetLink(gameObject)` 防泄漏；循环效果提供 Start/Stop 成对 API
 - 立绘缩放有"倍率"机制（`CurrentBaseScale = 原始 × _scaleMultiplier`），
   说话者高亮/DollyZoom 用 `DOScaleMultiplier` 与呼吸动作共存
@@ -91,7 +96,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNShootingStars / VNDriftingClouds | 夜晚偶发流星（fx meteor）/ 云本体缓移（fx skycloud，与云影互补） |
 | VNParallax / VNMouseStardust / VNClickRipple | 鼠标视差 / 星尘拖尾 / 点击涟漪 |
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
-| VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮 |
+| VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮（TMP textInfo 顶点动画） |
+| VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技 |
 | VNCharacterBlink / VNCharacterMouth | 默认表情自动眨眼 / 说话口型（透明画布叠加层） |
