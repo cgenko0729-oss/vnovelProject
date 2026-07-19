@@ -583,6 +583,13 @@ namespace VNEffects.EditorTools
                     case "jump":
                         if (string.IsNullOrEmpty(r.Get("label"))) Err(i, "jump needs a target label");
                         break;
+                    case "call":
+                        if (string.IsNullOrEmpty(r.Get("target"))) Err(i, "call needs a target label");
+                        if (r.isAsync) Err(i, "call cannot use async @");
+                        break;
+                    case "return":
+                        if (r.isAsync) Err(i, "return cannot use async @");
+                        break;
                     case "if":
                         if (string.IsNullOrEmpty(r.Get("condition")) ||
                             string.IsNullOrEmpty(r.Get("target")))

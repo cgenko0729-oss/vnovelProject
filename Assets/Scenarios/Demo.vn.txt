@@ -14,6 +14,7 @@
 # ---- P1 分支 ----
 #   label <名字> / jump <名字>
 #   jump <文件>::<名字>            跨文件直达 label（目标文件需登记进 Chapters）
+#   call <文件>::<名字> / return    调用公共片段并自动回到 call 的下一行（支持嵌套）
 #   flag <名字> [数值|+1|-1|rand:1-100]   rand = 区间内随机取整（含两端）
 #   if <表达式> jump <名字>     支持空格、!、整数算术/比较、&&、||、括号
 #   例：if 月份 == 12 && (好感度 + 友情度) / 2 >= 50 jump 圣诞约会
@@ -96,6 +97,20 @@ label 好结局
 小雪: （明天也想……和她一起看晚霞。）
 
 label 落幕
+call 章节收尾奖励
 hide 小雪 with:fade
 hide 亚里沙 with:dissolve
 : 第一章　完
+jump 演示结束
+
+# 子程序放在文件尾；主流程先跳过。return 会回到上面的 hide。
+label 章节收尾奖励
+call 记录奖励次数
+se s01
+return
+
+label 记录奖励次数
+flag 演示奖励次数 +1
+return
+
+label 演示结束

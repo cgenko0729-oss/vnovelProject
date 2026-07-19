@@ -38,6 +38,16 @@ namespace VNEffects
 
         List<VNScriptCommand> _commands;
         readonly Dictionary<string, int> _labels = new Dictionary<string, int>();
+        const int MaxCallDepth = 64;
+        sealed class VNCallFrame
+        {
+            public TextAsset returnScript;
+            public List<VNScriptCommand> returnCommands;
+            public int returnIndex;
+            public int sourceLine;
+        }
+        readonly List<VNCallFrame> _callStack = new List<VNCallFrame>();
+        TextAsset _entryScript;
         int _index;
         bool _running;
         bool _advance;
@@ -74,6 +84,7 @@ namespace VNEffects
 
         void Start()
         {
+            _entryScript = script;
             if (_backlog == null)
             {
                 _backlog = FindFirstObjectByType<VNBacklog>();
@@ -126,7 +137,11 @@ namespace VNEffects
 
         public void Play(TextAsset asset)
         {
-            if (asset != null) script = asset; // 记住剧本资产：翻译表按剧本名查找
+            if (asset != null)
+            {
+                script = asset; // 记住剧本资产：翻译表按剧本名查找
+                _entryScript = asset;
+            }
             Play(asset.text);
         }
 
@@ -347,6 +362,8 @@ namespace VNEffects
                         break;
                     case "choice":
                     case "jump":
+                    case "call":
+                    case "return":
                     case "if":
                     case "event": // 事件结果无法推断，不重放，同分支处理
                         hasBranching = true;
@@ -480,6 +497,7 @@ namespace VNEffects
         void Prepare(string source)
         {
             Stop();
+            _callStack.Clear();
             LoadCommands(source);
         }
 
@@ -514,21 +532,23 @@ namespace VNEffects
             }
         }
 
-        void SwitchChapter(string chapterName, int fromLine)
+        bool SwitchChapter(string chapterName, int fromLine)
         {
             TextAsset target = FindChapter(chapterName);
 
             if (target == null)
             {
                 Debug.LogError($"[VNScript] 第 {fromLine} 行：找不到章节「{chapterName}」，请在 VNScriptRunner 的 Chapters 列表中登记该剧本");
-                return;
+                return false;
             }
 
             script = target;
+            _callStack.Clear(); // chapter 是尾调用式流程切换，不保留子程序返回点
             LoadCommands(target.text);
             _index = 0;
             _currentSayIndex = 0;
             Debug.Log($"[VNScript] 已切换到章节「{target.name}」");
+            return true;
         }
 
         static string NormalizeChapterName(string name)
@@ -541,6 +561,8 @@ namespace VNEffects
             string wanted = NormalizeChapterName(chapterName);
             if (script != null && NormalizeChapterName(script.name) == wanted)
                 return script;
+            if (_entryScript != null && NormalizeChapterName(_entryScript.name) == wanted)
+                return _entryScript;
             foreach (var chapter in chapters)
                 if (chapter != null && NormalizeChapterName(chapter.name) == wanted)
                     return chapter;
@@ -696,6 +718,118 @@ namespace VNEffects
             return true;
         }
 
+        bool CallTo(string address, int fromLine, bool isAsync)
+        {
+            if (isAsync)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：call 不能使用行尾 @ 异步执行");
+                return false;
+            }
+            if (_callStack.Count >= MaxCallDepth)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：call 嵌套超过上限 {MaxCallDepth}，" +
+                               "可能存在无终止递归");
+                return false;
+            }
+
+            var frame = new VNCallFrame
+            {
+                returnScript = script,
+                returnCommands = _commands,
+                returnIndex = _index,
+                sourceLine = fromLine,
+            };
+            if (!JumpTo(address, fromLine)) return false;
+            _callStack.Add(frame);
+            return true;
+        }
+
+        bool ReturnFromCall(int fromLine, bool isAsync)
+        {
+            if (isAsync)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：return 不能使用行尾 @ 异步执行");
+                return false;
+            }
+            if (_callStack.Count == 0)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：return 没有对应的 call，停止当前剧本");
+                _index = _commands.Count;
+                return false;
+            }
+
+            int last = _callStack.Count - 1;
+            VNCallFrame frame = _callStack[last];
+            if (frame.returnCommands == null)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：call 返回点已损坏，停止当前剧本");
+                _callStack.Clear();
+                _index = _commands.Count;
+                return false;
+            }
+
+            _callStack.RemoveAt(last);
+            script = frame.returnScript;
+            _commands = frame.returnCommands;
+            VNScriptLocale.Apply(_commands, script != null ? script.name : null);
+            BuildLabelMap(_commands, _labels);
+            _index = Mathf.Clamp(frame.returnIndex, 0, _commands.Count);
+            _currentSayIndex = _index;
+            if (script != null) VNFont.Prewarm(script.text);
+            Debug.Log($"[VNScript] 已从子程序返回（call 第 {frame.sourceLine} 行）");
+            return true;
+        }
+
+        void CaptureCallStack(VNSaveData data)
+        {
+            data.callStack.Clear();
+            foreach (VNCallFrame frame in _callStack)
+                data.callStack.Add(new VNSaveData.CallFrameSave
+                {
+                    chapter = frame.returnScript != null ? frame.returnScript.name : null,
+                    returnIndex = frame.returnIndex,
+                    sourceLine = frame.sourceLine,
+                });
+        }
+
+        void RestoreCallStack(VNSaveData data)
+        {
+            _callStack.Clear();
+            if (data.callStack == null || data.callStack.Count == 0) return;
+            if (data.callStack.Count > MaxCallDepth)
+            {
+                Debug.LogError($"[VNSave] call 栈深度 {data.callStack.Count} 超过上限 {MaxCallDepth}，已忽略");
+                return;
+            }
+
+            foreach (VNSaveData.CallFrameSave saved in data.callStack)
+            {
+                TextAsset target = FindChapter(saved.chapter);
+                if (target == null)
+                {
+                    Debug.LogError($"[VNSave] 无法恢复 call 返回文件「{saved.chapter}」，call 栈已忽略");
+                    _callStack.Clear();
+                    return;
+                }
+                var commands = VNScriptParser.Parse(target.text);
+                if (saved.returnIndex < 0 || saved.returnIndex > commands.Count)
+                {
+                    Debug.LogError($"[VNSave] call 返回索引 {saved.returnIndex} 超出剧本「{target.name}」范围，" +
+                                   "call 栈已忽略");
+                    _callStack.Clear();
+                    return;
+                }
+                VNScriptLocale.Apply(commands, target.name);
+                _callStack.Add(new VNCallFrame
+                {
+                    returnScript = target,
+                    returnCommands = commands,
+                    returnIndex = saved.returnIndex,
+                    sourceLine = saved.sourceLine,
+                });
+            }
+        }
+
         // ------------------------------------------------------------------
         // 存档 / 读档
         // ------------------------------------------------------------------
@@ -720,6 +854,7 @@ namespace VNEffects
                 chapter = script != null ? script.name : null,
                 lastLine = _lastSayText,
             };
+            CaptureCallStack(data);
             stage.CaptureSnapshot(data);
             VNSaveSystem.Save(slot, data, thumbnail);
             VNToast.Show(quick ? VNLocale.T("runner.quickSaved")
@@ -740,8 +875,12 @@ namespace VNEffects
             SetSkip(false);
             SetAuto(false);
             Stop();
-            if (!string.IsNullOrEmpty(data.chapter))
-                SwitchChapter(data.chapter, 0);
+            if (!string.IsNullOrEmpty(data.chapter) && !SwitchChapter(data.chapter, 0))
+            {
+                Debug.LogError($"[VNSave] 当前章节「{data.chapter}」无法恢复，已中止读档");
+                return;
+            }
+            RestoreCallStack(data); // 旧存档字段为空，自动得到空栈
             stage.RestoreSnapshot(data);
             VNToast.Show(quick ? VNLocale.T("runner.quickLoaded")
                                : VNLocale.T("runner.loaded", slot));
@@ -1154,6 +1293,13 @@ namespace VNEffects
                 if (cmd.isAsync) StartCoroutine(co);
                 else yield return StartCoroutine(co);
             }
+            if (_callStack.Count > 0)
+            {
+                VNCallFrame frame = _callStack[_callStack.Count - 1];
+                Debug.LogError($"[VNScript] 子程序播放到文件末尾但没有 return（call 第 {frame.sourceLine} 行），" +
+                               "已停止并清空调用栈");
+                _callStack.Clear();
+            }
             _running = false;
             SetSkip(false);
             _voicePendingForNextSay = false;
@@ -1314,6 +1460,17 @@ namespace VNEffects
 
                 case "jump":
                     JumpTo(cmd.Arg(0), cmd.line);
+                    return null;
+
+                case "call":
+                    if (string.IsNullOrEmpty(cmd.Arg(0)))
+                        Debug.LogError($"[VNScript] 第 {cmd.line} 行：call 缺少目标 label");
+                    else
+                        CallTo(cmd.Arg(0), cmd.line, cmd.isAsync);
+                    return null;
+
+                case "return":
+                    ReturnFromCall(cmd.line, cmd.isAsync);
                     return null;
 
                 case "chapter":
