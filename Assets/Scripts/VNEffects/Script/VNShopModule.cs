@@ -194,6 +194,10 @@ namespace VNEffects
             _listContent.anchorMin = new Vector2(0f, 1f);
             _listContent.anchorMax = new Vector2(1f, 1f);
             _listContent.pivot = new Vector2(0.5f, 1f);
+            // sizeDelta 默认 (100,100)，横向拉伸下 = 比视口宽 100px → 左右各溢出 50px
+            // 被 RectMask2D 裁掉（图标/价格贴边时会缺一块），必须显式清零
+            _listContent.sizeDelta = Vector2.zero;
+            _listContent.anchoredPosition = Vector2.zero;
             var layout = contentGo.GetComponent<VerticalLayoutGroup>();
             layout.spacing = 12f;
             layout.childControlWidth = true;

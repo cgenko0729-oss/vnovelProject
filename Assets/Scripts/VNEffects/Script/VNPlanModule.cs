@@ -407,6 +407,11 @@ namespace VNEffects
             content.anchorMin = new Vector2(0f, 1f);
             content.anchorMax = new Vector2(1f, 1f);
             content.pivot = new Vector2(0.5f, 1f);
+            // 必须显式清零：RectTransform 默认 sizeDelta=(100,100)，横向拉伸锚点下
+            // 它是「相对父宽的增量」→ 内容会比视口宽 100px，pivot 0.5 使左右各溢出
+            // 50px 被 RectMask2D 裁掉（ContentSizeFitter 只管 y，永远不会修正 x）
+            content.sizeDelta = Vector2.zero;
+            content.anchoredPosition = Vector2.zero;
             var layout = contentGo.GetComponent<VerticalLayoutGroup>();
             layout.spacing = 10f;
             layout.childControlWidth = true;

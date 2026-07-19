@@ -470,6 +470,9 @@ namespace VNEffects
             _panelContent.anchorMax = new Vector2(0.7f, 1f);
             _panelContent.pivot = new Vector2(0.5f, 1f);
             _panelContent.anchoredPosition = new Vector2(0f, -150f);
+            // sizeDelta 默认 (100,100)，横向拉伸下 = 比锚点区宽 100px（此处无遮罩不会被裁，
+            // 但属性行会比设计宽度宽 100px），显式清零保证布局与锚点一致
+            _panelContent.sizeDelta = Vector2.zero;
             var layout = contentGo.GetComponent<VerticalLayoutGroup>();
             layout.spacing = 20f;
             layout.childControlHeight = true;

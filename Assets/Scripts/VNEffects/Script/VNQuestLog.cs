@@ -210,6 +210,9 @@ namespace VNEffects
             _content.anchorMax = new Vector2(1f, 1f);
             _content.pivot = new Vector2(0.5f, 1f);
             _content.anchoredPosition = Vector2.zero;
+            // sizeDelta 默认 (100,100)，横向拉伸下 = 比视口宽 100px → 左右各溢出 50px
+            // 被 RectMask2D 裁掉（任务标题左边缺字），必须显式清零
+            _content.sizeDelta = Vector2.zero;
             var layout = contentGo.GetComponent<VerticalLayoutGroup>();
             layout.spacing = 22f;
             layout.childControlHeight = true;
