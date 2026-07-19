@@ -1365,3 +1365,6 @@
 
   当前系统很适合“快速做出很多玩法”；下一阶段要解决的是“做出很多玩法以后，怎样仍然知道它们为什么触发、由谁修
   改、能否存档、会不会互相冲突”。这将决定它最终是一个灵活的原型工具，还是能够支撑完整商业游戏的制作系统。
+
+
+and also please update HowToUse.md file to reflect the newest system and usage and update(fix any old and wrong text). and  merge all the change in current project to main , so main have the newest state,

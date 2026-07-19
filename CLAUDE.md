@@ -112,7 +112,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNResultPopupModule | 结算大弹窗事件模块（event result grade:fail\|normal\|good\|great，四档大字+星光爆发） |
 | VNInventory | I 键物品栏（flags 反查道具，文案图标取自 VNShopDef） |
 | VNCalendarHud | 右下日历 HUD（flag 月份/剩余月数，time 命令驱动；月份 flag 不存在时自动隐藏） |
-| VNCgUnlocks | CG 鉴赏全局解锁存储（独立 JSON，与存档槽分离；CG 显示逻辑在 VNStage.ShowCg/HideCg） |
+| VNCgUnlocks / VNCgGallery | CG 全局解锁存储（独立 JSON，与存档槽分离）/ G 键鉴赏画廊（目录取 cgLibrary，解锁取 VNCgUnlocks，group 相同的合并成一格翻差分） |
 | VNLocale / VNScriptLocale | 本地化（中/英/日）：语言管理+UI 字符串表 / 剧本台词翻译查表（表在 Resources/VNLocale/，抽取工具 Tools→VN Effects→Localization） |
 
 ### 演示场景
@@ -152,7 +152,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   素材放 `Assets/CG/`（文件名=id，生成器自动灌入 VNStage.cgLibrary）；默认藏立绘
   （整层 CanvasGroup）+ 停环境特效，keep 参数按需保留；解锁记录在 VNCgUnlocks
   全局 JSON（与存档分离，勿用 flags 存解锁）；存档/调试重建已集成；
-  P2 鉴赏画廊待做（详见 WhatAiDo.md 五十六章）
+  P2 鉴赏画廊已完成（G 键：网格缩略图/未解锁「？」占位/全屏浏览/差分组 ←→ 翻页，
+  详见 WhatAiDo.md 七十八章）
 - 养成系统（已完成，六十三～六十六章）：属性/金钱/行动力/压力/善恶全是 flag
   （`stat <名> <+n|-n|值>` = 带 VNStatDef 钳制+飘字的 flag 写入；`flag` 保持静默语义）；
   选项行支持 `if:条件`（隐藏）与 `cost:金钱-100`（付不起置灰、选中自动扣）；

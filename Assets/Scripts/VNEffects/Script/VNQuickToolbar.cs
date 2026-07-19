@@ -89,6 +89,7 @@ namespace VNEffects
             CreateButton(VNLocale.T("toolbar.quest"), 72f, () => _runner?.RequestQuestLog());
             CreateButton(VNLocale.T("toolbar.stats"), 72f, () => _runner?.RequestStatsPanel());
             CreateButton(VNLocale.T("toolbar.inventory"), 72f, () => _runner?.RequestInventory());
+            CreateButton(VNLocale.T("toolbar.gallery"), 62f, () => _runner?.RequestCgGallery());
             CreateButton(VNLocale.T("toolbar.config"), 88f, () => _runner?.RequestConfigPanel());
             CreateButton(VNLocale.T("toolbar.hideui"), 100f, () => _runner?.SetInterfaceHidden(true));
         }

@@ -12,6 +12,7 @@ toolbar.log = Log
 toolbar.quest = 任务
 toolbar.stats = 属性
 toolbar.inventory = 道具
+toolbar.gallery = CG
 toolbar.config = Config
 toolbar.hideui = 隐藏 UI
 
@@ -116,3 +117,10 @@ result.normal = 普通
 result.good = 成功！
 result.great = 大成功！！
 result.continue = ▼ 点击继续
+
+# —— CG 鉴赏画廊 ——
+gallery.title = —— CG 鉴赏 ——
+gallery.empty = （还没有登记任何 CG）
+gallery.locked = ？
+gallery.progress = 已解锁 {0} / {1}
+gallery.hint = 点击查看　←→ 翻差分　Esc / G 返回

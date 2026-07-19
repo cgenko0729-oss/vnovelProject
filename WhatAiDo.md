@@ -3391,3 +3391,66 @@ else → arg
 | 八、角色/背景/CG | "拖进 VNStage.characters" | 角色/CG 自动扫目录；背景改填资产 |
 | 十三、排查表 | 三条指向 Chapters/VNStage 的旧解法 | 更新；新增「call 缺少目标 label」与「配置每次重建就没」两条 |
 | 附、速查卡 | 无限制说明 | choice 的 `flag:` 与 `if:` 限制补进速查卡 |
+
+---
+
+## 七十八、CG 鉴赏画廊 P2（2026-07-19，分支 `agent/cg-gallery`）
+
+补齐五十六章遗留的 P2：网格缩略图 / 未解锁占位 / 全屏浏览 / 差分组翻页。
+
+### 设计决策
+
+**① 未解锁的 CG 也占一格，显示「？」。**
+不是"只列已解锁"——玩家看得见"还差几张"才有收集动机。但**不画原图的任何像素**
+（sprite 置 null + 暗色块），避免剧透。顶部另给「已解锁 N / M」进度。
+
+**② 数据来源一分为二，职责不同。**
+
+| 来源 | 内容 | 为什么 |
+|---|---|---|
+| `VNStage.cgLibrary`（退回 `VNGameConfig.cgLibrary`） | **目录**：一共有哪些 CG | 目录是内容配置，随资产走 |
+| `VNCgUnlocks` | **解锁**：看过哪些 | 独立 JSON，与存档槽分离；读旧档/开新周目不丢 |
+
+退回配置资产这条路径是为将来做**纯标题画面的鉴赏入口**（那时场景里没有 VNStage）预留的。
+
+**③ 差分组 = 网格合并成一格。**
+`CgEntry.group` 非空的条目合并为一格（五十六章建 cgLibrary 时就为此预留了该字段）。
+格子显示组内第一张**已解锁**的图，右下角 `2/3` 角标；一张都没解锁则整格上锁。
+全屏浏览 `←→` 在组内翻页，且**跳过未解锁的差分**（`StepViewer` 循环找下一张已解锁的）。
+`group` 留空 = 用 `" " + id` 当组键自成一组（前缀空格保证不与真实 group 名相撞）。
+
+**④ 输入仍由 Runner 统一分发。**
+项目约定是"面板的按键归 Runner，事件模块才自己接管输入"。画廊比其他面板多一层
+状态（网格 / 全屏），所以 Runner 里的分支也多一层：全屏时 `←→`(含 `↑↓`) 翻差分、
+`Esc`/`G` 退回网格；网格时 `Esc`/`G` 关闭。组件只暴露
+`Open/Close/CloseViewer/ViewerNext/ViewerPrev` + `IsOpen/IsViewerOpen`。
+
+### 实现
+
+- **`VNCgGallery.cs`（新，Script/）**：程序化 UI，独立 Overlay Canvas
+  `sortingOrder = 600`（与任务日志/物品栏同层，同一时刻只开一个）。
+  `GridLayoutGroup`(FixedColumnCount) + `ScrollRect` + `ContentSizeFitter`；
+  全屏浏览层是同 Canvas 下的兄弟节点，打开时 `SetAsLastSibling()`。
+  翻差分带 0.18s `DOFade` 淡入，`SetLink` + `SetUpdate(true)`（不受 S 快进的
+  `DOTween.timeScale` 影响）。
+  切语言时整个 Canvas 销毁重建（与 VNInventory 同策略）。
+- **接线**：`VNScriptRunner` 加 `_cgGallery` 字段 + Start 自愈创建 +
+  输入链分支 + `RequestCgGallery()`；`VNQuickToolbar` 加 `CG` 按钮；
+  生成器建 `VNCgGallery` 物体并连 `stage`，场景提示文字加「G CG鉴赏」。
+- **本地化**：三张 ui 表各加 `gallery.title/empty/locked/progress/hint`
+  与 `toolbar.gallery`。
+
+### 踩到的坑
+
+- `_grid.sizeDelta` 必须显式清零：默认 `(100,100)` 在横向拉伸下会比视口宽 100px，
+  左右各溢出 50px 被 `RectMask2D` 裁掉（与 VNInventory 当年同一个坑，注释已标）。
+- `RoundedRectSprite` 有 `(22,22,22,22)` 边框，配 `Image.Type.Sliced`
+  才不会把圆角拉变形（与 VNConfigPanel 用法一致）。
+
+### 遗留
+
+- 差分组语法糖（`cg 组名#2`）仍未做——目前差分靠**给多个 id 填相同 group** 实现，
+  剧本侧照常写各自的 id。等真有大量差分需求再评估。
+- 画廊入口目前只有游戏内 G 键；标题画面/主菜单尚不存在，将来做的话
+  组件已支持无 VNStage 运行（走 VNGameConfig 目录）。
+- 未编译验证（Unity 编辑器占用工程），只做了括号/结构检查。
