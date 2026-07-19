@@ -1,0 +1,83 @@
+# ============================================================
+# 第3章.vn.txt —— 路线状态、演出组合与多条件资格拆解
+# ============================================================
+
+if 入口_第3章==1 jump 十一月主线
+if 入口_第3章==2 jump 天台续篇
+jump 十一月主线
+
+label 十一月主线
+flag 入口_第3章 0
+flag 已看_第3章 1
+flag 主线进度 3
+bg bg4 transition:InkBleed
+mood Night
+weather Fireflies
+letterbox on height:72 time:0.5
+fx kenburns on
+show 亚里沙 at:left with:DissolveGlow
+show 小雪 at:right with:DissolveGlow
+
+camera pushin 1.08 1.2 focus:小雪 @
+亚里沙: 最近每次见到小雪，心跳都会变得奇怪。
+fx heartbeat on
+小雪: 你是不是有什么话想说？
+
+# 条件选项可让不同培养方向出现专属回答；最后保留一个无条件选项防止卡死。
+choice
+* 用准备好的话认真回答 if:智力>=40 flag:告白方式_理性 -> 理性回答
+* 坦率说出真实感受 if:魅力>=40 flag:告白方式_坦率 -> 坦率回答
+* 用玩笑掩饰紧张 if:享受度>=15 flag:告白方式_玩笑 -> 玩笑回答
+* 先把话题带过去 flag:告白方式_保留 -> 保留回答
+
+label 理性回答
+stat 好感度_小雪 +8
+亚里沙: 我认真想过，我们一起度过的时间对我非常重要。
+jump 十一月汇合
+
+label 坦率回答
+stat 好感度_小雪 +12
+亚里沙: 因为见到你，我真的很开心。
+jump 十一月汇合
+
+label 玩笑回答
+stat 好感度_小雪 +6
+stat 享受度 +4
+亚里沙: 大概是因为某个人太可爱了吧。
+jump 十一月汇合
+
+label 保留回答
+stat 好感度_小雪 +2
+亚里沙: 等我再勇敢一点，就告诉你。
+
+label 十一月汇合
+fx heartbeat off
+camera reset @
+letterbox off time:0.4
+flag 入口_第3章 0
+hide 小雪 with:fade
+hide 亚里沙 with:fade
+reset effects
+chapter 主循环
+
+label 天台续篇
+flag 入口_第3章 0
+bg bg2 transition:Eyelid
+mood Sunset
+show 小雪 at:right with:FadeSlideUp
+if 去过_天台 jump 天台旧识
+jump 天台初见
+
+label 天台旧识
+小雪: 你果然又来这里了。
+stat 好感度_小雪 +6
+jump 天台结束
+
+label 天台初见
+小雪: 原来你第一次来天台呀。
+flag 去过_天台 1
+stat 好感度_小雪 +3
+
+label 天台结束
+hide 小雪 with:fade
+chapter 主循环
