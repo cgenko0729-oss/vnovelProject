@@ -21,12 +21,14 @@ namespace VNEffects
         Canvas _canvas;
         GameObject _panel;
         RectTransform _grid;
-        TextMeshProUGUI _title;
-        TextMeshProUGUI _hint;
-        Image _saveTabImage;
-        Image _loadTabImage;
+        TMP_Text _title;
+        TMP_Text _hint;
+        Graphic _saveTabImage;
+        Graphic _loadTabImage;
+        VNSaveLoadSkin _skin;
+        VNSaveSlotSkin _slotTemplate;
         GameObject _confirm;
-        TextMeshProUGUI _confirmText;
+        TMP_Text _confirmText;
         Button _confirmYes;
         Texture2D _pendingThumbnail;
         bool _open;
@@ -59,6 +61,8 @@ namespace VNEffects
             _confirm = null;
             _confirmText = null;
             _confirmYes = null;
+            _skin = null;
+            _slotTemplate = null;
             _slotCards.Clear();
         }
 
@@ -129,6 +133,16 @@ namespace VNEffects
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.saveLoadPrefab);
+            _skin = VNSystemUiSkinUtility.Instantiate<VNSaveLoadSkin>(
+                skinPrefab, canvasGo.transform, "VNSaveLoadPanel");
+            if (_skin != null)
+            {
+                BindCustomSkin(_skin);
+                _panel.SetActive(false);
+                return;
+            }
+
             _panel = new GameObject("Panel", typeof(RectTransform),
                 typeof(CanvasRenderer), typeof(Image));
             var panelRect = (RectTransform)_panel.transform;
@@ -191,13 +205,47 @@ namespace VNEffects
             _panel.SetActive(false);
         }
 
+        void BindCustomSkin(VNSaveLoadSkin skin)
+        {
+            _panel = skin.panelRoot;
+            _title = skin.titleText;
+            _hint = skin.hintText;
+            _grid = skin.slotContainer;
+            _slotTemplate = skin.slotTemplate;
+            _slotTemplate.gameObject.SetActive(false);
+            _saveTabImage = skin.saveTab.targetGraphic;
+            _loadTabImage = skin.loadTab.targetGraphic;
+
+            BindButton(skin.saveTab, () => _runner?.RequestSavePanel());
+            BindButton(skin.loadTab, ShowLoadMode);
+            BindButton(skin.closeButton, Close);
+            if (skin.saveTabLabel != null) skin.saveTabLabel.text = VNLocale.T("save.tabSave");
+            if (skin.loadTabLabel != null) skin.loadTabLabel.text = VNLocale.T("save.tabLoad");
+
+            _confirm = skin.confirmRoot;
+            _confirmText = skin.confirmMessage;
+            _confirmYes = skin.confirmYes;
+            BindButton(skin.confirmNo, HideConfirm);
+            if (skin.confirmYesLabel != null) skin.confirmYesLabel.text = VNLocale.T("common.confirm");
+            if (skin.confirmNoLabel != null) skin.confirmNoLabel.text = VNLocale.T("common.cancel");
+            _confirm.SetActive(false);
+        }
+
+        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+        {
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
+        }
+
         void SetMode(bool saveMode)
         {
             _saveMode = saveMode;
             _title.text = saveMode ? VNLocale.T("save.titleSave") : VNLocale.T("save.titleLoad");
             _hint.text = saveMode ? VNLocale.T("save.hintSave") : VNLocale.T("save.hintLoad");
-            _saveTabImage.color = saveMode ? Gold : new Color(0.11f, 0.14f, 0.22f, 1f);
-            _loadTabImage.color = saveMode ? new Color(0.11f, 0.14f, 0.22f, 1f) : Gold;
+            Color selected = _skin != null ? _skin.selectedTabColor : Gold;
+            Color normal = _skin != null ? _skin.normalTabColor : new Color(0.11f, 0.14f, 0.22f, 1f);
+            if (_saveTabImage != null) _saveTabImage.color = saveMode ? selected : normal;
+            if (_loadTabImage != null) _loadTabImage.color = saveMode ? normal : selected;
             RebuildSlots();
         }
 
@@ -223,6 +271,9 @@ namespace VNEffects
             bool occupied = data != null;
             Texture2D thumbnail = occupied ? VNSaveSystem.LoadThumbnail(slot) : null;
             if (thumbnail != null) _loadedThumbnails.Add(thumbnail);
+
+            if (_slotTemplate != null)
+                return CreateCustomSlotCard(slot, data, occupied, thumbnail);
 
             var go = new GameObject($"Slot_{slot:00}", typeof(RectTransform),
                 typeof(CanvasRenderer), typeof(Image), typeof(Button));
@@ -278,6 +329,30 @@ namespace VNEffects
 
             SetRect(lineText.rectTransform, new Vector2(226f, -70f), new Vector2(184f, 62f));
             lineText.text = occupied ? Truncate(data.lastLine, 42) : VNLocale.T("save.emptySlot");
+            return go;
+        }
+
+        GameObject CreateCustomSlotCard(int slot, VNSaveData data, bool occupied, Texture2D thumbnail)
+        {
+            var go = Instantiate(_slotTemplate.gameObject, _grid, false);
+            go.name = $"Slot_{slot:00}";
+            go.SetActive(true);
+            var card = go.GetComponent<VNSaveSlotSkin>();
+
+            card.thumbnail.texture = thumbnail != null ? thumbnail : Texture2D.whiteTexture;
+            card.thumbnail.color = thumbnail != null ? Color.white : card.emptyColor;
+            card.slotNumber.text = $"SLOT {slot:00}";
+            card.slotNumber.color = occupied ? card.occupiedNumberColor : card.emptyNumberColor;
+            card.savedAt.text = occupied && !string.IsNullOrEmpty(data.savedAt)
+                ? data.savedAt : "— EMPTY —";
+            card.lastLine.text = occupied ? Truncate(data.lastLine, 42) : VNLocale.T("save.emptySlot");
+            if (card.cardGraphic != null)
+                card.cardGraphic.color = occupied ? card.occupiedColor : card.emptyColor;
+
+            card.button.onClick.RemoveAllListeners();
+            card.button.interactable = _saveMode || occupied;
+            int capturedSlot = slot;
+            card.button.onClick.AddListener(() => SelectSlot(capturedSlot, occupied));
             return go;
         }
 
