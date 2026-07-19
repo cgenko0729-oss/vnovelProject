@@ -493,37 +493,30 @@ namespace VNEffects
             // 非中文语言：给台词/选项标注译文（缺译回退中文，命令流不变）
             VNScriptLocale.Apply(_commands, script != null ? script.name : null);
 
-            _labels.Clear();
-            for (int i = 0; i < _commands.Count; i++)
+            BuildLabelMap(_commands, _labels);
+        }
+
+        static void BuildLabelMap(
+            List<VNScriptCommand> commands,
+            Dictionary<string, int> destination)
+        {
+            destination.Clear();
+            for (int i = 0; i < commands.Count; i++)
             {
-                if (_commands[i].keyword != "label") continue;
-                string name = _commands[i].Arg(0);
+                if (commands[i].keyword != "label") continue;
+                string name = commands[i].Arg(0);
                 if (string.IsNullOrEmpty(name))
-                    Debug.LogError($"[VNScript] 第 {_commands[i].line} 行：label 缺少名字");
-                else if (_labels.ContainsKey(name))
-                    Debug.LogError($"[VNScript] 第 {_commands[i].line} 行：label「{name}」重复定义");
+                    Debug.LogError($"[VNScript] 第 {commands[i].line} 行：label 缺少名字");
+                else if (destination.ContainsKey(name))
+                    Debug.LogError($"[VNScript] 第 {commands[i].line} 行：label「{name}」重复定义");
                 else
-                    _labels[name] = i;
+                    destination[name] = i;
             }
         }
 
         void SwitchChapter(string chapterName, int fromLine)
         {
-            string wanted = NormalizeChapterName(chapterName);
-            TextAsset target = null;
-
-            if (script != null && NormalizeChapterName(script.name) == wanted)
-                target = script;
-
-            if (target == null)
-            {
-                foreach (var chapter in chapters)
-                {
-                    if (chapter == null || NormalizeChapterName(chapter.name) != wanted) continue;
-                    target = chapter;
-                    break;
-                }
-            }
+            TextAsset target = FindChapter(chapterName);
 
             if (target == null)
             {
@@ -540,13 +533,18 @@ namespace VNEffects
 
         static string NormalizeChapterName(string name)
         {
-            if (string.IsNullOrWhiteSpace(name)) return string.Empty;
-            string normalized = name.Trim();
-            if (normalized.EndsWith(".txt", System.StringComparison.OrdinalIgnoreCase))
-                normalized = normalized.Substring(0, normalized.Length - 4);
-            if (normalized.EndsWith(".vn", System.StringComparison.OrdinalIgnoreCase))
-                normalized = normalized.Substring(0, normalized.Length - 3);
-            return normalized.ToLowerInvariant();
+            return VNStoryAddress.NormalizeFile(name);
+        }
+
+        TextAsset FindChapter(string chapterName)
+        {
+            string wanted = NormalizeChapterName(chapterName);
+            if (script != null && NormalizeChapterName(script.name) == wanted)
+                return script;
+            foreach (var chapter in chapters)
+                if (chapter != null && NormalizeChapterName(chapter.name) == wanted)
+                    return chapter;
+            return null;
         }
 
         /// <summary>从指定命令索引开始（读档恢复用）</summary>
@@ -648,12 +646,54 @@ namespace VNEffects
             }
         }
 
-        void JumpTo(string label, int fromLine)
+        bool JumpTo(string address, int fromLine)
         {
-            if (_labels.TryGetValue(label, out int idx))
-                _index = idx;
-            else
+            if (!VNStoryAddress.TryParse(address, out string file, out string label,
+                    out string addressError))
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：{addressError}");
+                return false;
+            }
+
+            if (file == null)
+            {
+                if (_labels.TryGetValue(label, out int localIndex))
+                {
+                    _index = localIndex;
+                    return true;
+                }
                 Debug.LogError($"[VNScript] 第 {fromLine} 行：跳转目标 label「{label}」不存在");
+                return false;
+            }
+
+            TextAsset target = FindChapter(file);
+            if (target == null)
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：找不到剧本「{file}」，" +
+                               "请在 VNScriptRunner 的 Chapters 列表中登记该剧本");
+                return false;
+            }
+
+            // 先在临时结构中解析并确认 label；失败时不改变当前文件、命令索引或 label 表。
+            var targetCommands = VNScriptParser.Parse(target.text);
+            var targetLabels = new Dictionary<string, int>();
+            BuildLabelMap(targetCommands, targetLabels);
+            if (!targetLabels.TryGetValue(label, out int targetIndex))
+            {
+                Debug.LogError($"[VNScript] 第 {fromLine} 行：剧本「{target.name}」中不存在 label「{label}」");
+                return false;
+            }
+
+            VNFont.Prewarm(target.text);
+            VNScriptLocale.Apply(targetCommands, target.name);
+            script = target;
+            _commands = targetCommands;
+            _labels.Clear();
+            foreach (var pair in targetLabels) _labels[pair.Key] = pair.Value;
+            _index = targetIndex;
+            _currentSayIndex = targetIndex;
+            Debug.Log($"[VNScript] 已限定跳转到「{target.name}::{label}」");
+            return true;
         }
 
         // ------------------------------------------------------------------

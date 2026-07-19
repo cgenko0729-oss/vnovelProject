@@ -412,11 +412,17 @@ transition WhiteFlash
 label 天台线
 ...剧情...
 jump 结局汇合
+jump 节日活动集::圣诞约会
 ```
 
 - `label 名字` 只是位置标记，执行时无效果
 - `jump 名字` 跳到该标记（**支持向前跳**，标记可以写在 jump 后面）
+- `jump 文件::名字` 直接切换到另一个剧本的指定 label；`.vn.txt` 后缀可省略
 - label 重名会报错
+- 跨文件目标必须先拖进 `VNScriptRunner` 的 **Chapters** 列表。文件或 label 不存在时，
+  本次跳转会报错且保持当前剧本位置不变
+- `if ... jump 文件::label`、choice 的 `-> 文件::label`、event 结果的
+  `-> 文件::label` 都使用同一种地址格式
 
 ### chapter — 跨文件章节跳转 📂
 
@@ -427,17 +433,14 @@ chapter 结局集.vn.txt     # 后缀可写可不写，大小写不敏感
 
 - 目标文件必须先拖进 `VNScriptRunner` 的 **Chapters** 列表登记，否则报错
 - flag / 属性 / 任务状态是全局的，切文件**全部保留**
-- `chapter` 从目标文件**第一行**开始；想直达文件中间的某场戏，用
-  **"入口 flag + 文件头路由"**套路（详见 `GeneralQuestionGuide.md` 问题一）：
+- `chapter` 从目标文件**第一行**开始；想直达文件中间的某场戏，直接用限定跳转：
 
 ```
-# 跳转方
-flag 进入点 3
-chapter 十二月篇
-
-# 十二月篇.vn.txt 文件头
-if 进入点==3 jump 圣诞约会
+jump 十二月篇::圣诞约会
 ```
+
+旧的“入口 Flag + `chapter` + 文件头路由”仍完全兼容，适合确实需要从文件头做统一初始化的文件；
+仅仅为了选 label 时不再需要它。
 
 ### flag — 全局变量
 
@@ -1004,7 +1007,7 @@ voice <id>                                       语音
 volume <bgm|se|voice> <0~1>                      通道音量
 
 ── 流程 ──
-label <名> / jump <名>                           标记/跳转
+label <名> / jump <名|文件::名>                  本文件/跨文件指定标签跳转
 chapter <剧本文件名>                             跨文件章节跳转
 flag <名> [数值|+n|-n] [rand:min-max]            变量（静默；rand=区间随机）
 if <表达式> jump <名>                            条件跳转（!、算术、比较、&&、||、括号）

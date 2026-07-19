@@ -443,8 +443,25 @@ namespace VNEffects.EditorTools
 
             void CheckLabelRef(int i, string target, string what)
             {
-                if (!string.IsNullOrEmpty(target) && !labelSet.Contains(target))
-                    Err(i, $"{what} target label \"{target}\" does not exist");
+                if (string.IsNullOrEmpty(target)) return;
+                if (!VNStoryAddress.TryParse(target, out string file, out string label,
+                        out string addressError))
+                {
+                    Err(i, $"{what} target \"{target}\" is invalid: {addressError}");
+                    return;
+                }
+                if (file == null)
+                {
+                    if (!labelSet.Contains(label))
+                        Err(i, $"{what} target label \"{label}\" does not exist");
+                    return;
+                }
+
+                string normalized = VNStoryAddress.NormalizeFile(file);
+                if (!ctx.scenarioLabels.TryGetValue(normalized, out string[] labelsInFile))
+                    Err(i, $"{what} target scenario \"{file}\" does not exist under Assets/Scenarios");
+                else if (System.Array.IndexOf(labelsInFile, label) < 0)
+                    Err(i, $"{what} target label \"{label}\" does not exist in \"{file}\"");
             }
 
             for (int i = 0; i < rows.Count; i++)
@@ -696,6 +713,11 @@ namespace VNEffects.EditorTools
         public string[] voiceIds = System.Array.Empty<string>();
         public string[] eventIds = System.Array.Empty<string>();
         public string[] questIds = System.Array.Empty<string>();
+        public readonly Dictionary<string, string[]> scenarioLabels =
+            new Dictionary<string, string[]>();
+        public readonly Dictionary<string, string> scenarioPaths =
+            new Dictionary<string, string>();
+        public string[] qualifiedLabelIds = System.Array.Empty<string>();
 
         public bool HasCharacters => characterIds.Length > 0;
         public bool HasBackgrounds => backgroundIds.Length > 0;
