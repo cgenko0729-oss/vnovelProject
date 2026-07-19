@@ -39,6 +39,9 @@ namespace VNEffects
 
         protected override void OnLaunch(VNEventContext ctx)
         {
+            var cfg = VNGameConfig.Active;
+            if (cfg != null) VNGameConfig.ApplyList(cfg.shops, ref shops);
+
             string id = ctx.Kw("id");
             _shop = null;
             foreach (var s in shops)

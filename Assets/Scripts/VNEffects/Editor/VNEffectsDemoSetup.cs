@@ -417,6 +417,14 @@ namespace VNEffects.EditorTools
 
             var rig = BuildStageRig();
 
+            // ---------- 内容总配置（重建场景不丢人工绑定的关键） ----------
+            // 存在 Assets/Resources/VNGameConfig.asset 时，下面所有"内容类"设置
+            // 都以它为准；本生成器只负责把它挂上去，不再覆盖用户数据。
+            var config = AssetDatabase.LoadAssetAtPath<VNGameConfig>(VNGameConfig.AssetPath);
+            bool hasConfigBackgrounds = config != null && config.backgrounds.Count > 0;
+            bool hasConfigCharacters = config != null && config.characters.Count > 0;
+            bool hasConfigCg = config != null && config.cgLibrary.Count > 0;
+
             // ---------- 角色定义资产 ----------
             EnsureFolder(CharactersDir);
             var defA = rig.charSprite != null
@@ -431,23 +439,45 @@ namespace VNEffects.EditorTools
 
             // ---------- VNStage ----------
             var stage = new GameObject("VNStage").AddComponent<VNStage>();
-            if (defA != null) stage.characters.Add(defA);
-            if (defB != null) stage.characters.Add(defB);
+            stage.config = config;
 
-            // 背景库：bg1 = 初始背景，其余大图依次 bg2...
-            int bgIndex = 1;
-            if (rig.bgSprite != null)
-                stage.backgrounds.Add(new VNStage.BackgroundEntry
-                    { id = $"bg{bgIndex++}", sprite = rig.bgSprite });
-            foreach (var s in rig.allSprites)
+            // 角色：扫 Characters 目录全部登记（新建角色资产后无需手动拖）
+            if (hasConfigCharacters)
             {
-                if (s == rig.bgSprite) continue;
-                stage.backgrounds.Add(new VNStage.BackgroundEntry
-                    { id = $"bg{bgIndex++}", sprite = s });
+                stage.characters.AddRange(config.characters);
+            }
+            else
+            {
+                stage.characters.AddRange(FindAllAssets<VNCharacterDef>());
+                if (stage.characters.Count == 0)
+                {
+                    if (defA != null) stage.characters.Add(defA);
+                    if (defB != null) stage.characters.Add(defB);
+                }
+            }
+
+            // 背景库：配置资产里有就用它（语义 id），否则退回 demo 的 bg1/bg2… 自动编号
+            if (hasConfigBackgrounds)
+            {
+                stage.backgrounds.AddRange(config.backgrounds);
+            }
+            else
+            {
+                int bgIndex = 1;
+                if (rig.bgSprite != null)
+                    stage.backgrounds.Add(new VNStage.BackgroundEntry
+                        { id = $"bg{bgIndex++}", sprite = rig.bgSprite });
+                foreach (var s in rig.allSprites)
+                {
+                    if (s == rig.bgSprite) continue;
+                    stage.backgrounds.Add(new VNStage.BackgroundEntry
+                        { id = $"bg{bgIndex++}", sprite = s });
+                }
             }
 
             // CG 库：Assets/CG 下的图自动灌入（文件名 = id）
-            FillCgLibrary(stage);
+            if (hasConfigCg) stage.cgLibrary.AddRange(config.cgLibrary);
+            else FillCgLibrary(stage);
 
             stage.characterLayer = rig.layerFront;
             stage.backgroundImage = rig.bgImage;
@@ -476,7 +506,16 @@ namespace VNEffects.EditorTools
             stage.speakerHighlight = rig.speakerHighlight;
             stage.toneMatch = rig.toneMatch;
             stage.choicePanel = rig.choicePanel;
-            stage.vnAudio = new GameObject("VNAudio").AddComponent<VNAudio>();
+            var vnAudio = new GameObject("VNAudio").AddComponent<VNAudio>();
+            vnAudio.config = config; // 音频库与音量标定由配置资产提供（生成器不再造空库）
+            if (config != null)
+            {
+                vnAudio.bgmLibrary.AddRange(config.bgmLibrary);
+                vnAudio.seLibrary.AddRange(config.seLibrary);
+                vnAudio.voiceLibrary.AddRange(config.voiceLibrary);
+                if (config.typingTick != null) vnAudio.typingTick = config.typingTick;
+            }
+            stage.vnAudio = vnAudio;
 
             // ---------- 事件模块注册表（含 QTE 连打示例） ----------
             var registry = new GameObject("VNEventRegistry").AddComponent<VNEventRegistry>();
@@ -490,13 +529,22 @@ namespace VNEffects.EditorTools
             mapGo.transform.SetParent(registry.transform, false);
             mapGo.SetActive(false);
             var mapModule = mapGo.AddComponent<VNMapModule>();
-            mapModule.mapSprite = rig.bgSprite; // 演示用背景当地图底图
-            mapModule.locations.Add(new VNMapModule.Location
-                { name = "教室", position = new Vector2(0.28f, 0.55f) });
-            mapModule.locations.Add(new VNMapModule.Location
-                { name = "图书馆", position = new Vector2(0.68f, 0.6f) });
-            mapModule.locations.Add(new VNMapModule.Location
-                { name = "天台", position = new Vector2(0.5f, 0.82f), condition = "好感度>=2" });
+            // 地图底图与地点：配置资产优先（坐标/条件是人工数据，重建不能丢）
+            if (config != null && config.mapLocations.Count > 0)
+            {
+                mapModule.mapSprite = config.mapSprite != null ? config.mapSprite : rig.bgSprite;
+                mapModule.locations.AddRange(config.mapLocations);
+            }
+            else
+            {
+                mapModule.mapSprite = rig.bgSprite; // 演示用背景当地图底图
+                mapModule.locations.Add(new VNMapModule.Location
+                    { name = "教室", position = new Vector2(0.28f, 0.55f) });
+                mapModule.locations.Add(new VNMapModule.Location
+                    { name = "图书馆", position = new Vector2(0.68f, 0.6f) });
+                mapModule.locations.Add(new VNMapModule.Location
+                    { name = "天台", position = new Vector2(0.5f, 0.82f), condition = "好感度>=2" });
+            }
             registry.modules.Add(new VNEventRegistry.Entry { id = "map", template = mapModule });
 
             // 商店模块（event shop id:服装店）
@@ -506,7 +554,9 @@ namespace VNEffects.EditorTools
             shopGo.SetActive(false);
             var shopModule = shopGo.AddComponent<VNShopModule>();
             var demoShop = EnsureShopDef();
-            shopModule.shops.Add(demoShop);
+            // 扫 Shops 目录全部登记（新建商店资产后无需手动拖）
+            shopModule.shops.AddRange(FindAllAssets<VNShopDef>());
+            if (shopModule.shops.Count == 0) shopModule.shops.Add(demoShop);
             registry.modules.Add(new VNEventRegistry.Entry { id = "shop", template = shopModule });
 
             // 日程排程模块（event plan slots:7 pool:… / event plan op:next）
@@ -515,7 +565,8 @@ namespace VNEffects.EditorTools
             planGo.transform.SetParent(registry.transform, false);
             planGo.SetActive(false);
             var planModule = planGo.AddComponent<VNPlanModule>();
-            planModule.plans.Add(EnsurePlanDef());
+            EnsurePlanDef();
+            planModule.plans.AddRange(FindAllAssets<VNPlanDef>());
             registry.modules.Add(new VNEventRegistry.Entry { id = "plan", template = planModule });
 
             // 结果结算弹窗模块（event result grade:great title:xx）
@@ -529,30 +580,31 @@ namespace VNEffects.EditorTools
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------
             EnsureFolder(QuestsDir);
             var questLog = new GameObject("VNQuestLog").AddComponent<VNQuestLog>();
-            questLog.quests.Add(EnsureQuestDef());
+            EnsureQuestDef();
+            questLog.quests.AddRange(FindAllAssets<VNQuestDef>());
 
             // ---------- 养成属性系统（示例属性定义 + HUD/面板组件） ----------
             EnsureFolder(StatsDir);
             var statsHud = new GameObject("VNStatsHud").AddComponent<VNStatsHud>();
-            statsHud.stats.AddRange(EnsureStatDefs());
+            EnsureStatDefs();
+            statsHud.stats.AddRange(FindAllAssets<VNStatDef>());
 
             // ---------- 物品栏（道具文案来源 = 商店定义） ----------
             var inventory = new GameObject("VNInventory").AddComponent<VNInventory>();
-            inventory.shops.Add(demoShop);
+            inventory.shops.AddRange(shopModule.shops);
 
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
-            runner.script = scriptAsset;
+            runner.config = config;
+            // 入口剧本：配置资产指定了就用它，否则用 demo
+            runner.script = config != null && config.entryScript != null
+                ? config.entryScript
+                : scriptAsset;
             runner.playOnStart = true;
-            // 养成玩法演示剧本：可用 chapter RaisingDemo.vn 切换，或在 Scenario Editor 里直接调试播放
-            var raisingDemo =
-                AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Scenarios/RaisingDemo.vn.txt");
-            if (raisingDemo != null) runner.chapters.Add(raisingDemo);
-            // 周日程排程演示剧本（event plan / event result / flag rand:）
-            var weekPlanDemo =
-                AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Scenarios/WeekPlanDemo.vn.txt");
-            if (weekPlanDemo != null) runner.chapters.Add(weekPlanDemo);
+            // 章节列表：扫 Assets/Scenarios 下全部 *.vn.txt 自动登记。
+            // 以前只登记两个 demo，导致重建后所有 jump 文件::标签 全部报错。
+            runner.chapters.AddRange(ScanScenarioAssets());
             new GameObject("VNBacklog").AddComponent<VNBacklog>();
 
             // ---------- 极简提示 ----------
@@ -565,7 +617,47 @@ namespace VNEffects.EditorTools
             AssetDatabase.SaveAssets();
             EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScriptScenePath));
             Debug.Log($"[VNScript] 剧本演示场景已保存到 {ScriptScenePath}。" +
-                      $"剧本文件：{DemoScriptPath}（可直接编辑后重新 Play）。");
+                      $"入口剧本：{(runner.script != null ? runner.script.name : "(无)")}，" +
+                      $"章节 {runner.chapters.Count} 个，角色 {stage.characters.Count} 个，" +
+                      $"背景 {stage.backgrounds.Count} 条。");
+            if (config == null)
+                Debug.LogWarning("[VNScript] 未找到 " + VNGameConfig.AssetPath +
+                                 "：背景/音频/入口剧本等人工绑定仍然只存在场景里，下次重建会丢失。\n" +
+                                 "建议执行 Tools → VN Effects → Game Config → Import From Scene " +
+                                 "把当前绑定搬进资产。");
+            else
+                Debug.Log($"[VNScript] 已挂载内容配置 {VNGameConfig.AssetPath}：" +
+                          $"背景 {config.backgrounds.Count} / BGM {config.bgmLibrary.Count} / " +
+                          $"SE {config.seLibrary.Count} / 地图地点 {config.mapLocations.Count}。");
+        }
+
+        // ==================================================================
+        // 资产扫描（约定优于配置：新建资产丢进目录即自动登记，重建场景不会漏）
+        // ==================================================================
+
+        /// <summary>按类型扫描整个工程里的资产，按路径排序返回。</summary>
+        static List<T> FindAllAssets<T>() where T : Object
+        {
+            return AssetDatabase.FindAssets($"t:{typeof(T).Name}")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .OrderBy(p => p)
+                .Select(AssetDatabase.LoadAssetAtPath<T>)
+                .Where(a => a != null)
+                .ToList();
+        }
+
+        /// <summary>扫描 Assets/Scenarios 下的全部 *.vn.txt 作为章节列表。</summary>
+        static List<TextAsset> ScanScenarioAssets()
+        {
+            const string dir = "Assets/Scenarios";
+            if (!AssetDatabase.IsValidFolder(dir)) return new List<TextAsset>();
+            return AssetDatabase.FindAssets("t:TextAsset", new[] { dir })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(p => p.EndsWith(".vn.txt"))
+                .OrderBy(p => p)
+                .Select(AssetDatabase.LoadAssetAtPath<TextAsset>)
+                .Where(a => a != null)
+                .ToList();
         }
 
         // ==================================================================

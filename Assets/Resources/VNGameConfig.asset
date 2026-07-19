@@ -1,0 +1,122 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d89fbec99b788947b61b62082ba9309, type: 3}
+  m_Name: VNGameConfig
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNGameConfig
+  entryScript: {fileID: 4900000, guid: 125bc3630bf040f689d94ab187685140, type: 3}
+  chapters:
+  - {fileID: 4900000, guid: 0d2f133c50d8418aad140f1d9524d04e, type: 3}
+  - {fileID: 4900000, guid: ce52a06913efddc4d9d2fa1902600a1f, type: 3}
+  - {fileID: 4900000, guid: 955d5e078eed9f34e90d63598cda2b25, type: 3}
+  - {fileID: 4900000, guid: 125bc3630bf040f689d94ab187685140, type: 3}
+  - {fileID: 4900000, guid: 595810d117144dd09cf352f7d9537a5f, type: 3}
+  - {fileID: 4900000, guid: c8ec8fcd50f14ccfa72975821eac17aa, type: 3}
+  - {fileID: 4900000, guid: 2c494596a0914599ae545b1ab21cc6d8, type: 3}
+  - {fileID: 4900000, guid: 4c615a3f83a148229de313c73b4d376b, type: 3}
+  characters:
+  - {fileID: 11400000, guid: 85d21fec57553cb4983145ad9f930fbe, type: 2}
+  - {fileID: 11400000, guid: d6da61221a1ce74439a3baf628fd3164, type: 2}
+  backgrounds:
+  - id: "\u6559\u5BA4"
+    sprite: {fileID: 21300000, guid: a176010961b11324b933533e744a7a12, type: 3}
+  - id: "\u6559\u5BA4_\u9EC4\u660F"
+    sprite: {fileID: 21300000, guid: 95d1b7803d945e747ae2c052c1129e7c, type: 3}
+  - id: "\u8D70\u5ECA"
+    sprite: {fileID: 21300000, guid: 7bd59737b70209a45b2e9d18550560ef, type: 3}
+  - id: "\u5929\u53F0"
+    sprite: {fileID: 21300000, guid: ab298d5e55847a044b315c4f31be8719, type: 3}
+  - id: "\u653E\u5B66\u8DEF"
+    sprite: {fileID: 21300000, guid: 9a2ec598805ba7d439a28c500918d8a8, type: 3}
+  - id: "\u56FE\u4E66\u9986"
+    sprite: {fileID: 21300000, guid: 0e940e88790b1c24c9df1bf1912d37ed, type: 3}
+  - id: "\u4FBF\u5229\u5E97"
+    sprite: {fileID: 21300000, guid: a176010961b11324b933533e744a7a12, type: 3}
+  - id: "\u5546\u5E97\u8857"
+    sprite: {fileID: 21300000, guid: 9ed771fe09d36fa47919dd3b652c2a2b, type: 3}
+  - id: "\u6211\u7684\u623F\u95F4"
+    sprite: {fileID: 21300000, guid: f2b908dafb9f37140bc54c2f6376c4cb, type: 3}
+  - id: "\u6D77\u8FB9"
+    sprite: {fileID: 21300000, guid: f2b908dafb9f37140bc54c2f6376c4cb, type: 3}
+  - id: "\u6587\u5316\u796D\u4F1A\u573A"
+    sprite: {fileID: 21300000, guid: 758ffad5418cfd24f9639830affac8f0, type: 3}
+  - id: "\u96EA\u8857"
+    sprite: {fileID: 21300000, guid: 0032b4797afba264e8d5c66ae76851a2, type: 3}
+  - id: "\u8F66\u7AD9"
+    sprite: {fileID: 21300000, guid: b7d8d6ad1bc35254b80a0d0b1c773bdf, type: 3}
+  cgLibrary:
+  - id: "CG_\u521D\u6B21\u5E76\u80A9"
+    sprite: {fileID: 21300000, guid: 494c52f379832b843ac1493526dc0977, type: 3}
+    group: 
+  - id: "CG_\u96E8\u4F1E"
+    sprite: {fileID: 21300000, guid: e9bd097d1c9ddcf4d89e048dddddee2b, type: 3}
+    group: 
+  - id: "CG_\u70DF\u82B1"
+    sprite: {fileID: 21300000, guid: 36bf03b0d09df9646b1e28d7d314e7ec, type: 3}
+    group: 
+  - id: "CG_\u5929\u53F0\u544A\u767D"
+    sprite: {fileID: 21300000, guid: 50315aa4dcabfdd4583e67f0905467ab, type: 3}
+    group: 
+  - id: "CG_\u5723\u8BDE"
+    sprite: {fileID: 21300000, guid: 36bf03b0d09df9646b1e28d7d314e7ec, type: 3}
+    group: 
+  - id: "CG_\u7ED3\u5C40_\u604B\u4EBA"
+    sprite: {fileID: 21300000, guid: 01d81aec1362f044f9e618dfe32de960, type: 3}
+    group: 
+  bgmLibrary:
+  - id: "\u65E5\u5E38"
+    clip: {fileID: 8300000, guid: beb5fcb8906346044ae6cf58c8d94067, type: 3}
+    volume: 1
+  - id: "\u9752\u6625"
+    clip: {fileID: 8300000, guid: 258c473fd99396e4e83c93022e058781, type: 3}
+    volume: 1
+  - id: "\u5FC3\u8DF3"
+    clip: {fileID: 8300000, guid: beb5fcb8906346044ae6cf58c8d94067, type: 3}
+    volume: 1
+  - id: "\u751C\u871C"
+    clip: {fileID: 8300000, guid: 258c473fd99396e4e83c93022e058781, type: 3}
+    volume: 1
+  - id: "\u5FE7\u90C1"
+    clip: {fileID: 8300000, guid: beb5fcb8906346044ae6cf58c8d94067, type: 3}
+    volume: 1
+  - id: "\u6B22\u95F9"
+    clip: {fileID: 8300000, guid: 258c473fd99396e4e83c93022e058781, type: 3}
+    volume: 1
+  - id: "\u544A\u767D"
+    clip: {fileID: 8300000, guid: beb5fcb8906346044ae6cf58c8d94067, type: 3}
+    volume: 1
+  - id: "\u5C3E\u58F0"
+    clip: {fileID: 8300000, guid: 258c473fd99396e4e83c93022e058781, type: 3}
+    volume: 1
+  seLibrary: []
+  voiceLibrary: []
+  typingTick: {fileID: 0}
+  overrideChannelVolumes: 0
+  bgmVolume: 0.75
+  seVolume: 1
+  voiceVolume: 1
+  mapSprite: {fileID: 0}
+  mapLocations: []
+  stats:
+  - {fileID: 11400000, guid: d2d646d7b7af9ee4b815e5e96312adbd, type: 2}
+  - {fileID: 11400000, guid: 4296374b37a48b243b3195a405d7663c, type: 2}
+  - {fileID: 11400000, guid: 86a7d7a9e18db7e42b3639658067f9d7, type: 2}
+  - {fileID: 11400000, guid: b81522d9d21a3ce4f8cf82c3018243d9, type: 2}
+  - {fileID: 11400000, guid: b6fcb47257208034db3826f785fd07b5, type: 2}
+  - {fileID: 11400000, guid: 3cb1b15eafcfcc44a969004b97330406, type: 2}
+  - {fileID: 11400000, guid: 5be56981d75cd964a85327dc54b803ce, type: 2}
+  - {fileID: 11400000, guid: d15bb2737e32ea04bb5c510b9d6d1e66, type: 2}
+  shops:
+  - {fileID: 11400000, guid: 33ba0ffc84737484ea03875d4b03575f, type: 2}
+  plans:
+  - {fileID: 11400000, guid: 7f8a6d6ef183b554289e701a526150c3, type: 2}
+  quests:
+  - {fileID: 11400000, guid: 3ff1279f32fd18946832bf209e25e71b, type: 2}

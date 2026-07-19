@@ -1519,6 +1519,32 @@ S）：Open 按钮旁下拉最近 5 个文件。
 4. #9 分支流程图——剧本越写越长后，结构可视化的价值指数上升，且死链检测免费附送。
 5. #30 台词导出 CSV——一旦考虑配音/校对/翻译就是刚需，早做格式早稳定。
 
+我先快速看一下项目文档里已记录的路线图和技术债，再给你有依据的建议。
+
+  Searched for 1 pattern
+
+基于项目现状（CLAUDE.md 路线图 + WhatAiDo 遗留清单），给你梳理一下接下来的选择。
+
+第一步：先花 5 分钟验证昨天的养成系统（强烈建议）
+
+1. Unity 里 Tools → VN Effects → Create Script Demo Scene 重建场景
+2. Scenario Editor 打开 RaisingDemo.vn.txt → 选首行 → ▶ 播放，跑一遍打工/买东西/过月
+3. 没问题的话把 Unity 新生成的 .meta 文件提  产生一批）
+
+有 bug 随时丢给我修。
+
+然后可以做什么（按我的推荐排序）
+钱 +150…），养成游戏的核心爽点
+- 属性检定随机事件：event check stat:魅力 dc:50 掷骰对抗属性，成功/失败分支——事件接口现成，半天工作量
+- 礼物/装备系统：道具送人加好感度（gift 命令），或穿戴改变立绘表情
+
+③ P3 台词内嵌演出标记 {shake}{w:0.5}{color:red} —— 路线图上的既定下一步，打字机已经 TMP 化（五十五章专门为此打的地基），逐字抖动/变  。
+（HP=flag、攻防按属性算），和养成属性天然联动（智力高 = 魔法强）。
+
+⑤ 用新系统写真实剧情 —— Chapter2/Chapter3 实际用上养成循环，边写边发现系统缺什么（实践通常比再堆功能更能暴露真需求）。
+
+我的建议路径：验证 → ① 标题画面+CG画廊 → ② 月末结算 。你选一个（或者说"按你的建议来"），我就开分支动工。
+
 
  now please think of more improvements or features you can add for this visual novel script system, as much as possible ideas from various perspective please. Please anaylze for me as detailed as possible and reply in chinese:
  reply in chinese in whole section , and for what you do during this section write in WhatAiDo.md file 
@@ -1546,3 +1572,18 @@ the project summary is in WhatAiDo.md and CLAUDE.md  file, now in my unity 3d vi
 45. 全屏情绪水波：点击涟漪的全屏版——受击/震惊时整个画面荡一圈波纹（shader 已有波浪基础）。
 46. 胶片颗粒/CRT 滤镜：回忆用颗粒+划痕、梦境和版）。
 
+reply in chinese in whole section ,and for each feature do , do it in a new branch and push in public github repo :https://github.com/cgenko0729-oss/vnovelProject.git, and do not delete any branch as i want to go back any time.
+the project summary is in WhatAiDo.md and CLAUDE.md  file, now in my unity 3d visual novel game, i want to implement 力量智力魅力感性等等的属性像養成模擬類遊戲的玩法,然后比如说有金钱系统500g,C:\Users\TonyCheung\Pictures\_AQuickPhoto\screenshot_20260718_232616.png , 还有比如说行动力,压力值,善恶值等等的条目的话, what is the best way to do , please anylze for me and give me a plan, 
+
+
+
+ reply in chinese in whole section , and for each feature do , do it in a new branch and push in public github repo :https://github.com/cgenko0729-oss/vnovelProject.git. and do not delete any branch as i want to go back any time. now in my unity visual novel game dev , i have some questions about how to use and about the porject , pleae anser me and write the answer in a GeneralQuestionGuide.md file : 
+1.现在我要怎么在小游戏完成后或者日历的某一天跳到指定的脚本file或指定的对话,或者说当我达成特定的属性后开启跳到指定的脚本或指定的对话,或者说完成特定任务后可以跳到指定的脚本或指定的对话吗?要怎么写?
+2.这个游戏的game loop应该是怎么样的可以是怎么样的,或者说有什么建议或者说一般的模拟养成游戏和gal游戏是怎么样的game loop, 现在的游戏系统支持吗?可以实现吗?
+3.now the HowToUse.md — 视觉小说剧本系统使用教程 is a bit old,  update this document to reflect the current game system . 
+4.我可以实现像截图中这游戏一样的排好一周的打工日程或学习日程然后逐一执行妈每个日程有机会产出不同的结果有失败普通成功大成功等等然后可以加我不同的属性或金钱:C:\Users\TonyCheung\Pictures\_AQuickPhoto\screenshot_20260719_094449.png , 
+C:\Users\TonyCheung\Pictures\_AQuickPhoto\screenshot_20260719_094616.png, 
+C:\Users\TonyCheung\Pictures\_AQuickPhoto\screenshot_20260719_094527.png, 
+5.现在我游戏中不少的UI比如说Config, saveload, dialogue frame界面都是 程序生成的 ,如果我之后想换 风格换 美术资产 的话可能吗? 有什么方法? what is the best way.比如说把它们做成prefab等等.
+6.除了UI以外 还有什么系统是 程序 游戏中生成的吗 ,这样做好吗比如说我之后想改动他们的话会比较不方便吗 ?
+7.现在这个视觉游戏系统 能很容易追加新功能吗 我是说小的功能 ,比如说 日期变更的时候 多插一行 日期改变UI insert from left,或一个转场 画面 fade in fade out with se, 再比如说 我属性除了现在的属性还想增加 社交度 ,享受度,或别的角色的好感度, 友情度 等等.再比如说完成任务后弹出一个结果弹窗 和一段演出 . 

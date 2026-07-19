@@ -25,7 +25,14 @@ namespace VNEffects
 
         public bool IsOpen => _open;
 
-        void Awake() => VNLocale.LanguageChanged += OnLanguageChanged;
+        void Awake()
+        {
+            // 道具文案来源 = 商店定义，同样优先读 VNGameConfig
+            var cfg = VNGameConfig.Active;
+            if (cfg != null) VNGameConfig.ApplyList(cfg.shops, ref shops);
+
+            VNLocale.LanguageChanged += OnLanguageChanged;
+        }
 
         void OnDestroy() => VNLocale.LanguageChanged -= OnLanguageChanged;
 

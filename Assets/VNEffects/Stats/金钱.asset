@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 923d1db506d651846a8eaf5b788ae0da, type: 3}
+  m_Name: "\u91D1\u94B1"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNStatDef
+  id: "\u91D1\u94B1"
+  displayName: "\u91D1\u94B1"
+  displayNameEn: Money
+  displayNameJa: "\u6240\u6301\u91D1"
+  icon: {fileID: 0}
+  color: {r: 1, g: 0.82, b: 0.32, a: 1}
+  useClamp: 1
+  minValue: 0
+  maxValue: 999999
+  initialValue: 500
+  style: 0
+  unit: G
+  gradeSteps: []
+  showInHud: 1

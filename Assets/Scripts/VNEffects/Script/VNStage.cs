@@ -13,6 +13,10 @@ namespace VNEffects
     /// </summary>
     public class VNStage : MonoBehaviour
     {
+        [Header("内容总配置（留空 = 自动读 Resources/VNGameConfig）\n" +
+                "资产里填了的项覆盖下面的场景设置，留空的项保持场景原样")]
+        public VNGameConfig config;
+
         [Header("角色与背景库")]
         public List<VNCharacterDef> characters = new List<VNCharacterDef>();
 
@@ -127,7 +131,24 @@ namespace VNEffects
 
         void Awake()
         {
+            ApplyGameConfig();
             AutoWire();
+        }
+
+        /// <summary>
+        /// 从 VNGameConfig 资产覆盖内容库（角色/背景/CG）。
+        /// 场景重建会清空组件上的这些列表，但资产不会丢 —— 这就是它存在的意义。
+        /// 覆盖语义：资产里非空的列表才覆盖，留空的保持场景原值。
+        /// </summary>
+        void ApplyGameConfig()
+        {
+            if (config != null) VNGameConfig.SetActive(config);
+            var cfg = config != null ? config : VNGameConfig.Active;
+            if (cfg == null) return;
+
+            VNGameConfig.ApplyList(cfg.characters, ref characters);
+            VNGameConfig.ApplyList(cfg.backgrounds, ref backgrounds);
+            VNGameConfig.ApplyList(cfg.cgLibrary, ref cgLibrary);
         }
 
         /// <summary>

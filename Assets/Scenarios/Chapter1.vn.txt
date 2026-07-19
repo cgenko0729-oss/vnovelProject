@@ -1,32 +1,38 @@
-
-
 bg bg1 transition:Eyelid
-# start:cut → 眨眼睁开时画面已在 top 2.05 视角；end:fade → 末镜头叠化回全图
+mood Neutral
+weather None
 camseq start:cut end:fade endfade:1
 > top 2.05 0
 > 34,-269 2.05 2
 > right 2 0 xfade:0.5
 > -427,0 2 3
 fx godrays on
-weather Rain
-letterbox on
-fx speedlines on
-fx meteor on
 show 亚里沙 at:left expr:默认 with:AfterimageDash
+emote 亚里沙 Surprise
+wait 0.4
+emote 亚里沙 Angry
+wait 0.4
+emote 亚里沙 Shy
+wait 0.4
+emote 亚里沙 Dejected
+wait 0.4
+emote 亚里沙 Recover
+wait 0.4
+emote 亚里沙 Nod
+wait 0.4
+emote 亚里沙 HeadShake
 wait 0.4
 show 小雪 at:right with:AfterimageDash
-voice v02
+bgm play b01 fade:2
 亚里沙: xxx今天的晚霞真漂亮啊……整片天空都烧起来了一样。
-voice v01
+se s01
 亚里沙: 是啊。你看，连云的边缘都镶上了金色。
 
-bg bg7 transition:PageCurl
-wait 1
-bg bg9 transition:Shatter
-wait 1
-bg bg10 transition:Ripple
-bg bg6 transition:InkBleed
-bg bg4 transition:Blinds
+bg bg1 transition:PageCurl
+bg bg1 transition:Shatter
+bg bg1 transition:Ripple
+bg bg1 transition:InkBleed
+bg bg1 transition:Blinds
 camera pushin 1.05 5 focus:亚里沙 @
 亚里沙: 那个……小雪。
 小雪: ？怎么了？
@@ -34,15 +40,12 @@ emote 小雪 Surprise
 小雪 Surprise: 怎、怎么了？突然这么严肃。
 
 bgm stop b01 fade:2
-bgm play b02 fade:2
 
 hide 小雪 with:fade
 hide 亚里沙 with:dissolve
 show 小雪02 at:middle with:FadeSlideUp
 小雪02: 是啊。你看，连云的边缘都镶上了金色。
 move 小雪02 left 0.7
-se s03 loop
-
 #fx heartbeat on
 #亚里沙: 我一直……有件事想告诉你。
 #
@@ -128,4 +131,11 @@ chapter Chapter2
 # ============================================
 
 #小雪02
+
+
+
+
+
+
+
 

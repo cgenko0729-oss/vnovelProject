@@ -95,8 +95,12 @@ namespace VNEffects
         /// <summary>当前是否仍有角色语音在播放（口型同步用）。</summary>
         public bool IsVoicePlaying => _voice != null && _voice.isPlaying;
 
+        [Header("内容总配置（留空 = 自动读 Resources/VNGameConfig）")]
+        public VNGameConfig config;
+
         void Awake()
         {
+            ApplyGameConfig();
             _instance = this;
             _initialBgmVolume = bgmVolume;
             _initialSeVolume = seVolume;
@@ -106,6 +110,31 @@ namespace VNEffects
             _seOneShot = CreateSource("SE", false);
             _voice = CreateSource("Voice", false);
             _tick = CreateSource("TypeTick", false);
+        }
+
+        /// <summary>
+        /// 从 VNGameConfig 资产覆盖三个音频库与打字音。
+        /// 音量标定（每条 AudioEntry.volume）是纯人工数据，无法从文件名推断，
+        /// 所以必须存在资产里才不会被场景重建冲掉。
+        /// 必须在 _initialXxxVolume 快照之前调用，否则通道音量覆盖会被旧值盖回去。
+        /// </summary>
+        void ApplyGameConfig()
+        {
+            if (config != null) VNGameConfig.SetActive(config);
+            var cfg = config != null ? config : VNGameConfig.Active;
+            if (cfg == null) return;
+
+            VNGameConfig.ApplyList(cfg.bgmLibrary, ref bgmLibrary);
+            VNGameConfig.ApplyList(cfg.seLibrary, ref seLibrary);
+            VNGameConfig.ApplyList(cfg.voiceLibrary, ref voiceLibrary);
+
+            if (cfg.typingTick != null) typingTick = cfg.typingTick;
+            if (cfg.overrideChannelVolumes)
+            {
+                bgmVolume = cfg.bgmVolume;
+                seVolume = cfg.seVolume;
+                voiceVolume = cfg.voiceVolume;
+            }
         }
 
         /// <summary>编辑器从中间行调试前，立即清除之前自动播放留下的音频状态。</summary>

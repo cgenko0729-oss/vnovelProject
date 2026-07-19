@@ -30,7 +30,14 @@ namespace VNEffects
 
         public bool IsOpen => _open;
 
-        void Awake() => VNLocale.LanguageChanged += OnLanguageChanged;
+        void Awake()
+        {
+            // 定义资产列表优先读 VNGameConfig（场景重建会把它重置成 demo 的那几个）
+            var cfg = VNGameConfig.Active;
+            if (cfg != null) VNGameConfig.ApplyList(cfg.quests, ref quests);
+
+            VNLocale.LanguageChanged += OnLanguageChanged;
+        }
 
         void OnDestroy() => VNLocale.LanguageChanged -= OnLanguageChanged;
 

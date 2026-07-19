@@ -72,6 +72,9 @@ namespace VNEffects
                 return;
             }
 
+            var cfg = VNGameConfig.Active;
+            if (cfg != null) VNGameConfig.ApplyList(cfg.plans, ref plans);
+
             var def = FindDef(ctx.Kw("id"));
             BuildActionList(def, ctx.Kw("pool"), ctx.line);
             if (_actions.Count == 0)
