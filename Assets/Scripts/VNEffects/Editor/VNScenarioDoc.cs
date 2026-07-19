@@ -171,14 +171,22 @@ namespace VNEffects.EditorTools
                 row.options = new List<VNChoiceOptionRow>();
             if (row.keyword == "camseq") row.camLines = new List<string>();
 
-            // if 特殊语法：if <cond> jump <label>
+            // if 特殊语法：if <expression with spaces> jump <label>
             if (row.keyword == "if")
             {
-                if (tokens.Length >= 4 && tokens[2] == "jump")
+                int jumpIndex = -1;
+                for (int t = tokens.Length - 2; t >= 2; t--)
+                    if (tokens[t] == "jump")
+                    {
+                        jumpIndex = t;
+                        break;
+                    }
+                if (jumpIndex > 1 && jumpIndex + 1 < tokens.Length)
                 {
-                    row.Set("condition", tokens[1]);
-                    row.Set("target", tokens[3]);
-                    for (int t = 4; t < tokens.Length; t++) row.extraTokens.Add(tokens[t]);
+                    row.Set("condition", string.Join(" ", tokens, 1, jumpIndex - 1));
+                    row.Set("target", tokens[jumpIndex + 1]);
+                    for (int t = jumpIndex + 2; t < tokens.Length; t++)
+                        row.extraTokens.Add(tokens[t]);
                 }
                 else
                 {
@@ -386,12 +394,13 @@ namespace VNEffects.EditorTools
             {
                 if (r.kind != VNRowKind.Command) continue;
                 if (r.keyword == "flag") AddFlagBase(set, r.Get("name"));
-                if (r.keyword == "if") AddFlagBase(set, r.Get("condition"));
+                if (r.keyword == "if") AddConditionFlags(set, r.Get("condition"));
                 if (r.options != null)
                     foreach (var o in r.options)
                     {
                         AddFlagBase(set, o.flagOp);
                         AddFlagBase(set, o.costOp); // cost 引用的属性名也是 flag
+                        AddConditionFlags(set, o.condition);
                     }
             }
             var list = new List<string>(set);
@@ -405,6 +414,12 @@ namespace VNEffects.EditorTools
             int cut = expr.IndexOfAny(new[] { '+', '-', '>', '<', '=', '!' });
             string name = (cut > 0 ? expr.Substring(0, cut) : expr).TrimStart('!').Trim();
             if (name.Length > 0) set.Add(name);
+        }
+
+        static void AddConditionFlags(HashSet<string> set, string expression)
+        {
+            if (string.IsNullOrWhiteSpace(expression)) return;
+            VNExpression.TryCollectIdentifiers(expression, set, out _);
         }
 
         // ------------------------------------------------------------------
@@ -555,10 +570,8 @@ namespace VNEffects.EditorTools
                         if (string.IsNullOrEmpty(r.Get("condition")) ||
                             string.IsNullOrEmpty(r.Get("target")))
                             Err(i, "if syntax: if <cond> jump <label>");
-                        else if (!System.Text.RegularExpressions.Regex.IsMatch(
-                            r.Get("condition"), @"^!?[^\s<>=!]+([<>=!]=?-?\d+)?$"))
-                            Err(i, $"condition \"{r.Get("condition")}\" is invalid " +
-                                   "(no spaces; e.g. 勇气 / !勇气 / 好感度>=2)");
+                        else if (!VNExpression.TryValidate(r.Get("condition"), out string error))
+                            Err(i, $"condition \"{r.Get("condition")}\" is invalid: {error}");
                         break;
                     case "bg":
                         if (string.IsNullOrEmpty(r.Get("id"))) Err(i, "bg needs a background id");
@@ -579,9 +592,13 @@ namespace VNEffects.EditorTools
                                     !VNStatsHud.ParseCostOp(o.costOp, out _, out _))
                                     Err(i, $"cost \"{o.costOp}\" is invalid " +
                                            "(stat name ± number; e.g. 金钱-100)");
-                                if (!string.IsNullOrEmpty(o.condition) &&
-                                    o.condition.IndexOfAny(new[] { ' ', '\t' }) >= 0)
-                                    Err(i, $"option if \"{o.condition}\" must not contain spaces");
+                                if (!string.IsNullOrEmpty(o.condition))
+                                {
+                                    if (o.condition.IndexOfAny(new[] { ' ', '\t' }) >= 0)
+                                        Err(i, $"option if \"{o.condition}\" must not contain spaces");
+                                    else if (!VNExpression.TryValidate(o.condition, out string error))
+                                        Err(i, $"option if \"{o.condition}\" is invalid: {error}");
+                                }
                                 CheckLabelRef(i, o.jump, "choice option");
                             }
                         break;

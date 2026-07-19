@@ -1290,16 +1290,22 @@ namespace VNEffects
 
                 case "if":
                 {
-                    // if 条件 jump 标签   （条件内不能有空格，如 好感度>=2）
-                    string cond = cmd.Arg(0);
-                    string action = cmd.Arg(1);
-                    if (action != "jump" || string.IsNullOrEmpty(cmd.Arg(2)))
+                    // 从最后一个 jump 向前重组条件，因此独立 if 可安全使用空格与括号。
+                    int jumpIndex = -1;
+                    for (int i = cmd.args.Count - 2; i >= 1; i--)
+                        if (cmd.args[i] == "jump")
+                        {
+                            jumpIndex = i;
+                            break;
+                        }
+                    if (jumpIndex <= 0 || jumpIndex + 1 >= cmd.args.Count)
                     {
-                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：if 语法应为「if 条件 jump 标签」");
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：if 语法应为「if 条件表达式 jump 标签」");
                         return null;
                     }
+                    string cond = string.Join(" ", cmd.args.GetRange(0, jumpIndex));
                     if (VNFlags.Evaluate(cond, cmd.line))
-                        JumpTo(cmd.Arg(2), cmd.line);
+                        JumpTo(cmd.args[jumpIndex + 1], cmd.line);
                     return null;
                 }
 

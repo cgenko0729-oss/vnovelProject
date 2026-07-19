@@ -62,42 +62,14 @@ namespace VNEffects
             Set(op, 1);
         }
 
-        /// <summary>求值条件串（不含空格）：flag名 / !flag名 / flag名&lt;op&gt;数值</summary>
+        /// <summary>求值只读条件表达式：支持 !、算术、比较、&&、|| 与括号。</summary>
         public static bool Evaluate(string cond, int line = 0)
         {
-            if (string.IsNullOrEmpty(cond)) return false;
-            cond = cond.Trim();
+            if (VNExpression.TryEvaluate(cond, Get, out bool result, out string error))
+                return result;
 
-            if (cond.StartsWith("!"))
-                return Get(cond.Substring(1)) == 0;
-
-            // 按长度优先匹配比较符
-            string[] ops = { ">=", "<=", "==", "!=", ">", "<" };
-            foreach (var op in ops)
-            {
-                int idx = cond.IndexOf(op);
-                if (idx <= 0) continue;
-
-                string name = cond.Substring(0, idx).Trim();
-                string rhs = cond.Substring(idx + op.Length).Trim();
-                if (!int.TryParse(rhs, out int value))
-                {
-                    Debug.LogWarning($"[VNScript] 第 {line} 行：条件「{cond}」右侧不是数字");
-                    return false;
-                }
-                int lhs = Get(name);
-                switch (op)
-                {
-                    case ">=": return lhs >= value;
-                    case "<=": return lhs <= value;
-                    case "==": return lhs == value;
-                    case "!=": return lhs != value;
-                    case ">": return lhs > value;
-                    case "<": return lhs < value;
-                }
-            }
-
-            return Get(cond) != 0; // 裸 flag 名：非 0 即真
+            Debug.LogWarning($"[VNScript] 第 {line} 行：条件「{cond}」无效：{error}");
+            return false;
         }
     }
 }

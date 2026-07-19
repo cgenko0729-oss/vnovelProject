@@ -130,7 +130,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 剧本场景：菜单 **Tools → VN Effects → Create Script Demo Scene** → `VNScriptDemo.unity`
 - 关键语义：命令默认同步等待，行尾 `@` = 异步；台词行 = 等打字完+玩家推进
 - 分支语法（P1，已完成）：`label/jump`、`flag 名字 [+1|数值]`（VNFlags 全局整型字典）、
-  `if 条件 jump 标签`（条件无空格：`好感度>=2`）、`choice` + `* 文本 [flag:op] [-> 标签]`
+  `if 表达式 jump 标签`（支持空格、`!`、整数算术/比较、`&&`、`||`、括号）、
+  `choice` + `* 文本 [if:无空格表达式] [flag:op] [-> 标签]`
 - P2（已完成）：F5/F9 打开 20 槽存读档界面（JSON 快照+PNG 截图缩略图+时间+末句台词，仅台词处可存）、
   对话框快捷功能条（Save/Load/Auto/Skip/Log/任务/Config/隐藏 UI）、H/滚轮 回想、A 自动、
   S 快进（DOTween.timeScale 全局加速）、VNToast 提示
