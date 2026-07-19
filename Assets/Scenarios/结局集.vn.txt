@@ -1,0 +1,83 @@
+# ============================================================
+# 结局集.vn.txt —— 多结局路由与永久通关标记示例
+# 入口约定：1=小雪真结局、2=学业、3=财富、4=过劳、5=普通。
+# ============================================================
+
+if 入口_结局==1 jump 小雪真结局
+if 入口_结局==2 jump 学业结局
+if 入口_结局==3 jump 财富结局
+if 入口_结局==4 jump 过劳结局
+if 入口_结局==5 jump 普通结局
+jump 普通结局
+
+label 小雪真结局
+flag 入口_结局 0
+flag 已通关_小雪真结局 1
+flag 通关次数 +1
+bg bg2 transition:InkBleed
+mood Night
+weather Fireflies
+letterbox on height:92 time:0.6
+show 亚里沙 at:left with:DissolveGlow
+show 小雪 at:right with:DissolveGlow
+fx heartbeat on
+亚里沙: 无论未来去往哪里，我都想和你一起。
+小雪: 嗯。这次，我们都没有错过彼此。
+sakura
+fx heartbeat off
+letterbox off time:0.5
+: 小雪真结局——完成任务并达到足够好感。
+jump 结局收尾
+
+label 学业结局
+flag 入口_结局 0
+flag 已通关_学业结局 1
+flag 通关次数 +1
+bg bg3 transition:PageCurl
+mood Dream
+show 亚里沙 at:center with:FadeSlideUp
+亚里沙: 那些在图书馆度过的夜晚，最终为我打开了新的道路。
+: 学业结局——智力达到要求。
+jump 结局收尾
+
+label 财富结局
+flag 入口_结局 0
+flag 已通关_财富结局 1
+flag 通关次数 +1
+bg bg4 transition:Shatter
+mood Sunset
+show 亚里沙 at:center with:AfterimageDash
+亚里沙: 从第一份兼职开始，我终于建立了属于自己的事业。
+: 财富结局——积累了足够金钱。
+jump 结局收尾
+
+label 过劳结局
+flag 入口_结局 0
+flag 已通关_过劳结局 1
+flag 通关次数 +1
+bg bg1 transition:Eyelid
+mood Memory
+weather Rain
+show 亚里沙 at:center with:FadeSlideUp
+emote 亚里沙 Dejected
+亚里沙: 我一直向前奔跑，却忘记了为什么出发。
+: 过劳结局——压力过高。负面状态也应该拥有明确反馈。
+jump 结局收尾
+
+label 普通结局
+flag 入口_结局 0
+flag 已通关_普通结局 1
+flag 通关次数 +1
+bg bg1 transition:NoiseDissolve
+mood Neutral
+weather None
+show 亚里沙 at:center with:FadeSlideUp
+亚里沙: 没有轰轰烈烈，但这段日子依然值得珍惜。
+: 普通结局。
+
+label 结局收尾
+reset effects
+: 教学提示：通关 Flag 可以用于标题界面、周目继承、隐藏选项、CG 鉴赏和真结局解锁。
+: 本项目的槽位存档会保存 VNFlags；若要跨所有存档永久保存，应另建类似 CG 解锁的全局存储。
+# 有真实 CG 素材后可使用：cg <Assets/CG 中的文件名> transition:WhiteFlash
+: Flag 高级教学剧本套件到此结束。

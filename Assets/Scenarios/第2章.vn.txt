@@ -1,0 +1,87 @@
+# ============================================================
+# 第2章.vn.txt —— 跨文件多入口路由、任务阶段、条件选项
+# 外部可先写 flag 入口_第2章 1|2|3，再 chapter 第2章。
+# ============================================================
+
+# 文件头路由：每个入口都跳到稳定 label，不跳物理行号。
+if 入口_第2章==1 jump 十月主线
+if 入口_第2章==2 jump 期末考试
+if 入口_第2章==3 jump 放学后补课
+jump 十月主线
+
+label 十月主线
+flag 入口_第2章 0
+flag 已看_第2章 1
+flag 主线进度 2
+bg bg2 transition:PageCurl
+mood Sunset
+weather Petals
+bgm play b01 fade:1
+show 亚里沙 at:left with:FadeSlideUp
+show 小雪 at:right with:FadeSlideUp
+
+小雪: 十月到了。你已经习惯新的生活了吗？
+亚里沙: 每个月都在变化，但有些选择会一直留在心里。
+
+# 任务状态最终会写入 Flag“任务_告白大作战”。已有任务时跳过 start，避免重置阶段。
+if 任务_告白大作战 jump 任务已存在
+quest start 告白大作战
+
+label 任务已存在
+
+choice
+* 和小雪约定一起努力 flag:十月约定_小雪 -> 十月约定
+* 专心准备考试 if:性格_认真 flag:十月约定_学习 -> 十月学习
+* 邀请大家一起复习 if:社交度>=10 flag:十月约定_大家 -> 十月社交
+
+label 十月约定
+stat 好感度_小雪 +10
+stat 社交度 +3
+小雪: 那就说好了，不可以一个人偷偷放弃。
+jump 十月汇合
+
+label 十月学习
+stat 智力 +12
+亚里沙: 这次一定要取得好成绩。
+jump 十月汇合
+
+label 十月社交
+stat 社交度 +8
+stat 好感度_小雪 +6
+小雪: 人多一点，复习也会变得有趣呢。
+
+label 十月汇合
+quest stage 告白大作战 1
+hide 小雪 with:fade
+hide 亚里沙 with:fade
+bgm stop fade:1
+reset effects
+chapter 主循环
+
+# 第二入口：别的文件可以直接进入同一文件中的独立事件。
+label 期末考试
+flag 入口_第2章 0
+bg bg3 transition:Blinds
+event qte time:4 target:16 title:期末考试答题！
+* success flag:考试通过 -> 考试成功
+* fail flag:考试失败 -> 考试失败
+
+label 考试成功
+stat 智力 +20
+flag 考试结果 1
+: 考试成功；“考试结果=1”可以在数章之后继续使用。
+chapter 主循环
+
+label 考试失败
+stat 压力 +15
+flag 考试结果 -1
+: 考试失败；负数也可以作为状态值。
+chapter 主循环
+
+label 放学后补课
+flag 入口_第2章 0
+stat 智力 +8
+stat 好感度_小雪 +4
+flag 补课次数 +1
+: 这是第2章的第三个入口，适合复用同一个剧本文件收纳相关事件。
+chapter 主循环

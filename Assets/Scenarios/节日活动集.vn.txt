@@ -1,0 +1,95 @@
+# ============================================================
+# 节日活动集.vn.txt —— 一个文件收纳多个固定日期事件
+# 入口约定：1=圣诞、2=新年、3=生日。进入后立即清零，防止下次误路由。
+# ============================================================
+
+if 入口_节日活动==1 jump 圣诞活动
+if 入口_节日活动==2 jump 新年活动
+if 入口_节日活动==3 jump 小雪生日
+jump 无入口保护
+
+label 圣诞活动
+flag 入口_节日活动 0
+flag 已看_圣诞 1
+bg bg2 transition:InkSpread
+mood Night
+weather Snow
+fx skycloud on
+bgm play b01 fade:2
+show 小雪 at:right with:FadeSlideUp
+
+小雪: 圣诞快乐。没想到你真的来了。
+choice
+* 送出蝴蝶结发饰 if:道具_蝴蝶结发饰>=1 -> 圣诞送礼
+* 一起欣赏灯饰 -> 圣诞散步
+
+label 圣诞送礼
+flag 道具_蝴蝶结发饰 -1
+flag 圣诞礼物_蝴蝶结 1
+stat 好感度_小雪 +15
+stat 享受度 +6
+emote 小雪 Shy
+小雪: 这是特意为我准备的吗……谢谢。
+jump 圣诞结束
+
+label 圣诞散步
+stat 好感度_小雪 +7
+stat 享受度 +10
+小雪: 只要一起走着，普通的街道也会变得特别。
+
+label 圣诞结束
+fx meteor on
+se s01 @
+transition WhiteFlash
+flag 圣诞参与次数 +1
+hide 小雪 with:fade
+bgm stop fade:1
+reset effects
+chapter 主循环
+
+label 新年活动
+flag 入口_节日活动 0
+flag 已看_新年 1
+bg bg1 transition:PageCurl
+mood Dream
+weather Petals
+show 亚里沙 at:left with:DissolveGlow
+show 小雪 at:right with:DissolveGlow
+亚里沙: 新的一年，希望我们都能实现愿望。
+小雪: 那我许愿，明年也能像这样见到你。
+stat 好感度_小雪 +8
+flag 新年参拜次数 +1
+hide 小雪 with:fade
+hide 亚里沙 with:fade
+reset effects
+chapter 主循环
+
+label 小雪生日
+flag 入口_节日活动 0
+flag 已看_小雪生日 1
+bg bg3 transition:CircleWipe
+mood Sunset
+show 小雪 at:center with:FadeSlideUp
+choice
+* 送她一份精心准备的礼物 cost:金钱-200 -> 生日礼物
+* 陪她度过安静的一天 -> 生日陪伴
+
+label 生日礼物
+stat 好感度_小雪 +14
+flag 生日选择_礼物 1
+jump 生日结束
+
+label 生日陪伴
+stat 好感度_小雪 +9
+stat 享受度 +8
+flag 生日选择_陪伴 1
+
+label 生日结束
+sakura
+小雪: 今天会成为我一直珍藏的回忆。
+hide 小雪 with:fade
+chapter 主循环
+
+label 无入口保护
+: 节日活动集没有收到有效入口。为了避免误播，返回主循环。
+chapter 主循环

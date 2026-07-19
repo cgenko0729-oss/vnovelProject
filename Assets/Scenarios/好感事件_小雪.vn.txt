@@ -1,0 +1,94 @@
+# ============================================================
+# 好感事件_小雪.vn.txt —— 阈值事件、一次性标记、任务完成结果演出
+# 入口约定：1=好感20、2=好感50、3=任务完成。
+# ============================================================
+
+if 入口_小雪事件==1 jump 好感二十事件
+if 入口_小雪事件==2 jump 好感五十事件
+if 入口_小雪事件==3 jump 任务完成事件
+jump 无入口保护
+
+label 好感二十事件
+flag 入口_小雪事件 0
+flag 已看_小雪事件20 1
+bg bg1 transition:NoiseDissolve
+mood Sunset
+show 小雪 at:right with:FadeSlideUp
+小雪: 最近你好像总是在努力。偶尔也要休息一下。
+choice
+* 接受她的关心 flag:小雪事件20_接受 -> 接受关心
+* 说自己还可以继续坚持 flag:小雪事件20_逞强 -> 继续逞强
+
+label 接受关心
+stat 好感度_小雪 +6
+stat 压力 -10
+小雪: 那就一起休息一会儿吧。
+jump 好感二十结束
+
+label 继续逞强
+stat 好感度_小雪 +2
+stat 压力 +4
+小雪: 真是的……至少不要勉强自己。
+
+label 好感二十结束
+hide 小雪 with:fade
+chapter 主循环
+
+label 好感五十事件
+flag 入口_小雪事件 0
+flag 已看_小雪事件50 1
+flag 路线_小雪 1
+bg bg2 transition:Eyelid
+mood Night
+weather Fireflies
+letterbox on height:82 time:0.5
+show 亚里沙 at:left with:DissolveGlow
+show 小雪 at:right with:DissolveGlow
+fx heartbeat on
+小雪: 如果有一天，我们必须选择不同的道路……你会怎么办？
+choice
+* 我会追上你 flag:小雪事件50_追随 -> 追随回答
+* 我会在约定的地方等你 flag:小雪事件50_等待 -> 等待回答
+
+label 追随回答
+stat 好感度_小雪 +10
+亚里沙: 不管你去哪里，我都会努力追上。
+jump 好感五十结束
+
+label 等待回答
+stat 好感度_小雪 +8
+亚里沙: 我会相信我们的约定。
+
+label 好感五十结束
+sakura
+fx heartbeat off
+letterbox off time:0.4
+hide 小雪 with:fade
+hide 亚里沙 with:fade
+reset effects
+chapter 主循环
+
+label 任务完成事件
+flag 入口_小雪事件 0
+flag 已看_任务完成演出 1
+transition WhiteFlash
+se s01 @
+letterbox on height:90 time:0.35
+bg bg2 transition:Ripple
+mood Dream
+show 小雪 at:center with:FadeSlideUp
+emote 小雪 Shy
+: 任务完成！“告白大作战”的状态 Flag 已经是 100。
+小雪: 你的心意，我已经确实收到了。
+stat 好感度_小雪 +10
+flag 路线_小雪 1
+sakura
+wait 0.6
+letterbox off time:0.35
+hide 小雪 with:fade
+reset effects
+chapter 主循环
+
+label 无入口保护
+: 好感事件文件没有收到有效入口，因此安全返回主循环。
+chapter 主循环

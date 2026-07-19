@@ -1,0 +1,95 @@
+# ============================================================
+# 第1章.vn.txt —— Flag 高级教学套件：新游戏初始化与基础分支
+#
+# 使用前：把本套件的 7 个 .vn.txt 全部登记到 VNScriptRunner.Chapters。
+# 推荐从本文件开始播放。内部状态用 flag（静默），玩家可见数值用 stat（飘字/HUD）。
+# ============================================================
+
+# 裸 flag：非 0 即真；!flag：等于 0 时为真。
+if !已初始化 jump 新游戏初始化
+jump 已有进度入口
+
+label 新游戏初始化
+reset effects
+bg bg1 transition:Eyelid
+mood Neutral
+weather None
+portrait on
+bgm play b01 fade:2
+
+# 玩家可见属性。没有 VNStatDef 也能保存和判断，只是不会钳制或显示在 HUD。
+stat 金钱 500
+stat 行动力 10
+stat 压力 0
+stat 体力 70
+stat 智力 20
+stat 魅力 20
+stat 感性 20
+stat 社交度 0
+stat 享受度 0
+stat 好感度_小雪 0
+
+# 日历：当前系统按月推进。
+time set 9 remain:6
+
+# Flag 的常见角色：布尔开关、计数器、枚举/阶段、跨文件入口、防重复标记。
+flag 已初始化 1
+flag 主线进度 1
+flag 本月事件已触发 0
+flag 学习次数 0
+flag 打工次数 0
+flag 训练成功次数 0
+flag 与小雪相处次数 0
+flag 已看_第2章 0
+flag 已看_第3章 0
+flag 已看_圣诞 0
+flag 已看_小雪事件20 0
+flag 已看_小雪事件50 0
+flag 已看_任务完成演出 0
+flag 路线_小雪 0
+flag 路线_学业 0
+flag 路线_财富 0
+
+show 亚里沙 at:left with:DissolveGlow
+wait 0.3
+show 小雪 at:right with:FadeSlideUp
+
+亚里沙: 九月的新学期开始了。接下来每一个选择，都会留下看不见的记录。
+小雪: 有些记录是属性，有些是任务，还有些会决定未来能不能遇见某段剧情。
+
+# 选项可以在点击时直接写一个 flag，再跳到不同 label。
+choice
+* 我想认真学习 flag:性格_认真 -> 选择认真
+* 我想多认识朋友 flag:性格_外向 -> 选择外向
+* 我想享受青春 flag:性格_享乐 -> 选择享乐
+
+label 选择认真
+stat 智力 +10
+flag 路线_学业 1
+亚里沙: 先把成绩提高，未来才会有更多选择。
+jump 选择汇合
+
+label 选择外向
+stat 社交度 +10
+stat 好感度_小雪 +5
+亚里沙: 我想主动一点，不再错过重要的人。
+jump 选择汇合
+
+label 选择享乐
+stat 享受度 +10
+stat 压力 -5
+亚里沙: 努力很重要，但快乐也不能被忘记。
+
+label 选择汇合
+flag 入口_第1章 0
+亚里沙: 就从今天开始吧。
+hide 小雪 with:fade
+hide 亚里沙 with:dissolve
+bgm stop fade:1
+reset effects
+chapter 主循环
+
+# 已有进度时再次进入第1章，不重新初始化，避免覆盖存档数值。
+label 已有进度入口
+: 检测到“已初始化”不为 0，因此跳过初始化并返回主循环。
+chapter 主循环
