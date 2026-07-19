@@ -101,6 +101,34 @@ namespace VNEffects
         public string titleBgm;
 
         // ==============================================================
+        // UI 皮肤（对话框 / 选项面板；剧本 ui dialogue|choice <id> 切换）
+        // ==============================================================
+
+        [System.Serializable]
+        public class UiSkinEntry
+        {
+            [Header("剧本 ui 命令引用的 id（可中文，如 华丽 / 顶部）")]
+            public string id;
+            [Header("皮肤 prefab（根上挂 VNDialogueSkin 或 VNChoiceSkin）")]
+            public GameObject prefab;
+        }
+
+        [Header("──────── UI 皮肤 ────────")]
+        [Header("对话框皮肤库（起点：Tools → VN Effects → UI Skins 导出默认皮肤后复制修改）")]
+        public List<UiSkinEntry> dialogueSkins = new List<UiSkinEntry>();
+        [Header("选项面板皮肤库")]
+        public List<UiSkinEntry> choiceSkins = new List<UiSkinEntry>();
+
+        /// <summary>按 id 查皮肤 prefab；找不到或 id 为空返回 null</summary>
+        public static GameObject FindSkin(List<UiSkinEntry> list, string id)
+        {
+            if (list == null || string.IsNullOrEmpty(id)) return null;
+            foreach (var e in list)
+                if (e != null && e.id == id) return e.prefab;
+            return null;
+        }
+
+        // ==============================================================
         // 舞台内容
         // ==============================================================
 

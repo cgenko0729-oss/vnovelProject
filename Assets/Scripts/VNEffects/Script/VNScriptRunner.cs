@@ -334,6 +334,15 @@ namespace VNEffects
                     case "portrait":
                         snapshot.portraitOff = cmd.Arg(0, "on") == "off";
                         break;
+                    case "ui":
+                    {
+                        // 皮肤切换是持续状态：记入快照（default = 空 = 程序化默认）
+                        string skinId = cmd.Arg(1, "default");
+                        if (skinId == "default") skinId = null;
+                        if (cmd.Arg(0) == "dialogue") snapshot.dialogueSkin = skinId;
+                        else if (cmd.Arg(0) == "choice") snapshot.choiceSkin = skinId;
+                        break;
+                    }
                     case "show":
                         RebuildShowState(characters, cmd);
                         break;
@@ -1672,6 +1681,11 @@ namespace VNEffects
                 case "portrait":
                     // portrait on / portrait off：对话头像全局开关
                     stage.SetPortraitEnabled(cmd.Arg(0, "on") != "off");
+                    return null;
+
+                case "ui":
+                    // ui dialogue|choice <皮肤id|default>：切换对话框/选项面板皮肤
+                    stage.SetUiSkin(cmd.Arg(0), cmd.Arg(1, "default"), cmd.line);
                     return null;
 
                 case "camera":

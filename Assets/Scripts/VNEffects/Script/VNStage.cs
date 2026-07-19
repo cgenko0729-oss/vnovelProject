@@ -526,6 +526,72 @@ namespace VNEffects
         }
 
         // ------------------------------------------------------------------
+        // UI 皮肤（对话框 / 选项面板）
+        // ------------------------------------------------------------------
+
+        /// <summary>当前对话框皮肤 id（null = 程序化默认，进存档快照）</summary>
+        public string CurrentDialogueSkinId { get; private set; }
+        /// <summary>当前选项面板皮肤 id（null = 程序化默认，进存档快照）</summary>
+        public string CurrentChoiceSkinId { get; private set; }
+
+        /// <summary>
+        /// 剧本 ui 命令入口：ui dialogue|choice &lt;id|default&gt;。
+        /// id 在 VNGameConfig 的 dialogueSkins/choiceSkins 里登记；
+        /// default（或空）= 回程序化默认样式。找不到 id 时报错并保持现状。
+        /// </summary>
+        public void SetUiSkin(string kind, string id, int line = 0)
+        {
+            bool toDefault = string.IsNullOrEmpty(id) || id == "default";
+            var cfg = VNGameConfig.Active;
+
+            switch (kind)
+            {
+                case "dialogue":
+                {
+                    VNDialogueSkin skin = null;
+                    if (!toDefault)
+                    {
+                        var prefab = cfg != null
+                            ? VNGameConfig.FindSkin(cfg.dialogueSkins, id) : null;
+                        skin = prefab != null ? prefab.GetComponent<VNDialogueSkin>() : null;
+                        if (skin == null)
+                        {
+                            Debug.LogError($"[VNScript] 第 {line} 行：对话框皮肤「{id}」未在 " +
+                                           "VNGameConfig.dialogueSkins 登记（或 prefab 缺 VNDialogueSkin）");
+                            return;
+                        }
+                    }
+                    dialogue?.ApplySkin(skin);
+                    CurrentDialogueSkinId = toDefault ? null : id;
+                    break;
+                }
+                case "choice":
+                {
+                    VNChoiceSkin skin = null;
+                    if (!toDefault)
+                    {
+                        var prefab = cfg != null
+                            ? VNGameConfig.FindSkin(cfg.choiceSkins, id) : null;
+                        skin = prefab != null ? prefab.GetComponent<VNChoiceSkin>() : null;
+                        if (skin == null)
+                        {
+                            Debug.LogError($"[VNScript] 第 {line} 行：选项皮肤「{id}」未在 " +
+                                           "VNGameConfig.choiceSkins 登记（或 prefab 缺 VNChoiceSkin）");
+                            return;
+                        }
+                    }
+                    choicePanel?.ApplySkin(skin);
+                    CurrentChoiceSkinId = toDefault ? null : id;
+                    break;
+                }
+                default:
+                    Debug.LogWarning($"[VNScript] 第 {line} 行：ui 命令用法为" +
+                                     "「ui dialogue|choice <皮肤id|default>」");
+                    break;
+            }
+        }
+
+        // ------------------------------------------------------------------
         // 存档快照 / 读档恢复
         // ------------------------------------------------------------------
 
@@ -544,6 +610,8 @@ namespace VNEffects
             data.cgId = CurrentCgId;
             data.cgKeepChars = _cgKeepChars;
             data.cgKeepFx = _cgKeepFx;
+            data.dialogueSkin = CurrentDialogueSkinId;
+            data.choiceSkin = CurrentChoiceSkinId;
 
             data.fxOn.Clear();
             foreach (var kv in _fxStates)
@@ -570,6 +638,15 @@ namespace VNEffects
         public void RestoreSnapshot(VNSaveData data, bool instant)
         {
             ClearStage();
+
+            // UI 皮肤最先恢复：随后重放的台词/选项直接落在正确皮肤上
+            // （旧存档字段为空 = 默认样式，且仅在与当前不同时才切换，避免无谓重建）
+            if (data.dialogueSkin != CurrentDialogueSkinId)
+                SetUiSkin("dialogue", string.IsNullOrEmpty(data.dialogueSkin)
+                    ? "default" : data.dialogueSkin);
+            if (data.choiceSkin != CurrentChoiceSkinId)
+                SetUiSkin("choice", string.IsNullOrEmpty(data.choiceSkin)
+                    ? "default" : data.choiceSkin);
 
             if (!string.IsNullOrEmpty(data.backgroundId))
                 SetBackground(data.backgroundId, null);
