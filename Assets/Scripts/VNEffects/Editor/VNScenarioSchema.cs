@@ -226,10 +226,12 @@ namespace VNEffects.EditorTools
                 Pos("label", "to", VNParamSource.Label));
             Add("chapter", "Flow", "chapter <scenario file>",
                 Pos("chapter", "file", VNParamSource.Text));
-            Add("flag", "Flow", "flag <name> [value|+1|-1]",
+            Add("flag", "Flow", "flag <name> [value|+1|-1] [rand:min-max]\n" +
+                "rand:1-100 = 区间内随机取整写入（与 value 二选一，rand 优先）",
                 Pos("name", "flag", VNParamSource.Flag),
                 Pos("value", "value", VNParamSource.Options,
-                    new[] { "+1", "-1", "1", "0" }, weight: 0.5f));
+                    new[] { "+1", "-1", "1", "0" }, weight: 0.5f),
+                Kw("rand", "随机区间", VNParamSource.Text, weight: 0.5f));
             Add("stat", "Flow", "stat <name> <+n|-n|value>\n" +
                 "养成属性读写：与 flag 同存 VNFlags，但按 VNStatDef 钳制范围并飘字提示",
                 Pos("name", "属性", VNParamSource.Flag),

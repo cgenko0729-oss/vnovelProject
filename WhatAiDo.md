@@ -2937,3 +2937,37 @@ RaisingDemo.vn.txt 作为养成玩法范例。
 运行前需把七个 TextAsset 登记到场景 `VNScriptRunner.Chapters`，并从 `第1章.vn.txt` 开始。
 本批只新增剧本和 Unity `.meta`，没有修改用户已有章节、场景、运行时代码或生成器；完成后对
 命令关键字、label/jump 引用、chapter 目标、event 结果行和入口清零进行静态验证。
+
+## 六十九、flag 随机数扩展 rand:min-max（2026-07-19，分支 `agent/flag-rand`）
+
+周日程玩法（七十章）的前置小功能：给 flag 命令加区间随机写入，
+剧本可实现"失败/普通/成功/大成功"式的概率分级。
+
+### 语法
+
+```
+flag 运气 rand:1-100     # [1,100] 闭区间随机取整写入
+if 运气<=10 jump 失败
+if 运气<=80 jump 普通
+...
+```
+
+### 实现（VNScriptRunner.cs）
+
+- 运行时 `case "flag"` 与调试重建的 `ApplyDebugFlag` 原本是两份重复逻辑，
+  借此机会合并为共用静态方法 `ApplyFlagCommand(cmd, silent)`（silent = 重放时
+  不弹告警），rand 两条路径同时生效；
+- `TryParseRandRange`：从第 2 个字符起找 `-` 分隔符（兼容负数下限如 `-5-5`），
+  min>max 时自动交换；解析失败告警并不写入；
+- 随机源 = UnityEngine.Random（该文件未 using System，无歧义）。
+
+### 已知限制（有意为之）
+
+调试"重建前置状态"会静默重放 flag 命令 → rand 重新掷骰，重建出的分支状态
+可能与实际游玩路径不同。这与 event 结果不重放是同类限制（重建逻辑本来就把
+if/choice/event 视为分支点并告警），不额外处理。
+
+### 配套更新
+
+Demo.vn.txt 语法头、HowToUse.md 第五章（含"属性影响概率"的判定链写法示例）、
+Scenario Editor schema（flag 命令加 rand 参数框）。

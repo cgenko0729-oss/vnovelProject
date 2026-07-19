@@ -324,8 +324,8 @@ namespace VNEffects
                         }
                         break;
                     }
-                    case "flag":
-                        ApplyDebugFlag(cmd);
+                    case "flag": // 静默重放（rand 会重新掷骰，见 ApplyFlagCommand 注释）
+                        ApplyFlagCommand(cmd, true);
                         break;
                     case "quest": // 静默重放（写状态不弹 Toast）
                         _questLog?.Apply(cmd.Arg(0, "start"), cmd.Arg(1),
@@ -415,15 +415,51 @@ namespace VNEffects
             }
         }
 
-        static void ApplyDebugFlag(VNScriptCommand cmd)
+        /// <summary>
+        /// flag 命令共用实现（运行时执行与调试重建静默重放）。
+        ///   flag 名字 / flag 名字 3 / flag 名字 +1 / flag 名字 rand:1-100
+        /// rand:min-max = 闭区间随机取整写入。注意：调试重建重放时会重新掷骰，
+        /// 重建出的分支状态可能与实际游玩不同（与 event 结果不重放同类限制）。
+        /// </summary>
+        static void ApplyFlagCommand(VNScriptCommand cmd, bool silent)
         {
             string name = cmd.Arg(0);
+            if (string.IsNullOrEmpty(name))
+            {
+                if (!silent) Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：flag 缺少名字");
+                return;
+            }
+
+            string rand = cmd.Kw("rand");
+            if (!string.IsNullOrEmpty(rand))
+            {
+                if (TryParseRandRange(rand, out int lo, out int hi))
+                    VNFlags.Set(name, Random.Range(lo, hi + 1));
+                else if (!silent)
+                    Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：rand 区间「{rand}」" +
+                                     "应为「min-max」（如 1-100）");
+                return;
+            }
+
             string value = cmd.Arg(1);
-            if (string.IsNullOrEmpty(name)) return;
             if (string.IsNullOrEmpty(value)) VNFlags.Apply(name);
             else if (value.StartsWith("+") || value.StartsWith("-"))
                 VNFlags.Apply(name + value);
             else if (int.TryParse(value, out int parsed)) VNFlags.Set(name, parsed);
+            else if (!silent)
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：flag 值「{value}」无法识别");
+        }
+
+        /// <summary>解析 rand 区间串「min-max」（允许负数，如 -5-5）</summary>
+        static bool TryParseRandRange(string s, out int lo, out int hi)
+        {
+            lo = hi = 0;
+            int sep = s.IndexOf('-', 1); // 从第 2 个字符起找分隔符，兼容负数下限
+            if (sep <= 0 || sep >= s.Length - 1) return false;
+            if (!int.TryParse(s.Substring(0, sep), out lo)) return false;
+            if (!int.TryParse(s.Substring(sep + 1), out hi)) return false;
+            if (hi < lo) { int t = lo; lo = hi; hi = t; }
+            return true;
         }
 
         void RestoreDebugCamera(VNScriptCommand command)
@@ -1248,20 +1284,9 @@ namespace VNEffects
                     return null;
 
                 case "flag":
-                {
-                    // flag 名字 / flag 名字 3 / flag 名字 +1（也支持 flag 名字+1）
-                    string name = cmd.Arg(0);
-                    string value = cmd.Arg(1);
-                    if (string.IsNullOrEmpty(value))
-                        VNFlags.Apply(name);
-                    else if (value.StartsWith("+") || value.StartsWith("-"))
-                        VNFlags.Apply(name + value);
-                    else if (int.TryParse(value, out int v))
-                        VNFlags.Set(name, v);
-                    else
-                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：flag 值「{value}」无法识别");
+                    // flag 名字 / flag 名字 3 / flag 名字 +1 / flag 名字 rand:1-100
+                    ApplyFlagCommand(cmd, false);
                     return null;
-                }
 
                 case "if":
                 {
