@@ -100,3 +100,18 @@ qte.title = 連打！
 qte.success = 成功！
 qte.fail = 失敗…
 map.title = どこへ行く？
+
+# —— スケジュール ——
+plan.title = スケジュールを組もう
+plan.confirm = 決定
+plan.reset = リセット
+plan.rest = （休む）
+plan.slot = {0}日目
+plan.noSlot = 予定がいっぱいです（枠をクリックで解除）
+
+# —— リザルト ——
+result.fail = 失敗……
+result.normal = ふつう
+result.good = 成功！
+result.great = 大成功！！
+result.continue = ▼ クリックで続行

@@ -2971,3 +2971,68 @@ if/choice/event 视为分支点并告警），不额外处理。
 
 Demo.vn.txt 语法头、HowToUse.md 第五章（含"属性影响概率"的判定链写法示例）、
 Scenario Editor schema（flag 命令加 rand 参数框）。
+
+## 七十、周日程排程玩法：VNPlanModule + VNResultPopupModule（2026-07-19，分支 `agent/plan-module`）
+
+实现《火山的女儿》式「排好一周日程 → 逐一执行 → 随机产出失败/普通/成功/大成功
+→ 加属性」玩法。前置的随机数扩展见六十九章（分支 `agent/flag-rand`）。
+
+### 玩法拆成四块
+
+| 环节 | 实现 |
+|---|---|
+| ① 排一周日程 | `event plan slots:7 pool:打工,学习,剑术训练,休息 title:安排这一周` |
+| ② 逐格执行 | `event plan op:next`（无 UI 秒回，写 flag `当前格`/`当前行动`，剧本 if 派发） |
+| ③ 随机分级 | `flag 运气 rand:1-100` + if 阈值链 |
+| ④ 结算演出 | `event result grade:great title:剑术训练 sub:… se:…` + `stat` 飘字 |
+
+循环骨架（`label 执行日程` … `jump 执行日程`）全部写在剧本里。
+
+### 新文件
+
+- **VNPlanDef.cs**（资产）：候选行动清单。每个行动有 id（剧本 pool: 引用，不翻译）、
+  number（写进 flag 的行动编号，剧本按它派发）、显示名/预期收益文案（三语）、
+  图标、condition（上架条件，复用 VNFlags.Evaluate）。
+- **VNPlanModule.cs**（事件模块，id = `plan`）：
+  - 排程模式：左列候选行动（图标+名称+收益文案，点击填入下一个空格）、
+    右列 N 个日程格（点击清空），底部重置/确定。确定写入
+    `日程_1..N`（值 = 行动编号，**空格写 0 = 休息**）、`日程数`、`当前格`归零；
+  - `op:next` 模式：无 UI，当前格 +1 并把该格编号抄进 `当前行动`，
+    超出日程数返回结果 `end`（否则 `next`）——同步 Done，EventCo 的
+    `while (result == null)` 当帧就退出，对话框无闪烁；
+  - 无 VNPlanDef 资产时退化：`pool:` 名字按出现顺序编号 1..n 照常可玩。
+- **VNResultPopupModule.cs**（事件模块，id = `result`）：四档 grade
+  （fail/normal/good/great）各自的大字、配色、面板底色；大字 2.6 倍缩放砸落
+  + 落地 punch，good/great 追加 10 颗四芒星向外爆散；`title:`/`sub:`/`se:` 可选；
+  点击/回车/空格关闭（`inputDelay` 0.4s 防连点误触）。
+- **WeekPlanDemo.vn.txt**：完整可跑演示（两周循环、四种行动各自的概率表、
+  剑术训练演示「体力≥150 走另一条更宽松的阈值链」= 属性影响概率）。
+
+### 设计决策
+
+1. **概率表写在剧本里而不是模块内部**。评估过模块掷骰（公式写死在代码里）
+   的方案，选了剧本侧 `rand` + if 阈值链——概率表本质是**内容不是逻辑**，
+   调平衡不该改代码。属性影响概率靠「分流到另一条阈值链」表达。
+2. **排程与派发同一个模块的两种 op**，而不是拆成两个模块：它们共享
+   flag 命名约定（日程_N / 日程数 / 当前格 / 当前行动），放一起便于维护。
+3. **空格 = 休息（写 0）**，不强制填满：确定按钮永远可点，剧本把 0 当休息处理。
+4. **属性增减仍由剧本的 stat 命令负责**，弹窗只管演出——截图左侧那排增益条
+   就是 VNStatsHud 已有的 +N 飘字。
+
+### 配套改动
+
+- VNProceduralTextures 加 `SparkleSprite`（已有 Sparkle 贴图的 Sprite 包装，
+  供 Image 用于星光爆发）；
+- 场景生成器：注册 plan/result 两个模块模板、新建 `Assets/VNEffects/Plans/周日程.asset`
+  示例方案（打工1/学习2/剑术训练3/休息4，与演示剧本编号对应）、
+  把 WeekPlanDemo.vn.txt 登记进 Runner.chapters；
+- 三语 UI 字符串表加 `plan.*` / `result.*`；
+- Scenario Editor schema：event 命令说明补内置模块清单；
+- HowToUse.md 第六章新增「周日程排程：plan + result」小节 + 排查表 4 条 +
+  速查卡；GeneralQuestionGuide.md 问题四改写为「已实现」并补设计理由；
+  CLAUDE.md 组件速查表与养成系统条目更新。
+
+### 使用前提
+
+**必须重建剧本演示场景**（Tools → VN Effects → Create Script Demo Scene）
+才会注册 plan/result 模块并生成示例方案资产。

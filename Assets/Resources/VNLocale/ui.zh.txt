@@ -101,3 +101,18 @@ qte.title = 连打！
 qte.success = 成功！
 qte.fail = 失败…
 map.title = 要去哪里？
+
+# —— 日程排程 ——
+plan.title = 安排日程
+plan.confirm = 确定
+plan.reset = 重置
+plan.rest = （休息）
+plan.slot = 第 {0} 天
+plan.noSlot = 日程已排满（点右侧格子可清除）
+
+# —— 结果结算弹窗 ——
+result.fail = 失败……
+result.normal = 普通
+result.good = 成功！
+result.great = 大成功！！
+result.continue = ▼ 点击继续

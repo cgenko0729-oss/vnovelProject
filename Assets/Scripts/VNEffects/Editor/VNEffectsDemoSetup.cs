@@ -24,6 +24,7 @@ namespace VNEffects.EditorTools
         const string QuestsDir = "Assets/VNEffects/Quests";
         const string StatsDir = "Assets/VNEffects/Stats";
         const string ShopsDir = "Assets/VNEffects/Shops";
+        const string PlansDir = "Assets/VNEffects/Plans";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -507,6 +508,22 @@ namespace VNEffects.EditorTools
             var demoShop = EnsureShopDef();
             shopModule.shops.Add(demoShop);
             registry.modules.Add(new VNEventRegistry.Entry { id = "shop", template = shopModule });
+
+            // 日程排程模块（event plan slots:7 pool:… / event plan op:next）
+            EnsureFolder(PlansDir);
+            var planGo = new GameObject("PlanTemplate", typeof(RectTransform));
+            planGo.transform.SetParent(registry.transform, false);
+            planGo.SetActive(false);
+            var planModule = planGo.AddComponent<VNPlanModule>();
+            planModule.plans.Add(EnsurePlanDef());
+            registry.modules.Add(new VNEventRegistry.Entry { id = "plan", template = planModule });
+
+            // 结果结算弹窗模块（event result grade:great title:xx）
+            var resultGo = new GameObject("ResultTemplate", typeof(RectTransform));
+            resultGo.transform.SetParent(registry.transform, false);
+            resultGo.SetActive(false);
+            var resultModule = resultGo.AddComponent<VNResultPopupModule>();
+            registry.modules.Add(new VNEventRegistry.Entry { id = "result", template = resultModule });
             stage.eventRegistry = registry;
 
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------
@@ -532,6 +549,10 @@ namespace VNEffects.EditorTools
             var raisingDemo =
                 AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Scenarios/RaisingDemo.vn.txt");
             if (raisingDemo != null) runner.chapters.Add(raisingDemo);
+            // 周日程排程演示剧本（event plan / event result / flag rand:）
+            var weekPlanDemo =
+                AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Scenarios/WeekPlanDemo.vn.txt");
+            if (weekPlanDemo != null) runner.chapters.Add(weekPlanDemo);
             new GameObject("VNBacklog").AddComponent<VNBacklog>();
 
             // ---------- 极简提示 ----------
@@ -686,6 +707,54 @@ namespace VNEffects.EditorTools
                 descriptionJa = "特別なお客様だけに。（魅力50以上）",
                 price = 200, sellPrice = 100, maxOwned = 1,
                 condition = "魅力>=50",
+            });
+            AssetDatabase.CreateAsset(def, path);
+            return def;
+        }
+
+        /// <summary>示例日程方案：周日程（event plan id:周日程），四个行动与 WeekPlanDemo 剧本编号对应</summary>
+        static VNPlanDef EnsurePlanDef()
+        {
+            string path = $"{PlansDir}/周日程.asset";
+            var def = AssetDatabase.LoadAssetAtPath<VNPlanDef>(path);
+            if (def != null) return def;
+
+            def = ScriptableObject.CreateInstance<VNPlanDef>();
+            def.planId = "周日程";
+            def.title = "安排这一周";
+            def.titleEn = "Plan Your Week";
+            def.titleJa = "一週間の予定を組もう";
+            def.actions.Add(new VNPlanDef.ActionDef
+            {
+                id = "打工", number = 1, displayName = "便利店打工",
+                displayNameEn = "Part-time Job", displayNameJa = "コンビニバイト",
+                gainText = "金钱+150　压力+8",
+                gainTextEn = "Money +150 / Stress +8",
+                gainTextJa = "所持金+150　ストレス+8",
+            });
+            def.actions.Add(new VNPlanDef.ActionDef
+            {
+                id = "学习", number = 2, displayName = "图书馆学习",
+                displayNameEn = "Study", displayNameJa = "図書館で勉強",
+                gainText = "智力+12　压力+6",
+                gainTextEn = "Int +12 / Stress +6",
+                gainTextJa = "知力+12　ストレス+6",
+            });
+            def.actions.Add(new VNPlanDef.ActionDef
+            {
+                id = "剑术训练", number = 3, displayName = "剑术训练",
+                displayNameEn = "Sword Training", displayNameJa = "剣術訓練",
+                gainText = "体力+15　压力+12",
+                gainTextEn = "Vit +15 / Stress +12",
+                gainTextJa = "体力+15　ストレス+12",
+            });
+            def.actions.Add(new VNPlanDef.ActionDef
+            {
+                id = "休息", number = 4, displayName = "好好休息",
+                displayNameEn = "Rest", displayNameJa = "ゆっくり休む",
+                gainText = "压力-20",
+                gainTextEn = "Stress -20",
+                gainTextJa = "ストレス-20",
             });
             AssetDatabase.CreateAsset(def, path);
             return def;

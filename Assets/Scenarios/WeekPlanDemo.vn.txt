@@ -1,0 +1,150 @@
+# ============================================================
+# WeekPlanDemo.vn.txt —— 周日程排程演示（七十章功能串讲）
+# 玩法循环：排好一周日程 → 逐格执行 → 随机产出 失败/普通/成功/大成功 → 结算
+# 用到的机制：
+#   event plan slots:7 pool:…      排程面板（确定后写 flag 日程_1..7 / 日程数）
+#   event plan op:next             逐格派发（当前格+1、行动编号抄进 flag 当前行动）
+#   flag 运气 rand:1-100           区间随机掷骰
+#   event result grade:… title:…   结算大弹窗（fail/normal/good/great）
+#   stat 属性 +n                   属性增减（钳制+飘字）
+# 行动编号（Assets/VNEffects/Plans/周日程.asset）：
+#   1 打工 / 2 学习 / 3 剑术训练 / 4 休息（0 = 空格，也当休息处理）
+# 播放方式：Scenario Editor 打开本文件 → 选中首行 → ▶ 从选中行播放；
+#           或在其他剧本里 chapter WeekPlanDemo
+# ============================================================
+
+: （周日程演示开始——先初始化属性。）
+stat 金钱 300
+stat 行动力 10
+stat 压力 0
+flag 周数 0
+
+label 周初
+flag 周数 +1
+if 周数>2 jump 演示结束
+: （新的一周开始了。把这一周的日程排好吧！点左侧行动填入格子，点格子可清除。）
+event plan slots:7 pool:打工,学习,剑术训练,休息 title:安排这一周
+
+label 执行日程
+event plan op:next
+* next
+* end -> 周末结算
+if 当前行动==1 jump 行动_打工
+if 当前行动==2 jump 行动_学习
+if 当前行动==3 jump 行动_剑术
+jump 行动_休息
+
+# ---------- 打工：10% 失败 / 60% 普通 / 25% 成功 / 5% 大成功 ----------
+label 行动_打工
+: （便利店打工中……）
+flag 运气 rand:1-100
+if 运气<=10 jump 打工_失败
+if 运气<=70 jump 打工_普通
+if 运气<=95 jump 打工_成功
+event result grade:great title:便利店打工 sub:被店长夸奖，拿到了额外奖金！
+stat 金钱 +300
+stat 压力 +4
+jump 执行日程
+label 打工_失败
+event result grade:fail title:便利店打工 sub:打碎了货架上的商品……
+stat 金钱 +50
+stat 压力 +15
+jump 执行日程
+label 打工_普通
+event result grade:normal title:便利店打工
+stat 金钱 +150
+stat 压力 +8
+jump 执行日程
+label 打工_成功
+event result grade:good title:便利店打工 sub:干得很顺利！
+stat 金钱 +200
+stat 压力 +6
+jump 执行日程
+
+# ---------- 学习：10% 失败 / 60% 普通 / 25% 成功 / 5% 大成功 ----------
+label 行动_学习
+: （在图书馆用功中……）
+flag 运气 rand:1-100
+if 运气<=10 jump 学习_失败
+if 运气<=70 jump 学习_普通
+if 运气<=95 jump 学习_成功
+event result grade:great title:图书馆学习 sub:茅塞顿开，仿佛打通了任督二脉！
+stat 智力 +25
+stat 压力 +4
+jump 执行日程
+label 学习_失败
+event result grade:fail title:图书馆学习 sub:困得睡着了，什么都没记住……
+stat 压力 +10
+jump 执行日程
+label 学习_普通
+event result grade:normal title:图书馆学习
+stat 智力 +12
+stat 压力 +6
+jump 执行日程
+label 学习_成功
+event result grade:good title:图书馆学习 sub:今天状态很好！
+stat 智力 +18
+stat 压力 +5
+jump 执行日程
+
+# ---------- 剑术训练：属性影响概率示范 ----------
+# 基础：15% 失败 / 55% 普通 / 25% 成功 / 5% 大成功
+# 体力≥150 走"熟练"判定链：5% 失败 / 45% 普通 / 35% 成功 / 15% 大成功
+label 行动_剑术
+: （挥剑训练中……）
+flag 运气 rand:1-100
+if 体力>=150 jump 剑术判定_熟练
+if 运气<=15 jump 剑术_失败
+if 运气<=70 jump 剑术_普通
+if 运气<=95 jump 剑术_成功
+jump 剑术_大成功
+label 剑术判定_熟练
+if 运气<=5 jump 剑术_失败
+if 运气<=50 jump 剑术_普通
+if 运气<=85 jump 剑术_成功
+jump 剑术_大成功
+label 剑术_大成功
+event result grade:great title:剑术训练 sub:领悟了新的剑技！
+stat 体力 +30
+stat 魅力 +5
+stat 压力 +8
+jump 执行日程
+label 剑术_失败
+event result grade:fail title:剑术训练 sub:训练中受了点小伤……
+stat 体力 +5
+stat 压力 +18
+jump 执行日程
+label 剑术_普通
+event result grade:normal title:剑术训练
+stat 体力 +15
+stat 压力 +12
+jump 执行日程
+label 剑术_成功
+event result grade:good title:剑术训练 sub:动作越来越熟练了！
+stat 体力 +22
+stat 压力 +10
+jump 执行日程
+
+# ---------- 休息：80% 普通 / 20% 成功（遇到朋友） ----------
+label 行动_休息
+flag 运气 rand:1-100
+if 运气<=80 jump 休息_普通
+event result grade:good title:好好休息 sub:偶遇朋友，一起度过了愉快的一天！
+stat 压力 -30
+jump 执行日程
+label 休息_普通
+event result grade:normal title:好好休息 sub:悠闲的一天。
+stat 压力 -20
+jump 执行日程
+
+# ---------- 周末结算 ----------
+label 周末结算
+event result grade:good title:一周结束！ sub:按 C 打开属性面板看看成长吧
+if 压力>=80 jump 过劳警告
+jump 周初
+label 过劳警告
+: （压力快到极限了！下周多安排点休息吧……）
+jump 周初
+
+label 演示结束
+: （两周的日程演示结束！这套循环可以接上 time pass 组成月度大循环——参考 RaisingDemo。）

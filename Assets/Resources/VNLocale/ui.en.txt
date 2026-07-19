@@ -100,3 +100,18 @@ qte.title = Mash!
 qte.success = Success!
 qte.fail = Failed...
 map.title = Where to?
+
+# -- Schedule planner --
+plan.title = Plan Your Schedule
+plan.confirm = Confirm
+plan.reset = Reset
+plan.rest = (Rest)
+plan.slot = Day {0}
+plan.noSlot = Schedule is full (click a slot to clear it)
+
+# -- Result popup --
+result.fail = Failure...
+result.normal = Not bad
+result.good = Success!
+result.great = Great success!!
+result.continue = ▼ Click to continue

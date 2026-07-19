@@ -346,6 +346,26 @@ namespace VNEffects
             }
         }
 
+        static Sprite _sparkleSprite;
+
+        /// <summary>四芒星光的 Sprite 包装（供 Image 使用，结算弹窗星光爆发等）</summary>
+        public static Sprite SparkleSprite
+        {
+            get
+            {
+                if (_sparkleSprite == null)
+                {
+                    var tex = Sparkle;
+                    _sparkleSprite = Sprite.Create(
+                        tex, new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f), 100f);
+                    _sparkleSprite.name = "VN_SparkleSprite";
+                    _sparkleSprite.hideFlags = HideFlags.DontSave;
+                }
+                return _sparkleSprite;
+            }
+        }
+
         /// <summary>
         /// 通用生成器：alphaFunc 以中心为原点（dx, dy ∈ [-0.5, 0.5]）返回 alpha。
         /// RGB 恒为白色，颜色交给顶点色 / 材质 Tint 控制。

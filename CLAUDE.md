@@ -108,6 +108,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新） |
 | VNShopDef / VNShopModule | 商店定义资产 / 商店事件模块（event shop id:xx，买卖走金钱属性 + 道具_&lt;id&gt; flag） |
+| VNPlanDef / VNPlanModule | 日程方案资产 / 周日程排程模块（event plan 排格写 flag 日程_&lt;N&gt;；op:next 逐格派发到 flag 当前行动） |
+| VNResultPopupModule | 结算大弹窗事件模块（event result grade:fail\|normal\|good\|great，四档大字+星光爆发） |
 | VNInventory | I 键物品栏（flags 反查道具，文案图标取自 VNShopDef） |
 | VNCalendarHud | 右下日历 HUD（flag 月份/剩余月数，time 命令驱动；月份 flag 不存在时自动隐藏） |
 | VNCgUnlocks | CG 鉴赏全局解锁存储（独立 JSON，与存档槽分离；CG 显示逻辑在 VNStage.ShowCg/HideCg） |
@@ -153,6 +155,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   商店 `event shop id:服装店`（道具 = flag `道具_<id>` 计数）；
   日程 `time set 9 remain:36` / `time pass`（月份 1~12 循环、剩余月数递减、行动力回满，
   右下日历 HUD）；示例剧本 `Assets/Scenarios/RaisingDemo.vn.txt`
+- 周日程排程（已完成，七十章）：`event plan slots:7 pool:…` 排程面板（写 flag
+  `日程_1..N` / `日程数`）+ `event plan op:next` 逐格派发（写 `当前格` / `当前行动`）
+  + `flag 名 rand:1-100` 随机掷骰 + `event result grade:fail|normal|good|great`
+  结算弹窗；**概率表写在剧本里**（内容而非逻辑），属性影响概率靠分流到另一条阈值链；
+  示例剧本 `Assets/Scenarios/WeekPlanDemo.vn.txt`
 - 本地化（已完成，五十七章）：剧本只写中文（唯一真相），翻译放旁路表
   `Resources/VNLocale/Scenarios/<剧本名>.<lang>.txt`（key=FNV-1a(原文)+出现序号）；
   改完剧本跑 **Tools → VN Effects → Localization → Extract**（增量合并，已译保留）
