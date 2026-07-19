@@ -285,6 +285,29 @@ namespace VNEffects.EditorTools
             }
             _ctx.questIds = questIds.ToArray();
 
+            _ctx.scenarioLabels.Clear();
+            _ctx.scenarioPaths.Clear();
+            var qualifiedLabels = new List<string>();
+            foreach (string guid in AssetDatabase.FindAssets(
+                         "t:TextAsset", new[] { "Assets/Scenarios" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!path.EndsWith(".vn.txt", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var scenario = AssetDatabase.LoadAssetAtPath<TextAsset>(path);
+                if (scenario == null) continue;
+                string file = Path.GetFileName(path);
+                string normalized = VNStoryAddress.NormalizeFile(file);
+                var labels = VNScenarioDoc.Parse(scenario.text).CollectLabels().ToArray();
+                _ctx.scenarioLabels[normalized] = labels;
+                _ctx.scenarioPaths[normalized] = path;
+                string displayFile = VNStoryAddress.NormalizeFile(file);
+                foreach (string label in labels)
+                    qualifiedLabels.Add(displayFile + "::" + label);
+            }
+            qualifiedLabels.Sort();
+            _ctx.qualifiedLabelIds = qualifiedLabels.ToArray();
+
             _validatedVersion = -1; // 数据源变了要重新校验
         }
 
@@ -542,8 +565,8 @@ namespace VNEffects.EditorTools
 
                 GUILayout.FlexibleSpace();
 
-                // label 快速跳转
-                if (_labels.Count > 0 &&
+                // label 快速跳转（本文件 + Assets/Scenarios 下的跨文件地址）
+                if ((_labels.Count > 0 || _ctx.qualifiedLabelIds.Length > 0) &&
                     GUILayout.Button("Go to label ▾", EditorStyles.toolbarButton, GUILayout.Width(90f)))
                 {
                     var menu = new GenericMenu();
@@ -551,6 +574,14 @@ namespace VNEffects.EditorTools
                     {
                         string label = l;
                         menu.AddItem(new GUIContent(label), false, () => SelectLabelRow(label));
+                    }
+                    if (_labels.Count > 0 && _ctx.qualifiedLabelIds.Length > 0)
+                        menu.AddSeparator("");
+                    foreach (string address in _ctx.qualifiedLabelIds)
+                    {
+                        string capturedAddress = address;
+                        menu.AddItem(new GUIContent("跨文件/" + address), false,
+                            () => SelectStoryAddress(capturedAddress));
                     }
                     menu.ShowAsContext();
                 }
@@ -621,6 +652,25 @@ namespace VNEffects.EditorTools
                     return;
                 }
             }
+        }
+
+        void SelectStoryAddress(string address)
+        {
+            if (!VNStoryAddress.TryParse(address, out string file, out string label, out _))
+                return;
+            if (file == null)
+            {
+                SelectLabelRow(label);
+                return;
+            }
+            if (_dirty && !EditorUtility.DisplayDialog("Unsaved changes",
+                    "Discard unsaved changes and open the target scenario?", "Discard", "Cancel"))
+                return;
+            if (!_ctx.scenarioPaths.TryGetValue(VNStoryAddress.NormalizeFile(file), out string path))
+                return;
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            LoadFile(Path.GetFullPath(Path.Combine(projectRoot, path)));
+            SelectLabelRow(label);
         }
 
         void FocusRow(int index)
@@ -1039,7 +1089,7 @@ namespace VNEffects.EditorTools
                 o.flagOp, _flagOps, "(no flag)", (r, $"opt{i}.flag"));
             x += 122f;
             o.jump = PopupString(new Rect(x, rect.y, 118f, rect.height),
-                o.jump, _labels.ToArray(), "(continue)", (r, $"opt{i}.jump"));
+                o.jump, LabelAddressOptions(), "(continue)", (r, $"opt{i}.jump"));
             x += 122f;
 
             if (GUI.Button(new Rect(rect.xMax - 20f, rect.y, 20f, rect.height), "x",
@@ -1200,10 +1250,17 @@ namespace VNEffects.EditorTools
                 case VNParamSource.AudioVoice: return _ctx.voiceIds;
                 case VNParamSource.EventId: return _ctx.eventIds;
                 case VNParamSource.QuestId: return _ctx.questIds;
-                case VNParamSource.Label: return _labels.ToArray();
+                case VNParamSource.Label: return LabelAddressOptions();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框
             }
+        }
+
+        string[] LabelAddressOptions()
+        {
+            var options = new List<string>(_labels);
+            options.AddRange(_ctx.qualifiedLabelIds);
+            return options.ToArray();
         }
 
         // ---- 舞台一览小格 ----

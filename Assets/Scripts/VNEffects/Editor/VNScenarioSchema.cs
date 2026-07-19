@@ -222,7 +222,7 @@ namespace VNEffects.EditorTools
                 Pos("seconds", "sec", VNParamSource.Number, def: "0.5"));
             Add("label", "Flow", "label <name>",
                 Pos("name", "name", VNParamSource.Text));
-            Add("jump", "Flow", "jump <label>",
+            Add("jump", "Flow", "jump <label|scenario::label>",
                 Pos("label", "to", VNParamSource.Label));
             Add("chapter", "Flow", "chapter <scenario file>",
                 Pos("chapter", "file", VNParamSource.Text));
