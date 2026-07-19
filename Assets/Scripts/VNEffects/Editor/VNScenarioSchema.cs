@@ -245,7 +245,8 @@ namespace VNEffects.EditorTools
                 Kw("remain", "剩余月数", VNParamSource.Number, weight: 0.6f),
                 Kw("months", "跨月数", VNParamSource.Number, weight: 0.6f),
                 Kw("refill", "回满", VNParamSource.Options, new[] { "off" }, weight: 0.6f));
-            Add("if", "Flow", "if <cond> jump <label>  cond has NO spaces: 勇气 / !勇气 / 好感度>=2",
+            Add("if", "Flow", "if <expression> jump <label>\n" +
+                "supports spaces, !, + - * / %, comparisons, &&, || and parentheses",
                 Pos("condition", "if", VNParamSource.Text),
                 Pos("target", "jump", VNParamSource.Label));
             Add("choice", "Flow", "choice + '*' option lines\n" +
