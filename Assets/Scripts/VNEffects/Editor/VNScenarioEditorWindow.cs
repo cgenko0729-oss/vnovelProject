@@ -85,7 +85,7 @@ namespace VNEffects.EditorTools
                 { "sakura", "樱花" }, { "bgm", "背景音乐" }, { "se", "音效" },
                 { "voice", "语音" }, { "volume", "音量" }, { "wait", "等待" },
                 { "label", "标签" }, { "jump", "跳转" }, { "call", "调用" },
-                { "return", "返回" }, { "flag", "变量" },
+                { "return", "返回" }, { "params", "参数声明" }, { "flag", "变量" },
                 { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
                 { "chapter", "章节" }, { "quest", "任务" }, { "letterbox", "电影黑边" },
             };

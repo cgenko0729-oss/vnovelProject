@@ -15,6 +15,7 @@
 #   label <名字> / jump <名字>
 #   jump <文件>::<名字>            跨文件直达 label（目标文件需登记进 Chapters）
 #   call <文件>::<名字> / return    调用公共片段并自动回到 call 的下一行（支持嵌套）
+#   params 必填名 可选名=默认值       紧跟目标 label；call 用 名字:值 传参，${名字} 读取
 #   flag <名字> [数值|+1|-1|rand:1-100]   rand = 区间内随机取整（含两端）
 #   if <表达式> jump <名字>     支持空格、!、整数算术/比较、&&、||、括号
 #   例：if 月份 == 12 && (好感度 + 友情度) / 2 >= 50 jump 圣诞约会
@@ -97,20 +98,24 @@ label 好结局
 小雪: （明天也想……和她一起看晚霞。）
 
 label 落幕
-call 章节收尾奖励
+call 通用送礼 角色:小雪 道具:蝴蝶结 好感:10
 hide 小雪 with:fade
 hide 亚里沙 with:dissolve
 : 第一章　完
 jump 演示结束
 
-# 子程序放在文件尾；主流程先跳过。return 会回到上面的 hide。
-label 章节收尾奖励
-call 记录奖励次数
+# 子程序放在文件尾；主流程先跳过。params 必须紧跟 label。
+label 通用送礼
+params 角色 道具 好感=5
+${角色}: 谢谢你的${道具}，我会好好珍惜的。
+stat 好感度_${角色} +${好感}
+call 记录奖励次数 增量:${好感}
 se s01
 return
 
 label 记录奖励次数
-flag 演示奖励次数 +1
+params 增量
+flag 演示奖励次数 +${增量}
 return
 
 label 演示结束
