@@ -61,7 +61,11 @@ namespace VNEffects
         static Sprite BakeSprite(string name, Texture2D texture, Vector4 border)
         {
             string path = $"{TextureDir}/{name}.png";
-            File.WriteAllBytes(path, texture.EncodeToPNG());
+            // 程序化贴图 Apply(false, true) 释放了 CPU 拷贝（不可读），
+            // 经 RenderTexture 走一遍 GPU → ReadPixels 拿回可读副本再编码。
+            var readable = ReadableCopy(texture);
+            File.WriteAllBytes(path, readable.EncodeToPNG());
+            Object.DestroyImmediate(readable);
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
 
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
@@ -75,6 +79,22 @@ namespace VNEffects
             importer.SaveAndReimport();
 
             return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        }
+
+        /// <summary>不可读贴图的可读副本：Blit 到临时 RenderTexture 后 ReadPixels 取回</summary>
+        static Texture2D ReadableCopy(Texture2D source)
+        {
+            var rt = RenderTexture.GetTemporary(source.width, source.height, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            Graphics.Blit(source, rt);
+            var previous = RenderTexture.active;
+            RenderTexture.active = rt;
+            var copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+            copy.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+            copy.Apply();
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(rt);
+            return copy;
         }
 
         // ==============================================================
