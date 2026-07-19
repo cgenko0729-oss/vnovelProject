@@ -36,6 +36,8 @@ namespace VNEffects
         GameObject _canvasGo;
         CanvasGroup _group;
         GameObject _quitConfirm;
+        RectTransform _titleAnimationTarget;
+        VNStatsHud _statsHud;
         GameObject _hintText;          // 场景底部按键提示，标题期间藏起来
         bool _open;
         bool _busy;                    // 开始过渡进行中，防连点
@@ -62,6 +64,7 @@ namespace VNEffects
             _canvasGo = null;
             _group = null;
             _quitConfirm = null;
+            _titleAnimationTarget = null;
             if (wasOpen)
             {
                 _open = false;
@@ -101,6 +104,7 @@ namespace VNEffects
                 _canvasGo = null;
                 _group = null;
                 _quitConfirm = null;
+                _titleAnimationTarget = null;
             }
         }
 
@@ -130,6 +134,8 @@ namespace VNEffects
 
             if (_stage != null && _stage.dialogue != null)
                 _stage.dialogue.SetInterfaceVisible(false);
+            if (_statsHud == null) _statsHud = FindFirstObjectByType<VNStatsHud>();
+            _statsHud?.SetHudVisible(false);
             if (_hintText == null)
             {
                 var hint = GameObject.Find("HintText"); // 生成器创建的底部按键提示
@@ -146,6 +152,7 @@ namespace VNEffects
             }
             if (_stage != null && _stage.dialogue != null)
                 _stage.dialogue.SetInterfaceVisible(true); // 尊重 _shown：空对话框不会被强行显示
+            _statsHud?.SetHudVisible(true);
         }
 
         // ------------------------------------------------------------------
@@ -231,6 +238,16 @@ namespace VNEffects
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.titleMenuPrefab);
+            var customSkin = VNSystemUiSkinUtility.Instantiate<VNTitleMenuSkin>(
+                skinPrefab, _canvasGo.transform, "VNTitleMenu");
+            if (customSkin != null)
+            {
+                BindCustomSkin(customSkin);
+                _canvasGo.SetActive(false);
+                return;
+            }
+
             var root = new GameObject("Root", typeof(RectTransform), typeof(CanvasGroup));
             var rootRect = (RectTransform)root.transform;
             rootRect.SetParent(_canvasGo.transform, false);
@@ -269,6 +286,53 @@ namespace VNEffects
             _canvasGo.SetActive(false);
         }
 
+        void BindCustomSkin(VNTitleMenuSkin skin)
+        {
+            _group = skin.canvasGroup;
+            _titleAnimationTarget = skin.titleAnimationTarget != null
+                ? skin.titleAnimationTarget
+                : skin.gameTitle.rectTransform;
+            _quitConfirm = skin.quitConfirmRoot;
+
+            skin.gameTitle.text = ResolveGameTitle();
+            if (skin.versionText != null) skin.versionText.text = "Ver " + Application.version;
+
+            int latestSlot = FindLatestSlot();
+            VNSaveData latest = latestSlot >= 0 ? VNSaveSystem.Peek(latestSlot) : null;
+            skin.continueLabel.text = VNLocale.T("title.continue");
+            if (skin.continueTimeText != null)
+                skin.continueTimeText.text = latest != null ? latest.savedAt : "";
+            else if (latest != null && !string.IsNullOrEmpty(latest.savedAt))
+                skin.continueLabel.text += $"  <size=60%><color=#C9D2E8AA>{latest.savedAt}</color></size>";
+
+            BindButton(skin.startButton, skin.startLabel, VNLocale.T("title.start"), OnStartClicked, true);
+            BindButton(skin.continueButton, null, null, OnContinueClicked, latestSlot >= 0);
+            BindButton(skin.loadButton, skin.loadLabel, VNLocale.T("title.load"),
+                () => _runner?.RequestLoadPanel(), true);
+            BindButton(skin.galleryButton, skin.galleryLabel, VNLocale.T("title.gallery"),
+                () => _runner?.RequestCgGallery(), true);
+            BindButton(skin.configButton, skin.configLabel, VNLocale.T("title.config"),
+                () => _runner?.RequestConfigPanel(), true);
+            BindButton(skin.quitButton, skin.quitLabel, VNLocale.T("title.quit"),
+                () => _quitConfirm.SetActive(true), true);
+
+            skin.quitConfirmMessage.text = VNLocale.T("title.quitConfirm");
+            BindButton(skin.quitConfirmButton, skin.quitConfirmLabel, VNLocale.T("common.confirm"),
+                OnQuitConfirmed, true);
+            BindButton(skin.quitCancelButton, skin.quitCancelLabel, VNLocale.T("common.cancel"),
+                () => _quitConfirm.SetActive(false), true);
+            _quitConfirm.SetActive(false);
+        }
+
+        static void BindButton(Button button, TMP_Text label, string text,
+            UnityEngine.Events.UnityAction action, bool interactable)
+        {
+            if (label != null && text != null) label.text = text;
+            button.onClick.RemoveAllListeners();
+            if (action != null) button.onClick.AddListener(action);
+            button.interactable = interactable;
+        }
+
         void BuildTitleText(RectTransform parent)
         {
             // 标题背后的暖色光晕，缓慢呼吸（与项目"发光=光晕贴图+脉动"的套路一致）
@@ -287,6 +351,7 @@ namespace VNEffects
             title.fontStyle = FontStyles.Bold;
             title.color = new Color(0.99f, 0.97f, 0.92f, 1f);
             var titleRect = title.rectTransform;
+            _titleAnimationTarget = titleRect;
             titleRect.anchorMin = titleRect.anchorMax = new Vector2(0f, 1f);
             titleRect.pivot = new Vector2(0f, 1f);
             titleRect.anchoredPosition = new Vector2(118f, -150f);
@@ -488,7 +553,7 @@ namespace VNEffects
                 .SetUpdate(true).SetLink(_canvasGo);
 
             // 标题从上方轻轻落位
-            var title = _canvasGo.transform.Find("Root/GameTitle") as RectTransform;
+            var title = _titleAnimationTarget;
             if (title != null)
             {
                 Vector2 pos = title.anchoredPosition;
