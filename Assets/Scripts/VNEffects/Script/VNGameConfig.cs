@@ -119,6 +119,9 @@ namespace VNEffects
         [Header("选项面板皮肤库")]
         public List<UiSkinEntry> choiceSkins = new List<UiSkinEntry>();
 
+        [Header("系统菜单全局主题（留空 = 标题/设置/CG/回想/工具条/存读档/状态均使用程序化默认 UI）")]
+        public VNSystemUiSkinSet systemUiSkin;
+
         /// <summary>按 id 查皮肤 prefab；找不到或 id 为空返回 null</summary>
         public static GameObject FindSkin(List<UiSkinEntry> list, string id)
         {
