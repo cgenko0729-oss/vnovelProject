@@ -132,3 +132,25 @@ title.gallery = CG 鑑賞
 title.config = 設定
 title.quit = ゲーム終了
 title.quitConfirm = ゲームを終了しますか？
+
+# —— バトルモジュール ——
+battle.title = {0} が立ちはだかった！
+battle.player = 自分
+battle.attack = こうげき
+battle.heavy = 強打
+battle.guard = 防御
+battle.escape = にげる
+battle.win = 勝利！
+battle.lose = 敗北……
+battle.escaped = うまく逃げ切った！
+battle.miss = MISS
+battle.logStart = 戦闘開始！{0} が迫ってくる！
+battle.logPlayerTurn = 自分のターン——行動を選択（1234 キー可）
+battle.logHit = 命中！{0} に {1} ダメージ
+battle.logCrit = 会心の一撃！{0} に {1} ダメージ！
+battle.logMiss = 強打は空振りに終わった……
+battle.logGuard = {0} は身構えた
+battle.logGuarded = （防御で軽減）
+battle.logEscapeFail = 逃げられなかった！
+battle.logEnemyHit = {0} の攻撃！{1} ダメージを受けた
+battle.logEnemyHeavy = {0} の猛攻！{1} ダメージを受けた！

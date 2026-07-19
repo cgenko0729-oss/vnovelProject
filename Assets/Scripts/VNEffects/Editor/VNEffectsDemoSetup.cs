@@ -575,6 +575,13 @@ namespace VNEffects.EditorTools
             resultGo.SetActive(false);
             var resultModule = resultGo.AddComponent<VNResultPopupModule>();
             registry.modules.Add(new VNEventRegistry.Entry { id = "result", template = resultModule });
+
+            // 回合制小战斗模块（event battle enemy:xx ehp:26 …；结果 胜利/失败/逃跑）
+            var battleGo = new GameObject("BattleTemplate", typeof(RectTransform));
+            battleGo.transform.SetParent(registry.transform, false);
+            battleGo.SetActive(false);
+            var battleModule = battleGo.AddComponent<VNBattleModule>();
+            registry.modules.Add(new VNEventRegistry.Entry { id = "battle", template = battleModule });
             stage.eventRegistry = registry;
 
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------

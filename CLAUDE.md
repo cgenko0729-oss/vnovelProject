@@ -105,6 +105,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNCharacterBlink / VNCharacterMouth | 默认表情自动眨眼 / 说话口型（透明画布叠加层） |
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
+| VNBattleModule | 回合制小战斗（event battle，结果 胜利/失败/逃跑；patkstat/phpstat/pdefstat 从 flag 读属性=养成联动，结束写 flag 战斗剩余HP 供车轮战） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新） |
 | VNShopDef / VNShopModule | 商店定义资产 / 商店事件模块（event shop id:xx，买卖走金钱属性 + 道具_&lt;id&gt; flag） |
@@ -145,7 +146,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   `* 结果名 [flag:op] [-> 标签]` 结果行（复用 choice 解析）；VNEventModule 基类 +
   VNEventRegistry 注册表；事件期间快捷键全禁、不可存档、调试重建视为分支点；
   模块三铁律=不碰舞台/unscaled 计时+SetUpdate(true)/全部 SetLink。
-  示例模块：qte（连打条）、map（地图选地点，条件显隐+`去过_<地点>` flag）
+  示例模块：qte（连打条）、map（地图选地点，条件显隐+`去过_<地点>` flag）、
+  battle（回合制小战斗，示例剧本 `Assets/Scenarios/BattleDemo.vn.txt`）
 - 任务系统（已完成）：`quest start|stage|done|fail <id> [阶段]`，状态=flag`任务_<id>`
   （0 未接取/1..n 进行中/100 完成/-1 失败），VNQuestDef 资产只管文案（无资产照常运作），
   J 键日志面板；存档/if 分支/调试重建零改动复用 flags 设施
@@ -172,7 +174,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   再 Validate 查缺译；choice 选项翻译显示、按索引匹配；**event 结果行/角色 id/
   flag 名永远不翻译**（逻辑标识符）；名牌/任务/地图显示名在各资产的 En/Ja 字段填
 - **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
-  战斗示例模块（事件接口 P4）待动工；已知技术债清单见 ProjectCodeGuide 第十二节
+  战斗示例模块（事件接口 P4）已完成（VNBattleModule，`event battle`）；
+  已知技术债清单见 ProjectCodeGuide 第十二节
 
 ## 剧本可视化编辑器（当前状态）
 

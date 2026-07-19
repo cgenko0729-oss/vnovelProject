@@ -57,6 +57,7 @@ namespace VNEffects.EditorTools
                 ["shop"] = new HashSet<string> { "离开" },
                 ["plan"] = new HashSet<string> { "confirm", "next", "end" },
                 ["result"] = new HashSet<string> { "fail", "normal", "good", "great" },
+                ["battle"] = new HashSet<string> { "胜利", "失败", "逃跑" },
                 // map 的结果名 = 地点名，取自场景模板，运行时补
             };
 

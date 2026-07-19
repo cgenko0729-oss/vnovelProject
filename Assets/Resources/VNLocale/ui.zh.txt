@@ -133,3 +133,25 @@ title.gallery = CG 鉴赏
 title.config = 系统设置
 title.quit = 退出游戏
 title.quitConfirm = 确定要退出游戏吗？
+
+# —— 战斗模块 ——
+battle.title = {0} 挡住了去路！
+battle.player = 我方
+battle.attack = 攻击
+battle.heavy = 重击
+battle.guard = 防御
+battle.escape = 逃跑
+battle.win = 胜利！
+battle.lose = 战败……
+battle.escaped = 成功逃脱！
+battle.miss = MISS
+battle.logStart = 战斗开始！{0} 逼近了！
+battle.logPlayerTurn = 我方回合——选择行动（1234 键可用）
+battle.logHit = 命中！{0} 受到 {1} 点伤害
+battle.logCrit = 会心一击！{0} 受到 {1} 点伤害！
+battle.logMiss = {0} 的重击落空了……
+battle.logGuard = {0} 摆出了防御姿态
+battle.logGuarded = （防御减伤）
+battle.logEscapeFail = 逃跑失败！
+battle.logEnemyHit = {0} 的攻击！受到 {1} 点伤害
+battle.logEnemyHeavy = {0} 的猛攻！受到 {1} 点伤害！

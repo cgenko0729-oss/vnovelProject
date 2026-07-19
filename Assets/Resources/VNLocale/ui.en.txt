@@ -132,3 +132,25 @@ title.gallery = CG Gallery
 title.config = Settings
 title.quit = Quit
 title.quitConfirm = Quit the game?
+
+# -- Battle module --
+battle.title = {0} blocks the way!
+battle.player = You
+battle.attack = Attack
+battle.heavy = Heavy
+battle.guard = Guard
+battle.escape = Flee
+battle.win = VICTORY!
+battle.lose = Defeated...
+battle.escaped = Got away!
+battle.miss = MISS
+battle.logStart = Battle start! {0} draws near!
+battle.logPlayerTurn = Your turn - choose an action (keys 1-4)
+battle.logHit = Hit! {0} takes {1} damage
+battle.logCrit = Critical! {0} takes {1} damage!
+battle.logMiss = {0}'s heavy blow missed...
+battle.logGuard = {0} braces for impact
+battle.logGuarded = (guarded)
+battle.logEscapeFail = Couldn't escape!
+battle.logEnemyHit = {0} attacks! You take {1} damage
+battle.logEnemyHeavy = {0}'s fierce blow! You take {1} damage!
