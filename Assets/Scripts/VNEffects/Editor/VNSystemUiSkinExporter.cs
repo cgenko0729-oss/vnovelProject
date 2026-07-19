@@ -346,7 +346,9 @@ namespace VNEffects
         static void BuildSliderRow(Transform parent, string name, float top, out TMP_Text label, out Slider slider, out TMP_Text value)
         {
             label = Text(parent, name + "Label", 24, TextAlignmentOptions.Left, new Vector2(82, -top), new Vector2(170, 42));
-            var go = Node(parent, name + "Slider", typeof(Slider)); SetRect((RectTransform)go.transform, new Vector2(260, -top), new Vector2(340, 44)); slider = go.GetComponent<Slider>();
+            var go = Node(parent, name + "Slider", typeof(Image), typeof(Slider)); SetRect((RectTransform)go.transform, new Vector2(260, -top), new Vector2(340, 44));
+            var hitArea = go.GetComponent<Image>(); hitArea.color = Color.clear; hitArea.raycastTarget = true;
+            slider = go.GetComponent<Slider>();
             var bg = Image(go.transform, "Background", new Color(.1f, .13f, .21f, 1)); Stretch(bg.rectTransform); bg.rectTransform.offsetMin = new Vector2(0, 17); bg.rectTransform.offsetMax = new Vector2(0, -17);
             var fillArea = Node(go.transform, "FillArea"); Stretch((RectTransform)fillArea.transform); ((RectTransform)fillArea.transform).offsetMin = new Vector2(7, 17); ((RectTransform)fillArea.transform).offsetMax = new Vector2(-7, -17);
             var fill = FullImage(fillArea.transform, "Fill", new Color(1, .62f, .2f, 1)); slider.fillRect = fill.rectTransform;

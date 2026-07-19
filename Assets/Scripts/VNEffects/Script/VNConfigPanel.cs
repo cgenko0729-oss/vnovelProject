@@ -232,6 +232,17 @@ namespace VNEffects
         static void BindSlider(Slider slider, TMP_Text valueText, float min, float max, float value,
             Func<float, string> format, Action<float> changed)
         {
+            // Slider 本身必须位于 GraphicRaycaster 的命中面上。美术 prefab 可能只保留
+            // 不接收射线的装饰图片，因此在实例上补一层透明命中图，不改变可见外观。
+            var hitGraphic = slider.GetComponent<Graphic>();
+            if (hitGraphic == null)
+            {
+                var hitImage = slider.gameObject.AddComponent<Image>();
+                hitImage.color = Color.clear;
+                hitGraphic = hitImage;
+            }
+            hitGraphic.raycastTarget = true;
+
             slider.minValue = min;
             slider.maxValue = max;
             slider.SetValueWithoutNotify(value);
