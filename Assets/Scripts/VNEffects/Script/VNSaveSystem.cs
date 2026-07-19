@@ -8,10 +8,20 @@ namespace VNEffects
     [System.Serializable]
     public class VNSaveData
     {
+        public int saveVersion = 2;       // 0/缺省 = call 栈加入前的旧存档
         public int commandIndex;          // 恢复点（正在显示的那句台词的命令索引）
         public string chapter;            // 当前章节文件名（旧存档为空时沿用场景默认章节）
         public string savedAt;            // 保存时间
         public string lastLine;           // 最后一句台词（存档预览用）
+
+        [System.Serializable]
+        public class CallFrameSave
+        {
+            public string chapter;        // 返回文件
+            public int returnIndex;       // call 后的下一条命令
+            public int sourceLine;        // call 所在物理行（诊断用）
+        }
+        public List<CallFrameSave> callStack = new List<CallFrameSave>();
 
         public List<string> flagNames = new List<string>();
         public List<int> flagValues = new List<int>();
