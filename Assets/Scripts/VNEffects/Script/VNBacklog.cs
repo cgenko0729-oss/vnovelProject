@@ -27,6 +27,8 @@ namespace VNEffects
         GameObject _panel;
         RectTransform _content;
         ScrollRect _scroll;
+        VNBacklogSkin _skin;
+        VNBacklogEntrySkin _entryTemplate;
         bool _open;
 
         public bool IsOpen => _open;
@@ -44,6 +46,8 @@ namespace VNEffects
             _panel = null;
             _content = null;
             _scroll = null;
+            _skin = null;
+            _entryTemplate = null;
         }
 
         /// <summary>记录一条台词（VNScriptRunner 在每句 say 时调用）</summary>
@@ -94,6 +98,16 @@ namespace VNEffects
             var scaler = canvasGo.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.backlogPrefab);
+            _skin = VNSystemUiSkinUtility.Instantiate<VNBacklogSkin>(
+                skinPrefab, canvasGo.transform, "VNBacklog");
+            if (_skin != null)
+            {
+                BindCustomSkin(_skin);
+                _panel.SetActive(false);
+                return;
+            }
 
             _panel = new GameObject("Panel", typeof(RectTransform));
             var panelRect = (RectTransform)_panel.transform;
@@ -167,13 +181,47 @@ namespace VNEffects
             _panel.SetActive(false);
         }
 
+        void BindCustomSkin(VNBacklogSkin skin)
+        {
+            _panel = skin.panelRoot;
+            _scroll = skin.scroll;
+            _content = skin.content;
+            _entryTemplate = skin.entryTemplate;
+            _entryTemplate.gameObject.SetActive(false);
+            skin.titleText.text = VNLocale.T("backlog.title");
+            if (skin.closeButton != null) BindButton(skin.closeButton, Close);
+            if (skin.backgroundCloseButton != null) BindButton(skin.backgroundCloseButton, Close);
+        }
+
+        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+        {
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
+        }
+
         void RebuildList()
         {
             for (int i = _content.childCount - 1; i >= 0; i--)
-                Destroy(_content.GetChild(i).gameObject);
+            {
+                var child = _content.GetChild(i);
+                if (_entryTemplate != null && child == _entryTemplate.transform) continue;
+                Destroy(child.gameObject);
+            }
 
             foreach (var e in _entries)
             {
+                if (_entryTemplate != null)
+                {
+                    var go = Instantiate(_entryTemplate.gameObject, _content, false);
+                    go.SetActive(true);
+                    var entry = go.GetComponent<VNBacklogEntrySkin>();
+                    bool hasSpeaker = !string.IsNullOrEmpty(e.name);
+                    entry.speakerText.gameObject.SetActive(hasSpeaker);
+                    entry.speakerText.text = hasSpeaker ? e.name : "";
+                    entry.bodyText.text = e.text;
+                    continue;
+                }
+
                 var t = CreateText(_content, 28, TextAlignmentOptions.TopLeft);
                 t.richText = true;
                 string name = string.IsNullOrEmpty(e.name)
