@@ -1,95 +1,452 @@
 # ============================================================
-# 节日活动集.vn.txt —— 一个文件收纳多个固定日期事件
-# 入口约定：1=圣诞、2=新年、3=生日。进入后立即清零，防止下次误路由。
+# 节日活动集.vn.txt —— 固定月份事件（文件头路由模式）
+# ------------------------------------------------------------
+# 【进入方式】主循环每个月初 call 一次：
+#   call 节日活动集::月度路由
+#
+# 【本文件教学的机制】★ 路由表模式
+#   一个 label 当"总机"，按 月份 分派到具体节日，没有匹配就直接 return。
+#   主循环只写一行 call，从此**加节日不用碰主循环**——
+#   这是整个剧本架构里性价比最高的一个模式。
+#
+#   为什么路由要放在被调用文件里，而不是主循环里？
+#     主循环写 `if 月份==7 jump ...` 会让主循环随节日数量膨胀；
+#     而且节日之间的优先级、互斥（同月两个节日）只有本文件最清楚。
+#
+# 【还教了】
+#   event plan 周日程排程（9 月文化祭）—— 排格 → op:next 逐格派发 → rand 分级 → result 结算
+#   守卫 flag 防重复（虽然每月只过一次，但读档/调试重播时会救你）
+#   嵌套 call（月度路由 → 文化祭周 → 公共片段::换场）
 # ============================================================
 
-if 入口_节日活动==1 jump 圣诞活动
-if 入口_节日活动==2 jump 新年活动
-if 入口_节日活动==3 jump 小雪生日
-jump 无入口保护
 
-label 圣诞活动
-flag 入口_节日活动 0
-flag 已看_圣诞 1
-bg bg2 transition:InkSpread
-mood Night
-weather Snow
+# ------------------------------------------------------------
+# 月度路由 —— 总机
+# ------------------------------------------------------------
+label 月度路由
+# 守卫写在条件里（`&& !xx已办`）而不是事件内部：
+# 好处是路由表本身就是一张"哪个月有什么、办过没有"的全局清单，一眼看完。
+if 月份==7 && !暑假已办 jump 暑假海边
+if 月份==9 && !文化祭已办 jump 文化祭周
+if 月份==12 && !圣诞已办 jump 圣诞夜
+if 月份==2 && !情人节已办 jump 情人节
+# 这个月没有节日
+return
+
+
+# ============================================================
+# 七月：暑假 · 海边
+#   教学点：weather / mood / cg / 天气与调色联动、choice 的 cost 与 if 组合
+# ============================================================
+label 暑假海边
+flag 暑假已办 1
+call 公共片段::换场 背景:海边 心情:Neutral 转场:CircleWipe
+fx shimmer on
+fx haze on
 fx skycloud on
-bgm play b01 fade:2
-show 小雪 at:right with:FadeSlideUp
+bgm play 欢闹 fade:2
+show 星野结衣 at:center expr:微笑 with:ScaleBounce
 
-小雪: 圣诞快乐。没想到你真的来了。
+: 七月。全班组织的海边合宿。
+星野结衣 微笑: 佐野同学！你居然真的来了！我还以为你会宅在家里！
+我: ……被葵威胁了。她说不来就把我的座位换到讲台旁边。
+
+# 好感门槛的隐藏选项 + 花钱选项，同一个 choice 里三种修饰符全用上
 choice
-* 送出蝴蝶结发饰 if:道具_蝴蝶结发饰>=1 -> 圣诞送礼
-* 一起欣赏灯饰 -> 圣诞散步
+* 躲在遮阳伞下看书 -> 海边_看书
+* 陪她去买刨冰 cost:金钱-150 -> 海边_刨冰
+* 主动邀她一起下水 if:好感度_结衣>=40 -> 海边_下水
 
-label 圣诞送礼
-flag 道具_蝴蝶结发饰 -1
-flag 圣诞礼物_蝴蝶结 1
-stat 好感度_小雪 +15
-stat 享受度 +6
-emote 小雪 Shy
-小雪: 这是特意为我准备的吗……谢谢。
-jump 圣诞结束
+label 海边_看书
+: （沙滩太亮，书上的字都在跳。……但至少这里很安全。）
+星野结衣 沮丧: 真的假的，来海边看书？你也太浪费了吧。
+call 公共片段::好感反馈 数值:3
+jump 海边_夜晚
 
-label 圣诞散步
-stat 好感度_小雪 +7
-stat 享受度 +10
-小雪: 只要一起走着，普通的街道也会变得特别。
+label 海边_刨冰
+星野结衣 微笑: 草莓味的！啊——头好痛头好痛！
+: （她捂着额头的样子，比刨冰还甜。……我在想什么啊。）
+stat 压力 -12
+call 公共片段::好感反馈 数值:10
+jump 海边_夜晚
 
-label 圣诞结束
+label 海边_下水
+fx heartbeat on
+我: ……要不要，一起下去？
+emote 星野结衣 Surprise
+星野结衣 惊讶: 诶？！你主动约我？！
+星野结衣 微笑: ——好啊！输的人请晚饭！
+fx heartbeat off
+stat 体力 +10
+call 公共片段::好感反馈 数值:16
+flag 一起下过水 1
+jump 海边_夜晚
+
+label 海边_夜晚
+# ---------- 夜晚烟花：CG + 转场 + 演出堆叠 ----------
+call 公共片段::换场 背景:海边 心情:Night 转场:Blinds
+weather Fireflies
 fx meteor on
-se s01 @
-transition WhiteFlash
-flag 圣诞参与次数 +1
-hide 小雪 with:fade
-bgm stop fade:1
-reset effects
-chapter 主循环
+fx shimmer on
+bgm play 甜蜜 fade:2
 
-label 新年活动
-flag 入口_节日活动 0
-flag 已看_新年 1
-bg bg1 transition:PageCurl
-mood Dream
+: 夜里的沙滩，远处放起了烟花。
+se 烟花
+shake light
+cg CG_烟花 transition:WhiteFlash
+
+星野结衣 害羞: ……喂。谢谢你今天来。
+星野结衣 害羞: 大家都在，可是……我一直在找你在哪儿。
+
+fx heartbeat on
+: （烟花的光，一下一下地照亮她的侧脸。）
+: （我想把这一刻，永远留在这里。）
+fx heartbeat off
+
+cg off transition:NoiseDissolve
+call 公共片段::好感反馈 数值:12
+hide 星野结衣 with:fade
+reset effects
+return
+
+
+# ============================================================
+# 九月：文化祭 —— event plan 周日程排程 ★本包玩法密度最高的一段
+# ============================================================
+# 【plan 的四块拼图】
+#   ① event plan slots: pool:        排程面板 → 写 flag 日程_1..N / 日程数 / 当前格=0
+#   ② event plan op:next             逐格派发 → 当前格+1，行动编号写进 flag 当前行动
+#                                     超出格数返回结果 end
+#   ③ flag 运气 rand:1-100           掷骰
+#   ④ event result grade:            结算弹窗（fail/normal/good/great）
+#   **概率表写在剧本里**，因为它属于"内容"而不是"逻辑"——
+#   想调平衡直接改这里的数字，不用碰一行 C#。
+#
+# 【行动编号】pool 里的名字按出现顺序编号：
+#   1 布置会场 / 2 排练 / 3 做料理 / 4 休息（空格 = 0，当休息处理）
+# 【升级路径】想要图标 + 收益文案，就建一个 planId=文化祭准备 的 VNPlanDef 资产
+#   （见 README）。找不到该资产时会自动退化成 pool 编号模式，现在就能跑。
+# ============================================================
+label 文化祭周
+flag 文化祭已办 1
+call 公共片段::换场 背景:教室 心情:Morning 转场:Tiles
+bgm play 欢闹 fade:1.5
+show 星野结衣 at:center expr:坏笑 with:ScaleBounce
+
+: 九月。文化祭前的一周。
+星野结衣 坏笑: 我们班决定做女仆咖啡厅！然后——
+星野结衣 微笑: 佐野同学，你被我指名当筹备负责人了！
+我: ……为什么是我。
+星野结衣 坏笑: 因为你看起来最会做计划表啊！
+
+hide 星野结衣 with:fade
+call 公共片段::换场 背景:文化祭会场 心情:Neutral 转场:NoiseDissolve
+
+# ---------- ① 排程面板 ----------
+: （一周七天。怎么分配，全看我了。）
+event plan id:文化祭准备 slots:7 pool:布置会场,排练,做料理,休息 title:安排文化祭前的一周
+
+# ---------- ② 逐格执行循环 ----------
+label 文化祭_执行
+event plan op:next
+* next
+* end -> 文化祭_当天
+
+# 派发结果在 flag 当前行动 里；用 if 分流到各行动
+if 当前行动==1 jump 文化祭_布置
+if 当前行动==2 jump 文化祭_排练
+if 当前行动==3 jump 文化祭_料理
+# 0（空格）与 4 都当休息处理
+jump 文化祭_休息
+
+
+# ---------- 布置会场：10% 失败 / 60% 普通 / 25% 成功 / 5% 大成功 ----------
+label 文化祭_布置
+: （搬桌子、贴彩带、修坏掉的灯。）
+flag 运气 rand:1-100
+# ★ 属性影响概率：体力高的人走另一条阈值更宽松的判定链
+if 体力>=80 jump 布置判定_有力气
+if 运气<=10 jump 布置_失败
+if 运气<=70 jump 布置_普通
+if 运气<=95 jump 布置_成功
+jump 布置_大成功
+label 布置判定_有力气
+if 运气<=3 jump 布置_失败
+if 运气<=50 jump 布置_普通
+if 运气<=85 jump 布置_成功
+jump 布置_大成功
+
+label 布置_失败
+event result grade:fail title:布置会场 sub:梯子翻了，人和彩带一起摔下来……
+shake medium
+stat 体力 -5
+stat 压力 +18
+jump 文化祭_执行
+label 布置_普通
+event result grade:normal title:布置会场
+flag 会场完成度 +10
+stat 压力 +8
+jump 文化祭_执行
+label 布置_成功
+event result grade:good title:布置会场 sub:进度比预想的快！
+flag 会场完成度 +18
+stat 体力 +5
+stat 压力 +6
+jump 文化祭_执行
+label 布置_大成功
+event result grade:great title:布置会场 sub:全班都来帮忙，一天干完三天的活！
+flag 会场完成度 +30
+stat 体力 +8
+stat 魅力 +3
+jump 文化祭_执行
+
+# ---------- 排练：魅力影响 ----------
+label 文化祭_排练
+: （对台词、走位、练招呼客人的笑容。……笑容这项我永远不及格。）
+flag 运气 rand:1-100
+if 魅力>=60 jump 排练判定_老练
+if 运气<=15 jump 排练_失败
+if 运气<=75 jump 排练_普通
+if 运气<=95 jump 排练_成功
+jump 排练_大成功
+label 排练判定_老练
+if 运气<=5 jump 排练_失败
+if 运气<=55 jump 排练_普通
+if 运气<=88 jump 排练_成功
+jump 排练_大成功
+
+label 排练_失败
+event result grade:fail title:排练 sub:紧张到一句台词都说不完整
+stat 压力 +20
+jump 文化祭_执行
+label 排练_普通
+event result grade:normal title:排练
+stat 魅力 +5
+stat 压力 +7
+jump 文化祭_执行
+label 排练_成功
+event result grade:good title:排练 sub:结衣夸你进步很快！
+stat 魅力 +10
+call 公共片段::好感反馈 数值:4
+jump 文化祭_执行
+label 排练_大成功
+event result grade:great title:排练 sub:全班鼓掌！你居然有表演天赋？
+stat 魅力 +18
+call 公共片段::好感反馈 数值:8
+jump 文化祭_执行
+
+# ---------- 做料理：智力影响 ----------
+label 文化祭_料理
+: （试做菜单。和结衣两个人，在家政教室。）
+flag 运气 rand:1-100
+if 智力>=70 jump 料理判定_看得懂食谱
+if 运气<=15 jump 料理_失败
+if 运气<=75 jump 料理_普通
+jump 料理_成功
+label 料理判定_看得懂食谱
+if 运气<=5 jump 料理_失败
+if 运气<=55 jump 料理_普通
+if 运气<=90 jump 料理_成功
+jump 料理_大成功
+
+label 料理_失败
+event result grade:fail title:试做菜单 sub:焦了。整间教室都是黑烟。
+stat 压力 +15
+jump 文化祭_执行
+label 料理_普通
+event result grade:normal title:试做菜单
+flag 菜单完成度 +10
+stat 压力 +6
+jump 文化祭_执行
+label 料理_成功
+event result grade:good title:试做菜单 sub:两个人配合得意外地好
+flag 菜单完成度 +18
+call 公共片段::好感反馈 数值:5
+jump 文化祭_执行
+label 料理_大成功
+event result grade:great title:试做菜单 sub:她凑过来尝味道的距离，近得犯规
+flag 菜单完成度 +28
+fx heartbeat on
+星野结衣 害羞: ……啊。抱歉，靠太近了。
+fx heartbeat off
+call 公共片段::好感反馈 数值:12
+jump 文化祭_执行
+
+# ---------- 休息 ----------
+label 文化祭_休息
+flag 运气 rand:1-100
+if 运气<=70 jump 休息_普通
+event result grade:good title:休息 sub:在天台睡了一觉，梦见了她
+stat 压力 -28
+jump 文化祭_执行
+label 休息_普通
+event result grade:normal title:休息 sub:什么都没做的一天。
+stat 压力 -20
+jump 文化祭_执行
+
+
+# ---------- ③ 文化祭当天：用累计值决定成败 ----------
+# ★ 这是 plan 玩法真正的爽点：一周的每一个决策，都在这一刻被结算。
+label 文化祭_当天
+call 公共片段::换场 背景:文化祭会场 心情:Sunset 转场:WhiteFlash
 weather Petals
-show 亚里沙 at:left with:DissolveGlow
-show 小雪 at:right with:DissolveGlow
-亚里沙: 新的一年，希望我们都能实现愿望。
-小雪: 那我许愿，明年也能像这样见到你。
-stat 好感度_小雪 +8
-flag 新年参拜次数 +1
-hide 小雪 with:fade
-hide 亚里沙 with:fade
-reset effects
-chapter 主循环
+fx godrays on
+bgm play 甜蜜 fade:2
+show 星野结衣 at:center expr:微笑 with:FlashBloom
 
-label 小雪生日
-flag 入口_节日活动 0
-flag 已看_小雪生日 1
-bg bg3 transition:CircleWipe
-mood Sunset
-show 小雪 at:center with:FadeSlideUp
-choice
-* 送她一份精心准备的礼物 cost:金钱-200 -> 生日礼物
-* 陪她度过安静的一天 -> 生日陪伴
+: 文化祭当天。
+# 复合条件判总评：会场 + 菜单 + 压力三项一起看
+if 会场完成度>=90 && 菜单完成度>=60 && 压力<70 jump 文化祭_大成功
+if 会场完成度>=60 || 菜单完成度>=40 jump 文化祭_成功
+jump 文化祭_失败
 
-label 生日礼物
-stat 好感度_小雪 +14
-flag 生日选择_礼物 1
-jump 生日结束
-
-label 生日陪伴
-stat 好感度_小雪 +9
-stat 享受度 +8
-flag 生日选择_陪伴 1
-
-label 生日结束
+label 文化祭_大成功
+event result grade:great title:女仆咖啡厅 sub:全校第一名！排队排到了操场！
 sakura
-小雪: 今天会成为我一直珍藏的回忆。
-hide 小雪 with:fade
-chapter 主循环
+星野结衣 惊讶: 我们拿第一了！！第一诶！！
+: （她一激动，直接抱住了我。）
+: （——三秒后她才反应过来，红着脸跳开。）
+fx heartbeat on
+星野结衣 害羞: ……刚、刚才那个不算！忘掉！
+fx heartbeat off
+call 公共片段::好感反馈 数值:25
+stat 魅力 +10
+flag 文化祭优胜 1
+jump 文化祭收尾
 
-label 无入口保护
-: 节日活动集没有收到有效入口。为了避免误播，返回主循环。
-chapter 主循环
+label 文化祭_成功
+event result grade:good title:女仆咖啡厅 sub:营业顺利，大家都玩得很开心
+星野结衣 微笑: 辛苦啦，负责人！这一周多亏有你。
+call 公共片段::好感反馈 数值:12
+jump 文化祭收尾
+
+label 文化祭_失败
+event result grade:fail title:女仆咖啡厅 sub:准备不足，中途就关门了……
+emote 星野结衣 Dejected
+星野结衣 沮丧: ……没关系啦。明年再来过。
+: （她在安慰我。这比被骂还难受。）
+stat 压力 +25
+call 公共片段::好感反馈 数值:2
+jump 文化祭收尾
+
+label 文化祭收尾
+hide 星野结衣 with:fade
+reset effects
+return
+
+
+# ============================================================
+# 十二月：圣诞夜
+#   教学点：weather Snow / mood 联动 / 用道具做隐藏分支
+# ============================================================
+label 圣诞夜
+flag 圣诞已办 1
+call 公共片段::换场 背景:雪街 心情:Night 转场:InkSpread
+weather Snow
+fx meteor on
+bgm play 甜蜜 fade:2
+show 星野结衣 at:center expr:微笑 with:DissolveGlow
+
+: 十二月。圣诞夜的商店街，灯饰亮得像另一个世界。
+星野结衣 微笑: 圣诞节居然愿意陪我出来，你真的变了好多诶。
+
+# ★ 用"有没有某个道具"做隐藏最优解——玩家如果之前在商店买过挂坠，
+#   这里就会多出一条选项。这就是养成与剧情的咬合点。
+choice
+* 陪她逛完整条街 -> 圣诞_逛街
+* 把神秘挂坠送给她 if:道具_神秘挂坠>=1 -> 圣诞_挂坠
+* 说自己该回家了 -> 圣诞_早退
+
+label 圣诞_逛街
+: （我们从街头走到街尾，什么都没买，只是走着。）
+星野结衣 微笑: 这样就够啦。今天超开心的。
+call 公共片段::好感反馈 数值:12
+jump 圣诞_收尾
+
+label 圣诞_挂坠
+se 闪光
+flag 道具_神秘挂坠 -1
+: （把那条挂坠放到她手心里。）
+我: 圣诞快乐。……这个，给你。
+emote 星野结衣 Surprise
+cg CG_圣诞 transition:WhiteFlash
+星野结衣 害羞: ……你什么时候买的啊，笨蛋。
+星野结衣 害羞: 我、我也有准备礼物啦！……虽然只是围巾。
+sakura
+fx heartbeat on
+: （她把围巾绕在我脖子上。手指擦过我的下巴。）
+fx heartbeat off
+cg off transition:NoiseDissolve
+call 公共片段::好感反馈 数值:28
+flag 收到围巾 1
+jump 圣诞_收尾
+
+label 圣诞_早退
+我: ……我该回去了。家里有事。
+: （骗人的。我只是快撑不住了。）
+emote 星野结衣 Dejected
+星野结衣 沮丧: ……这样啊。那，圣诞快乐。
+call 公共片段::好感反馈 数值:1
+stat 压力 +20
+jump 圣诞_收尾
+
+label 圣诞_收尾
+hide 星野结衣 with:fade
+weather None
+reset effects
+return
+
+
+# ============================================================
+# 二月：情人节
+#   教学点：把"过去的所有选择"汇总成一次判定（本作的中期总检）
+# ============================================================
+label 情人节
+flag 情人节已办 1
+call 公共片段::换场 背景:教室_黄昏 心情:Sunset 转场:CircleWipe
+weather Petals
+bgm play 心跳 fade:2
+show 星野结衣 at:center expr:害羞 with:ShineReveal
+
+: 二月十四日。放学后的教室。
+星野结衣 害羞: 那个……佐野同学。
+
+# ★ 中期总检：好感 + 路线 + 前面攒下的伏笔 flag，一次全用上。
+#   这就是所有那些不起眼的 flag 存在的意义——它们在这里变成了不同的戏。
+if 好感度_结衣>=70 && (收到围巾 || 看过她的软弱) jump 情人节_本命
+if 好感度_结衣>=45 || 路线==1 jump 情人节_友情巧克力升级版
+jump 情人节_义理
+
+label 情人节_本命
+se 闪光
+sakura
+fx heartbeat on
+: （她递过来一个包装得很用心的小盒子。手在抖。）
+星野结衣 害羞: 这个是……本命。
+星野结衣 害羞: 意思你懂吧？……不懂的话，我就直接说了哦。
+: （——不。让我，让我先说。）
+: （但是喉咙又一次背叛了我。）
+fx heartbeat off
+call 公共片段::好感反馈 数值:20
+flag 收到本命巧克力 1
+jump 情人节收尾
+
+label 情人节_友情巧克力升级版
+星野结衣 微笑: 喏，给你的！我自己做的哦，别嫌弃啦。
+: （形状歪歪扭扭，但是很甜。）
+星野结衣 坏笑: 白色情人节记得还礼哦！三倍！
+call 公共片段::好感反馈 数值:12
+jump 情人节收尾
+
+label 情人节_义理
+星野结衣 默认: 这个，义理巧克力。全班男生都有份啦。
+: （……全班都有份。）
+: （我盯着手里那颗便利店包装的巧克力，看了很久。）
+call 公共片段::好感反馈 数值:3
+stat 压力 +15
+jump 情人节收尾
+
+label 情人节收尾
+hide 星野结衣 with:fade
+reset effects
+return

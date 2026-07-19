@@ -84,8 +84,27 @@ namespace VNEffects
         public int CurrentLine =>
             _running && _index > 0 && _index <= _commands.Count ? _commands[_index - 1].line : 0;
 
+        [Header("内容总配置（留空 = 自动读 Resources/VNGameConfig）")]
+        public VNGameConfig config;
+
+        /// <summary>
+        /// 从 VNGameConfig 资产覆盖入口剧本与章节列表。
+        /// 章节列表是场景重建后最容易被忘记的一项（不登记 = 所有跨文件跳转直接报错），
+        /// 所以生成器会扫 Assets/Scenarios 自动补，这里再兜一层资产覆盖。
+        /// </summary>
+        void ApplyGameConfig()
+        {
+            if (config != null) VNGameConfig.SetActive(config);
+            var cfg = config != null ? config : VNGameConfig.Active;
+            if (cfg == null) return;
+
+            if (cfg.entryScript != null) script = cfg.entryScript;
+            VNGameConfig.ApplyList(cfg.chapters, ref chapters);
+        }
+
         void Start()
         {
+            ApplyGameConfig();
             _entryScript = script;
             if (_backlog == null)
             {

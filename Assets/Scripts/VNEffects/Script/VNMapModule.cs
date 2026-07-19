@@ -69,6 +69,15 @@ namespace VNEffects
 
         protected override void OnLaunch(VNEventContext ctx)
         {
+            // 地图底图与地点坐标是纯人工数据（归一化坐标 + 条件表达式），
+            // 场景重建会把它们重置成 demo 的三个点，所以优先读 VNGameConfig 资产。
+            var cfg = VNGameConfig.Active;
+            if (cfg != null)
+            {
+                if (cfg.mapSprite != null) mapSprite = cfg.mapSprite;
+                VNGameConfig.ApplyList(cfg.mapLocations, ref locations);
+            }
+
             // 可用地点 = 通过条件 且 被本次「* 结果行」接住
             var visible = new List<Location>();
             foreach (var loc in locations)

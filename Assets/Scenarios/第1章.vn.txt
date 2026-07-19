@@ -1,95 +1,192 @@
 # ============================================================
-# 第1章.vn.txt —— Flag 高级教学套件：新游戏初始化与基础分支
+# 第1章.vn.txt —— 序章：辣妹坐到了我旁边
+# ------------------------------------------------------------
+# 【本文件教学的机制】
+#   演出层：bg/transition、mood、weather、fx、camera/camseq、emote、
+#           move、cg、letterbox、shake、wait、行尾 @ 异步
+#   逻辑层：label/jump、flag、stat、choice（含 flag: 与 ->）、
+#           quest start、chapter（切幕并清空调用栈）
 #
-# 使用前：把本套件的 7 个 .vn.txt 全部登记到 VNScriptRunner.Chapters。
-# 推荐从本文件开始播放。内部状态用 flag（静默），玩家可见数值用 stat（飘字/HUD）。
+# 【叙事视角】
+#   男主是第一人称宅宅，**没有立绘**：
+#     : （……）   内心独白（无名牌旁白）
+#     : ……        场景叙述
+#     我: ……      说出口的话（名牌显示"我"）
+#   这是纯 Gal 的标准写法，比给男主做立绘省一半素材。
+#
+# 【结尾去向】
+#   chapter 主循环   ← 用 chapter 而不是 jump，因为这是"第一次进入养成阶段"，
+#                      需要主循环的文件头初始化跑一遍；chapter 会清空调用栈，
+#                      表示"序章彻底结束，不再返回"。
 # ============================================================
 
-# 裸 flag：非 0 即真；!flag：等于 0 时为真。
-if !已初始化 jump 新游戏初始化
-jump 已有进度入口
+# ---------- 开幕：先黑边 + 转场，建立"电影开场"的仪式感 ----------
+letterbox on time:1.2
+bg 教室 transition:Eyelid
+mood Morning
+fx godrays on
+fx clouds on
+bgm play 日常 fade:2
 
-label 新游戏初始化
-reset effects
-bg bg1 transition:Eyelid
-mood Neutral
-weather None
-portrait on
-bgm play b01 fade:2
+: 四月。樱花落尽的第二周，我升上了高二。
+: （新班级、新座位、新的一年——对我来说，也不过是换个地方看小说而已。）
 
-# 玩家可见属性。没有 VNStatDef 也能保存和判断，只是不会钳制或显示在 HUD。
-stat 金钱 500
-stat 行动力 10
-stat 压力 0
-stat 体力 70
-stat 智力 20
-stat 魅力 20
-stat 感性 20
-stat 社交度 0
-stat 享受度 0
-stat 好感度_小雪 0
+wait 0.4
+se 门
+: 教室的门被拉开。
 
-# 日历：当前系统按月推进。
-time set 9 remain:6
+# ---------- 女主登场：最华丽的出场预设 + 急推镜头 ----------
+# 顺序讲究：先 camera 急推（异步 @，不挡下面的 show），再 show，
+# 于是"镜头猛地推过去"和"人出现"是同时发生的。
+camera snapzoom 1.12 @
+show 星野结衣 at:center expr:默认 with:DissolveGlow
+se 惊
+fx speedlines burst
 
-# Flag 的常见角色：布尔开关、计数器、枚举/阶段、跨文件入口、防重复标记。
-flag 已初始化 1
-flag 主线进度 1
-flag 本月事件已触发 0
-flag 学习次数 0
-flag 打工次数 0
-flag 训练成功次数 0
-flag 与小雪相处次数 0
-flag 已看_第2章 0
-flag 已看_第3章 0
-flag 已看_圣诞 0
-flag 已看_小雪事件20 0
-flag 已看_小雪事件50 0
-flag 已看_任务完成演出 0
-flag 路线_小雪 0
-flag 路线_学业 0
-flag 路线_财富 0
+: （……）
+: （染成浅金色的头发，耳朵上一排耳钉，制服裙子短得像在挑衅校规。）
+: （班上的辣妹——星野结衣。）
+: （和我，是完全不同世界的生物。）
 
-show 亚里沙 at:left with:DissolveGlow
-wait 0.3
-show 小雪 at:right with:FadeSlideUp
+# camseq：手写路径镜头。比 camera 预设自由，适合"从上到下打量一个人"。
+# 首点时长 0 = 瞬切起手；整块加 @ 让镜头和下面的台词同时进行。
+camseq start:fade end:fade @
+> 星野结衣:head 1.6 0
+> 星野结衣:waist 1.6 1.4
+> middle 1.0 1.0
 
-亚里沙: 九月的新学期开始了。接下来每一个选择，都会留下看不见的记录。
-小雪: 有些记录是属性，有些是任务，还有些会决定未来能不能遇见某段剧情。
+星野结衣 默认: 唔——哪个是我的座位来着……
+wait 0.5
 
-# 选项可以在点击时直接写一个 flag，再跳到不同 label。
+# 她走到我旁边：move 是"滑步换位"，配 @ 可边走边说
+move 星野结衣 left 0.9 @
+星野结衣 默认: 啊，找到了。窗边诶，赚到。
+
+camera reset @
+: （……等等。）
+: （窗边靠走廊那一排的倒数第二个，是我的座位。）
+: （那么她的座位，就是——）
+
+# ⚠ 易错点：emote 的动作名是**英文枚举**
+#   （Surprise / Angry / Shy / Dejected / Recover / Nod / HeadShake）；
+#   而 `星野结衣 惊讶: 台词` 里的"惊讶"是**角色资产里的表情名**（中文，可自定义）。
+#   两者是不同的东西，别混用——写成 `emote 星野结衣 惊讶` 会报错。
+emote 星野结衣 Surprise
+星野结衣 惊讶: 诶，你就是坐我旁边的人？
+星野结衣 微笑: 我叫星野结衣。一年请多指教啦！
+
+# ---------- 第一个选择：定下男主的"性格底色" ----------
+# 教学点：选项的 flag: 可以顺手写变量，-> 决定跳哪里。
+#         这里三个选项汇合到同一个 label，只是起手好感与"宅度"不同——
+#         这是分支剧本最省成本的写法：**分叉一小段，立刻收束**。
 choice
-* 我想认真学习 flag:性格_认真 -> 选择认真
-* 我想多认识朋友 flag:性格_外向 -> 选择外向
-* 我想享受青春 flag:性格_享乐 -> 选择享乐
+* 慌张地点点头 flag:好感度_结衣+3 -> 反应_点头
+* 报上名字，正常回应 flag:好感度_结衣+6 -> 反应_正常
+* 假装没听见，继续看书 flag:好感度_结衣+1 -> 反应_装死
 
-label 选择认真
-stat 智力 +10
-flag 路线_学业 1
-亚里沙: 先把成绩提高，未来才会有更多选择。
-jump 选择汇合
+label 反应_点头
+emote 星野结衣 Nod
+: （喉咙像被堵住了。我只能拼命点头。）
+星野结衣 坏笑: 哈哈，你好紧张诶。放轻松啦，我又不咬人。
+jump 反应汇合
 
-label 选择外向
-stat 社交度 +10
-stat 好感度_小雪 +5
-亚里沙: 我想主动一点，不再错过重要的人。
-jump 选择汇合
+label 反应_正常
+我: ……我叫佐野。请、请多指教。
+星野结衣 微笑: 佐野同学是吧，记住了！
+: （只是报了个名字，手心却全是汗。）
+jump 反应汇合
 
-label 选择享乐
-stat 享受度 +10
-stat 压力 -5
-亚里沙: 努力很重要，但快乐也不能被忘记。
+label 反应_装死
+# 装死路线加"宅度"：把书举高本身就是宅的自我防卫
+stat 宅度 +5
+emote 星野结衣 HeadShake
+: （我把书举高，挡住了脸。）
+星野结衣 默认: ……喂—— 我在跟你说话诶？
+星野结衣 坏笑: 算了，你这种人我见多了。慢慢来吧～
+jump 反应汇合
 
-label 选择汇合
-flag 入口_第1章 0
-亚里沙: 就从今天开始吧。
-hide 小雪 with:fade
-hide 亚里沙 with:dissolve
-bgm stop fade:1
+# ---------- 汇合：共通剧情 ----------
+label 反应汇合
+flag 见过_结衣 1
+: 上课铃响了。
+
+# 一次 wait + 转场，表示时间跳跃到放学
+transition Blinds
+wait 0.3
+call 公共片段::换场 背景:教室_黄昏 心情:Sunset 转场:NoiseDissolve
+fx godrays on
+weather Petals
+bgm play 青春 fade:2
+
+: 放学后。值日的教室里只剩下两个人。
+
+# fx dof：伪景深，背景糊掉、立绘"浮"出来——特写对话的标配
+fx dof on
+camera pushin 1.06 5 focus:星野结衣 @
+星野结衣 默认: 佐野同学，你一直在看什么书啊？
+
+choice
+* 老实说是轻小说 flag:结衣知道我是宅+1 -> 书_坦白
+* 含糊带过 -> 书_含糊
+
+label 书_坦白
+stat 宅度 +10
+我: ……轻小说。你大概没听过的那种。
+emote 星野结衣 Surprise
+星野结衣 惊讶: 诶——！我知道啊！我弟房间里堆了一整柜！
+星野结衣 微笑: 原来你是这种人啊。有点意外，但……不讨厌。
+call 公共片段::好感反馈 数值:8
+jump 书_汇合
+
+label 书_含糊
+我: ……没什么，随便看看。
+emote 星野结衣 Dejected
+星野结衣 沮丧: 唔，这样啊。
+wait 0.4
+emote 星野结衣 Recover
+星野结衣 微笑: 不过你看得好认真诶，感觉很厉害。
+call 公共片段::好感反馈 数值:3
+jump 书_汇合
+
+label 书_汇合
+fx dof off
+camera reset @
+
+# ---------- 名场面：CG + 心跳 + 樱吹雪 ----------
+wait 0.4
+星野结衣 微笑: 一起走到校门口吧？反正顺路。
+: （——顺路？她家在哪我都不知道。）
+: （但我还是点了头。）
+
+cg CG_初次并肩 transition:WhiteFlash
+fx heartbeat on
+: 并肩走在洒满夕阳的走廊上。
+: （我和她之间隔着半米。这半米，好像有一整个宇宙那么宽。）
+星野结衣 微笑: 明天见啦，佐野同学！
+fx heartbeat off
+cg off transition:NoiseDissolve
+
+# ---------- 收尾：接取主线任务，切入养成主循环 ----------
+call 公共片段::换场 背景:我的房间 心情:Night 转场:CircleWipe
+weather None
+bgm play 忧郁 fade:2
+
+: （回到房间，我盯着天花板发了半小时的呆。）
+: （……不可能的。她是辣妹，我是宅。这本身就是设定上的错误。）
+wait 0.6
+fx heartbeat on
+: （可是——）
+: （如果，只是如果……）
+
+# quest start：接取任务会弹 Toast，玩家按 J 能随时查看
+quest start 告白大作战
+: （——我决定了。这一年，我要让她记住我。）
+fx heartbeat off
+
+letterbox off
+hide 星野结衣 with:dissolve
+: 第一章　完
 reset effects
-chapter 主循环
 
-# 已有进度时再次进入第1章，不重新初始化，避免覆盖存档数值。
-label 已有进度入口
-: 检测到“已初始化”不为 0，因此跳过初始化并返回主循环。
+# chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环

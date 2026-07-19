@@ -260,11 +260,28 @@ namespace VNEffects
             cmd.keyword = tokens[0];
             for (int t = 1; t < tokens.Length; t++)
             {
-                int colon = tokens[t].IndexOf(':');
-                if (colon > 0 && colon < tokens[t].Length - 1)
-                    cmd.kwargs[tokens[t].Substring(0, colon)] = tokens[t].Substring(colon + 1);
+                string token = tokens[t];
+                int colon = token.IndexOf(':');
+
+                // 限定地址「文件::标签」不是 key:value。
+                // 判据：第一个冒号后面**紧跟另一个冒号**时，整个 token 是位置参数
+                // （jump / call / chapter 的目标）。
+                // 反例保护：`title:第1章::序` 的第一个冒号后面是「第」，仍按 key:value 处理，
+                // 值里保留 :: 原样传给 VNStoryAddress。
+                bool qualifiedAddress =
+                    colon >= 0 && colon + 1 < token.Length && token[colon + 1] == ':';
+
+                // camto / camcut 的第一个参数是「目标点」，可能长成 角色:部位
+                // （如 camto 亚里沙:head 1.6 0.8），与 key:value 撞形。
+                // 这两个命令的**首个**位置参数一律不当 kwarg。
+                // （camseq 的 > 路径点行走 ParseCamWaypoint，本来就无条件取 tokens[0]，不受影响。）
+                bool camPointArg =
+                    t == 1 && (cmd.keyword == "camto" || cmd.keyword == "camcut");
+
+                if (!qualifiedAddress && !camPointArg && colon > 0 && colon < token.Length - 1)
+                    cmd.kwargs[token.Substring(0, colon)] = token.Substring(colon + 1);
                 else
-                    cmd.args.Add(tokens[t]);
+                    cmd.args.Add(token);
             }
         }
 

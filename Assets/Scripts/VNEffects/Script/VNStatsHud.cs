@@ -44,6 +44,10 @@ namespace VNEffects
 
         void Awake()
         {
+            // 定义资产列表优先读 VNGameConfig（场景重建会把它重置成 demo 的那几个）
+            var cfg = VNGameConfig.Active;
+            if (cfg != null) VNGameConfig.ApplyList(cfg.stats, ref stats);
+
             VNLocale.LanguageChanged += OnLanguageChanged;
             VNFlags.Changed += MarkDirty;
         }

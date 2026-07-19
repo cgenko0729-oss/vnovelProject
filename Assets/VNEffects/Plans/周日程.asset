@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f3c41fda07abfc14ebc13d3340dbcaca, type: 3}
+  m_Name: "\u5468\u65E5\u7A0B"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPlanDef
+  planId: "\u5468\u65E5\u7A0B"
+  title: "\u5B89\u6392\u8FD9\u4E00\u5468"
+  titleEn: Plan Your Week
+  titleJa: "\u4E00\u9031\u9593\u306E\u4E88\u5B9A\u3092\u7D44\u3082\u3046"
+  actions:
+  - id: "\u6253\u5DE5"
+    number: 1
+    displayName: "\u4FBF\u5229\u5E97\u6253\u5DE5"
+    displayNameEn: Part-time Job
+    displayNameJa: "\u30B3\u30F3\u30D3\u30CB\u30D0\u30A4\u30C8"
+    gainText: "\u91D1\u94B1+150\u3000\u538B\u529B+8"
+    gainTextEn: Money +150 / Stress +8
+    gainTextJa: "\u6240\u6301\u91D1+150\u3000\u30B9\u30C8\u30EC\u30B9+8"
+    icon: {fileID: 0}
+    condition: 
+  - id: "\u5B66\u4E60"
+    number: 2
+    displayName: "\u56FE\u4E66\u9986\u5B66\u4E60"
+    displayNameEn: Study
+    displayNameJa: "\u56F3\u66F8\u9928\u3067\u52C9\u5F37"
+    gainText: "\u667A\u529B+12\u3000\u538B\u529B+6"
+    gainTextEn: Int +12 / Stress +6
+    gainTextJa: "\u77E5\u529B+12\u3000\u30B9\u30C8\u30EC\u30B9+6"
+    icon: {fileID: 0}
+    condition: 
+  - id: "\u5251\u672F\u8BAD\u7EC3"
+    number: 3
+    displayName: "\u5251\u672F\u8BAD\u7EC3"
+    displayNameEn: Sword Training
+    displayNameJa: "\u5263\u8853\u8A13\u7DF4"
+    gainText: "\u4F53\u529B+15\u3000\u538B\u529B+12"
+    gainTextEn: Vit +15 / Stress +12
+    gainTextJa: "\u4F53\u529B+15\u3000\u30B9\u30C8\u30EC\u30B9+12"
+    icon: {fileID: 0}
+    condition: 
+  - id: "\u4F11\u606F"
+    number: 4
+    displayName: "\u597D\u597D\u4F11\u606F"
+    displayNameEn: Rest
+    displayNameJa: "\u3086\u3063\u304F\u308A\u4F11\u3080"
+    gainText: "\u538B\u529B-20"
+    gainTextEn: Stress -20
+    gainTextJa: "\u30B9\u30C8\u30EC\u30B9-20"
+    icon: {fileID: 0}
+    condition: 
