@@ -22,6 +22,21 @@ MonoBehaviour:
   - {fileID: 4900000, guid: c8ec8fcd50f14ccfa72975821eac17aa, type: 3}
   - {fileID: 4900000, guid: 2c494596a0914599ae545b1ab21cc6d8, type: 3}
   - {fileID: 4900000, guid: 4c615a3f83a148229de313c73b4d376b, type: 3}
+  gameTitle: 
+  gameTitleEn: 
+  gameTitleJa: 
+  titleBackground: 
+  titleBgm: 
+  dialogueSkins:
+  - id: "\u7ECF\u5178"
+    prefab: {fileID: 6093085639625304626, guid: f62a4121092f2704ea1e857dd47c889d, type: 3}
+  - id: "\u9876\u90E8"
+    prefab: {fileID: 8003070586189573604, guid: 2cd67e7c06fd8284eab7e9e2eadce8f8, type: 3}
+  choiceSkins:
+  - id: "\u7ECF\u5178"
+    prefab: {fileID: 2849680794329722818, guid: 83d52225b861bd94f9c227eb488019c3, type: 3}
+  - id: "\u53F3\u5217"
+    prefab: {fileID: 805707084096112339, guid: 774934d146cf8d148b8588f947c23b43, type: 3}
   characters:
   - {fileID: 11400000, guid: 85d21fec57553cb4983145ad9f930fbe, type: 2}
   - {fileID: 11400000, guid: d6da61221a1ce74439a3baf628fd3164, type: 2}

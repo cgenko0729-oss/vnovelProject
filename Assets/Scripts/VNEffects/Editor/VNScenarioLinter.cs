@@ -87,6 +87,8 @@ namespace VNEffects.EditorTools
                 new Dictionary<string, HashSet<string>>();
             public HashSet<string> eventModules = new HashSet<string>();
             public HashSet<string> mapLocations = new HashSet<string>();
+            public HashSet<string> dialogueSkins = new HashSet<string>();
+            public HashSet<string> choiceSkins = new HashSet<string>();
             public bool sceneRegistryFound;   // 场景里有没有 VNEventRegistry
         }
 
@@ -207,6 +209,10 @@ namespace VNEffects.EditorTools
                 foreach (var a in cfg.seLibrary) if (a != null) reg.ses.Add(a.id);
                 foreach (var a in cfg.voiceLibrary) if (a != null) reg.voices.Add(a.id);
                 foreach (var l in cfg.mapLocations) if (l != null) reg.mapLocations.Add(l.name);
+                foreach (var s in cfg.dialogueSkins)
+                    if (s != null && !string.IsNullOrEmpty(s.id)) reg.dialogueSkins.Add(s.id);
+                foreach (var s in cfg.choiceSkins)
+                    if (s != null && !string.IsNullOrEmpty(s.id)) reg.choiceSkins.Add(s.id);
             }
 
             var stage = Object.FindFirstObjectByType<VNStage>(FindObjectsInactive.Include);
@@ -397,6 +403,29 @@ namespace VNEffects.EditorTools
                         CheckId(issues, f, c.line, c.Arg(0), reg.voices, "语音",
                             "unknown-voice", "在 VNGameConfig 的 Voice Library 里登记。");
                         break;
+
+                    case "ui":
+                    {
+                        // ui dialogue|choice <id|default>；default 永远合法
+                        string kind = c.Arg(0);
+                        string skinId = c.Arg(1, "default");
+                        if (kind != "dialogue" && kind != "choice")
+                        {
+                            Add(issues, VNLintSeverity.Error, "bad-ui-kind", f, c.line,
+                                $"ui 命令的对象「{kind}」不认识",
+                                "用法：ui dialogue|choice <皮肤id|default>。");
+                        }
+                        else if (skinId != "default" && !Dynamic(skinId))
+                        {
+                            var known = kind == "dialogue" ? reg.dialogueSkins : reg.choiceSkins;
+                            if (!known.Contains(skinId))
+                                Add(issues, VNLintSeverity.Warning, "unknown-ui-skin", f, c.line,
+                                    $"UI 皮肤「{skinId}」未登记",
+                                    $"在 VNGameConfig 的 {(kind == "dialogue" ? "Dialogue" : "Choice")} " +
+                                    "Skins 里登记 id→prefab；运行时未登记的皮肤会报错并保持现状。");
+                        }
+                        break;
+                    }
 
                     case "show":
                     case "hide":

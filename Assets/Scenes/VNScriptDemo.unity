@@ -27123,7 +27123,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNScriptRunner
   stage: {fileID: 360770714}
-  script: {fileID: 4900000, guid: 7bc19c23bb1425c4d8024c27edcc65d4, type: 3}
+  script: {fileID: 4900000, guid: 1bc8d1c2e986cb1419062b4774a88452, type: 3}
   chapters:
   - {fileID: 4900000, guid: 7bc19c23bb1425c4d8024c27edcc65d4, type: 3}
   - {fileID: 4900000, guid: 3dc677cd351b51d40aecfaeeede5f343, type: 3}

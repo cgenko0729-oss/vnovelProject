@@ -13,6 +13,7 @@ namespace VNEffects
         GameObject _root;
         Image _autoImage;
         Image _skipImage;
+        RectTransform _dock; // 停靠点（皮肤 toolbarAnchor/panel）；null = 对话框根（老位置）
 
         static readonly Color Normal = new Color(0.045f, 0.06f, 0.105f, 0.94f);
         static readonly Color Active = new Color(0.92f, 0.61f, 0.18f, 0.98f);
@@ -49,11 +50,8 @@ namespace VNEffects
             _root = new GameObject("QuickToolbar", typeof(RectTransform),
                 typeof(Canvas), typeof(GraphicRaycaster), typeof(CanvasRenderer),
                 typeof(Image), typeof(HorizontalLayoutGroup));
+            AttachRoot();
             var rect = (RectTransform)_root.transform;
-            rect.SetParent(transform, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
-            rect.pivot = new Vector2(1f, 0f);
-            rect.anchoredPosition = new Vector2(-18f, 9f);
             rect.sizeDelta = new Vector2(1013f, 42f); // 十二个固定宽按钮 + 间距/内边距
 
             // VNDialogueBox 自己是 overrideSorting 的嵌套 Canvas。工具条需要独立
@@ -92,6 +90,27 @@ namespace VNEffects
             CreateButton(VNLocale.T("toolbar.gallery"), 62f, () => _runner?.RequestCgGallery());
             CreateButton(VNLocale.T("toolbar.config"), 88f, () => _runner?.RequestConfigPanel());
             CreateButton(VNLocale.T("toolbar.hideui"), 100f, () => _runner?.SetInterfaceHidden(true));
+        }
+
+        /// <summary>
+        /// 对话框皮肤切换时的停靠：挂到 dock 的右上角（null = 挂回对话框根的老位置）。
+        /// 旧皮肤销毁是延迟的，本帧内重新挂接即可把功能条从将亡层级里救出来。
+        /// </summary>
+        public void SetDock(RectTransform dock)
+        {
+            _dock = dock;
+            if (_root == null) { Build(); return; }
+            AttachRoot();
+        }
+
+        void AttachRoot()
+        {
+            var rect = (RectTransform)_root.transform;
+            Transform parent = _dock != null ? (Transform)_dock : transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 0f);
+            rect.anchoredPosition = new Vector2(-18f, 9f);
         }
 
         Image CreateButton(string label, float width, UnityEngine.Events.UnityAction action)

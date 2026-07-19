@@ -40,6 +40,8 @@ namespace VNEffects
         public string cgId;                            // 显示中的 CG（空 = 无，旧存档缺省兼容）
         public bool cgKeepChars;                       // cg 命令的 chars:keep
         public bool cgKeepFx;                          // cg 命令的 fx:keep
+        public string dialogueSkin;                    // 对话框皮肤 id（空 = 默认，旧存档兼容）
+        public string choiceSkin;                      // 选项面板皮肤 id（空 = 默认）
 
         [System.Serializable]
         public class CharSave
