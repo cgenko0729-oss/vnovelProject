@@ -24,6 +24,11 @@ namespace VNEffects
         GameObject _hudBar;
         GameObject _panel;
         RectTransform _panelContent;
+        RectTransform _hudEntryContainer;
+        VNStatsHudSkin _hudSkin;
+        VNStatsHudEntrySkin _hudTemplate;
+        VNStatsPanelSkin _panelSkin;
+        VNStatsPanelRowSkin _panelTemplate;
         bool _open;
         bool _dirty;
         bool _hudVisible = true;
@@ -75,6 +80,11 @@ namespace VNEffects
             _hudBar = null;
             _panel = null;
             _panelContent = null;
+            _hudEntryContainer = null;
+            _hudSkin = null;
+            _hudTemplate = null;
+            _panelSkin = null;
+            _panelTemplate = null;
             _hudEntries.Clear();
             BuildHud();
         }
@@ -252,6 +262,26 @@ namespace VNEffects
             EnsureCanvas();
             if (_hudBar != null || !HasHudStats()) return;
 
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.statsHudPrefab);
+            _hudSkin = VNSystemUiSkinUtility.Instantiate<VNStatsHudSkin>(
+                skinPrefab, _canvas.transform, "VNStatsHud");
+            if (_hudSkin != null)
+            {
+                _hudBar = _hudSkin.hudRoot;
+                _hudEntryContainer = _hudSkin.entryContainer;
+                _hudTemplate = _hudSkin.entryTemplate;
+                _hudTemplate.gameObject.SetActive(false);
+                _hudEntries.Clear();
+                foreach (var def in stats)
+                {
+                    if (def == null || !def.showInHud || string.IsNullOrEmpty(def.id)) continue;
+                    _hudEntries.Add(CreateHudEntry(def));
+                }
+                _hudBar.SetActive(_hudVisible);
+                RefreshHud(false);
+                return;
+            }
+
             _hudBar = new GameObject("HudBar", typeof(RectTransform), typeof(CanvasRenderer),
                 typeof(Image), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
             var rect = (RectTransform)_hudBar.transform;
@@ -291,6 +321,8 @@ namespace VNEffects
 
         HudEntry CreateHudEntry(VNStatDef def)
         {
+            if (_hudTemplate != null) return CreateCustomHudEntry(def);
+
             var root = new GameObject(def.id, typeof(RectTransform), typeof(HorizontalLayoutGroup));
             root.transform.SetParent(_hudBar.transform, false);
             var layout = root.GetComponent<HorizontalLayoutGroup>();
@@ -357,6 +389,29 @@ namespace VNEffects
             return new HudEntry
             {
                 def = def, value = value, bar = bar,
+                lastValue = VNFlags.Get(def.id),
+            };
+        }
+
+        HudEntry CreateCustomHudEntry(VNStatDef def)
+        {
+            var go = Instantiate(_hudTemplate.gameObject, _hudEntryContainer, false);
+            go.name = def.id;
+            go.SetActive(true);
+            var skin = go.GetComponent<VNStatsHudEntrySkin>();
+            skin.icon.sprite = def.icon != null ? def.icon : DotSprite();
+            skin.icon.color = def.icon != null ? Color.white : def.color;
+            skin.nameText.text = def.DisplayName;
+
+            bool hasBar = def.Normalized(def.minValue) >= 0f &&
+                          skin.barRoot != null && skin.barFill != null;
+            if (skin.barRoot != null) skin.barRoot.SetActive(hasBar);
+            if (hasBar) skin.barFill.color = def.color;
+            return new HudEntry
+            {
+                def = def,
+                value = skin.valueText,
+                bar = hasBar ? skin.barFill : null,
                 lastValue = VNFlags.Get(def.id),
             };
         }
@@ -442,6 +497,23 @@ namespace VNEffects
             if (_panel != null) return;
             EnsureCanvas();
 
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.statsPanelPrefab);
+            _panelSkin = VNSystemUiSkinUtility.Instantiate<VNStatsPanelSkin>(
+                skinPrefab, _canvas.transform, "VNStatsPanel");
+            if (_panelSkin != null)
+            {
+                _panel = _panelSkin.panelRoot;
+                _panelContent = _panelSkin.content;
+                _panelTemplate = _panelSkin.rowTemplate;
+                _panelTemplate.gameObject.SetActive(false);
+                _panelSkin.titleText.text = VNLocale.T("stats.title");
+                if (_panelSkin.closeButton != null) BindButton(_panelSkin.closeButton, Close);
+                if (_panelSkin.backgroundCloseButton != null)
+                    BindButton(_panelSkin.backgroundCloseButton, Close);
+                _panel.SetActive(false);
+                return;
+            }
+
             _panel = new GameObject("Panel", typeof(RectTransform));
             var panelRect = (RectTransform)_panel.transform;
             panelRect.SetParent(_canvas.transform, false);
@@ -488,11 +560,21 @@ namespace VNEffects
             _panel.SetActive(false);
         }
 
+        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+        {
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
+        }
+
         void RebuildPanelList()
         {
             if (_panelContent == null) return;
             for (int i = _panelContent.childCount - 1; i >= 0; i--)
-                Destroy(_panelContent.GetChild(i).gameObject);
+            {
+                var child = _panelContent.GetChild(i);
+                if (_panelTemplate != null && child == _panelTemplate.transform) continue;
+                Destroy(child.gameObject);
+            }
 
             if (stats.Count == 0)
             {
@@ -506,6 +588,12 @@ namespace VNEffects
             {
                 if (def == null || string.IsNullOrEmpty(def.id)) continue;
                 int v = VNFlags.Get(def.id);
+
+                if (_panelTemplate != null)
+                {
+                    CreateCustomPanelRow(def, v);
+                    continue;
+                }
 
                 var row = new GameObject(def.id, typeof(RectTransform), typeof(LayoutElement));
                 row.transform.SetParent(_panelContent, false);
@@ -565,6 +653,34 @@ namespace VNEffects
                 valueRect.anchorMax = new Vector2(1f, 1f);
                 valueRect.offsetMin = Vector2.zero;
                 valueRect.offsetMax = Vector2.zero;
+            }
+        }
+
+        void CreateCustomPanelRow(VNStatDef def, int value)
+        {
+            var go = Instantiate(_panelTemplate.gameObject, _panelContent, false);
+            go.name = def.id;
+            go.SetActive(true);
+            var row = go.GetComponent<VNStatsPanelRowSkin>();
+            if (row.icon != null)
+            {
+                row.icon.sprite = def.icon != null ? def.icon : DotSprite();
+                row.icon.color = def.icon != null ? Color.white : def.color;
+            }
+            row.nameText.text = def.DisplayName;
+            string grade = def.style == VNStatStyle.Grade ? def.GradeOf(value) : "";
+            row.valueText.text = string.IsNullOrEmpty(grade)
+                ? def.Format(value)
+                : $"{def.Format(value)}  <color=#{ColorUtility.ToHtmlStringRGB(def.color)}>{grade}</color>";
+
+            float normalized = def.Normalized(value);
+            bool hasBar = normalized >= 0f && row.barRoot != null && row.barFill != null;
+            if (row.barRoot != null) row.barRoot.SetActive(hasBar);
+            if (hasBar)
+            {
+                row.barFill.color = def.color;
+                var fillRect = (RectTransform)row.barFill.transform;
+                fillRect.anchorMax = new Vector2(Mathf.Clamp01(normalized), 1f);
             }
         }
 
