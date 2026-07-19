@@ -20,7 +20,7 @@ namespace VNEffects
         VNStage _stage;
         GameObject _canvasGo;
         GameObject _panel;
-        TextMeshProUGUI _fullscreenLabel;
+        TMP_Text _fullscreenLabel;
         bool _open;
         bool _settingsApplied;
 
@@ -85,6 +85,16 @@ namespace VNEffects
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
+
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.configPanelPrefab);
+            var customSkin = VNSystemUiSkinUtility.Instantiate<VNConfigPanelSkin>(
+                skinPrefab, canvasGo.transform, "VNConfigPanel");
+            if (customSkin != null)
+            {
+                BindCustomSkin(customSkin);
+                _panel.SetActive(false);
+                return;
+            }
 
             _panel = new GameObject("Panel", typeof(RectTransform));
             var panelRect = (RectTransform)_panel.transform;
@@ -167,6 +177,85 @@ namespace VNEffects
             SetRect(hint.rectTransform, new Vector2(80f, -668f), new Vector2(620f, 34f));
             hint.color = new Color(0.68f, 0.74f, 0.86f, 0.9f);
             _panel.SetActive(false);
+        }
+
+        void BindCustomSkin(VNConfigPanelSkin skin)
+        {
+            _panel = skin.panelRoot;
+            _fullscreenLabel = skin.fullscreenLabel;
+
+            skin.titleText.text = VNLocale.T("config.title");
+            if (skin.hintText != null) skin.hintText.text = VNLocale.T("config.hint");
+            if (skin.bgmLabel != null) skin.bgmLabel.text = VNLocale.T("config.bgm");
+            if (skin.seLabel != null) skin.seLabel.text = VNLocale.T("config.se");
+            if (skin.voiceLabel != null) skin.voiceLabel.text = VNLocale.T("config.voice");
+            if (skin.textSpeedLabel != null) skin.textSpeedLabel.text = VNLocale.T("config.textSpeed");
+            if (skin.languageLabel != null) skin.languageLabel.text = VNLocale.T("config.language");
+
+            BindButton(skin.closeButton, Close);
+            if (skin.backgroundCloseButton != null) BindButton(skin.backgroundCloseButton, Close);
+
+            float bgm = _stage != null && _stage.vnAudio != null ? _stage.vnAudio.bgmVolume : 0.75f;
+            float se = _stage != null && _stage.vnAudio != null ? _stage.vnAudio.seVolume : 1f;
+            float voice = _stage != null && _stage.vnAudio != null ? _stage.vnAudio.voiceVolume : 1f;
+            float speed = _stage != null && _stage.dialogue != null ? _stage.dialogue.TextSpeed : 18f;
+
+            BindSlider(skin.bgmSlider, skin.bgmValue, 0f, 1f, bgm, v => $"{v:P0}", value =>
+            {
+                _stage?.vnAudio?.SetVolume("bgm", value);
+                PlayerPrefs.SetFloat(BgmKey, value);
+            });
+            BindSlider(skin.seSlider, skin.seValue, 0f, 1f, se, v => $"{v:P0}", value =>
+            {
+                _stage?.vnAudio?.SetVolume("se", value);
+                PlayerPrefs.SetFloat(SeKey, value);
+            });
+            BindSlider(skin.voiceSlider, skin.voiceValue, 0f, 1f, voice, v => $"{v:P0}", value =>
+            {
+                _stage?.vnAudio?.SetVolume("voice", value);
+                PlayerPrefs.SetFloat(VoiceKey, value);
+            });
+            BindSlider(skin.textSpeedSlider, skin.textSpeedValue, 8f, 60f, speed,
+                v => VNLocale.T("config.textSpeedValue", v), value =>
+                {
+                    _stage?.dialogue?.SetTextSpeed(value);
+                    PlayerPrefs.SetFloat(TextSpeedKey, value);
+                });
+
+            BindLanguageButton(skin.chineseButton, skin.chineseLabel, VNLanguage.Chinese, skin.selectedLanguageColor);
+            BindLanguageButton(skin.englishButton, skin.englishLabel, VNLanguage.English, skin.selectedLanguageColor);
+            BindLanguageButton(skin.japaneseButton, skin.japaneseLabel, VNLanguage.Japanese, skin.selectedLanguageColor);
+            BindButton(skin.fullscreenButton, ToggleFullscreen);
+            UpdateFullscreenLabel();
+        }
+
+        static void BindSlider(Slider slider, TMP_Text valueText, float min, float max, float value,
+            Func<float, string> format, Action<float> changed)
+        {
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.SetValueWithoutNotify(value);
+            valueText.text = format(value);
+            slider.onValueChanged.RemoveAllListeners();
+            slider.onValueChanged.AddListener(v =>
+            {
+                valueText.text = format(v);
+                changed(v);
+            });
+        }
+
+        void BindLanguageButton(Button button, TMP_Text label, VNLanguage language, Color activeColor)
+        {
+            if (label != null) label.text = VNLocale.DisplayName(language);
+            BindButton(button, () => SetLanguage(language));
+            if (VNLocale.Language == language && button.targetGraphic != null)
+                button.targetGraphic.color = activeColor;
+        }
+
+        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+        {
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
         }
 
         void RefreshValues() => UpdateFullscreenLabel();
