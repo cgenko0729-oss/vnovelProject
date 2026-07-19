@@ -3036,3 +3036,19 @@ Scenario Editor schema（flag 命令加 rand 参数框）。
 
 **必须重建剧本演示场景**（Tools → VN Effects → Create Script Demo Scene）
 才会注册 plan/result 模块并生成示例方案资产。
+
+## 七十一、事件模块回想开关 RecordInBacklog（2026-07-19，分支 `agent/plan-backlog-quiet`）
+
+七十章实装后发现的瑕疵：`event plan op:next` 是纯流程控制调用，一周会跑 7 次，
+EventCo 每次都往回想里写一条「plan → next」，把玩家的回想记录淹没。
+
+修法（最小改动，对其他模块零影响）：
+
+- `VNEventModule` 加虚属性 `RecordInBacklog`（默认 true），文档注明「纯流程控制型
+  调用应返回 false」；
+- `VNScriptRunner.EventCo` 在 `Destroy(module.gameObject)` **之前**读取该属性
+  （Destroy 是帧末延迟执行，但读值要早于销毁才安全），据此决定是否 Record；
+- `VNPlanModule` 用 `_dispatchMode` 字段区分两种 op，派发模式返回 false。
+
+排程面板本身（`event plan` 无 op 参数）仍照常记入回想，qte/map/shop/result
+行为不变。

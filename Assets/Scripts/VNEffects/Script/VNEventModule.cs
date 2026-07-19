@@ -73,6 +73,13 @@ namespace VNEffects
             _onDone?.Invoke(outcome ?? "");
         }
 
+        /// <summary>
+        /// 本次事件是否记入回想（Backlog）。默认 true；纯流程控制型调用
+        /// （如 event plan op:next 逐格派发，一周会调 7 次）应返回 false，
+        /// 否则回想里全是无意义的重复条目。Runner 在模块销毁前读取。
+        /// </summary>
+        public virtual bool RecordInBacklog => true;
+
         /// <summary>剧本被停止/调试中断时的清理钩子（随后模块被销毁）</summary>
         public virtual void CancelForDebug() { }
     }

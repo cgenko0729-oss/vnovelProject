@@ -1501,11 +1501,13 @@ namespace VNEffects
             while (result == null) yield return null;
 
             _activeEventModule = null;
+            bool recordInBacklog = module.RecordInBacklog; // 销毁前读取
             Destroy(module.gameObject);
             stage.dialogue?.Show();
             _eventActive = false;
 
-            _backlog?.Record(VNLocale.T("backlog.event"), $"{id} → {result}");
+            if (recordInBacklog)
+                _backlog?.Record(VNLocale.T("backlog.event"), $"{id} → {result}");
             if (int.TryParse(result, out int numeric))
                 VNFlags.Set("事件结果", numeric);
 

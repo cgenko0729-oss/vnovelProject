@@ -54,6 +54,10 @@ namespace VNEffects
         readonly List<VNPlanDef.ActionDef> _actions = new List<VNPlanDef.ActionDef>();
         int[] _slots;          // 每格的行动编号（0 = 空/休息）
         bool _closing;
+        bool _dispatchMode;    // op:next 纯流程派发（不记回想，一周会调 N 次）
+
+        /// <summary>逐格派发只是流程控制，记进回想全是「plan → next」噪音</summary>
+        public override bool RecordInBacklog => !_dispatchMode;
 
         RectTransform _panel;
         readonly List<TextMeshProUGUI> _slotTexts = new List<TextMeshProUGUI>();
@@ -63,6 +67,7 @@ namespace VNEffects
         {
             if (ctx.Kw("op") == "next")
             {
+                _dispatchMode = true;
                 AdvanceCursor();
                 return;
             }
