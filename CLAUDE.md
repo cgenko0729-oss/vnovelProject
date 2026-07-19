@@ -2,7 +2,9 @@
 
 > 本文件是给 Claude（AI 助手）的项目说明书。所有开发过程的详细记录在 `WhatAiDo.md`；
 > 逐脚本的代码指南（职责/用法/扩展/维护）在 `ProjectCodeGuide.md`，改代码前先查它；
-> 从空场景手动搭建舞台的完整教程（含层级/排序/参数依据）在 `SetUpGuide.md`。
+> 从空场景手动搭建舞台的完整教程（含层级/排序/参数依据）在 `SetUpGuide.md`；
+> 剧本写法教程在 `HowToUse.md`。
+> **可复用工作流程已做成技能**（`.claude/skills/`），做对应任务时先调用技能拿清单，见下方「技能索引」。
 
 ## 项目概况
 
@@ -19,11 +21,26 @@
 1. **全程用中文回复用户**
 2. **每个新功能开新分支**（当前约定 `agent/<名称>`；历史分支也有 `feature/*`），完成后合并回
    `main`，**永远不删除任何分支**（用户靠分支回滚）
-3. 每批开发完成后**详细追加记录到 `WhatAiDo.md`**（计划、文件说明、技术决策、修复记录）
+3. 每批开发完成后**详细追加记录到 `WhatAiDo.md`**（模板见技能 vn-doc-update）
 4. 提交信息英文、正文中文注释；commit 尾部加 Co-Authored-By
-5. 合并时若报 `unable to unlink ... VNEffectsDemo.unity`：是 Unity 编辑器占用场景文件，
-   `git clean -f -- <残留新文件>` 后重试合并即可
-6. 推送偶尔网络慢会超时：用 `run_in_background` 后台推送
+5. 分支/合并/推送的完整流程与坑（unlink 报错、后台推送）见技能 **vn-new-feature**
+
+## 技能索引（.claude/skills/，按需调用）
+
+| 技能 | 什么时候用 |
+|---|---|
+| vn-new-feature | 开始任何新功能/修 bug（分支、提交、合并流程） |
+| vn-doc-update | 功能完成后同步文档（WhatAiDo 章节模板等） |
+| vn-new-command | 给剧本 DSL 加新命令（全链路 9 步清单） |
+| vn-new-event-module | 写新玩法事件模块（三铁律、注册、结果契约） |
+| vn-new-effect | 加新特效/演出组件（硬约定、fx 接线、演示场景） |
+| vn-save-compat | 新增任何运行时状态（存档/调试重建三处同步） |
+| vn-editor-extend | 改剧本可视化编辑器（Schema、行号换算、Bridge 时序） |
+| vn-write-scenario | 写/改 .vn.txt 剧本（语法要点、Lint） |
+| vn-add-assets | 接素材（立绘/背景/CG/音频/定义资产 → VNGameConfig） |
+| vn-ui-skin | 做 UI 皮肤（对话框/选项皮肤 与 系统菜单主题两条线） |
+| vn-localize | 本地化（Extract/Validate、翻译红线、加新语言） |
+| vn-debug | 剧本/演出排错（Lint、从选中行播放、编译验证） |
 
 ## 目录结构
 
@@ -55,26 +72,19 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 └── (场外) 粒子系统们(sortingOrder 10~31)、EventSystem、各管理器空物体
 ```
 
-### 关键技术约定
+### 关键技术约定（一行版，展开细节见技能 vn-new-effect / vn-ui-skin / vn-localize）
 
-- **发光=HDR 颜色(>1) + Bloom(阈值1.0)**；uGUI 顶点色被钳制到 1，HDR 必须走材质属性
-- **贴图全程序化生成**（`VNProceduralTextures`：柔圆/四芒星/光晕/光束/花瓣/圆环/圆角面板…），零美术依赖
-- **每张图独立材质实例**（`VNImageEffectController` 自动管理），多立绘互不串扰
-- uGUI 自定义 shader 走传统 CGPROGRAM（Canvas 不经过 URP 光照），保留 UI 裁剪兼容
-- **UI 不写深度缓冲** → 不能用真 DoF/深度类后处理区分层，模糊在 `VNImageEffect` 里做（9-tap）
-- 文字全部用 **TextMeshPro（TextMeshProUGUI）**，字体一律取 `VNFont.Asset`（统一入口，
-  按 `VNLocale.Language` 返回对应字体：中/英 = Noto Sans SC，日 = Noto Sans JP，
-  均为动态多图集 SDF，三级兜底见 VNFont.cs 注释）；**禁止再用 legacy Text /
-  LegacyRuntime.ttf**。玩家可见的 UI 字符串禁止硬编码，一律 `VNLocale.T(key)` 查表
-  （表在 `Resources/VNLocale/ui.<code>.txt`；[Header]/Debug.Log 等开发者文案保持中文）。编辑期创建、随场景保存的 TMP 文字必须引用
-  `VNFontAssetBuilder.EnsureFontAsset()` 的持久化资产（运行时临时资产存场景会变 Missing）。
-  API 换算对照表见 WhatAiDo.md 五十五章（TextAnchor→TextAlignmentOptions、
-  lineSpacing 倍率→字号百分比等）
-- 所有 Tween `SetLink(gameObject)` 防泄漏；循环效果提供 Start/Stop 成对 API
-- 立绘缩放有"倍率"机制（`CurrentBaseScale = 原始 × _scaleMultiplier`），
-  说话者高亮/DollyZoom 用 `DOScaleMultiplier` 与呼吸动作共存
-- 粒子 velocityOverLifetime 三轴曲线**模式必须一致**（都用 `MinMaxCurve(min,max)`）
-- 运行时创建带 Awake 配置的组件用"先 SetActive(false) 挂组件赋值再激活"（见 `VNAmbientParticles.Create`）
+- **发光=HDR 颜色(>1) + Bloom(阈值1.0)**；uGUI 顶点色被钳到 1，HDR 走材质属性
+- **贴图全程序化生成**（`VNProceduralTextures`），零美术依赖
+- **每张图独立材质实例**（`VNImageEffectController` 管理）；uGUI 自定义 shader 走 CGPROGRAM
+- **UI 不写深度缓冲** → 无真 DoF，模糊走 `VNImageEffect` 9-tap
+- 文字全用 **TextMeshPro** + `VNFont.Asset` 统一入口，禁止 legacy Text；
+  玩家可见 UI 字符串一律 `VNLocale.T(key)`，禁止硬编码；
+  编辑期存场景的 TMP 文字必须用 `VNFontAssetBuilder.EnsureFontAsset()` 持久化资产
+- 所有 Tween `SetLink(gameObject)`；循环效果 Start/Stop 成对 API
+- 立绘缩放走「倍率」机制（`DOScaleMultiplier`），别直接改 localScale
+- 粒子 velocityOverLifetime 三轴曲线模式必须一致
+- 运行时创建带 Awake 配置的组件：先 SetActive(false) 挂好赋值再激活
 
 ### 组件速查（Assets/Scripts/VNEffects/）
 
@@ -129,97 +139,36 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 
 - **选型结论**：自研 Ren'Py 风格纯文本剧本（Git/AI 协作友好）；Dialogue System 插件保留不用
 - 代码在 `Assets/Scripts/VNEffects/Script/`：VNScriptParser → VNScriptRunner → VNStage → 特效 API
-- 剧本文件：`Assets/Scenarios/*.vn.txt`（语法速查见 Demo.vn.txt 文件头 / WhatAiDo.md 十六章）
-- 角色定义：`Assets/VNEffects/Characters/*.asset`（VNCharacterDef：id/名牌/表情→立绘映射）
-- 剧本场景：菜单 **Tools → VN Effects → Create Script Demo Scene** → `VNScriptDemo.unity`
+- 剧本文件：`Assets/Scenarios/*.vn.txt`；剧本场景：**Tools → VN Effects → Create Script Demo Scene**
 - 关键语义：命令默认同步等待，行尾 `@` = 异步；台词行 = 等打字完+玩家推进
-- 分支语法（P1，已完成）：`label/jump`、`flag 名字 [+1|数值]`（VNFlags 全局整型字典）、
-  `if 表达式 jump 标签`（支持空格、`!`、整数算术/比较、`&&`、`||`、括号）、
-  `jump 文件::标签`（if/choice/event 目标同样支持）、
-  `call 文件::标签 名:值` / `params 名 [名=默认]` / `${名}` / `return`
-  （只读字符串参数、显式嵌套转发、64 层可存档调用栈；chapter 清栈、jump 保栈）、
-  `choice` + `* 文本 [if:无空格表达式] [flag:op] [-> 标签]`
-- P2（已完成）：F5/F9 打开 20 槽存读档界面（JSON 快照+PNG 截图缩略图+时间+末句台词，仅台词处可存）、
-  对话框快捷功能条（Save/Load/Auto/Skip/Log/任务/Config/隐藏 UI）、H/滚轮 回想、A 自动、
-  S 快进（DOTween.timeScale 全局加速）、VNToast 提示
-- 音频（已完成）：三通道独立库（bgmLibrary/seLibrary/voiceLibrary，旧 library 兼容回退）+
-  每条目基准音量标定；`bgm/se/voice` 均支持 `vol:` 参数，公式=条目基准×剧本 vol×通道音量
-- 玩法事件接口（已完成，四十一章规划的 P1~P3）：`event <模块id> [key:value…]` +
-  `* 结果名 [flag:op] [-> 标签]` 结果行（复用 choice 解析）；VNEventModule 基类 +
-  VNEventRegistry 注册表；事件期间快捷键全禁、不可存档、调试重建视为分支点；
-  模块三铁律=不碰舞台/unscaled 计时+SetUpdate(true)/全部 SetLink。
-  示例模块：qte（连打条）、map（地图选地点，条件显隐+`去过_<地点>` flag）、
-  battle（回合制小战斗，示例剧本 `Assets/Scenarios/BattleDemo.vn.txt`）
-- 任务系统（已完成）：`quest start|stage|done|fail <id> [阶段]`，状态=flag`任务_<id>`
-  （0 未接取/1..n 进行中/100 完成/-1 失败），VNQuestDef 资产只管文案（无资产照常运作），
-  J 键日志面板；存档/if 分支/调试重建零改动复用 flags 设施
-- CG 系统 P1（已完成）：`cg <id> [transition:] [chars:keep] [fx:keep]` / `cg off`；
-  素材放 `Assets/CG/`（文件名=id，生成器自动灌入 VNStage.cgLibrary）；默认藏立绘
-  （整层 CanvasGroup）+ 停环境特效，keep 参数按需保留；解锁记录在 VNCgUnlocks
-  全局 JSON（与存档分离，勿用 flags 存解锁）；存档/调试重建已集成；
-  P2 鉴赏画廊已完成（G 键：网格缩略图/未解锁「？」占位/全屏浏览/差分组 ←→ 翻页，
-  详见 WhatAiDo.md 七十八章）
-- 养成系统（已完成，六十三～六十六章）：属性/金钱/行动力/压力/善恶全是 flag
-  （`stat <名> <+n|-n|值>` = 带 VNStatDef 钳制+飘字的 flag 写入；`flag` 保持静默语义）；
-  选项行支持 `if:条件`（隐藏）与 `cost:金钱-100`（付不起置灰、选中自动扣）；
-  商店 `event shop id:服装店`（道具 = flag `道具_<id>` 计数）；
-  日程 `time set 9 remain:36` / `time pass`（月份 1~12 循环、剩余月数递减、行动力回满，
-  右下日历 HUD）；示例剧本 `Assets/Scenarios/RaisingDemo.vn.txt`
-- 周日程排程（已完成，七十章）：`event plan slots:7 pool:…` 排程面板（写 flag
-  `日程_1..N` / `日程数`）+ `event plan op:next` 逐格派发（写 `当前格` / `当前行动`）
-  + `flag 名 rand:1-100` 随机掷骰 + `event result grade:fail|normal|good|great`
-  结算弹窗；**概率表写在剧本里**（内容而非逻辑），属性影响概率靠分流到另一条阈值链；
-  示例剧本 `Assets/Scenarios/WeekPlanDemo.vn.txt`
-- 本地化（已完成，五十七章）：剧本只写中文（唯一真相），翻译放旁路表
-  `Resources/VNLocale/Scenarios/<剧本名>.<lang>.txt`（key=FNV-1a(原文)+出现序号）；
-  改完剧本跑 **Tools → VN Effects → Localization → Extract**（增量合并，已译保留）
-  再 Validate 查缺译；choice 选项翻译显示、按索引匹配；**event 结果行/角色 id/
-  flag 名永远不翻译**（逻辑标识符）；名牌/任务/地图显示名在各资产的 En/Ja 字段填
-- UI 皮肤（已完成，八十二章）：`ui dialogue|choice <皮肤id|default>` 切换对话框/
-  选项面板样式；皮肤 = prefab + VNDialogueSkin/VNChoiceSkin 槽位组件，在
-  VNGameConfig「UI 皮肤」区登记 id；起步模板 **Tools → VN Effects → UI Skins →
-  Export Skin Prefabs**；皮肤状态进存档；示例剧本 `Assets/Scenarios/UiSkinDemo.vn.txt`
-- 系统菜单全局皮肤（已完成，八十三章）：`VNGameConfig.systemUiSkin` 指向唯一
-  `VNSystemUiSkinSet`；标题/设置/CG/纯文字 Backlog/快捷条/存读档/顶部属性 HUD/完整属性页
-  均可编辑 prefab。菜单 **Tools → VN Effects → System UI Skins → Export Default Prefabs**
-  生成 8 个起步模板，**Validate Global Theme** 校验必需槽位；未配置或必需槽位无效时按单个
-  界面退回旧程序化 UI，不进存档、无剧本命令
+- **写剧本 → 技能 vn-write-scenario；加命令 → 技能 vn-new-command；语法详解 → HowToUse.md**
+
+已完成的子系统（详解章节都在 WhatAiDo.md，语法用法在 HowToUse.md）：
+
+| 子系统 | 一句话 | 章节 |
+|---|---|---|
+| 分支/变量/子程序 | label/jump/flag/if（含逻辑运算）/choice/call/params/return，跨文件 `文件::标签` | 十七、七十三~七十六 |
+| 存档/回想/Auto/Skip | F5/F9 20 槽 + 快捷功能条 + H 回想 + A/S；仅台词处可存 | 十九、三十五、五十九 |
+| 音频 | 三通道库+基准音量；`bgm/se/voice` 支持 `vol:`，公式=基准×vol×通道 | 四十 |
+| 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result | 四十一~四十四、七十、八十一 |
+| 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
+| CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
+| 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |
+| 周日程排程 | `event plan` 排格/派发 + `flag rand:` + `event result` 结算；概率表写剧本 | 七十 |
+| 本地化 | 剧本只写中文，翻译旁路表 + Extract/Validate → 技能 vn-localize | 五十七 |
+| UI 皮肤 | `ui dialogue\|choice <id>`（进存档）+ 系统菜单全局主题（不进存档）→ 技能 vn-ui-skin | 八十二、八十三 |
+| 标题菜单 | VNTitleMenu 同场景覆盖层，配置在 VNGameConfig「标题画面」区 | 八十 |
+| 静态校验器 | Tools → VN Effects → Lint Scenarios（Ctrl+Shift+L），检查项全表见 HowToUse 十二·五 | 七十九 |
+
 - **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
-  战斗示例模块（事件接口 P4）已完成（VNBattleModule，`event battle`）；
   已知技术债清单见 ProjectCodeGuide 第十二节
 
-## 剧本可视化编辑器（当前状态）
+## 剧本可视化编辑器
 
 - 菜单：**Tools → VN Effects → Scenario Editor**；核心文件：
   `Editor/VNScenarioEditorWindow.cs`、`VNScenarioDoc.cs`、`VNScenarioSchema.cs`。
-- 文本仍是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`；保存时重新生成文本，注释/空行保留。
-- 主命令菜单为分层 `GenericMenu`：Dialogue / Scene / Character / Camera / FX / Audio / Flow，
-  关键字保留英文并带中文说明；`say（对白）` 是可与命令行互转的一等行类型。
-- transition 与 emote 枚举显示中英对照，但剧本值保持英文；其他动态 id 不强制翻译。
-- 工具栏“分类颜色”可为七个分类自定义颜色，值存 `EditorPrefs`，不能因此把剧本文档标脏。
-- `bg`、`say`、`show` 使用通用 Sprite 缩略图浏览器（搜索/网格/当前项/清除/custom）；主行
-  也显示内联小图。Sprite 必须按 `textureRect` 画 UV，不能直接把整张 texture 当缩略图。
-- `say` 的角色/表情是专用字段 `VNRow.speaker / expression`，不是 `VNRow.values`；图片选择回调
-  必须经专用访问器读写。`show` 才使用普通 `character / expr` 参数。不要再次混用这两条路径。
-- 背景预览来源是当前场景 `VNStage.backgrounds`；角色与表情来源是项目中的
-  `VNCharacterDef` 资产。`Refresh Sources` 会重建这些缓存。
-
-### 从选中行播放
-
-- Edit 页选中一行后点击 `▶ 从选中行播放`；默认勾选“重建前置状态”。
-- UI 行号必须用 `SourceLineForRow` 换算物理文本行：choice 选项和 camseq waypoint 都会额外占行；
-  空行/注释从下一条有效命令启动。
-- 编辑器 Bridge 用 `SessionState` 传递 `_doc.GenerateText()`、目标行、rebuild 标志后进入 Play，
-  因此未保存文本也能调试；请求消费后必须清除。
-- Bridge 必须等待 `VNScriptRunner.IsInitialized`，否则 Runner 的 `Start/playOnStart` 会在调试启动后
-  再覆盖一次播放位置。
-- 运行时入口：`VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`；直接模式最终调用
-  `ResumeAt(index)`。
-- 重建模式按目标前的文件顺序汇总状态，复用 `VNSaveData` 与
-  `VNStage.RestoreSnapshot(data, true)`：背景、天气、氛围、BGM/音量/循环 SE、角色站位与表情、
-  portrait、FX、focus、flags、可确定镜头状态。不会预播台词、等待、转场、一次性 SE、voice。
-- `VNAudio.ResetForDebug()` 用来清除默认启动留下的声音/Tween；只应在编辑器中间行调试重建时调用。
-- choice/jump/if 的历史路径无法由一个目标物理行唯一推断，当前按文件顺序重建并警告；如需精确
-  分支上下文，应扩展为“从存档快照启动”，不要假装自动推断玩家选择。
-
-完整开发与分支记录见 `WhatAiDo.md` 第三十二章。
+- 文本是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`，保存时重新生成文本，注释/空行保留。
+- 支持「▶ 从选中行播放」（默认重建前置状态）调试；入口
+  `VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`。
+- **改编辑器前必读技能 vn-editor-extend**（say 专用字段、行号换算、Bridge 时序等硬规则都在里面）；
+  调试能力边界见技能 vn-debug。完整记录见 WhatAiDo.md 三十一/三十二章。
