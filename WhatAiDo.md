@@ -2878,3 +2878,29 @@ jump 月初
 
 文档定位：与 HowToUse.md（语法教程）、ProjectCodeGuide.md（代码指南）互补的
 「使用与规划 FAQ」，后续同类问题继续追加到该文件。
+
+## 六十八、HowToUse.md 全面翻新：补齐现有全部系统（2026-07-19，分支 `agent/howtouse-refresh`）
+
+旧版 HowToUse.md 停留在 P0+P1+P2（演出/分支/存档）时代，本次对照当前代码
+（VNScriptRunner 的完整命令表、VNStage 的 fx 分支、快捷键处理）全面翻新：
+
+- **新增命令章节**：`cg`（CG 显示/关闭/keep 参数/全局解锁）、`chapter`（跨文件章节
+  跳转 + 入口 flag 路由套路）、`letterbox`、`portrait`、`reset effects`；
+- **新增「玩法系统命令」一章**：`event`（qte/map/shop 三内置模块 + 结果行语法）、
+  商店与物品栏（VNShopDef / 道具_flag / I 键）、`quest` 任务（任务_flag 状态表 / J 键）、
+  `stat` 属性（与 flag 的静默/演出之分、零代码加新属性）、`time` 日程（set/pass/
+  refill 参数、月份/剩余月数 flag、日历 HUD）；
+- **choice 选项**补 `if:` 条件显隐与 `cost:` 花费置灰；if 章节点明「万物皆 flag」
+  （属性/月份/任务/道具全部可直接 if）；
+- **fx 表**补新特效：speedlines/shockwave/filmgrain/crt/kenburns/meteor/skycloud，
+  mood 表补 Dream 并标注 Memory/Dream 的滤镜联动；
+- **音频**改为三通道独立库 + vol: 参数 + 基准音量公式；
+- **玩家操作表**更新为当前全量快捷键（H/A/S/F5/F9/Q/L/J/C/I/右键隐藏 UI/Esc）、
+  快捷功能条、20 槽存读档界面说明；
+- **新增章节**：本地化流程（Extract/Validate、逻辑标识符不翻译）、
+  剧本可视化编辑器（从选中行播放）；资产管理补 CG 目录与玩法定义资产一览表；
+- **排查表**补：chapter 找不到、choice 全隐藏、cost 置灰、事件中快捷键失效、
+  日历不显示、翻译缺失等新条目；速查卡按 演出/音频/流程/玩法 分组重排。
+
+文档结构从 10 章扩到 13 章；示例剧本尾部加 chapter 接续示例，并指向
+RaisingDemo.vn.txt 作为养成玩法范例。
