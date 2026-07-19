@@ -21,7 +21,8 @@
 10. [本地化（中/英/日）](#十本地化)
 11. [剧本可视化编辑器](#十一剧本可视化编辑器)
 12. [完整示例剧本](#十二完整示例剧本)
-13. [常见问题排查](#十三常见问题排查)
+13. [剧本静态校验器](#十二五剧本静态校验器-)
+14. [常见问题排查](#十三常见问题排查)
 
 ---
 
@@ -1084,6 +1085,56 @@ transition WhiteFlash
 : 第二章　完
 chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scenarios/ 即可）
 ```
+
+---
+
+## 十二·五、剧本静态校验器 🔍
+
+**Tools → VN Effects → Lint Scenarios**（快捷键 `Ctrl+Shift+L`）
+
+一键扫描 `Assets/Scenarios/` 下**全部** `.vn.txt`，把"跑到那一行才会发现"的错误
+提前到编辑期。双击结果行直接打开文件并定位到出错行。
+
+> 它**复用运行时的 `VNScriptParser`**，不是另写一套分词——
+> 所以校验器看到的命令流与游戏执行的完全一致，不会出现"校验通过但运行报错"。
+
+### 检查项
+
+| 严重度 | 规则 | 抓什么 |
+|---|---|---|
+| **错误** | `dangling-jump` | jump / call / if…jump / 选项 `->` 的目标 label 或文件不存在（**带拼写建议**） |
+| | `dup-label` | 同文件 label 重名 |
+| | `bad-chapter` | chapter 目标文件不存在 |
+| | `missing-return` | 被 call 的子程序存在走不到 `return` 的路径（含"子程序里用 chapter"） |
+| | `params-not-first` | `params` 没紧跟 label |
+| | `call-missing-arg` | call 少传必填参数 |
+| | `bad-emote` | `emote` 写了中文表情名（它要的是英文动作枚举） |
+| | `choice-flag-assign` | 选项里写 `flag:名 值` —— **静默失效**的经典坑 |
+| | `empty-choice` | choice 下面没有选项行 |
+| **警告** | `empty-library` | 某个库整个是空的但剧本引用了 N 个 id（→ 全部静音/不显示） |
+| | `unknown-bg/cg/bgm/se/voice` | 引用了未登记的素材 id |
+| | `unknown-character` / `unknown-expression` | 角色未定义 / 该角色没有这个表情（**会列出它有哪些**） |
+| | `all-options-conditional` | 一组 choice 的选项**全部**带 `if:` → 可能一个都不显示、流程卡死 |
+| | `bad-event-outcome` | event 结果名不在该模块的返回值里（拼错会**静默**走顺序继续） |
+| | `unknown-event-module` | 模块 id 没注册进 VNEventRegistry |
+| | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
+| | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
+| **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
+
+### 两条设计取舍
+
+- **资产类问题是"警告"不是"错误"**：边写剧本边补素材是正常工作流，
+  全报错会让人习惯性忽略整个输出——那校验器就废了。宁可少喊。
+- **`${参数}` 一律跳过**：值到运行时才确定，静态期无法判断，报了也是噪音。
+
+### `loop-risk` 是怎么判的
+
+典型事故：主循环写 `if 月份==6 jump 第2章::序`，第2章演完 `jump 主循环::行动菜单`，
+于是条件再次成立 → 无限循环。
+
+判据：**条件里引用的 flag，没有任何一个在目标文件里被写过** → 大概率缺守卫。
+正确写法是在第2章开头 `flag 第2章已看 1`，并把条件写成
+`if 月份==6 && !第2章已看 jump 第2章::序`。
 
 ---
 
