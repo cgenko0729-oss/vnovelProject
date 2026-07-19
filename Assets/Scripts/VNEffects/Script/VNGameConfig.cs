@@ -85,6 +85,22 @@ namespace VNEffects
         public List<TextAsset> chapters = new List<TextAsset>();
 
         // ==============================================================
+        // 标题画面（VNTitleMenu 读取；全部留空也能工作）
+        // ==============================================================
+
+        [Header("──────── 标题画面 ────────")]
+        [Header("游戏标题（留空 = \"Visual Novel\"；En/Ja 留空回退中文）")]
+        public string gameTitle;
+        public string gameTitleEn;
+        public string gameTitleJa;
+
+        [Header("标题背景 id（须在背景库登记；留空 = 背景库第一张）")]
+        public string titleBackground;
+
+        [Header("标题 BGM id（须在 BGM 库登记；留空 = 标题不播音乐）")]
+        public string titleBgm;
+
+        // ==============================================================
         // 舞台内容
         // ==============================================================
 

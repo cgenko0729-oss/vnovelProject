@@ -64,6 +64,7 @@ namespace VNEffects
         VNInventory _inventory;
         VNCgGallery _cgGallery;
         VNCalendarHud _calendarHud;
+        VNTitleMenu _titleMenu;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
@@ -146,7 +147,18 @@ namespace VNEffects
             EnsureSaveLoadPanel();
             EnsureQuickToolbar();
             EnsureConfigPanel(); // 启动时应用 PlayerPrefs 中保存的音量、文字速度与显示模式
-            if (playOnStart && script != null) Play(script);
+            _titleMenu = FindFirstObjectByType<VNTitleMenu>();
+            if (_titleMenu != null && _titleMenu.showOnStart)
+            {
+                // 标题菜单接管启动：跳过 playOnStart，由「开始/继续」按钮进入播放。
+                // 编辑器"从选中行播放"不受影响——它走 ResumeAt，标题层会被自动收起。
+                _titleMenu.Initialize(this, stage);
+                _titleMenu.Open();
+            }
+            else if (playOnStart && script != null)
+            {
+                Play(script);
+            }
             IsInitialized = true;
             VNLocale.LanguageChanged -= OnLocaleChanged; // 幂等订阅
             VNLocale.LanguageChanged += OnLocaleChanged;
@@ -612,9 +624,23 @@ namespace VNEffects
                 Prepare(script.text);
             }
             Stop();
+            _titleMenu?.NotifyGameplayStarted(); // 任何入口开始播放都顺手收起标题层
             _index = Mathf.Clamp(index, 0, _commands.Count);
             _currentSayIndex = _index;
             _co = StartCoroutine(Run());
+        }
+
+        /// <summary>标题菜单「开始游戏」：清空全部 flag，从入口剧本头开始。</summary>
+        public void StartNewGame()
+        {
+            var entry = _entryScript != null ? _entryScript : script;
+            if (entry == null)
+            {
+                Debug.LogError("[VNScript] 没有入口剧本可播放（检查 VNScriptRunner.script / VNGameConfig.entryScript）");
+                return;
+            }
+            VNFlags.Clear(); // 新游戏 = 干净的世界状态（call 栈由 Play → Prepare 清）
+            Play(entry);
         }
 
         public void Stop()
@@ -1449,6 +1475,10 @@ namespace VNEffects
                 }
                 return;
             }
+
+            // 标题菜单打开期间：按钮走 EventSystem，游戏快捷键与推进全部屏蔽。
+            // （读档/设置/画廊面板叠在标题之上时，它们的关闭键由上面各自的分支处理。）
+            if (_titleMenu != null && _titleMenu.IsOpen) return;
 
             if (kb.hKey.wasPressedThisFrame ||
                 (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
