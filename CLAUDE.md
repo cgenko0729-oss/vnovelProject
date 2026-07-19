@@ -100,6 +100,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮（TMP textInfo 顶点动画）；支持皮肤 prefab（VNDialogueSkin 槽位绑定，程序化默认兜底） |
 | VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI Skins → Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；皮肤状态进存档 |
+| VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章） |
 | VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技 |
@@ -178,6 +179,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   选项面板样式；皮肤 = prefab + VNDialogueSkin/VNChoiceSkin 槽位组件，在
   VNGameConfig「UI 皮肤」区登记 id；起步模板 **Tools → VN Effects → UI Skins →
   Export Skin Prefabs**；皮肤状态进存档；示例剧本 `Assets/Scenarios/UiSkinDemo.vn.txt`
+- 系统菜单全局皮肤（已完成，八十三章）：`VNGameConfig.systemUiSkin` 指向唯一
+  `VNSystemUiSkinSet`；标题/设置/CG/纯文字 Backlog/快捷条/存读档/顶部属性 HUD/完整属性页
+  均可编辑 prefab。菜单 **Tools → VN Effects → System UI Skins → Export Default Prefabs**
+  生成 8 个起步模板，**Validate Global Theme** 校验必需槽位；未配置或必需槽位无效时按单个
+  界面退回旧程序化 UI，不进存档、无剧本命令
 - **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
   战斗示例模块（事件接口 P4）已完成（VNBattleModule，`event battle`）；
   已知技术债清单见 ProjectCodeGuide 第十二节

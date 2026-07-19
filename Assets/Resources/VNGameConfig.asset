@@ -37,6 +37,7 @@ MonoBehaviour:
     prefab: {fileID: 2849680794329722818, guid: 83d52225b861bd94f9c227eb488019c3, type: 3}
   - id: "\u53F3\u5217"
     prefab: {fileID: 805707084096112339, guid: 774934d146cf8d148b8588f947c23b43, type: 3}
+  systemUiSkin: {fileID: 11400000, guid: 244dec5b51cf9d342842c10a590bf8b6, type: 2}
   characters:
   - {fileID: 11400000, guid: 85d21fec57553cb4983145ad9f930fbe, type: 2}
   - {fileID: 11400000, guid: d6da61221a1ce74439a3baf628fd3164, type: 2}
