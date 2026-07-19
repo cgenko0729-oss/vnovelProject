@@ -593,6 +593,10 @@ namespace VNEffects.EditorTools
             var inventory = new GameObject("VNInventory").AddComponent<VNInventory>();
             inventory.shops.AddRange(shopModule.shops);
 
+            // ---------- CG 鉴赏画廊（目录取 VNStage.cgLibrary，解锁取 VNCgUnlocks） ----------
+            var cgGallery = new GameObject("VNCgGallery").AddComponent<VNCgGallery>();
+            cgGallery.stage = stage;
+
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;
@@ -610,7 +614,7 @@ namespace VNEffects.EditorTools
             // ---------- 极简提示 ----------
             var hint = CreateHintText(rig.canvasGo.transform, 70f);
             hint.text = "Enter/空格/点击 推进（打字中=催促） | H/滚轮上滑 回想 | A 自动 | S 快进\n" +
-                        "F5 存档界面 | F9 读档界面 | J 任务日志 | C 属性面板 | I 物品栏";
+                        "F5 存档界面 | F9 读档界面 | J 任务日志 | C 属性面板 | I 物品栏 | G CG鉴赏";
 
             // ---------- 保存 ----------
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScriptScenePath);

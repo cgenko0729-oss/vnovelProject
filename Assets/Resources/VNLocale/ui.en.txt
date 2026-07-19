@@ -11,6 +11,7 @@ toolbar.log = Log
 toolbar.quest = Quests
 toolbar.stats = Stats
 toolbar.inventory = Items
+toolbar.gallery = CG
 toolbar.config = Config
 toolbar.hideui = Hide UI
 
@@ -115,3 +116,10 @@ result.normal = Not bad
 result.good = Success!
 result.great = Great success!!
 result.continue = ▼ Click to continue
+
+# -- CG gallery --
+gallery.title = -- CG Gallery --
+gallery.empty = (No CG registered yet)
+gallery.locked = ?
+gallery.progress = Unlocked {0} / {1}
+gallery.hint = Click to view / Arrow keys for variants / Esc or G to close

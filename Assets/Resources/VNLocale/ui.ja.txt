@@ -11,6 +11,7 @@ toolbar.log = ログ
 toolbar.quest = クエスト
 toolbar.stats = ステータス
 toolbar.inventory = アイテム
+toolbar.gallery = CG
 toolbar.config = 設定
 toolbar.hideui = UI非表示
 
@@ -115,3 +116,10 @@ result.normal = ふつう
 result.good = 成功！
 result.great = 大成功！！
 result.continue = ▼ クリックで続行
+
+# —— CG 鑑賞 ——
+gallery.title = —— CG 鑑賞 ——
+gallery.empty = （CG がまだ登録されていません）
+gallery.locked = ？
+gallery.progress = 解放 {0} / {1}
+gallery.hint = クリックで表示　←→ で差分　Esc / G で戻る

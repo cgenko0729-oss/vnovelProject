@@ -62,6 +62,7 @@ namespace VNEffects
         VNQuestLog _questLog;
         VNStatsHud _statsHud;
         VNInventory _inventory;
+        VNCgGallery _cgGallery;
         VNCalendarHud _calendarHud;
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
@@ -129,6 +130,12 @@ namespace VNEffects
                 _inventory = FindFirstObjectByType<VNInventory>();
                 if (_inventory == null) // 没有登记商店资产也能工作（道具 id 当名字）
                     _inventory = new GameObject("VNInventory").AddComponent<VNInventory>();
+            }
+            if (_cgGallery == null)
+            {
+                _cgGallery = FindFirstObjectByType<VNCgGallery>();
+                if (_cgGallery == null) // 没有 CG 素材也无害（画廊会显示"还没登记 CG"）
+                    _cgGallery = new GameObject("VNCgGallery").AddComponent<VNCgGallery>();
             }
             if (_calendarHud == null)
             {
@@ -1244,6 +1251,12 @@ namespace VNEffects
             _inventory.Toggle();
         }
 
+        public void RequestCgGallery()
+        {
+            if (_cgGallery == null || _eventActive) return;
+            _cgGallery.Toggle();
+        }
+
         public void RequestConfigPanel()
         {
             EnsureConfigPanel();
@@ -1415,6 +1428,28 @@ namespace VNEffects
                 return;
             }
 
+            // CG 鉴赏打开期间：只处理翻页与关闭，不推进剧情。
+            // 比其他面板多一层——全屏浏览时 ←→ 翻差分、Esc/G 先退回网格。
+            if (_cgGallery != null && _cgGallery.IsOpen)
+            {
+                if (_cgGallery.IsViewerOpen)
+                {
+                    if (kb.escapeKey.wasPressedThisFrame || kb.gKey.wasPressedThisFrame)
+                        _cgGallery.CloseViewer();
+                    else if (kb.rightArrowKey.wasPressedThisFrame ||
+                             kb.downArrowKey.wasPressedThisFrame)
+                        _cgGallery.ViewerNext();
+                    else if (kb.leftArrowKey.wasPressedThisFrame ||
+                             kb.upArrowKey.wasPressedThisFrame)
+                        _cgGallery.ViewerPrev();
+                }
+                else if (kb.gKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                {
+                    _cgGallery.Close();
+                }
+                return;
+            }
+
             if (kb.hKey.wasPressedThisFrame ||
                 (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
             {
@@ -1437,6 +1472,12 @@ namespace VNEffects
             if (kb.iKey.wasPressedThisFrame)
             {
                 _inventory?.Open();
+                return;
+            }
+
+            if (kb.gKey.wasPressedThisFrame)
+            {
+                _cgGallery?.Open();
                 return;
             }
 
