@@ -13,6 +13,9 @@ namespace VNEffects
         GameObject _root;
         Image _autoImage;
         Image _skipImage;
+        VNToolbarActionSlot _autoSlot;
+        VNToolbarActionSlot _skipSlot;
+        VNQuickToolbarSkin _toolbarSkin;
         RectTransform _dock; // 停靠点（皮肤 toolbarAnchor/panel）；null = 对话框根（老位置）
 
         static readonly Color Normal = new Color(0.045f, 0.06f, 0.105f, 0.94f);
@@ -37,6 +40,9 @@ namespace VNEffects
             _root = null;
             _autoImage = null;
             _skipImage = null;
+            _autoSlot = null;
+            _skipSlot = null;
+            _toolbarSkin = null;
             Build();
         }
 
@@ -47,6 +53,18 @@ namespace VNEffects
             if (EventSystem.current == null)
                 new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
 
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.quickToolbarPrefab);
+            _toolbarSkin = VNSystemUiSkinUtility.Instantiate<VNQuickToolbarSkin>(
+                skinPrefab, transform, "VNQuickToolbar");
+            if (_toolbarSkin != null)
+            {
+                _root = _toolbarSkin.gameObject;
+                AttachRoot();
+                ConfigureCanvas();
+                BindCustomSlots();
+                return;
+            }
+
             _root = new GameObject("QuickToolbar", typeof(RectTransform),
                 typeof(Canvas), typeof(GraphicRaycaster), typeof(CanvasRenderer),
                 typeof(Image), typeof(HorizontalLayoutGroup));
@@ -54,13 +72,10 @@ namespace VNEffects
             var rect = (RectTransform)_root.transform;
             rect.sizeDelta = new Vector2(1013f, 42f); // 十二个固定宽按钮 + 间距/内边距
 
+            ConfigureCanvas();
+
             // VNDialogueBox 自己是 overrideSorting 的嵌套 Canvas。工具条需要独立
             // GraphicRaycaster 才能接收按钮点击，同时提高一层排序保证文字在按钮底图之上。
-            var parentCanvas = GetComponent<Canvas>();
-            var toolbarCanvas = _root.GetComponent<Canvas>();
-            toolbarCanvas.overrideSorting = true;
-            toolbarCanvas.sortingOrder = parentCanvas != null ? parentCanvas.sortingOrder + 1 : 41;
-
             var bg = _root.GetComponent<Image>();
             bg.sprite = VNProceduralTextures.RoundedRectSprite;
             bg.type = Image.Type.Sliced;
@@ -92,6 +107,74 @@ namespace VNEffects
             CreateButton(VNLocale.T("toolbar.hideui"), 100f, () => _runner?.SetInterfaceHidden(true));
         }
 
+        void ConfigureCanvas()
+        {
+            var toolbarCanvas = _root.GetComponent<Canvas>();
+            if (toolbarCanvas == null) toolbarCanvas = _root.AddComponent<Canvas>();
+            if (_root.GetComponent<GraphicRaycaster>() == null) _root.AddComponent<GraphicRaycaster>();
+            var parentCanvas = GetComponent<Canvas>();
+            toolbarCanvas.overrideSorting = true;
+            toolbarCanvas.sortingOrder = parentCanvas != null ? parentCanvas.sortingOrder + 1 : 41;
+        }
+
+        void BindCustomSlots()
+        {
+            foreach (var slot in _toolbarSkin.Slots)
+            {
+                if (slot == null || slot.button == null) continue;
+                if (slot.label != null) slot.label.text = LabelFor(slot.action);
+                slot.button.onClick.RemoveAllListeners();
+                slot.button.onClick.AddListener(() => Execute(slot.action));
+                if (slot.action == VNToolbarAction.Auto) _autoSlot = slot;
+                else if (slot.action == VNToolbarAction.Skip) _skipSlot = slot;
+            }
+        }
+
+        static string LabelFor(VNToolbarAction action)
+        {
+            switch (action)
+            {
+                case VNToolbarAction.Save: return VNLocale.T("toolbar.save");
+                case VNToolbarAction.Load: return VNLocale.T("toolbar.load");
+                case VNToolbarAction.QuickSave: return VNLocale.T("toolbar.qsave");
+                case VNToolbarAction.QuickLoad: return VNLocale.T("toolbar.qload");
+                case VNToolbarAction.Auto: return VNLocale.T("toolbar.auto");
+                case VNToolbarAction.Skip: return VNLocale.T("toolbar.skip");
+                case VNToolbarAction.Backlog: return VNLocale.T("toolbar.log");
+                case VNToolbarAction.Quest: return VNLocale.T("toolbar.quest");
+                case VNToolbarAction.Stats: return VNLocale.T("toolbar.stats");
+                case VNToolbarAction.Inventory: return VNLocale.T("toolbar.inventory");
+                case VNToolbarAction.Gallery: return VNLocale.T("toolbar.gallery");
+                case VNToolbarAction.Config: return VNLocale.T("toolbar.config");
+                case VNToolbarAction.HideUi: return VNLocale.T("toolbar.hideui");
+                default: return action.ToString();
+            }
+        }
+
+        void Execute(VNToolbarAction action)
+        {
+            switch (action)
+            {
+                case VNToolbarAction.Save: _runner?.RequestSavePanel(); break;
+                case VNToolbarAction.Load: _runner?.RequestLoadPanel(); break;
+                case VNToolbarAction.QuickSave: _runner?.QuickSave(); break;
+                case VNToolbarAction.QuickLoad: _runner?.QuickLoad(); break;
+                case VNToolbarAction.Auto:
+                    if (_runner != null) _runner.SetAuto(!_runner.IsAuto);
+                    break;
+                case VNToolbarAction.Skip:
+                    if (_runner != null) _runner.SetSkip(!_runner.IsSkipping);
+                    break;
+                case VNToolbarAction.Backlog: _runner?.RequestBacklog(); break;
+                case VNToolbarAction.Quest: _runner?.RequestQuestLog(); break;
+                case VNToolbarAction.Stats: _runner?.RequestStatsPanel(); break;
+                case VNToolbarAction.Inventory: _runner?.RequestInventory(); break;
+                case VNToolbarAction.Gallery: _runner?.RequestCgGallery(); break;
+                case VNToolbarAction.Config: _runner?.RequestConfigPanel(); break;
+                case VNToolbarAction.HideUi: _runner?.SetInterfaceHidden(true); break;
+            }
+        }
+
         /// <summary>
         /// 对话框皮肤切换时的停靠：挂到 dock 的右上角（null = 挂回对话框根的老位置）。
         /// 旧皮肤销毁是延迟的，本帧内重新挂接即可把功能条从将亡层级里救出来。
@@ -108,6 +191,7 @@ namespace VNEffects
             var rect = (RectTransform)_root.transform;
             Transform parent = _dock != null ? (Transform)_dock : transform;
             rect.SetParent(parent, false);
+            if (_toolbarSkin != null) return; // 自定义 prefab 保留自己的锚点、轴心和位置
             rect.anchorMin = rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(1f, 0f);
             rect.anchoredPosition = new Vector2(-18f, 9f);
@@ -148,9 +232,11 @@ namespace VNEffects
 
         void Update()
         {
-            if (_runner == null || _autoImage == null) return;
-            _autoImage.color = _runner.IsAuto ? Active : Normal;
-            _skipImage.color = _runner.IsSkipping ? Active : Normal;
+            if (_runner == null) return;
+            if (_autoImage != null) _autoImage.color = _runner.IsAuto ? Active : Normal;
+            if (_skipImage != null) _skipImage.color = _runner.IsSkipping ? Active : Normal;
+            _autoSlot?.SetActiveState(_runner.IsAuto);
+            _skipSlot?.SetActiveState(_runner.IsSkipping);
         }
     }
 }
