@@ -195,6 +195,21 @@ namespace VNEffects.EditorTools
                 return;
             }
 
+            // call/params 的尾部是可变长度自由文本，由各自运行时语法再细分。
+            if (row.keyword == "call")
+            {
+                if (tokens.Length > 1) row.Set("target", tokens[1]);
+                if (tokens.Length > 2)
+                    row.Set("arguments", string.Join(" ", tokens, 2, tokens.Length - 2));
+                return;
+            }
+            if (row.keyword == "params")
+            {
+                if (tokens.Length > 1)
+                    row.Set("declaration", string.Join(" ", tokens, 1, tokens.Length - 1));
+                return;
+            }
+
             var positional = new List<VNParamDef>();
             if (def != null) positional.AddRange(def.Positional());
             int posIndex = 0;
@@ -586,10 +601,21 @@ namespace VNEffects.EditorTools
                     case "call":
                         if (string.IsNullOrEmpty(r.Get("target"))) Err(i, "call needs a target label");
                         if (r.isAsync) Err(i, "call cannot use async @");
+                        ValidateCallArguments(i, r.Get("arguments"), Err);
                         break;
                     case "return":
                         if (r.isAsync) Err(i, "return cannot use async @");
                         break;
+                    case "params":
+                    {
+                        int previous = i - 1;
+                        while (previous >= 0 && rows[previous].kind == VNRowKind.Raw) previous--;
+                        if (previous < 0 || rows[previous].kind != VNRowKind.Command ||
+                            rows[previous].keyword != "label")
+                            Err(i, "params must be the first command after a label");
+                        ValidateParameterDeclaration(i, r.Get("declaration"), Err);
+                        break;
+                    }
                     case "if":
                         if (string.IsNullOrEmpty(r.Get("condition")) ||
                             string.IsNullOrEmpty(r.Get("target")))
@@ -644,6 +670,53 @@ namespace VNEffects.EditorTools
                 }
             }
             return issues;
+        }
+
+        static void ValidateCallArguments(
+            int rowIndex,
+            string arguments,
+            System.Action<int, string> error)
+        {
+            if (string.IsNullOrWhiteSpace(arguments)) return;
+            var names = new HashSet<string>();
+            foreach (string token in arguments.Split(new[] { ' ', '\t' },
+                         System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                int colon = token.IndexOf(':');
+                if (colon <= 0 || colon >= token.Length - 1 || token.Contains(","))
+                {
+                    error(rowIndex, $"call argument \"{token}\" must be name:value " +
+                                    "(no commas or spaces in value)");
+                    continue;
+                }
+                string name = token.Substring(0, colon);
+                if (!names.Add(name)) error(rowIndex, $"call argument \"{name}\" is repeated");
+            }
+        }
+
+        static void ValidateParameterDeclaration(
+            int rowIndex,
+            string declaration,
+            System.Action<int, string> error)
+        {
+            if (string.IsNullOrWhiteSpace(declaration))
+            {
+                error(rowIndex, "params needs at least one name or name=default");
+                return;
+            }
+            var names = new HashSet<string>();
+            foreach (string token in declaration.Split(new[] { ' ', '\t' },
+                         System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                int equals = token.IndexOf('=');
+                string name = equals >= 0 ? token.Substring(0, equals) : token;
+                if (name.Length == 0 || token.Contains(":") || token.Contains(","))
+                {
+                    error(rowIndex, $"params token \"{token}\" must be name or name=default");
+                    continue;
+                }
+                if (!names.Add(name)) error(rowIndex, $"params name \"{name}\" is repeated");
+            }
         }
 
         static bool FirstWaypointIsCut(VNRow camseq)

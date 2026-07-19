@@ -45,8 +45,10 @@ namespace VNEffects
             public List<VNScriptCommand> returnCommands;
             public int returnIndex;
             public int sourceLine;
+            public Dictionary<string, string> returnParameters;
         }
         readonly List<VNCallFrame> _callStack = new List<VNCallFrame>();
+        Dictionary<string, string> _currentParameters = new Dictionary<string, string>();
         TextAsset _entryScript;
         int _index;
         bool _running;
@@ -498,6 +500,7 @@ namespace VNEffects
         {
             Stop();
             _callStack.Clear();
+            _currentParameters.Clear();
             LoadCommands(source);
         }
 
@@ -544,6 +547,7 @@ namespace VNEffects
 
             script = target;
             _callStack.Clear(); // chapter 是尾调用式流程切换，不保留子程序返回点
+            _currentParameters.Clear();
             LoadCommands(target.text);
             _index = 0;
             _currentSayIndex = 0;
@@ -718,16 +722,16 @@ namespace VNEffects
             return true;
         }
 
-        bool CallTo(string address, int fromLine, bool isAsync)
+        bool CallTo(VNScriptCommand command)
         {
-            if (isAsync)
+            if (command.isAsync)
             {
-                Debug.LogError($"[VNScript] 第 {fromLine} 行：call 不能使用行尾 @ 异步执行");
+                Debug.LogError($"[VNScript] 第 {command.line} 行：call 不能使用行尾 @ 异步执行");
                 return false;
             }
             if (_callStack.Count >= MaxCallDepth)
             {
-                Debug.LogError($"[VNScript] 第 {fromLine} 行：call 嵌套超过上限 {MaxCallDepth}，" +
+                Debug.LogError($"[VNScript] 第 {command.line} 行：call 嵌套超过上限 {MaxCallDepth}，" +
                                "可能存在无终止递归");
                 return false;
             }
@@ -737,11 +741,102 @@ namespace VNEffects
                 returnScript = script,
                 returnCommands = _commands,
                 returnIndex = _index,
-                sourceLine = fromLine,
+                sourceLine = command.line,
+                returnParameters = _currentParameters,
             };
-            if (!JumpTo(address, fromLine)) return false;
+            if (!JumpTo(command.Arg(0), command.line)) return false;
+            if (!TryBindCallParameters(command, out Dictionary<string, string> calleeParameters))
+            {
+                RestoreExecutionFrame(frame);
+                return false;
+            }
             _callStack.Add(frame);
+            _currentParameters = calleeParameters;
             return true;
+        }
+
+        bool TryBindCallParameters(
+            VNScriptCommand call,
+            out Dictionary<string, string> values)
+        {
+            values = new Dictionary<string, string>();
+            var declared = new HashSet<string>();
+            bool hasError = false;
+
+            // JumpTo 后 _index 指向目标 label；params 必须是其后的第一条有效命令。
+            VNScriptCommand declaration = _index + 1 < _commands.Count
+                ? _commands[_index + 1] : null;
+            if (declaration != null && declaration.keyword == "params")
+            {
+                if (declaration.args.Count == 0 && declaration.kwargs.Count == 0)
+                {
+                    Debug.LogError($"[VNScript] 第 {declaration.line} 行：params 至少需要一个参数名");
+                    hasError = true;
+                }
+                foreach (var invalid in declaration.kwargs)
+                {
+                    Debug.LogError($"[VNScript] 第 {declaration.line} 行：params 声明「{invalid.Key}:{invalid.Value}」" +
+                                   "无效，请使用 名字 或 名字=默认值");
+                    hasError = true;
+                }
+                foreach (string token in declaration.args)
+                {
+                    int equals = token.IndexOf('=');
+                    string name = (equals >= 0 ? token.Substring(0, equals) : token).Trim();
+                    string defaultValue = equals >= 0 ? token.Substring(equals + 1) : null;
+                    if (name.Length == 0 || equals == 0 || token.Contains(","))
+                    {
+                        Debug.LogError($"[VNScript] 第 {declaration.line} 行：params 参数「{token}」无效");
+                        hasError = true;
+                        continue;
+                    }
+                    if (!declared.Add(name))
+                    {
+                        Debug.LogError($"[VNScript] 第 {declaration.line} 行：params 重复声明「{name}」");
+                        hasError = true;
+                        continue;
+                    }
+
+                    if (call.kwargs.TryGetValue(name, out string supplied))
+                        values[name] = supplied;
+                    else if (defaultValue != null)
+                        values[name] = defaultValue;
+                    else
+                    {
+                        Debug.LogError($"[VNScript] 第 {call.line} 行：call 缺少必需参数「{name}」");
+                        hasError = true;
+                    }
+                }
+            }
+
+            foreach (var pair in call.kwargs)
+            {
+                if (pair.Key.Contains(",") || pair.Value.Contains(","))
+                {
+                    Debug.LogError($"[VNScript] 第 {call.line} 行：call 参数「{pair.Key}:{pair.Value}」" +
+                                   "不能包含逗号");
+                    hasError = true;
+                    continue;
+                }
+                if (!declared.Contains(pair.Key))
+                    Debug.LogWarning($"[VNScript] 第 {call.line} 行：目标未声明参数「{pair.Key}」，已忽略");
+            }
+            for (int i = 1; i < call.args.Count; i++)
+                Debug.LogWarning($"[VNScript] 第 {call.line} 行：call 多余位置参数「{call.args[i]}」，已忽略；" +
+                                 "请使用 名字:值");
+            return !hasError;
+        }
+
+        void RestoreExecutionFrame(VNCallFrame frame)
+        {
+            script = frame.returnScript;
+            _commands = frame.returnCommands;
+            _currentParameters = frame.returnParameters ?? new Dictionary<string, string>();
+            VNScriptLocale.Apply(_commands, script != null ? script.name : null);
+            BuildLabelMap(_commands, _labels);
+            _index = Mathf.Clamp(frame.returnIndex, 0, _commands.Count);
+            _currentSayIndex = _index;
+            if (script != null) VNFont.Prewarm(script.text);
         }
 
         bool ReturnFromCall(int fromLine, bool isAsync)
@@ -754,6 +849,7 @@ namespace VNEffects
             if (_callStack.Count == 0)
             {
                 Debug.LogError($"[VNScript] 第 {fromLine} 行：return 没有对应的 call，停止当前剧本");
+                _currentParameters.Clear();
                 _index = _commands.Count;
                 return false;
             }
@@ -764,37 +860,64 @@ namespace VNEffects
             {
                 Debug.LogError($"[VNScript] 第 {fromLine} 行：call 返回点已损坏，停止当前剧本");
                 _callStack.Clear();
+                _currentParameters.Clear();
                 _index = _commands.Count;
                 return false;
             }
 
             _callStack.RemoveAt(last);
-            script = frame.returnScript;
-            _commands = frame.returnCommands;
-            VNScriptLocale.Apply(_commands, script != null ? script.name : null);
-            BuildLabelMap(_commands, _labels);
-            _index = Mathf.Clamp(frame.returnIndex, 0, _commands.Count);
-            _currentSayIndex = _index;
-            if (script != null) VNFont.Prewarm(script.text);
+            RestoreExecutionFrame(frame);
             Debug.Log($"[VNScript] 已从子程序返回（call 第 {frame.sourceLine} 行）");
             return true;
+        }
+
+        static Dictionary<string, string> ReadParameters(
+            List<string> names,
+            List<string> values)
+        {
+            var result = new Dictionary<string, string>();
+            if (names == null || values == null) return result;
+            for (int i = 0; i < names.Count && i < values.Count; i++)
+                if (!string.IsNullOrEmpty(names[i])) result[names[i]] = values[i] ?? string.Empty;
+            return result;
+        }
+
+        static void WriteParameters(
+            Dictionary<string, string> source,
+            List<string> names,
+            List<string> values)
+        {
+            names.Clear();
+            values.Clear();
+            if (source == null) return;
+            foreach (var pair in source)
+            {
+                names.Add(pair.Key);
+                values.Add(pair.Value);
+            }
         }
 
         void CaptureCallStack(VNSaveData data)
         {
             data.callStack.Clear();
+            WriteParameters(_currentParameters, data.parameterNames, data.parameterValues);
             foreach (VNCallFrame frame in _callStack)
-                data.callStack.Add(new VNSaveData.CallFrameSave
+            {
+                var saved = new VNSaveData.CallFrameSave
                 {
                     chapter = frame.returnScript != null ? frame.returnScript.name : null,
                     returnIndex = frame.returnIndex,
                     sourceLine = frame.sourceLine,
-                });
+                };
+                WriteParameters(frame.returnParameters, saved.parameterNames, saved.parameterValues);
+                data.callStack.Add(saved);
+            }
         }
 
         void RestoreCallStack(VNSaveData data)
         {
             _callStack.Clear();
+            _currentParameters = ReadParameters(data.parameterNames, data.parameterValues);
             if (data.callStack == null || data.callStack.Count == 0) return;
             if (data.callStack.Count > MaxCallDepth)
             {
@@ -826,8 +949,90 @@ namespace VNEffects
                     returnCommands = commands,
                     returnIndex = saved.returnIndex,
                     sourceLine = saved.sourceLine,
+                    returnParameters = ReadParameters(
+                        saved.parameterNames, saved.parameterValues),
                 });
             }
+        }
+
+        VNScriptCommand ResolveParameters(VNScriptCommand source)
+        {
+            // 定义本身必须稳定；label/params 不能通过参数动态改名。
+            if (source.keyword == "label" || source.keyword == "params") return source;
+            if (!HasParameterPlaceholder(source)) return source;
+
+            var missing = new HashSet<string>();
+            string Replace(string value) => VNParameterInterpolator.Interpolate(
+                value,
+                _currentParameters,
+                name => missing.Add(name));
+
+            var command = new VNScriptCommand
+            {
+                keyword = source.keyword,
+                isAsync = source.isAsync,
+                line = source.line,
+                speaker = Replace(source.speaker),
+                expression = Replace(source.expression),
+                text = Replace(source.text),
+                localizedText = Replace(source.localizedText),
+            };
+            foreach (string arg in source.args) command.args.Add(Replace(arg));
+            foreach (var pair in source.kwargs) command.kwargs[pair.Key] = Replace(pair.Value);
+
+            if (source.options != null)
+            {
+                command.options = new List<VNChoiceOption>();
+                foreach (VNChoiceOption option in source.options)
+                    command.options.Add(new VNChoiceOption
+                    {
+                        text = Replace(option.text),
+                        localizedText = Replace(option.localizedText),
+                        flagOp = Replace(option.flagOp),
+                        condition = Replace(option.condition),
+                        costOp = Replace(option.costOp),
+                        jumpLabel = Replace(option.jumpLabel),
+                        line = option.line,
+                    });
+            }
+            if (source.camPoints != null)
+            {
+                command.camPoints = new List<VNCamWaypointDef>();
+                foreach (VNCamWaypointDef point in source.camPoints)
+                    command.camPoints.Add(new VNCamWaypointDef
+                    {
+                        point = Replace(point.point),
+                        zoom = point.zoom,
+                        duration = point.duration,
+                        ease = Replace(point.ease),
+                        fade = point.fade,
+                        line = point.line,
+                    });
+            }
+
+            foreach (string name in missing)
+                Debug.LogError($"[VNScript] 第 {source.line} 行：找不到 call 参数「{name}」，" +
+                               "占位符保持原样");
+            return command;
+        }
+
+        static bool HasParameterPlaceholder(VNScriptCommand command)
+        {
+            bool Has(string value) => value != null &&
+                                      value.IndexOf("${", System.StringComparison.Ordinal) >= 0;
+            if (Has(command.speaker) || Has(command.expression) || Has(command.text) ||
+                Has(command.localizedText)) return true;
+            foreach (string arg in command.args) if (Has(arg)) return true;
+            foreach (var pair in command.kwargs) if (Has(pair.Value)) return true;
+            if (command.options != null)
+                foreach (VNChoiceOption option in command.options)
+                    if (Has(option.text) || Has(option.localizedText) || Has(option.flagOp) ||
+                        Has(option.condition) || Has(option.costOp) || Has(option.jumpLabel))
+                        return true;
+            if (command.camPoints != null)
+                foreach (VNCamWaypointDef point in command.camPoints)
+                    if (Has(point.point) || Has(point.ease)) return true;
+            return false;
         }
 
         // ------------------------------------------------------------------
@@ -1279,7 +1484,7 @@ namespace VNEffects
             _running = true;
             while (_index < _commands.Count)
             {
-                var cmd = _commands[_index++];
+                var cmd = ResolveParameters(_commands[_index++]);
                 IEnumerator co = null;
                 try
                 {
@@ -1299,6 +1504,7 @@ namespace VNEffects
                 Debug.LogError($"[VNScript] 子程序播放到文件末尾但没有 return（call 第 {frame.sourceLine} 行），" +
                                "已停止并清空调用栈");
                 _callStack.Clear();
+                _currentParameters.Clear();
             }
             _running = false;
             SetSkip(false);
@@ -1466,12 +1672,15 @@ namespace VNEffects
                     if (string.IsNullOrEmpty(cmd.Arg(0)))
                         Debug.LogError($"[VNScript] 第 {cmd.line} 行：call 缺少目标 label");
                     else
-                        CallTo(cmd.Arg(0), cmd.line, cmd.isAsync);
+                        CallTo(cmd);
                     return null;
 
                 case "return":
                     ReturnFromCall(cmd.line, cmd.isAsync);
                     return null;
+
+                case "params":
+                    return null; // 声明已在 call 进入目标时绑定；运行到此处无需再执行
 
                 case "chapter":
                     if (string.IsNullOrEmpty(cmd.Arg(0)))

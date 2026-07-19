@@ -87,7 +87,7 @@ namespace VNEffects
             "bg", "cg", "show", "hide", "emote", "wait",
             "camera", "shake", "weather", "mood", "fx",
             "sakura", "transition", "reset",
-            "label", "jump", "call", "return", "flag", "stat", "time", "if", "choice",
+            "label", "jump", "call", "return", "params", "flag", "stat", "time", "if", "choice",
             "chapter",
             "move", "bgm", "se", "voice", "volume",
             "camseq", "camcut", "camto",

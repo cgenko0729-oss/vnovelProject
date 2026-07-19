@@ -224,9 +224,12 @@ namespace VNEffects.EditorTools
                 Pos("name", "name", VNParamSource.Text));
             Add("jump", "Flow", "jump <label|scenario::label>",
                 Pos("label", "to", VNParamSource.Label));
-            Add("call", "Flow", "call <label|scenario::label>  (return resumes after call)",
-                Pos("target", "to", VNParamSource.Label));
+            Add("call", "Flow", "call <target> [name:value ...]  (values contain no spaces)",
+                Pos("target", "to", VNParamSource.Label),
+                Pos("arguments", "args", VNParamSource.Text, weight: 2f));
             Add("return", "Flow", "return  (finish the current call)");
+            Add("params", "Flow", "params <required> [optional=default ...]  (place after label)",
+                Pos("declaration", "declare", VNParamSource.Text, weight: 2f));
             Add("chapter", "Flow", "chapter <scenario file>",
                 Pos("chapter", "file", VNParamSource.Text));
             Add("flag", "Flow", "flag <name> [value|+1|-1] [rand:min-max]\n" +
