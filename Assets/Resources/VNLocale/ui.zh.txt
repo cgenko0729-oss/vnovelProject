@@ -124,3 +124,12 @@ gallery.empty = （还没有登记任何 CG）
 gallery.locked = ？
 gallery.progress = 已解锁 {0} / {1}
 gallery.hint = 点击查看　←→ 翻差分　Esc / G 返回
+
+# —— 标题菜单 ——
+title.start = 开始游戏
+title.continue = 继续游戏
+title.load = 读取存档
+title.gallery = CG 鉴赏
+title.config = 系统设置
+title.quit = 退出游戏
+title.quitConfirm = 确定要退出游戏吗？

@@ -123,3 +123,12 @@ gallery.empty = （CG がまだ登録されていません）
 gallery.locked = ？
 gallery.progress = 解放 {0} / {1}
 gallery.hint = クリックで表示　←→ で差分　Esc / G で戻る
+
+# —— タイトルメニュー ——
+title.start = はじめから
+title.continue = つづきから
+title.load = ロード
+title.gallery = CG 鑑賞
+title.config = 設定
+title.quit = ゲーム終了
+title.quitConfirm = ゲームを終了しますか？

@@ -123,3 +123,12 @@ gallery.empty = (No CG registered yet)
 gallery.locked = ?
 gallery.progress = Unlocked {0} / {1}
 gallery.hint = Click to view / Arrow keys for variants / Esc or G to close
+
+# -- Title menu --
+title.start = New Game
+title.continue = Continue
+title.load = Load Game
+title.gallery = CG Gallery
+title.config = Settings
+title.quit = Quit
+title.quitConfirm = Quit the game?

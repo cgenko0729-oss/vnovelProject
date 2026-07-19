@@ -597,6 +597,11 @@ namespace VNEffects.EditorTools
             var cgGallery = new GameObject("VNCgGallery").AddComponent<VNCgGallery>();
             cgGallery.stage = stage;
 
+            // ---------- 标题菜单（开始/继续/读档/鉴赏/设置/退出；Runner 启动时接管） ----------
+            // 标题文字/背景/BGM 在 VNGameConfig 的"标题画面"区配置；调试剧情嫌它挡路时
+            // 把场景里这个物体的 showOnStart 勾掉即可（重建场景会恢复默认开）。
+            new GameObject("VNTitleMenu").AddComponent<VNTitleMenu>();
+
             // ---------- VNScriptRunner + Backlog ----------
             var runner = new GameObject("VNScriptRunner").AddComponent<VNScriptRunner>();
             runner.stage = stage;

@@ -3454,3 +3454,67 @@ else → arg
 - 画廊入口目前只有游戏内 G 键；标题画面/主菜单尚不存在，将来做的话
   组件已支持无 VNStage 运行（走 VNGameConfig 目录）。
 - 未编译验证（Unity 编辑器占用工程），只做了括号/结构检查。
+
+## 八十、开始菜单（标题画面）（2026-07-19，分支 `agent/title-menu`）
+
+### 需求与选型
+
+用户要求实现开始菜单（开始游戏 / 继续 / 读取存档 / CG 鉴赏 / 设置 / 退出）。
+经确认的四个决策：
+
+1. **同场景覆盖层**（不做独立 TitleScene）：零场景切换、复用生成器一键重建，
+   舞台就是标题背景板（Ken Burns 默认漂移是真的舞台效果，不用另做）。
+2. **「继续」与「读取存档」双按钮**：继续 = 直接读保存时间最新的槽
+   （含快速存档槽 0），无档置灰并显示最近存档时间；读取存档 = 打开现成
+   VNSaveLoadPanel 选槽。
+3. **设置复用 VNConfigPanel**，一处维护。
+4. **视觉走"现有背景图 + 程序化演出"**：背景库第一张（或配置指定）+ 标题
+   光晕呼吸 + uGUI 假星光上飘 + 按钮悬停提亮。
+
+### 新增 / 修改文件
+
+- **新增 `Script/VNTitleMenu.cs`**：标题层组件，全部运行时构建
+  （与存读档/设置面板同款套路）。要点：
+  - Overlay Canvas 排序 **500**：在游戏 UI（Screen Space - Camera）之上、
+    画廊 600 / 存读档 900 / 设置 950 之下 → 读档/鉴赏/设置按钮**直接调
+    Runner 的现成 Request 接口**，面板自然盖在标题上，零新 UI。
+  - 收起规则只有一条：`VNScriptRunner.ResumeAt`（新游戏/读档/编辑器
+    "从选中行播放"全走它）调 `NotifyGameplayStarted()` → 标题层销毁
+    （销毁而非隐藏：14 个星光循环 Tween 靠 SetLink 随画布回收，不留后台空转）。
+  - 标题期间藏起对话框（`SetInterfaceVisible(false)`，尊重 `_shown` 语义，
+    恢复时不会强行显示空框）与场景底部按键提示（按名字找 `HintText`）。
+  - 退出带确认弹窗（Esc 可关），编辑器下退 Play 模式。
+  - 语言切换销毁重建刷新文案（背景/BGM 只应用一次，`_stageApplied` 挡住重播）。
+- **`VNScriptRunner.cs`**：
+  - `Start()`：发现场景里有 `VNTitleMenu` 且 `showOnStart` → 跳过
+    `playOnStart`，改为 `titleMenu.Open()`；否则维持旧行为（老场景零影响）。
+  - `Update()`：标题打开期间屏蔽全部游戏快捷键与推进（插在画廊分支之后——
+    叠在标题上的面板关闭键由上方各自分支处理，天然可用）。
+  - 新增 `StartNewGame()`：`VNFlags.Clear()` + 从入口剧本 `Play()`
+    （call 栈由 Play → Prepare 清，无需额外处理）。
+  - `ResumeAt()` 开头补 `_titleMenu?.NotifyGameplayStarted()`。
+- **`VNGameConfig.cs`**：新增"标题画面"区——`gameTitle/En/Ja`（按语言取、
+  缺省回退中文、全空用 "Visual Novel"）、`titleBackground`（背景 id，留空 =
+  背景库第一张）、`titleBgm`（留空 = 不播）。跟随资产的既有覆盖语义，
+  重建场景不丢。
+- **`VNEffectsDemoSetup.cs`**：`CreateScriptDemoScene` 创建 `VNTitleMenu`
+  空物体（`showOnStart` 默认开；调试剧情嫌挡路可在场景里临时关）。
+- **本地化**：三张 ui 表各加 `title.start/continue/load/gallery/config/quit/quitConfirm`。
+
+### 技术决策记录
+
+- **为什么继续按钮把快存槽 0 也算进"最新"**：玩家最后的进度就是最后的进度，
+  不应因为它存在 Q 键专用槽就被跳过。
+- **为什么收起钩子放 ResumeAt 而不是各入口**：ResumeAt 是所有播放路径的唯一
+  漏斗（Play / LoadFrom / PlayFromSourceLine 全收敛于它），一个钩子覆盖全部，
+  以后新增入口也不会漏。
+- **假星光而不用 VNAmbientParticles**：Screen Space - Overlay 画布永远盖在
+  相机渲染的粒子系统之上，真粒子在标题层后面看不见；uGUI Image + DOTween
+  循环是同视觉成本最低的替代。
+
+### 遗留
+
+- 游戏内"返回标题"入口未做（快捷功能条可加一个按钮，调 Stop + 重开标题层）。
+- 编辑器"从选中行播放"的直接模式下，标题层会先应用标题背景再被调试目标覆盖
+  （重建模式会按剧本重摆，无影响）；只影响调试观感，不影响玩家路径。
+- 未编译验证（Unity 编辑器占用工程）；已按既有组件逐 API 核对。
