@@ -23,5 +23,8 @@ namespace VNEffects
 
         [Header("状态完整页")]
         public GameObject statsPanelPrefab;
+
+        [Header("背包（道具 + 装备栏）")]
+        public GameObject inventoryPrefab;
     }
 }

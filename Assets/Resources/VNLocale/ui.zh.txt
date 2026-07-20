@@ -89,8 +89,31 @@ shop.owned = 持有 {0}
 shop.empty = （没有可交易的商品）
 shop.toastBuy = 购入 {0}（{1}）
 shop.toastSell = 卖出 {0}（{1}）
-inventory.title = —— 道具 ——
+inventory.title = —— 背包 ——
 inventory.empty = （身上什么都没有）
+inventory.hint = 左键查看说明，右键 装备 / 卸下 / 使用
+
+# —— 装备 ——
+equip.slot.1 = 头部
+equip.slot.2 = 脸部
+equip.slot.3 = 上半身
+equip.slot.4 = 手部
+equip.slot.5 = 下半身
+equip.slot.6 = 脚部
+equip.slot.7 = 特殊
+equip.menu.equip = 装备
+equip.menu.unequip = 卸下
+equip.menu.use = 使用
+equip.equippedMark = E
+equip.emptySlot = ——
+equip.toastEquip = 已装备 {0}
+equip.toastUnequip = 已卸下 {0}
+equip.toastUse = 使用了 {0}
+equip.detail.slot = 装备部位：{0}
+equip.detail.bonus = 装备加成：{0}
+equip.detail.effect = 特殊效果：{0}
+equip.detail.use = 使用效果：{0}
+equip.detail.consume = （使用后消耗 1 个）
 
 # —— 日程日历 ——
 calendar.month = {0}月

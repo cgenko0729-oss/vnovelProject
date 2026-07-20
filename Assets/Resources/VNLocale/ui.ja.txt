@@ -88,8 +88,31 @@ shop.owned = 所持 {0}
 shop.empty = （取引できる商品がありません）
 shop.toastBuy = {0} を購入（{1}）
 shop.toastSell = {0} を売却（{1}）
-inventory.title = —— アイテム ——
+inventory.title = —— 持ち物 ——
 inventory.empty = （何も持っていません）
+inventory.hint = 左クリックで詳細、右クリックで 装備 / 外す / 使う
+
+# —— 装備 ——
+equip.slot.1 = 頭部
+equip.slot.2 = 顔
+equip.slot.3 = 上半身
+equip.slot.4 = 手
+equip.slot.5 = 下半身
+equip.slot.6 = 足
+equip.slot.7 = 特殊
+equip.menu.equip = 装備
+equip.menu.unequip = 外す
+equip.menu.use = 使う
+equip.equippedMark = E
+equip.emptySlot = ——
+equip.toastEquip = {0}を装備した
+equip.toastUnequip = {0}を外した
+equip.toastUse = {0}を使った
+equip.detail.slot = 装備部位：{0}
+equip.detail.bonus = 装備効果：{0}
+equip.detail.effect = 特殊効果：{0}
+equip.detail.use = 使用効果：{0}
+equip.detail.consume = （使用後 1 個消費）
 
 # —— カレンダー ——
 calendar.month = {0}月

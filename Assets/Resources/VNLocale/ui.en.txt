@@ -88,8 +88,31 @@ shop.owned = Owned {0}
 shop.empty = (Nothing to trade)
 shop.toastBuy = Bought {0} ({1})
 shop.toastSell = Sold {0} ({1})
-inventory.title = —— Items ——
+inventory.title = —— Inventory ——
 inventory.empty = (You have nothing)
+inventory.hint = Left-click for details; right-click to Equip / Unequip / Use
+
+# —— Equipment ——
+equip.slot.1 = Head
+equip.slot.2 = Face
+equip.slot.3 = Body
+equip.slot.4 = Hands
+equip.slot.5 = Legs
+equip.slot.6 = Feet
+equip.slot.7 = Special
+equip.menu.equip = Equip
+equip.menu.unequip = Unequip
+equip.menu.use = Use
+equip.equippedMark = E
+equip.emptySlot = ——
+equip.toastEquip = Equipped {0}
+equip.toastUnequip = Removed {0}
+equip.toastUse = Used {0}
+equip.detail.slot = Slot: {0}
+equip.detail.bonus = Bonus: {0}
+equip.detail.effect = Effect: {0}
+equip.detail.use = On use: {0}
+equip.detail.consume = (consumes 1 on use)
 
 # —— Calendar ——
 calendar.month = Month {0}

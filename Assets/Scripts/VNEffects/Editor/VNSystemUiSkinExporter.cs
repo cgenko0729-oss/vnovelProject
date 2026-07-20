@@ -41,6 +41,7 @@ namespace VNEffects
             set.backlogPrefab = BuildBacklog();
             set.statsHudPrefab = BuildStatsHud();
             set.statsPanelPrefab = BuildStatsPanel();
+            set.inventoryPrefab = BuildInventory();
             EditorUtility.SetDirty(set);
 
             var cfg = AssetDatabase.LoadAssetAtPath<VNGameConfig>(VNGameConfig.AssetPath);
@@ -66,7 +67,7 @@ namespace VNEffects
             if (set == null) throw new System.InvalidOperationException($"找不到系统 UI 全局主题：{SetPath}");
 
             ValidateAllInternal(set);
-            Debug.Log("[VNSystemUiSkin] 全局主题和 8 个 prefab 的必需槽位校验通过。");
+            Debug.Log("[VNSystemUiSkin] 全局主题和 9 个 prefab 的必需槽位校验通过。");
         }
 
         static void ValidateAllInternal(VNSystemUiSkinSet set)
@@ -79,6 +80,7 @@ namespace VNEffects
             ValidatePrefab<VNBacklogSkin>(set.backlogPrefab, "Backlog");
             ValidatePrefab<VNStatsHudSkin>(set.statsHudPrefab, "顶部属性 HUD");
             ValidatePrefab<VNStatsPanelSkin>(set.statsPanelPrefab, "完整属性页");
+            ValidatePrefab<VNInventorySkin>(set.inventoryPrefab, "背包");
 
             var config = AssetDatabase.LoadAssetAtPath<VNGameConfig>(VNGameConfig.AssetPath);
             if (config != null && config.systemUiSkin != set)
@@ -288,6 +290,76 @@ namespace VNEffects
             rs.valueText = Text(row.transform, "Value", 27, TextAlignmentOptions.MidlineRight, new Vector2(570, 0), new Vector2(190, 50));
             skin.rowTemplate = rs; row.SetActive(false);
             return Save(root);
+        }
+
+        static GameObject BuildInventory()
+        {
+            var root = Root("Inventory_Default"); var skin = root.AddComponent<VNInventorySkin>(); skin.panelRoot = root;
+            skin.backgroundCloseButton = FullButton(root.transform, "Dim", new Color(0, .01f, .02f, .88f));
+            skin.titleText = Text(root.transform, "Title", 34, TextAlignmentOptions.Center, new Vector2(600, -22), new Vector2(720, 46));
+            skin.hintText = Text(root.transform, "Hint", 20, TextAlignmentOptions.Center, new Vector2(600, -74), new Vector2(720, 28)); skin.hintText.color = new Color(1, 1, 1, .55f);
+            (skin.closeButton, _) = FixedButton(root.transform, "Close", new Vector2(1840, -30), new Vector2(58, 52), "×");
+
+            BuildScroll(root.transform, new Vector2(.05f, .16f), new Vector2(.47f, .87f), out var scroll, out var content);
+            skin.itemContent = content;
+            skin.emptyText = Text(scroll.transform, "Empty", 26, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            Stretch(skin.emptyText.rectTransform); skin.emptyText.color = new Color(1, 1, 1, .55f);
+            skin.rowTemplate = BuildInventoryRow(content); skin.rowTemplate.gameObject.SetActive(false);
+
+            var slots = Node(root.transform, "Slots", typeof(VerticalLayoutGroup));
+            var slotsRect = (RectTransform)slots.transform; slotsRect.anchorMin = new Vector2(.53f, .16f); slotsRect.anchorMax = new Vector2(.95f, .87f); slotsRect.offsetMin = slotsRect.offsetMax = Vector2.zero;
+            var slotsLayout = slots.GetComponent<VerticalLayoutGroup>(); slotsLayout.spacing = 10; slotsLayout.childControlWidth = true; slotsLayout.childControlHeight = true; slotsLayout.childForceExpandHeight = true;
+            skin.headSlot = BuildInventorySlot(slots.transform, "Slot_Head");
+            skin.faceSlot = BuildInventorySlot(slots.transform, "Slot_Face");
+            skin.upperBodySlot = BuildInventorySlot(slots.transform, "Slot_UpperBody");
+            skin.handsSlot = BuildInventorySlot(slots.transform, "Slot_Hands");
+            skin.lowerBodySlot = BuildInventorySlot(slots.transform, "Slot_LowerBody");
+            skin.feetSlot = BuildInventorySlot(slots.transform, "Slot_Feet");
+            skin.specialSlot = BuildInventorySlot(slots.transform, "Slot_Special");
+
+            var detail = Image(root.transform, "Detail", new Color(1, 1, 1, .04f));
+            detail.rectTransform.anchorMin = new Vector2(.05f, .02f); detail.rectTransform.anchorMax = new Vector2(.95f, .14f); detail.rectTransform.offsetMin = detail.rectTransform.offsetMax = Vector2.zero;
+            skin.detailText = Text(detail.transform, "Text", 22, TextAlignmentOptions.TopLeft, Vector2.zero, Vector2.zero);
+            Stretch(skin.detailText.rectTransform); skin.detailText.rectTransform.offsetMin = new Vector2(18, 10); skin.detailText.rectTransform.offsetMax = new Vector2(-18, -10);
+            skin.detailText.textWrappingMode = TextWrappingModes.Normal;
+            return Save(root);
+        }
+
+        static VNInventoryRowSkin BuildInventoryRow(Transform parent)
+        {
+            var pair = LayoutButton(parent, "RowTemplate", 0); var go = pair.Item1.gameObject; Object.DestroyImmediate(pair.Item2.gameObject);
+            go.GetComponent<LayoutElement>().preferredHeight = 64; go.GetComponent<Image>().color = new Color(1, 1, 1, .05f);
+            var skin = go.AddComponent<VNInventoryRowSkin>(); skin.button = pair.Item1;
+            skin.icon = Image(go.transform, "Icon", Color.white); SetSide(skin.icon.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(8, 0), new Vector2(48, 48)); skin.icon.preserveAspect = true;
+            skin.nameText = Text(go.transform, "Name", 26, TextAlignmentOptions.MidlineLeft, Vector2.zero, Vector2.zero);
+            Stretch(skin.nameText.rectTransform); skin.nameText.rectTransform.offsetMin = new Vector2(68, 0); skin.nameText.rectTransform.offsetMax = new Vector2(-140, 0);
+            skin.countText = Text(go.transform, "Count", 24, TextAlignmentOptions.MidlineRight, Vector2.zero, Vector2.zero);
+            SetSide(skin.countText.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(1, .5f), new Vector2(-14, 0), new Vector2(80, 0)); skin.countText.color = new Color(1, .82f, .5f, 1);
+            var mark = Text(go.transform, "EquippedMark", 21, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero); mark.text = "E"; mark.fontStyle = FontStyles.Bold;
+            SetSide(mark.rectTransform, new Vector2(1, 0), new Vector2(1, 1), new Vector2(1, .5f), new Vector2(-96, 0), new Vector2(40, 0)); mark.color = new Color(.56f, .88f, .56f, 1);
+            skin.equippedMark = mark.gameObject;
+            return skin;
+        }
+
+        static VNInventorySlotSkin BuildInventorySlot(Transform parent, string name)
+        {
+            var pair = LayoutButton(parent, name, 0); var go = pair.Item1.gameObject; Object.DestroyImmediate(pair.Item2.gameObject);
+            go.GetComponent<Image>().color = new Color(1, 1, 1, .05f);
+            var skin = go.AddComponent<VNInventorySlotSkin>(); skin.button = pair.Item1;
+            skin.slotLabel = Text(go.transform, "SlotLabel", 24, TextAlignmentOptions.MidlineLeft, Vector2.zero, Vector2.zero);
+            SetSide(skin.slotLabel.rectTransform, new Vector2(0, 0), new Vector2(0, 1), new Vector2(0, .5f), new Vector2(16, 0), new Vector2(130, 0)); skin.slotLabel.color = new Color(.66f, .85f, 1, 1);
+            skin.icon = Image(go.transform, "Icon", Color.white); SetSide(skin.icon.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(152, 0), new Vector2(46, 46)); skin.icon.preserveAspect = true;
+            skin.itemNameText = Text(go.transform, "ItemName", 25, TextAlignmentOptions.MidlineLeft, Vector2.zero, Vector2.zero);
+            Stretch(skin.itemNameText.rectTransform); skin.itemNameText.rectTransform.offsetMin = new Vector2(212, 0); skin.itemNameText.rectTransform.offsetMax = new Vector2(-14, 0);
+            var empty = Text(go.transform, "Empty", 23, TextAlignmentOptions.MidlineLeft, Vector2.zero, Vector2.zero); empty.text = "——"; empty.color = new Color(1, 1, 1, .28f);
+            Stretch(empty.rectTransform); empty.rectTransform.offsetMin = new Vector2(212, 0); empty.rectTransform.offsetMax = new Vector2(-14, 0);
+            skin.emptyMark = empty.gameObject;
+            return skin;
+        }
+
+        static void SetSide(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 pos, Vector2 size)
+        {
+            rect.anchorMin = anchorMin; rect.anchorMax = anchorMax; rect.pivot = pivot; rect.anchoredPosition = pos; rect.sizeDelta = size;
         }
 
         static void BuildConfirm(Transform parent, VNSaveLoadSkin skin)

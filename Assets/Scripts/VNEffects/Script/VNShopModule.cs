@@ -109,6 +109,7 @@ namespace VNEffects
             if (item.sellPrice <= 0 || item.Owned <= 0) return;
             ApplyMoney(item.sellPrice);
             VNFlags.Add(VNShopDef.ItemFlagName(item.id), -1);
+            VNEquipment.HandleItemLost(item.id); // 卖光装备中的道具 → 强制卸下
             VNToast.Show(VNLocale.T("shop.toastSell", item.DisplayName,
                 FormatMoney(item.sellPrice)), 1.6f);
             RefreshMoney();

@@ -29,7 +29,14 @@ MonoBehaviour:
     price: 120
     sellPrice: 60
     maxOwned: 0
-    condition: 
+    condition:
+    equipSlot: 1
+    statBonuses:
+    - statId: "魅力"
+      amount: 3
+    passiveEffects: []
+    useOps: []
+    consumeOnUse: 1
   - id: "\u6D0B\u88C5"
     displayName: "\u6D0B\u88C5"
     displayNameEn: Dress
@@ -41,7 +48,14 @@ MonoBehaviour:
     price: 300
     sellPrice: 150
     maxOwned: 1
-    condition: 
+    condition:
+    equipSlot: 3
+    statBonuses:
+    - statId: "魅力"
+      amount: 8
+    passiveEffects: []
+    useOps: []
+    consumeOnUse: 1
   - id: "\u795E\u79D8\u6302\u5760"
     displayName: "\u795E\u79D8\u6302\u5760"
     displayNameEn: Mysterious Pendant
@@ -55,3 +69,32 @@ MonoBehaviour:
     sellPrice: 100
     maxOwned: 1
     condition: "\u9B45\u529B>=50"
+    equipSlot: 7
+    statBonuses: []
+    passiveEffects:
+    - effectId: "\u91D1\u94B1\u52A0\u500D"
+      amount: 1
+      label: "\u6253\u5DE5\u62A5\u916C\u7FFB\u500D\uFF08\u5267\u672C\u5224\u5B9A\uFF09"
+      labelEn: Doubles part-time job pay (checked by script)
+      labelJa: "\u30D0\u30A4\u30C8\u5831\u916C2\u500D\uFF08\u30B9\u30AF\u30EA\u30D7\u30C8\u5224\u5B9A\uFF09"
+    useOps: []
+    consumeOnUse: 1
+  - id: "\u7CBE\u529B\u5145\u6C9B\u5242"
+    displayName: "\u7CBE\u529B\u5145\u6C9B\u5242"
+    displayNameEn: Energy Drink
+    displayNameJa: "\u5143\u6C17\u30C9\u30EA\u30F3\u30AF"
+    description: "\u4E00\u996E\u800C\u5C3D\uFF0C\u6D51\u8EAB\u662F\u52B2\u3002\u4F7F\u7528\u540E\u884C\u52A8\u529B +2\u3002"
+    descriptionEn: Chug it down for a burst of energy. Restores 2 AP on use.
+    descriptionJa: "\u4E00\u6C17\u306B\u98F2\u3081\u3070\u5143\u6C17\u3044\u3063\u3071\u3044\u3002\u4F7F\u7528\u3067\u884C\u52D5\u529B +2\u3002"
+    icon: {fileID: 0}
+    price: 80
+    sellPrice: 30
+    maxOwned: 0
+    condition:
+    equipSlot: 0
+    statBonuses: []
+    passiveEffects: []
+    useOps:
+    - statId: "\u884C\u52A8\u529B"
+      amount: 2
+    consumeOnUse: 1

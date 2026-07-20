@@ -110,7 +110,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮（TMP textInfo 顶点动画）；支持皮肤 prefab（VNDialogueSkin 槽位绑定，程序化默认兜底） |
 | VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI Skins → Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；皮肤状态进存档 |
-| VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章） |
+| VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页/背包分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章） |
 | VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技 |
@@ -123,7 +123,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNShopDef / VNShopModule | 商店定义资产 / 商店事件模块（event shop id:xx，买卖走金钱属性 + 道具_&lt;id&gt; flag） |
 | VNPlanDef / VNPlanModule | 日程方案资产 / 周日程排程模块（event plan 排格写 flag 日程_&lt;N&gt;；op:next 逐格派发到 flag 当前行动） |
 | VNResultPopupModule | 结算大弹窗事件模块（event result grade:fail\|normal\|good\|great，四档大字+星光爆发） |
-| VNInventory | I 键物品栏（flags 反查道具，文案图标取自 VNShopDef） |
+| VNInventory | I 键背包：左道具一览 + 右 7 格装备栏 + 介绍区，右键菜单 装备/卸下/使用（文案图标装备数据取自 VNShopDef；外观走系统主题 inventoryPrefab + VNInventorySkin 槽位，缺失退回程序化 UI） |
+| VNEquipment | 装备核心（纯静态）：状态全存 flags——装备_&lt;道具id&gt;=部位编号、装备实增_（卸下按实际生效量扣回防钳制不对称）、装备效果_&lt;效果id&gt;（特殊效果合计，生效逻辑由剧本 if 判断） |
 | VNCalendarHud | 右下日历 HUD（flag 月份/剩余月数，time 命令驱动；月份 flag 不存在时自动隐藏） |
 | VNCgUnlocks / VNCgGallery | CG 全局解锁存储（独立 JSON，与存档槽分离）/ G 键鉴赏画廊（目录取 cgLibrary，解锁取 VNCgUnlocks，group 相同的合并成一格翻差分） |
 | VNTitleMenu | 开始菜单（同场景覆盖层 Canvas 500）：开始/继续(最新档含快存)/读档/鉴赏/设置/退出，后四者复用现成面板；Runner 启动时接管 playOnStart，ResumeAt 自动收层；标题文字/背景/BGM 配在 VNGameConfig「标题画面」区 |
@@ -154,6 +155,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
 | 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |
+| 装备 | I 键背包 7 部位装备栏；VNShopDef.Item 加装备/使用字段；状态全在 flags（装备_/装备实增_/装备效果_），特殊效果由剧本 if 判断生效 | 八十五 |
 | 周日程排程 | `event plan` 排格/派发 + `flag rand:` + `event result` 结算；概率表写剧本 | 七十 |
 | 本地化 | 剧本只写中文，翻译旁路表 + Extract/Validate → 技能 vn-localize | 五十七 |
 | UI 皮肤 | `ui dialogue\|choice <id>`（进存档）+ 系统菜单全局主题（不进存档）→ 技能 vn-ui-skin | 八十二、八十三 |
