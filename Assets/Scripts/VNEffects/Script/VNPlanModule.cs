@@ -25,6 +25,8 @@ namespace VNEffects
     ///
     /// 行动详情（图标/收益文案/编号）来自 VNPlanDef 资产（模板 Inspector 登记，
     /// event plan id:xx 选择）；没有资产时 pool: 的行动名按出现顺序编号 1..n。
+    /// 外观走系统主题 VNSystemUiSkinSet.planPrefab（VNPlanSkin 槽位），
+    /// 缺失或校验失败时退回本文件的程序化默认 UI。
     /// 遵守事件模块三铁律：不碰舞台演出 / unscaled 计时 + SetUpdate(true) /
     /// 全部 Tween SetLink。
     /// </summary>
@@ -59,9 +61,13 @@ namespace VNEffects
         /// <summary>逐格派发只是流程控制，记进回想全是「plan → next」噪音</summary>
         public override bool RecordInBacklog => !_dispatchMode;
 
+        VNPlanSkin _skin;      // 皮肤实例；null = 程序化默认 UI
         RectTransform _panel;
-        readonly List<TextMeshProUGUI> _slotTexts = new List<TextMeshProUGUI>();
-        readonly List<Image> _slotImages = new List<Image>();
+        readonly List<TMP_Text> _slotTexts = new List<TMP_Text>();
+        readonly List<Image> _slotImages = new List<Image>();          // 条目可为 null（皮肤格没配背景槽）
+        readonly List<RectTransform> _slotRects = new List<RectTransform>();
+        Color _slotEmptyColor = SlotEmptyColor;
+        Color _slotFilledColor = SlotFilledColor;
 
         protected override void OnLaunch(VNEventContext ctx)
         {
@@ -221,12 +227,92 @@ namespace VNEffects
         }
 
         // ------------------------------------------------------------------
-        // UI 构建（程序化，参照 VNShopModule）
+        // UI 构建：优先全局主题皮肤（VNSystemUiSkinSet.planPrefab），
+        // 缺失或校验失败时退回程序化默认（参照 VNShopModule）
         // ------------------------------------------------------------------
 
         void BuildUi(string titleText)
         {
+            _slotTexts.Clear();
+            _slotImages.Clear();
+            _slotRects.Clear();
+
+            var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.planPrefab);
+            _skin = VNSystemUiSkinUtility.Instantiate<VNPlanSkin>(
+                skinPrefab, transform, "VNPlanModule");
+            if (_skin != null) BuildFromSkin(titleText);
+            else BuildDefault(titleText);
+
+            RefreshSlots();
+
+            // 面板弹入（两条路径共用）
+            _panel.localScale = Vector3.one * 0.92f;
+            _panel.DOScale(1f, 0.28f).SetEase(Ease.OutBack)
+                  .SetUpdate(true).SetLink(gameObject);
+        }
+
+        /// <summary>皮肤路径：模板行克隆 + 槽位接线，布局外观全由 prefab 决定</summary>
+        void BuildFromSkin(string titleText)
+        {
+            _panel = _skin.panelRoot;
+            _skin.titleText.text = titleText;
+            if (_skin.resetLabel != null) _skin.resetLabel.text = VNLocale.T("plan.reset");
+            if (_skin.confirmLabel != null) _skin.confirmLabel.text = VNLocale.T("plan.confirm");
+            _skin.resetButton.onClick.RemoveAllListeners();
+            _skin.resetButton.onClick.AddListener(ResetAll);
+            _skin.confirmButton.onClick.RemoveAllListeners();
+            _skin.confirmButton.onClick.AddListener(Confirm);
+            _slotEmptyColor = _skin.slotTemplate.emptyColor;
+            _slotFilledColor = _skin.slotTemplate.filledColor;
+
+            _skin.actionTemplate.gameObject.SetActive(false);
+            foreach (var action in _actions)
+            {
+                var captured = action;
+                var row = Instantiate(_skin.actionTemplate, _skin.actionContent, false);
+                row.gameObject.SetActive(true);
+                row.button.onClick.RemoveAllListeners();
+                row.button.onClick.AddListener(() => AssignToFirstEmpty(captured));
+                if (row.icon != null && action.icon != null)
+                {
+                    row.icon.sprite = action.icon;
+                    row.icon.preserveAspect = true;
+                }
+                if (row.gainText != null)
+                {
+                    row.nameText.text = action.DisplayName;
+                    row.gainText.text = action.LocalizedGainText ?? "";
+                }
+                else
+                {
+                    row.nameText.richText = true;
+                    string gain = string.IsNullOrEmpty(action.LocalizedGainText)
+                        ? ""
+                        : $"\n<size=20><color=#a8d8a8>{action.LocalizedGainText}</color></size>";
+                    row.nameText.text = $"{action.DisplayName}{gain}";
+                }
+            }
+
+            _skin.slotTemplate.gameObject.SetActive(false);
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                int captured = i;
+                var row = Instantiate(_skin.slotTemplate, _skin.slotContent, false);
+                row.gameObject.SetActive(true);
+                row.dayText.text = VNLocale.T("plan.slot", i + 1);
+                row.button.onClick.RemoveAllListeners();
+                row.button.onClick.AddListener(() => ClearSlot(captured));
+                _slotRects.Add((RectTransform)row.transform);
+                _slotTexts.Add(row.assignedText);
+                _slotImages.Add(row.background);
+            }
+        }
+
+        void BuildDefault(string titleText)
+        {
             var root = (RectTransform)transform;
+            _slotEmptyColor = SlotEmptyColor;
+            _slotFilledColor = SlotFilledColor;
 
             var dim = CreateImage("Dim", root, null, new Color(0f, 0f, 0f, 0.72f));
             Stretch(dim);
@@ -238,9 +324,6 @@ namespace VNEffects
             _panel.anchorMax = new Vector2(0.86f, 0.92f);
             _panel.offsetMin = Vector2.zero;
             _panel.offsetMax = Vector2.zero;
-            _panel.localScale = Vector3.one * 0.92f;
-            _panel.DOScale(1f, 0.28f).SetEase(Ease.OutBack)
-                  .SetUpdate(true).SetLink(gameObject);
 
             var title = CreateText("Title", _panel, 40, TitleColor, titleText);
             title.fontStyle = FontStyles.Bold;
@@ -268,8 +351,6 @@ namespace VNEffects
             confirmRect.pivot = new Vector2(0.5f, 0f);
             confirmRect.anchoredPosition = new Vector2(0f, 22f);
             confirmRect.sizeDelta = new Vector2(200f, 54f);
-
-            RefreshSlots();
         }
 
         /// <summary>左列：候选行动（图标 + 名称 + 预期收益文案），点击填入下一个空格</summary>
@@ -320,8 +401,6 @@ namespace VNEffects
             CreateScrollColumn("Slots",
                 new Vector2(0.52f, 0.12f), new Vector2(0.96f, 0.86f), out var content);
 
-            _slotTexts.Clear();
-            _slotImages.Clear();
             for (int i = 0; i < _slots.Length; i++)
             {
                 int captured = i;
@@ -332,6 +411,7 @@ namespace VNEffects
                 var button = row.gameObject.AddComponent<Button>();
                 button.targetGraphic = row.GetComponent<Image>();
                 button.onClick.AddListener(() => ClearSlot(captured));
+                _slotRects.Add(row);
                 _slotImages.Add(row.GetComponent<Image>());
 
                 var day = CreateText("Day", row, 24, new Color(1f, 0.92f, 0.7f, 0.9f),
@@ -364,7 +444,8 @@ namespace VNEffects
                 _slotTexts[i].text = filled
                     ? action.DisplayName
                     : $"<color=#8a8fa0>{VNLocale.T("plan.rest")}</color>";
-                _slotImages[i].color = filled ? SlotFilledColor : SlotEmptyColor;
+                if (_slotImages[i] != null)
+                    _slotImages[i].color = filled ? _slotFilledColor : _slotEmptyColor;
             }
         }
 
@@ -377,7 +458,7 @@ namespace VNEffects
 
         void PunchSlot(int index)
         {
-            var rect = (RectTransform)_slotTexts[index].transform.parent;
+            var rect = _slotRects[index];
             rect.DOKill(true);
             rect.DOPunchScale(Vector3.one * 0.05f, 0.2f, 8, 0.6f)
                 .SetUpdate(true).SetLink(gameObject);

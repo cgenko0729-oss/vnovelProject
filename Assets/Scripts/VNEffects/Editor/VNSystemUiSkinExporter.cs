@@ -42,6 +42,8 @@ namespace VNEffects
             set.statsHudPrefab = BuildStatsHud();
             set.statsPanelPrefab = BuildStatsPanel();
             set.inventoryPrefab = BuildInventory();
+            set.planPrefab = BuildPlan();
+            set.resultPopupPrefab = BuildResultPopup();
             EditorUtility.SetDirty(set);
 
             var cfg = AssetDatabase.LoadAssetAtPath<VNGameConfig>(VNGameConfig.AssetPath);
@@ -60,6 +62,33 @@ namespace VNEffects
                       "复制 prefab 后修改图片、锚点和布局即可；必需槽位缺失时运行时自动退回程序化 UI。");
         }
 
+        /// <summary>只导出排程面板与结算弹窗两个默认 prefab，不碰其余 9 个
+        /// （已有主题里手改过的 prefab 不会被覆盖）。</summary>
+        [MenuItem("Tools/VN Effects/System UI Skins/Export Event Panel Prefabs (Plan & Result)")]
+        public static void ExportEventPanels()
+        {
+            var set = AssetDatabase.LoadAssetAtPath<VNSystemUiSkinSet>(SetPath);
+            if (set == null)
+            {
+                Debug.LogError($"[VNSystemUiSkin] 找不到全局主题资产 {SetPath}，" +
+                               "请先运行 Export Default Prefabs。");
+                return;
+            }
+
+            EnsureFolder(Dir);
+            _rounded = AssetDatabase.LoadAssetAtPath<Sprite>(RoundedPath);
+            _font = VNFontAssetBuilder.EnsureFontAsset();
+
+            set.planPrefab = BuildPlan();
+            set.resultPopupPrefab = BuildResultPopup();
+            EditorUtility.SetDirty(set);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorGUIUtility.PingObject(set);
+            Debug.Log("[VNSystemUiSkin] 排程面板与结算弹窗默认 prefab 已导出并登记" +
+                      "（其余系统 UI prefab 未改动）。");
+        }
+
         [MenuItem("Tools/VN Effects/System UI Skins/Validate Global Theme")]
         public static void ValidateAll()
         {
@@ -67,7 +96,7 @@ namespace VNEffects
             if (set == null) throw new System.InvalidOperationException($"找不到系统 UI 全局主题：{SetPath}");
 
             ValidateAllInternal(set);
-            Debug.Log("[VNSystemUiSkin] 全局主题和 9 个 prefab 的必需槽位校验通过。");
+            Debug.Log("[VNSystemUiSkin] 全局主题和 11 个 prefab 的必需槽位校验通过。");
         }
 
         static void ValidateAllInternal(VNSystemUiSkinSet set)
@@ -81,6 +110,8 @@ namespace VNEffects
             ValidatePrefab<VNStatsHudSkin>(set.statsHudPrefab, "顶部属性 HUD");
             ValidatePrefab<VNStatsPanelSkin>(set.statsPanelPrefab, "完整属性页");
             ValidatePrefab<VNInventorySkin>(set.inventoryPrefab, "背包");
+            ValidatePrefab<VNPlanSkin>(set.planPrefab, "排程面板");
+            ValidatePrefab<VNResultPopupSkin>(set.resultPopupPrefab, "结算弹窗");
 
             var config = AssetDatabase.LoadAssetAtPath<VNGameConfig>(VNGameConfig.AssetPath);
             if (config != null && config.systemUiSkin != set)
@@ -355,6 +386,131 @@ namespace VNEffects
             Stretch(empty.rectTransform); empty.rectTransform.offsetMin = new Vector2(212, 0); empty.rectTransform.offsetMax = new Vector2(-14, 0);
             skin.emptyMark = empty.gameObject;
             return skin;
+        }
+
+        static GameObject BuildPlan()
+        {
+            var root = Root("PlanPanel_Default");
+            var skin = root.AddComponent<VNPlanSkin>();
+            FullImage(root.transform, "Dim", new Color(0f, 0f, 0f, .72f)).raycastTarget = true;
+
+            var panel = Image(root.transform, "Panel", Panel);
+            panel.rectTransform.anchorMin = new Vector2(.14f, .08f);
+            panel.rectTransform.anchorMax = new Vector2(.86f, .92f);
+            panel.rectTransform.offsetMin = panel.rectTransform.offsetMax = Vector2.zero;
+            skin.panelRoot = panel.rectTransform;
+
+            skin.titleText = Text(panel.transform, "Title", 40, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            skin.titleText.fontStyle = FontStyles.Bold; skin.titleText.color = Gold;
+            var titleRect = skin.titleText.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f); titleRect.anchorMax = Vector2.one; titleRect.pivot = new Vector2(.5f, 1f);
+            titleRect.anchoredPosition = new Vector2(0f, -26f); titleRect.sizeDelta = new Vector2(0f, 52f);
+
+            BuildScroll(panel.transform, new Vector2(.04f, .14f), new Vector2(.48f, .86f), out _, out var actionContent);
+            skin.actionContent = actionContent;
+            skin.actionTemplate = BuildPlanActionRow(actionContent);
+            skin.actionTemplate.gameObject.SetActive(false);
+
+            BuildScroll(panel.transform, new Vector2(.52f, .14f), new Vector2(.96f, .86f), out _, out var slotContent);
+            skin.slotContent = slotContent;
+            skin.slotTemplate = BuildPlanSlotRow(slotContent);
+            skin.slotTemplate.gameObject.SetActive(false);
+
+            (skin.resetButton, skin.resetLabel) = BottomButton(panel.transform, "Reset", new Vector2(.35f, 0f));
+            (skin.confirmButton, skin.confirmLabel) = BottomButton(panel.transform, "Confirm", new Vector2(.65f, 0f));
+            skin.confirmButton.targetGraphic.color = new Color(.92f, .61f, .18f, .98f);
+            return Save(root);
+        }
+
+        static VNPlanActionRowSkin BuildPlanActionRow(Transform parent)
+        {
+            var pair = LayoutButton(parent, "ActionTemplate", 0); var go = pair.Item1.gameObject;
+            go.GetComponent<LayoutElement>().preferredHeight = 84; go.GetComponent<Image>().color = new Color(1, 1, 1, .06f);
+            var skin = go.AddComponent<VNPlanActionRowSkin>(); skin.button = pair.Item1;
+            skin.icon = Image(go.transform, "Icon", new Color(.5f, .65f, 1f, .5f));
+            SetSide(skin.icon.rectTransform, new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(0, .5f), new Vector2(14, 0), new Vector2(56, 56));
+            skin.icon.preserveAspect = true;
+            skin.nameText = pair.Item2; skin.nameText.fontSize = 27; skin.nameText.alignment = TextAlignmentOptions.MidlineLeft;
+            skin.nameText.rectTransform.offsetMin = new Vector2(84, 30); skin.nameText.rectTransform.offsetMax = new Vector2(-12, -6);
+            skin.gainText = Text(go.transform, "Gain", 20, TextAlignmentOptions.MidlineLeft, Vector2.zero, Vector2.zero);
+            Stretch(skin.gainText.rectTransform);
+            skin.gainText.rectTransform.offsetMin = new Vector2(84, 8); skin.gainText.rectTransform.offsetMax = new Vector2(-12, -48);
+            skin.gainText.color = new Color(.66f, .85f, .66f, 1f);
+            return skin;
+        }
+
+        static VNPlanSlotRowSkin BuildPlanSlotRow(Transform parent)
+        {
+            var pair = LayoutButton(parent, "SlotTemplate", 0); var go = pair.Item1.gameObject;
+            go.GetComponent<LayoutElement>().preferredHeight = 64;
+            var skin = go.AddComponent<VNPlanSlotRowSkin>(); skin.button = pair.Item1;
+            skin.background = go.GetComponent<Image>(); skin.background.color = skin.emptyColor;
+            skin.dayText = pair.Item2; skin.dayText.fontSize = 24; skin.dayText.alignment = TextAlignmentOptions.MidlineLeft;
+            skin.dayText.color = new Color(1f, .92f, .7f, .9f);
+            var dayRect = skin.dayText.rectTransform;
+            dayRect.anchorMin = Vector2.zero; dayRect.anchorMax = new Vector2(.32f, 1f);
+            dayRect.offsetMin = new Vector2(16, 0); dayRect.offsetMax = Vector2.zero;
+            skin.assignedText = Text(go.transform, "Assigned", 26, TextAlignmentOptions.MidlineLeft, Vector2.zero, Vector2.zero);
+            var assignedRect = skin.assignedText.rectTransform;
+            assignedRect.anchorMin = new Vector2(.32f, 0f); assignedRect.anchorMax = Vector2.one;
+            assignedRect.offsetMin = Vector2.zero; assignedRect.offsetMax = new Vector2(-12, 0);
+            return skin;
+        }
+
+        static GameObject BuildResultPopup()
+        {
+            var root = Root("ResultPopup_Default");
+            var skin = root.AddComponent<VNResultPopupSkin>();
+            FullImage(root.transform, "Dim", new Color(0f, 0f, 0f, .6f)).raycastTarget = true;
+
+            var panel = Image(root.transform, "Panel", new Color(.06f, .08f, .13f, .97f));
+            At(panel.rectTransform, new Vector2(.5f, .52f), new Vector2(720, 380));
+            skin.panelRoot = panel.rectTransform; skin.panelBackground = panel;
+
+            skin.gradeText = Text(panel.transform, "Grade", 96, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            skin.gradeText.fontStyle = FontStyles.Bold | FontStyles.Italic;
+            At(skin.gradeText.rectTransform, new Vector2(.5f, .68f), new Vector2(680, 130));
+            skin.gradeLocalText = Text(panel.transform, "GradeLocal", 30, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            At(skin.gradeLocalText.rectTransform, new Vector2(.5f, .44f), new Vector2(600, 44));
+            skin.titleText = Text(panel.transform, "Title", 34, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            skin.titleText.fontStyle = FontStyles.Bold;
+            At(skin.titleText.rectTransform, new Vector2(.5f, .28f), new Vector2(660, 48));
+            skin.subText = Text(panel.transform, "Sub", 24, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            skin.subText.color = new Color(1, 1, 1, .65f);
+            At(skin.subText.rectTransform, new Vector2(.5f, .17f), new Vector2(660, 36));
+            skin.hintText = Text(panel.transform, "Hint", 22, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            skin.hintText.color = new Color(1, 1, 1, .55f);
+            At(skin.hintText.rectTransform, new Vector2(.5f, .06f), new Vector2(400, 32));
+
+            var bar = Image(panel.transform, "Bar", new Color(1, 1, 1, .12f));
+            At(bar.rectTransform, new Vector2(.5f, .5f), new Vector2(440, 20));
+            skin.barRoot = bar.gameObject;
+            var fill = Image(bar.transform, "Fill", Gold);
+            fill.rectTransform.anchorMin = Vector2.zero; fill.rectTransform.anchorMax = new Vector2(0f, 1f);
+            fill.rectTransform.offsetMin = fill.rectTransform.offsetMax = Vector2.zero;
+            skin.barFill = fill.rectTransform;
+            skin.percentText = Text(panel.transform, "Percent", 64, TextAlignmentOptions.Center, Vector2.zero, Vector2.zero);
+            skin.percentText.fontStyle = FontStyles.Bold; skin.percentText.color = Gold;
+            At(skin.percentText.rectTransform, new Vector2(.5f, .72f), new Vector2(400, 80));
+
+            skin.burstOrigin = skin.gradeText.rectTransform;
+            return Save(root);
+        }
+
+        static (Button, TextMeshProUGUI) BottomButton(Transform parent, string name, Vector2 anchor)
+        {
+            var pair = LayoutButton(parent, name, 200);
+            var rect = (RectTransform)pair.Item1.transform;
+            rect.anchorMin = rect.anchorMax = anchor; rect.pivot = new Vector2(.5f, 0f);
+            rect.anchoredPosition = new Vector2(0f, 22f); rect.sizeDelta = new Vector2(200f, 54f);
+            pair.Item2.fontSize = 26;
+            return pair;
+        }
+
+        static void At(RectTransform rect, Vector2 anchor, Vector2 size)
+        {
+            rect.anchorMin = rect.anchorMax = anchor; rect.pivot = new Vector2(.5f, .5f);
+            rect.anchoredPosition = Vector2.zero; rect.sizeDelta = size;
         }
 
         static void SetSide(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 pos, Vector2 size)

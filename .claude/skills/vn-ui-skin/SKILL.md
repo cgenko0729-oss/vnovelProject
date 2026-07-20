@@ -7,7 +7,7 @@ description: 制作/修改 UI 皮肤：对话框与选项面板皮肤（VNDialog
 
 ## 何时用我
 做/改对话框、选项面板、标题菜单、设置、CG 画廊、Backlog、快捷条、存读档、
-属性 HUD/面板的外观时。
+属性 HUD/面板、背包、排程面板、结算弹窗的外观时。
 
 ## 两条独立的皮肤线（别混）
 | | 对话框/选项皮肤 | 系统菜单全局主题 |
@@ -16,7 +16,7 @@ description: 制作/修改 UI 皮肤：对话框与选项面板皮肤（VNDialog
 | 登记 | VNGameConfig「UI 皮肤」区登记 id | VNGameConfig.systemUiSkin 指向 SkinSet |
 | 切换 | 剧本命令 `ui dialogue\|choice <id\|default>` | 无剧本命令，全局唯一 |
 | 存档 | **进存档** | **不进存档** |
-| 起步模板 | Tools → VN Effects → UI Skins → Export Skin Prefabs | Tools → VN Effects → System UI Skins → Export Default Prefabs（9 个，含背包 Inventory） |
+| 起步模板 | Tools → VN Effects → UI Skins → Export Skin Prefabs | Tools → VN Effects → System UI Skins → Export Default Prefabs（11 个，含背包/排程面板/结算弹窗）；只重导排程+结算两项用 Export Event Panel Prefabs（不覆盖手改过的其他 prefab） |
 | 校验 | — | 同菜单 Validate Global Theme（查必需槽位） |
 
 ## 铁律
@@ -37,5 +37,6 @@ description: 制作/修改 UI 皮肤：对话框与选项面板皮肤（VNDialog
 - [ ] WhatAiDo.md 记录（见 [vn-doc-update]）
 
 ## 权威参考
-- WhatAiDo.md 八十二（对话框/选项皮肤）、八十三（系统菜单全局皮肤）、八十（标题菜单）
+- WhatAiDo.md 八十二（对话框/选项皮肤）、八十三（系统菜单全局皮肤）、八十（标题菜单）、
+  八十六（排程面板/结算弹窗皮肤 + 判定冲条）
 - 示例剧本 `Assets/Scenarios/UiSkinDemo.vn.txt`；ProjectCodeGuide.md 七（系统 UI）

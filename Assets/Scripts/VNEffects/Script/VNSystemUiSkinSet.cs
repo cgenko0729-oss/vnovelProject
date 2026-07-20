@@ -26,5 +26,9 @@ namespace VNEffects
 
         [Header("背包（道具 + 装备栏）")]
         public GameObject inventoryPrefab;
+
+        [Header("玩法事件面板（周日程排程 / 结果结算弹窗）")]
+        public GameObject planPrefab;
+        public GameObject resultPopupPrefab;
     }
 }
