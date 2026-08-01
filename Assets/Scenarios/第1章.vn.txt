@@ -23,16 +23,20 @@
 # ---------- 开幕：先黑边 + 转场，建立"电影开场"的仪式感 ----------
 letterbox on time:1.2
 bg 教室 transition:Eyelid
-mood Morning
+bg 教室_黄昏 transition:WhiteFlash
+mood Neutral
 fx godrays on
 fx clouds on
 bgm play 日常 fade:2
 
 : 四月。樱花落尽的第二周，我升上了高二。
 : （新班级、新座位、新的一年——对我来说，也不过是换个地方看小说而已。）
+se se1
+wait 0.3
+se se1
 
 wait 0.4
-se 门
+se se1
 : 教室的门被拉开。
 
 # ---------- 女主登场：最华丽的出场预设 + 急推镜头 ----------
@@ -40,7 +44,7 @@ se 门
 # 于是"镜头猛地推过去"和"人出现"是同时发生的。
 camera snapzoom 1.12 @
 show 星野结衣 at:center expr:默认 with:DissolveGlow
-se 惊
+se se1
 fx speedlines burst
 
 : （……）
@@ -190,3 +194,5 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+

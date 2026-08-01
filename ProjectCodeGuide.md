@@ -191,8 +191,26 @@
   （台词+语音期间在叠加子 Image 上随机开合张嘴图）。
 - **共同设计**：整张透明画布叠加、与主体共享 `VNImageEffectController.Mat`
   材质（溶解/调色同步）、DOTween 随机间隔驱动。
-- **扩展提示**：这套"透明画布叠加层"就是将来做红晕/汗珠/怒气符号
-  `overlay` 命令的现成蓝本（第三十九章第 10 条）。
+- **扩展提示**：这套"透明画布叠加层"就是漫符系统（下条）的蓝本。
+
+### VNCharacterMarks.cs（`Script/`）—— 立绘漫符
+
+- **职责**：`mark` 命令的执行体。在角色 GameObject 下建子 Image 弹出漫画符号
+  （汗滴/井字怒气/感叹号/问号/爱心/音符/红晕/灯泡/省略号/眩晕星/蒸汽）。
+- **符号图**：`VNProceduralTextures.MarkSprite(kind)` 程序化生成
+  （硬边符号走 4×4 超采样 + 形态学膨胀描边；红晕/蒸汽走柔边 alpha 曲线）；
+  角色资产 `markSprites` 里配了同名 Sprite 时优先用自定义图。
+- **定位**：`VNCharacterDef.markAnchor` 归一化偏移（`(0,0)` = 立绘中心），
+  剧本 `pos:x,y` 临时覆盖；尺寸 = 立绘高 × 0.15 × `markScale` × `size:`。
+- **共享材质**：与嘴部叠加层同样共用 `VNImageEffectController.Mat`，
+  所以出场溶解/退场淡出/调色自动带上漫符，不需要单独处理退场。
+- **timing 取舍**：`Show()` 返回的 Sequence **只含弹出段**（约 0.28 秒），
+  停留与消失走独立的 `DOVirtual.DelayedCall` —— 这样既守住"命令默认同步、
+  `@` 异步"的全局语义，又不会让一次性符号把对白卡住一秒半。
+- **状态归属**：`keep` 符号 → `VNSaveData.CharSave.marks`（英文正名逗号串）；
+  一次性符号不是持续状态，存档与调试重建都忽略。
+- **名称解析**：`TryParse` 接受英文正名与中文别名，`CanonicalNames`
+  是编辑器下拉与校验器的单一真相 —— 加新符号只改这一处 + 枚举 + 形状函数。
 
 ### VNDialogueBox.cs + VNTypewriterText.cs（根目录）
 

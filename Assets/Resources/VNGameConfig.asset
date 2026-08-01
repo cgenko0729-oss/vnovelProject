@@ -26,7 +26,7 @@ MonoBehaviour:
   gameTitleEn: 
   gameTitleJa: 
   titleBackground: 
-  titleBgm: 
+  titleBgm: "\u65E5\u5E38"
   dialogueSkins:
   - id: "\u7ECF\u5178"
     prefab: {fileID: 6093085639625304626, guid: f62a4121092f2704ea1e857dd47c889d, type: 3}
@@ -112,7 +112,10 @@ MonoBehaviour:
   - id: "\u5C3E\u58F0"
     clip: {fileID: 8300000, guid: 258c473fd99396e4e83c93022e058781, type: 3}
     volume: 1
-  seLibrary: []
+  seLibrary:
+  - id: se1
+    clip: {fileID: 8300000, guid: 5a5e611553e163c4da7f6b8b945722e4, type: 3}
+    volume: 1
   voiceLibrary: []
   typingTick: {fileID: 0}
   overrideChannelVolumes: 0
@@ -122,13 +125,13 @@ MonoBehaviour:
   mapSprite: {fileID: 0}
   mapLocations: []
   stats:
-  - {fileID: 11400000, guid: d2d646d7b7af9ee4b815e5e96312adbd, type: 2}
+  - {fileID: 11400000, guid: 5be56981d75cd964a85327dc54b803ce, type: 2}
+  - {fileID: 11400000, guid: 3cb1b15eafcfcc44a969004b97330406, type: 2}
   - {fileID: 11400000, guid: 4296374b37a48b243b3195a405d7663c, type: 2}
   - {fileID: 11400000, guid: 86a7d7a9e18db7e42b3639658067f9d7, type: 2}
+  - {fileID: 11400000, guid: d2d646d7b7af9ee4b815e5e96312adbd, type: 2}
   - {fileID: 11400000, guid: b81522d9d21a3ce4f8cf82c3018243d9, type: 2}
   - {fileID: 11400000, guid: b6fcb47257208034db3826f785fd07b5, type: 2}
-  - {fileID: 11400000, guid: 3cb1b15eafcfcc44a969004b97330406, type: 2}
-  - {fileID: 11400000, guid: 5be56981d75cd964a85327dc54b803ce, type: 2}
   - {fileID: 11400000, guid: d15bb2737e32ea04bb5c510b9d6d1e66, type: 2}
   shops:
   - {fileID: 11400000, guid: 33ba0ffc84737484ea03875d4b03575f, type: 2}

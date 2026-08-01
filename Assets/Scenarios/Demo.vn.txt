@@ -5,6 +5,8 @@
 #   show <角色> [at:left|center|right] [expr:表情] [with:出场预设]
 #   hide <角色> [with:dissolve|fade]
 #   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake>
+#   mark <角色> <sweat|anger|exclaim|question|heart|note|blush|bulb|ellipsis|dizzy|steam|clear>
+#        [keep|off] [pos:0.2,0.36] [size:1] [dur:1.1]     立绘漫符，中文别名也行（汗/怒/惊/问/心…）
 #   角色 [表情]: 台词        /  旁白: 台词  /  : 无名牌旁白
 #   wait <秒> | shake <light|medium|heavy> | sakura
 #   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
@@ -47,9 +49,14 @@ quest start 告白大作战       # 接取 → Toast「新任务：告白大作�
 camera pushin 1.05 5 focus:亚里沙 @
 亚里沙: 那个……小雪。
 emote 小雪 Surprise
+mark 小雪 exclaim @              # 漫符：惊！弹一下就消失
 小雪: 怎、怎么了？突然这么严肃。
 
+mark 亚里沙 sweat @              # 冒冷汗（一次性）
+亚里沙: 呃、那个……
+
 fx heartbeat on
+mark 小雪 heart keep             # 常驻爱心，进存档，直到被清掉
 亚里沙: 我一直……有件事想告诉你。
 
 choice
@@ -68,11 +75,14 @@ sakura
 emote 小雪 Surprise
 wait 0.5
 emote 小雪 Shy
+mark 小雪 blush pos:0,0.33 @      # 贴脸的符号要自己给 pos:
 小雪: ……笨蛋。怎么突然、说这种话啦。
 jump 夜晚
 
 label 退缩线
 fx heartbeat off
+mark 小雪 clear                   # 常驻爱心到此为止
+mark 小雪 ellipsis @
 emote 亚里沙 Dejected
 亚里沙: ……没、没什么！忘了吧！
 emote 小雪 HeadShake

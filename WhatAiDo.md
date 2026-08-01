@@ -3951,3 +3951,86 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   结算时先见数字 0→100 冲刺 + 填充条加速，冲满闪白后 GREAT!! 砸落 + 星光爆发；
   冲条阶段点击无效，揭晓后点击/回车/空格正常关闭。
 - 把 VNGameConfig.systemUiSkin 清空再跑：两界面退回程序化默认 UI，冲条演出同样存在。
+
+## 八十七、立绘漫符系统（汗滴 / 井字怒气 / 感叹号 …）（2026-08-02，分支 `agent/manga-marks`）
+
+### 需求 / 背景
+
+视觉美化分析里排在「立绘表现力」一档的低成本高收益项：在立绘上叠一枚漫画符号
+（汗滴、井字怒气、感叹号、问号…），日式 VN 表现力的核心语汇之一。
+
+用户明确划定了范围：**不做立绘分层部件化（Layered Sprite）**，只要「在立绘指定位置
+叠一张额外的符号图」。四个设计点由用户拍板：
+
+1. 符号图 = **程序化生成 + 可选素材覆盖**（延续项目零美术依赖的约定）
+2. 位置 = **角色资产配默认锚点，剧本可临时覆盖**
+3. 调用 = **新命令 `mark`，默认一次性，可 `keep` 常驻**
+4. 符号清单 = 点名的四个 + 情感类 + 状态类，共 **11 种**
+
+### 文件改动清单
+
+**新增**
+
+- `Script/VNCharacterMarks.cs` —— 漫符组件本体。`VNMarkKind` 枚举（11 种）、
+  英文正名 + 中文别名解析表、`Show/ShowInstant/FadeOut/ClearAll/ClearImmediate`、
+  常驻符号序列化（`SerializeKeep`）。
+
+**修改**
+
+- `VNProceduralTextures.cs` —— 新增漫符贴图生成区（约 260 行）：
+  `MarkSprite(kind)` 懒加载缓存 + `HardMark`（4×4 超采样 + 圆核膨胀描边）+
+  `SoftMark`（柔边 alpha）+ 形状基元（圆/胶囊/圆弧）+ 11 个符号的形状函数。
+- `Script/VNCharacterDef.cs` —— 加「漫符」区：`markAnchor`（归一化偏移，默认
+  `(0.2, 0.36)`）、`markScale`、`markSprites`（自定义图覆盖列表 + `MarkOverride` 类）。
+- `Script/VNStage.cs` —— `ActiveCharacter.marks` 字段、`CreateCharacter` 挂组件、
+  `Mark()` API、`CaptureSnapshot` 写常驻符号、`ShowInstant` 重载还原符号。
+- `Script/VNSaveSystem.cs` —— `CharSave.marks`（英文正名逗号串，旧存档为空即无符号）。
+- `Script/VNScriptParser.cs` —— 关键字加 `mark`。
+- `Script/VNScriptRunner.cs` —— `Dispatch` 的 `mark` case、`ParseMarkPos` 解析
+  `pos:x,y`、`RebuildStateBefore` 的 `mark` case、`RebuildMarkState`、
+  `RebuildShowState` 补上常驻符号的沿用。
+- `Editor/VNScenarioSchema.cs` —— `MarkNames` + `mark` 命令参数模式登记。
+- `Editor/VNScenarioEditorWindow.cs` —— 命令中文名「漫符」+ `MarkTranslations`
+  下拉中文对照 + `IsMarkParameter`。
+- `Editor/VNScenarioLinter.cs` —— `bad-mark` / `bad-mark-mode` 两项检查。
+- `HowToUse.md` / `Demo.vn.txt` / `CLAUDE.md` / `ProjectCodeGuide.md` —— 文档同步。
+
+### 技术决策与取舍
+
+1. **沿用「透明画布叠加层」而不是新做一层**：符号是角色 GameObject 的子物体，
+   uGUI 天然画在立绘之上，且跟着立绘一起震动/移动/缩放。与嘴部叠加层一样
+   共用 `VNImageEffectController.Mat`，于是出场溶解、退场淡出、色调匹配
+   全部自动生效 —— 退场路径一行代码都不用写。
+
+2. **同步语义的取舍（本次最需要记住的一点）**：项目铁律是「命令默认同步等待，
+   行尾 `@` 异步」。但一次性漫符全程约 1.6 秒，默认同步就会把对白卡住。
+   解法是让 `Show()` 返回的 Sequence **只包含弹出段（约 0.28 秒）**，
+   停留与消失挂在独立的 `DOVirtual.DelayedCall` 上。这样既没有破坏全局语义
+   （`@` 照常生效），默认写法也不会拖节奏。
+
+3. **描边走形态学膨胀而不是 SDF**：`?` `!` `♪` 这类符号是多段基元拼的，
+   逐段算 SDF 拼不出连续外轮廓；先超采样出覆盖率再用圆核膨胀取最大值，
+   任意形状都能拿到一圈干净描边，代价只是生成时多跑一遍（懒加载，一次性）。
+
+4. **不做 `emote` 自动联动**：用户选的是「新命令」而非「挂在 emote 上」，
+   所以 `emote 小雪 Angry` 不会自动冒怒气符号 —— 保留作者的显式控制。
+   将来若要联动，在 `VNCharacterEmotes` 各动作里调 `marks.Show()` 即可，
+   是加法不是改法。
+
+5. **红晕/蒸汽不做「自动贴脸」**：不同构图的立绘头部位置差异很大，
+   与其做一套猜不准的隐藏偏移，不如让作者显式写 `pos:0,0.33`。
+   规则简单可预测，胜过藏起来的魔法。
+
+6. **只有 `keep` 进存档**：一次性符号播完即逝不是持续状态，
+   存档快照与调试重建（`RebuildMarkState`）都只处理常驻符号。
+   `RebuildShowState` 补了一条：已在场角色重播 `show` 时把常驻符号带过来，
+   与运行时 `VNStage.Show` 不清符号的行为保持一致。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp.csproj` / `Assembly-CSharp-Editor.csproj`
+  均 **0 错误**（103 个警告全为既有的 `FindFirstObjectByType` 过时警告）。
+- Unity 内跑 `Demo.vn.txt`：告白段会依次出现 感叹号 → 汗滴 → 常驻爱心；
+  退缩线里 `mark 小雪 clear` 会把爱心清掉并冒省略号。
+- 存档验证：在常驻爱心亮着时 F5 存档 → 读档，爱心应原样挂回（无弹出动画）。
+- 校验器：把符号名故意写错跑 Ctrl+Shift+L，应报 `bad-mark` 并列出可用名。

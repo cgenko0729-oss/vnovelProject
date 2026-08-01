@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 362741fa3b2b43bb8cfd9c1c9dc64125, type: 3}
+  m_Name: VNSystemUiSkinSet_Default
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNSystemUiSkinSet
+  titleMenuPrefab: {fileID: 768236147733139997, guid: e8afc144f6434b543a64d8f9093cd835, type: 3}
+  configPanelPrefab: {fileID: 1759737530826113292, guid: bd019e73f48fc7442863aafa517eca73, type: 3}
+  cgGalleryPrefab: {fileID: 5288622107587341733, guid: b29eca27d562be246951edde0ed96c66, type: 3}
+  backlogPrefab: {fileID: 645530486983154976, guid: 473892d7ab762de4a8c654d2c0a4cce9, type: 3}
+  saveLoadPrefab: {fileID: 3299658034286809009, guid: 3158550dc6fccf14fa974b45b50cb889, type: 3}
+  quickToolbarPrefab: {fileID: 2253084779006639223, guid: cdf049151c07ab8459597b4154dc95d2, type: 3}
+  statsHudPrefab: {fileID: 1629249116840838727, guid: dfc3701507747a84d80b44099670b3e1, type: 3}
+  statsPanelPrefab: {fileID: 6592234823805104328, guid: 2ed56d7c11dad744c8a97983b6e3e423, type: 3}
+  inventoryPrefab: {fileID: 5340751804961841775, guid: 83918bc8ef6d737468a2537e35b55c71, type: 3}
+  planPrefab: {fileID: 270587631316082367, guid: bc30141921b93bf478711b9643c0c628, type: 3}
+  resultPopupPrefab: {fileID: 161910608157957908, guid: 41ea0a8c5f1ad39489e8bd3002ee4cbe, type: 3}
