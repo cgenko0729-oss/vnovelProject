@@ -25,7 +25,7 @@ namespace VNEffects.EditorTools
         const string StatsDir = "Assets/VNEffects/Stats";
         const string ShopsDir = "Assets/VNEffects/Shops";
         const string PlansDir = "Assets/VNEffects/Plans";
-        const string QuizzesDir = "Assets/VNEffects/Quizzes";
+        internal const string QuizzesDir = "Assets/VNEffects/Quizzes";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -879,8 +879,11 @@ namespace VNEffects.EditorTools
             return def;
         }
 
-        /// <summary>示例题库：社团常识（event quiz id:社团常识），5 题够演示随机抽 3 题</summary>
-        static VNQuizDef EnsureQuizDef()
+        /// <summary>
+        /// 示例题库：社团常识（event quiz id:社团常识），5 题够演示随机抽 3 题。
+        /// 增量安装器 VNQuizInstaller 也调它——不重建场景也能拿到同一份示例。
+        /// </summary>
+        internal static VNQuizDef EnsureQuizDef()
         {
             string path = $"{QuizzesDir}/社团常识.asset";
             var def = AssetDatabase.LoadAssetAtPath<VNQuizDef>(path);
@@ -1280,7 +1283,7 @@ hide 亚里沙 with:dissolve
             if (dirty) importer.SaveAndReimport();
         }
 
-        static void EnsureFolder(string path)
+        internal static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
             string parent = Path.GetDirectoryName(path).Replace('\\', '/');

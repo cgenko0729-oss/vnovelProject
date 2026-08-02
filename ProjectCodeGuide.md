@@ -367,6 +367,11 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   示例剧本 `Assets/Scenarios/QuizDemo.vn.txt`（随机抽题/指定题号/成绩 flag 细分）。
 - **扩展**：想打乱选项顺序，在 `ShowQuestion()` 里洗一次显示索引映射、
   `Answer()` 换算回原始下标即可，是加法不是改法。
+- `Editor/VNQuizInstaller.cs`（Tools → VN Effects → Install Quiz Module To Scene）：
+  **增量装进当前场景**，不走 `Create Script Demo Scene` 的 `NewScene(EmptyScene)` 重造，
+  手工整理过的 Hierarchy 不会丢。模板物体**必须带 RectTransform**
+  （`BuildUi` 直接 `(RectTransform)transform`）——这正是不该手工接的原因。
+  支持 Undo、重复执行安全；新增事件模块时照抄这个文件即可。
 
 ### VNQuestDef.cs / VNQuestLog.cs —— 任务系统
 

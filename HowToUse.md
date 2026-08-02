@@ -767,6 +767,11 @@ if 答题正确数>=3 jump 学霸称号
 题干为空、选项少于 2 个、答案序号越界的题会被自动跳过，不会让事件卡住。
 新建题库资产后跑一次 **Tools → VN Effects → Game Config → Rescan Asset Folders** 登记。
 
+**第一次用要先装模块**：**Tools → VN Effects → Install Quiz Module To Scene**
+——只往当前场景的 VNEventRegistry 里补一个禁用的 QuizTemplate 并登记题库，
+**不重建场景**（`Create Script Demo Scene` 会从零重造，手工整理的层级会丢）。
+装完记得 Ctrl+S 存场景。重复执行安全：已经装过就只刷新题库列表。
+
 ### 商店与物品栏 🛒
 
 ```

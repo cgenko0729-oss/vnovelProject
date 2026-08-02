@@ -4109,3 +4109,23 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   答对涨智力、答错涨压力的飘字 / 结算大字与三档分支 / `pick:3,4` 固定出那两题。
 - 校验器：把 `id:社团常识` 改成不存在的 id 跑 Ctrl+Shift+L，应报 `unknown-quiz`；
   把 `* 全对` 写成 `* 满分`，应报 `bad-event-outcome`。
+
+### 追加：增量安装菜单（同日）
+
+用户指出重建场景会把手工整理好的 Hierarchy 全部打乱——这是 `Create Script Demo Scene`
+内部 `NewScene(EmptyScene)` 的固有代价。为「只想让注册表多一条」的场合补了增量入口：
+
+- 新增 `Editor/VNQuizInstaller.cs` —— **Tools → VN Effects → Install Quiz Module To Scene**。
+  只做三件事：在场景现有的 `VNEventRegistry` 下补一个禁用的 `QuizTemplate`
+  （**带 RectTransform**）→ 确保示例题库存在并把工程里全部 `VNQuizDef` 填进模板 →
+  登记进 `VNGameConfig`。支持 Undo、重复执行安全（已装过只刷新题库列表）、
+  自动 `MarkSceneDirty` 并选中新建物体。
+- `Editor/VNEffectsDemoSetup.cs` —— `QuizzesDir` / `EnsureQuizDef()` / `EnsureFolder()`
+  改 `internal`，示例题库只有一份实现，两条入口共用。
+
+**为什么模板必须带 RectTransform**：`VNQuizModule.BuildUi` 里直接
+`(RectTransform)transform`，手工 Create Empty 得到的是普通 Transform，
+运行时会抛 `InvalidCastException`。这也是「别手工接、用安装器」的主要理由。
+
+将来再加事件模块时，照这个文件复制一份即可（约 100 行）；
+真到了模块很多的那天，再合并成一个列出全部模块的通用安装器。
