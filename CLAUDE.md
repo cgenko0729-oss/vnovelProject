@@ -179,5 +179,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 文本是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`，保存时重新生成文本，注释/空行保留。
 - 支持「▶ 从选中行播放」（默认重建前置状态）调试；入口
   `VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`。
+- 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；
+  文本框编辑中的第一下 Enter 只结束编辑。插命令行仍走列表底部 `+` 下拉。
 - **改编辑器前必读技能 vn-editor-extend**（say 专用字段、行号换算、Bridge 时序等硬规则都在里面）；
   调试能力边界见技能 vn-debug。完整记录见 WhatAiDo.md 三十一/三十二章。

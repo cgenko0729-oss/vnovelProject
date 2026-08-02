@@ -4277,3 +4277,66 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 - 存档验证：聊到一半按 F5 存档 → 读档后应完整重建"到那条消息为止"的所有气泡。
 - Lint 验证：`Ctrl+Shift+L` 应对 `sns` 拼错的子命令、缺 `late:` 的 `timeout:`、
   没有 `sns close` 的会话给出对应提示。
+
+## 九十一、剧本编辑器 Enter 快捷插行（2026-08-02，分支 `agent/editor-insert-hotkey`）
+
+### 需求 / 背景
+
+用户反馈"在两行之间插一条新台词很麻烦，只能靠 Duplicate 复制一行再改"。
+
+排查后确认**功能本来就有**：`ReorderableList` 底部 footer 的 `+` 按钮走
+`onAddDropdownCallback → ShowAddMenu → InsertRow`，插入位置就是 `_list.index + 1`。
+问题出在**入口距离**——`+` 在整个列表的最底部，剧本几百行时要滚到底才够得着，
+点完还要在 GenericMenu 里挑一次类型，一共三步；而 Duplicate 按钮固定在顶栏，
+一步就能"变出一行"，所以用户自然退化成用 Duplicate 当插入用。
+
+结论：不是缺功能，是缺**顺手的入口**。用户拍板只做**键盘快捷键**这一条线
+（顶栏按钮 / 行内悬停 ＋ / 右键菜单三个备选方案都不做），插入内容固定为**空台词行**，
+并且插完**自动把键盘焦点送进新行的台词输入框**。
+
+### 文件改动清单
+
+**修改**：`Editor/VNScenarioEditorWindow.cs`（单文件）
+
+- 新增字段 `_pendingInsertAt` / `_pendingFocusRow` / 常量 `SayFocusControl`。
+- `HandleInsertKeys()`：Edit 页签下 `Enter` = 选区下方插入、`Shift+Enter` = 选区上方插入，
+  无选中则追加到末尾；带 Ctrl/Cmd/Alt 一律不接管（不抢撤销等组合键）。
+- `ApplyPendingInsert()` / `ScrollRowIntoView()`：真正插行 + 只在目标行不可见时才滚动。
+- `OnGUI` 开头 Layout 事件调用 `ApplyPendingInsert()`，`HandleUndoKeys()` 后调 `HandleInsertKeys()`。
+- `DrawRow` → `DrawSayRow(rect, r, index)` 多传行号，用于焦点定位。
+- `RebindList()` 清两个 pending 字段（换文件/撤销重载后不能残留旧行号）。
+- Edit 页 HelpBox 顶部补一行中文快捷键说明。
+
+### 技术决策与取舍
+
+1. **KeyDown 里绝不直接改 `_doc.rows` 长度**：IMGUI 的控件布局在 Layout 事件就定死了，
+   在 KeyDown 事件里增删列表元素会让后续 `DoLayoutList` 的控件数量对不上，
+   典型报错 `Getting control N's position in a group with only M controls`。
+   所以 KeyDown 只把目标行号记进 `_pendingInsertAt` 并 `Repaint()`，
+   到**下一个 Layout 事件开头**再执行插入。撤销快照顺序也因此正确：
+   `_frameSnapshot` 此刻仍是改动前的文本，`MarkStructural()` 压进去的就是旧状态。
+
+2. **在文本框里打字时不抢 Enter**：`EditorGUIUtility.editingTextField` 为真直接返回。
+   实际手感是"打完字 → Enter 结束编辑 → 再 Enter 开新行"，
+   两下 Enter 连击反而成了写连续对白最快的节奏；也彻底避免了误吞输入。
+   （台词文本框是单行 `EditorGUI.TextField`，Enter 不会变成换行符，这一点是前提。）
+
+3. **抢焦点必须等控件画完**：`GUI.SetNextControlName` 在 TextField 之前设名，
+   `EditorGUI.FocusTextInControl` 放在 **Repaint 事件**里、控件已经存在之后调用，
+   否则 IMGUI 找不到这个控件名，焦点会静默失败。
+
+4. **滚动条按需才动**：新行通常就贴着当前选中行，画面本来就在视野内，
+   无条件 `_pendingScrollY`（`FocusRow` 那套）会让每插一行画面都跳一下。
+   改成只在新行超出可视区时才滚，且留 40px 余量。
+
+5. **不动 footer 的 `+` 菜单**：快捷键只管最高频的台词行，
+   插命令行仍走原来的 `+` 下拉，两条路径互不影响，回退风险最小。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**
+  （构建前 csproj 因未刷新缺 `VNSnsView.cs` / `VNSnsMessage.cs`，临时补进去编译后已还原）。
+- Unity 内 Tools → VN Effects → Scenario Editor 打开任意剧本：
+  选中中间某行按 Enter，应在其**下方**出现一条空台词行、光标已在台词框里可直接打字；
+  Shift+Enter 应插在**上方**；连按两次 Enter 可连续开行；Ctrl+Z 应能整条撤销掉。
+- 回归：footer 的 `+`、Duplicate、多选拖动排序、`▶ 从选中行播放` 行为不变。

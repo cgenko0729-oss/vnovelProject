@@ -36,6 +36,12 @@ namespace VNEffects.EditorTools
         Vector2 _scroll;
         float _pendingScrollY = -1f;
 
+        // Enter / Shift+Enter 快捷插入台词行：KeyDown 期间不能改列表长度
+        // （IMGUI 布局已在 Layout 事件里定好），所以只记位置，留到下一个 Layout 再插
+        const string SayFocusControl = "VNScenarioEditor.NewSayRow";
+        int _pendingInsertAt = -1;   // 待插入的行号
+        int _pendingFocusRow = -1;   // 插完后要把键盘焦点送进去的行号
+
         readonly VNScenarioSourceContext _ctx = new VNScenarioSourceContext();
         readonly List<SpritePreviewItem> _backgroundPreviews =
             new List<SpritePreviewItem>();
@@ -194,6 +200,8 @@ namespace VNEffects.EditorTools
         {
             BuildList();
             _customEdit.Clear();
+            _pendingInsertAt = -1;
+            _pendingFocusRow = -1;
         }
 
         /// <summary>当前多选的行号（升序、已过滤越界）；没有多选时退回单选 index</summary>
@@ -476,12 +484,66 @@ namespace VNEffects.EditorTools
             }
         }
 
+        /// <summary>Enter = 在选区下方插一条台词行，Shift+Enter = 插在上方（文本框内不抢键）</summary>
+        void HandleInsertKeys()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown || _tab != Tab.Edit) return;
+            if (e.keyCode != KeyCode.Return && e.keyCode != KeyCode.KeypadEnter) return;
+            if (e.control || e.command || e.alt) return;
+            // 正在文本框里打字：这次 Enter 交给文本框结束编辑，再按一次才插入
+            if (EditorGUIUtility.editingTextField) return;
+
+            var selected = SelectedRowIndices();
+            if (selected.Count == 0)
+                _pendingInsertAt = _doc.rows.Count;
+            else
+                _pendingInsertAt = e.shift
+                    ? selected[0]
+                    : selected[selected.Count - 1] + 1;
+            e.Use();
+            Repaint();
+        }
+
+        /// <summary>在下一个 Layout 事件里真正插行（改列表长度必须避开其它 IMGUI 事件）</summary>
+        void ApplyPendingInsert()
+        {
+            if (_pendingInsertAt < 0) return;
+            int at = Mathf.Clamp(_pendingInsertAt, 0, _doc.rows.Count);
+            _pendingInsertAt = -1;
+
+            MarkStructural();
+            _doc.rows.Insert(at, NewSayRow());
+            _list.ClearSelection();
+            _list.index = at;
+            _list.Select(at, true);
+            _pendingFocusRow = at;
+            ScrollRowIntoView(at);
+            Bump();
+        }
+
+        /// <summary>目标行已经在可视区内就不动滚动条，避免插一行画面就跳一下</summary>
+        void ScrollRowIntoView(int index)
+        {
+            if (index < 0 || index >= _doc.rows.Count) return;
+            float top = 0f;
+            for (int i = 0; i < index; i++) top += RowHeight(_doc.rows[i]);
+            float bottom = top + RowHeight(_doc.rows[index]);
+            float viewH = Mathf.Max(120f, position.height - 130f);
+            if (top < _scroll.y)
+                _pendingScrollY = Mathf.Max(0f, top - 40f);
+            else if (bottom > _scroll.y + viewH)
+                _pendingScrollY = Mathf.Max(0f, bottom - viewH + 40f);
+        }
+
         // ------------------------------------------------------------------
         // GUI
         // ------------------------------------------------------------------
 
         void OnGUI()
         {
+            if (Event.current.type == EventType.Layout) ApplyPendingInsert();
+
             // 帧首快照（撤销用：结构操作要拿"改动前"的文本）
             if (Event.current.type == EventType.Layout && _frameSnapshotVersion != _version)
             {
@@ -490,6 +552,7 @@ namespace VNEffects.EditorTools
             }
 
             HandleUndoKeys();
+            HandleInsertKeys();
             ValidateIfNeeded();
             DrawToolbar();
             if (_showCategoryColors)
@@ -758,6 +821,8 @@ namespace VNEffects.EditorTools
             EditorGUILayout.EndScrollView();
 
             EditorGUILayout.HelpBox(
+                "Enter = 在选中行下方插入台词行（自动聚焦，可直接打字），Shift+Enter = 插在上方；" +
+                "在文本框里打字时第一下 Enter 只是结束编辑，再按一次才插入。\n" +
                 "Shift+click = select range, Ctrl+click = toggle select; " +
                 "drag moves all selected rows, [-] / Duplicate act on the whole selection. " +
                 "Drag handle to reorder. [+] adds after selection. \"@\" = async (do not wait). " +
@@ -846,7 +911,7 @@ namespace VNEffects.EditorTools
             switch (r.kind)
             {
                 case VNRowKind.Raw: DrawRawRow(line0, r); break;
-                case VNRowKind.Say: DrawSayRow(line0, r); break;
+                case VNRowKind.Say: DrawSayRow(line0, r, index); break;
                 case VNRowKind.Command: DrawCommandRow(rect, line0, r); break;
             }
         }
@@ -862,7 +927,7 @@ namespace VNEffects.EditorTools
                 GUI.Label(rect, " (blank line)", EditorStyles.centeredGreyMiniLabel);
         }
 
-        void DrawSayRow(Rect rect, VNRow r)
+        void DrawSayRow(Rect rect, VNRow r, int index)
         {
             float x = rect.x;
             var typeRect = new Rect(x, rect.y, 128f, rect.height);
@@ -882,8 +947,17 @@ namespace VNEffects.EditorTools
             x += 96f;
 
             float asyncW = 26f;
+            bool focusMe = _pendingFocusRow == index;
+            if (focusMe) GUI.SetNextControlName(SayFocusControl);
             r.text = EditorGUI.TextField(
                 new Rect(x, rect.y, rect.xMax - x - asyncW - 2f, rect.height), r.text);
+            // 控件画完后再抢焦点（IMGUI 只认已经存在的控件名）
+            if (focusMe && Event.current.type == EventType.Repaint)
+            {
+                _pendingFocusRow = -1;
+                EditorGUI.FocusTextInControl(SayFocusControl);
+                Repaint();
+            }
             r.isAsync = GUI.Toggle(new Rect(rect.xMax - asyncW, rect.y, asyncW, rect.height),
                 r.isAsync, "@", EditorStyles.miniButton);
         }
