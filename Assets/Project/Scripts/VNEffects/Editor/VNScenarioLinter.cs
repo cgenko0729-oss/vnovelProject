@@ -125,6 +125,7 @@ namespace VNEffects.EditorTools
                 CheckAssets(f, reg, issues);
                 CheckChoices(f, issues);
                 CheckEvents(f, reg, issues);
+                CheckSns(f, reg, issues);
             }
 
             // 跨文件检查（需要全量索引）
@@ -626,6 +627,113 @@ namespace VNEffects.EditorTools
         }
 
         // ==============================================================
+        // 规则：sns 手机聊天
+        // ==============================================================
+
+        static readonly HashSet<string> SnsSubcommands = new HashSet<string>
+        {
+            "open", "close", "voice", "image", "typing", "read", "time", "system", "reply",
+        };
+
+        static void CheckSns(ScriptFile f, Registry reg, List<VNLintIssue> issues)
+        {
+            // 跨 label / 跨文件的会话结构没法静态判定，这里只做"整文件有没有 open"
+            // 和"最后一次 open 之后有没有 close"这两种低误报检查。
+            bool anyOpen = false, anySns = false;
+            int lastOpenLine = 0;
+            bool closedAfterLastOpen = true;
+
+            foreach (var c in f.cmds)
+            {
+                if (c.keyword != "sns") continue;
+                anySns = true;
+                string sub = (c.Arg(0) ?? "").ToLower();
+
+                if (!SnsSubcommands.Contains(sub))
+                {
+                    Add(issues, VNLintSeverity.Error, "bad-sns-sub", f, c.line,
+                        $"sns 子命令「{c.Arg(0)}」不认识",
+                        "可用：" + string.Join(" / ", SnsSubcommands.OrderBy(s => s)) + "。");
+                    continue;
+                }
+
+                switch (sub)
+                {
+                    case "open":
+                        anyOpen = true;
+                        lastOpenLine = c.line;
+                        closedAfterLastOpen = false;
+                        if (string.IsNullOrEmpty(c.Arg(1)))
+                            Add(issues, VNLintSeverity.Error, "sns-open-no-peer", f, c.line,
+                                "sns open 没写对方角色 id",
+                                "用法：sns open <角色id> [id:会话] [title:标题] [me:玩家说话者名]。");
+                        else
+                            CheckCharacter(issues, f, c.line, c.Arg(1), reg);
+                        break;
+
+                    case "close":
+                        closedAfterLastOpen = true;
+                        break;
+
+                    case "voice":
+                        if (string.IsNullOrEmpty(c.Arg(2)))
+                            Add(issues, VNLintSeverity.Error, "sns-voice-no-id", f, c.line,
+                                "sns voice 缺少语音 id",
+                                "用法：sns voice <发送者> <语音id> [text:文字稿]。");
+                        else
+                            CheckId(issues, f, c.line, c.Arg(2), reg.voices, "语音",
+                                "unknown-voice", "在 VNGameConfig 的 Voice Library 里登记。");
+                        break;
+
+                    case "image":
+                        if (string.IsNullOrEmpty(c.Arg(2)))
+                            Add(issues, VNLintSeverity.Error, "sns-image-no-id", f, c.line,
+                                "sns image 缺少 CG id",
+                                "用法：sns image <发送者> <CG id> [unlock:no]。");
+                        else
+                            CheckId(issues, f, c.line, c.Arg(2), reg.cgs, "CG",
+                                "unknown-cg",
+                                "把图放进 Assets/CG（文件名=id）后跑 Rescan Asset Folders。");
+                        break;
+
+                    case "reply":
+                    {
+                        if (c.options == null || c.options.Count == 0)
+                        {
+                            Add(issues, VNLintSeverity.Error, "empty-sns-reply", f, c.line,
+                                "sns reply 下面没有任何 * 回复行",
+                                "下一行起用 `* 文本 [if:条件] [flag:好感+1] [-> 标签]` 列出候选回复。");
+                            break;
+                        }
+                        string timeout = c.Kw("timeout");
+                        if (!string.IsNullOrEmpty(timeout) && string.IsNullOrEmpty(c.Kw("late")))
+                            Add(issues, VNLintSeverity.Warning, "sns-timeout-no-late", f, c.line,
+                                "sns reply 写了 timeout: 但没写 late:",
+                                "超时（已读不回）没有去向，运行时会退回成不限时。" +
+                                "补 late:<标签> 指定超时后跳哪，可再配 lateflag:好感-1。");
+                        if (c.options.All(o => !string.IsNullOrEmpty(o.condition)))
+                            Add(issues, VNLintSeverity.Warning, "all-replies-conditional", f, c.line,
+                                "这组 sns reply 的每条回复都有 if: 条件",
+                                "条件同时不满足时会没有回复可选。留一条无条件的保底回复。");
+                        break;
+                    }
+                }
+            }
+
+            if (anySns && !anyOpen)
+                Add(issues, VNLintSeverity.Error, "sns-not-open", f, 0,
+                    "这个剧本用了 sns 子命令，但整份文件里没有 sns open",
+                    "聊天界面必须先 `sns open <角色id>` 打开；" +
+                    "若会话是在别的文件里打开的，请忽略本条。");
+
+            if (anyOpen && !closedAfterLastOpen)
+                Add(issues, VNLintSeverity.Warning, "sns-not-closed", f, lastOpenLine,
+                    "这次 sns open 之后没有对应的 sns close",
+                    "聊天界面会一直盖在画面上、台词继续走气泡。" +
+                    "聊完记得 `sns close`（若在别的文件里关闭，请忽略本条）。");
+        }
+
+        // ==============================================================
         // 规则：跳转目标（跨文件）
         // ==============================================================
 
@@ -648,6 +756,11 @@ namespace VNEffects.EditorTools
                             int at = LastJumpIndex(c);
                             if (at >= 0 && at + 1 < c.args.Count)
                                 Resolve(issues, byName, f, c.line, c.args[at + 1], "if…jump");
+                            break;
+                        case "sns":
+                            // sns reply 的 late:<标签> 是超时（已读不回）的去向
+                            if (c.Arg(0) == "reply")
+                                Resolve(issues, byName, f, c.line, c.Kw("late"), "sns reply late:");
                             break;
                         case "chapter":
                             string target = (c.Arg(0) ?? "").Replace(".vn.txt", "");

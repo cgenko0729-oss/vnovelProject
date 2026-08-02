@@ -944,6 +944,58 @@ time pass refill:体力    # 回满的属性换成"体力"
 - 养成 Game Loop 的完整套路（月初→行动 choice→月末 time pass→结局判定）
   见 `RaisingDemo.vn.txt` 与 `GeneralQuestionGuide.md` 问题二
 
+### sns — 手机聊天（SNS）📱
+
+模拟手机通讯软件的聊天环节：左侧是对方的消息，右侧是自己的，从上往下堆叠可滚动。
+
+```
+sns open 星野结衣 title:星野结衣 me:我
+sns time 今天 21:34
+
+星野结衣: 在吗？                    # 台词行 = 左侧对方气泡
+sns typing 1.6                      # 「正在输入…」停顿 1.6 秒
+星野结衣: 刚才你是不是把伞落下了
+
+sns image 星野结衣 CG_雨伞 unlock:yes   # 图片气泡（点击看大图）
+我: 啊，真的是我的                  # 「我」= 右侧自己的气泡
+sns read                            # 给最后一条自己的消息标「已读」
+
+sns reply timeout:8 late:没回复 lateflag:好感度-1
+* 好，明天见 flag:好感度+2 -> 答应了
+* 你直接带来给我吧 -> 使唤她
+
+sns close                           # 关掉手机，回到普通对话
+```
+
+**核心概念：SNS 是对话框的另一种呈现方式，不是独立小游戏。**
+`sns open` 之后普通台词行就变成聊天气泡，所以**存档、`if` 分支、`flag`、
+翻译表全部照常可用**——聊天中途随时可以存档（这点是它不做成 `event` 模块的原因）。
+
+| 命令 | 说明 |
+|---|---|
+| `sns open <角色> [id:会话] [title:标题] [me:玩家说话者名]` | 打开界面；对方头像取角色资产 |
+| `sns close` | 关闭并清空本次会话 |
+| `<角色>: 内容` | 左侧对方气泡 |
+| `我: 内容` | 右侧自己气泡（`me` / `我` / `玩家` / `主角` 都算自己） |
+| `: 内容` | 居中系统提示（无名牌旁白） |
+| `sns voice <发送者> <语音id> [text:文字稿]` | 语音气泡，点击播放（对方未听过带红点） |
+| `sns image <发送者> <CG id> [unlock:no]` | 图片气泡，点击看大图；默认解锁进 G 键画廊 |
+| `sns typing [秒]` | 「对方正在输入…」，等待指定秒数 |
+| `sns read` | 最后一条自己的消息标记为已读 |
+| `sns time <自由文本>` | 居中时间分割线（如 `sns time 今天 21:34`） |
+| `sns system <自由文本>` | 居中系统提示（如「对方撤回了一条消息」） |
+| `sns reply [timeout:秒] [late:标签] [lateflag:变量op]` + `*` 行 | 候选回复；选中的文本自动变成右侧气泡 |
+
+- **回复行语法同 choice**：`* 文本 [if:条件] [flag:好感+1] [-> 标签]`，
+  但**不支持 `cost:`**（写了会被忽略并告警）
+- **限时回复**：`timeout:` 必须配 `late:<标签>` 指定「已读不回」的去向，
+  否则运行时退回成不限时（Lint 会提前警告）；倒计时期间禁用全部快捷键与存档
+- **聊天期间的按键**：`H`/滚轮回想、`A`/`S` 自动快进、`J`/`C`/`I`/`G` 各面板、
+  右键隐藏 UI **全部屏蔽**（滚轮留给聊天记录滚动，聊天窗自己就是历史记录）；
+  `F5`/`F9`/`Q`/`L` 存读档照常可用
+- **聊天记录不进 H 键回想**，且 `sns close` 后清空；存档保存的是当前会话的完整消息列表
+- 完整示例见 `Assets/Scenarios/SnsDemo.vn.txt`
+
 ---
 
 ## 七、演出 timing 控制
@@ -1251,6 +1303,10 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `bad-mark-mode` | `mark` 第三个参数不是 `keep` / `off` |
 | | `choice-flag-assign` | 选项里写 `flag:名 值` —— **静默失效**的经典坑 |
 | | `empty-choice` | choice 下面没有选项行 |
+| | `bad-sns-sub` | `sns` 的子命令拼错（会列出可用的） |
+| | `sns-open-no-peer` / `sns-voice-no-id` / `sns-image-no-id` | sns 命令缺必填的角色 / 语音 / CG id |
+| | `empty-sns-reply` | `sns reply` 下面没有 `*` 回复行 |
+| | `sns-not-open` | 整份文件用了 sns 子命令却从没 `sns open`（跨文件打开时可忽略） |
 | **警告** | `empty-library` | 某个库整个是空的但剧本引用了 N 个 id（→ 全部静音/不显示） |
 | | `unknown-bg/cg/bgm/se/voice` | 引用了未登记的素材 id |
 | | `unknown-character` / `unknown-expression` | 角色未定义 / 该角色没有这个表情（**会列出它有哪些**） |
@@ -1258,6 +1314,9 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `bad-event-outcome` | event 结果名不在该模块的返回值里（拼错会**静默**走顺序继续） |
 | | `unknown-event-module` | 模块 id 没注册进 VNEventRegistry |
 | | `unknown-quiz` | `event quiz` 的 `id:` 没有对应的 VNQuizDef 题库资产（整段问答会被静默跳过） |
+| | `sns-not-closed` | 最后一次 `sns open` 之后没有 `sns close`（手机会一直盖在画面上） |
+| | `sns-timeout-no-late` | `sns reply` 写了 `timeout:` 却没写 `late:` → 运行时退回成不限时 |
+| | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
 | | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
 | | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
 | **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
@@ -1360,6 +1419,17 @@ event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
                                                  结果 全对/及格/失败
 quest <start|stage|done|fail> <id> [阶段]        任务
+
+── SNS 手机聊天 ──
+sns open <角色> [id:] [title:] [me:玩家说话者名]  打开聊天界面
+sns close                                        关闭并清空会话
+  打开后：「角色: 内容」左气泡 /「我: 内容」右气泡 /「: 内容」居中提示
+sns voice <发送者> <语音id> [text:文字稿]         语音气泡（点击播放）
+sns image <发送者> <CG id> [unlock:no]            图片气泡（点击看大图）
+sns typing [秒] / sns read                       正在输入… / 已读标记
+sns time <文本> / sns system <文本>               时间分割线 / 系统提示
+sns reply [timeout:秒] [late:标签] [lateflag:op] + * 回复行   候选回复
+  * 回复文本 [if:条件] [flag:好感+1] [-> 标签]     （不支持 cost:）
 stat <名> <+n|-n|值>                             属性（钳制+飘字）
 time set <月> [remain:N] / time pass [months:N] [refill:]   日程
 

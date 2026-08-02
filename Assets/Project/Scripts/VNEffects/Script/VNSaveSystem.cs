@@ -52,6 +52,16 @@ namespace VNEffects
             public string marks;   // 常驻漫符的英文正名，逗号分隔（空 = 无，旧存档兼容）
         }
         public List<CharSave> characters = new List<CharSave>();
+
+        // ---- SNS 手机聊天（旧存档全部缺省 = 未打开）----
+        public bool snsOpen;                   // 存档瞬间聊天界面是否开着
+        public string snsPeerId;               // 对方角色 id
+        public string snsSessionId;            // 会话 id（默认同 peerId）
+        public string snsTitle;                // 顶栏标题
+        public string snsPlayerAlias;          // 剧本里代表玩家的说话者名（sns open 的 me:）
+        // 本次会话已发出的全部消息，顺序即显示顺序。
+        // 存档点必然停在某条消息上，因此这份列表天然就是"截断到存档点"的历史。
+        public List<VNSnsMessage> snsMessages = new List<VNSnsMessage>();
     }
 
     /// <summary>

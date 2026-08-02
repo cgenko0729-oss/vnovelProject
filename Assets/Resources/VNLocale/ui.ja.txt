@@ -188,3 +188,14 @@ battle.logGuarded = （防御で軽減）
 battle.logEscapeFail = 逃げられなかった！
 battle.logEnemyHit = {0} の攻撃！{1} ダメージを受けた
 battle.logEnemyHeavy = {0} の猛攻！{1} ダメージを受けた！
+
+# —— SNS スマホチャット ——
+sns.title = トーク
+sns.online = オンライン
+sns.inputHint = クリックで続ける…
+sns.read = 既読
+sns.voice = ボイスメッセージ
+sns.timer = {0}秒
+sns.noReply = （返信しなかった）
+sns.imageMissing = 画像を読み込めません
+sns.closeImage = クリックで閉じる

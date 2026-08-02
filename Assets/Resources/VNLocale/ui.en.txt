@@ -188,3 +188,14 @@ battle.logGuarded = (guarded)
 battle.logEscapeFail = Couldn't escape!
 battle.logEnemyHit = {0} attacks! You take {1} damage
 battle.logEnemyHeavy = {0}'s fierce blow! You take {1} damage!
+
+# —— SNS phone chat ——
+sns.title = Chat
+sns.online = Online
+sns.inputHint = Click to continue...
+sns.read = Read
+sns.voice = Voice message
+sns.timer = {0}s
+sns.noReply = (You didn't reply)
+sns.imageMissing = Image unavailable
+sns.closeImage = Click anywhere to close

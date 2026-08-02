@@ -373,6 +373,29 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   （`BuildUi` 直接 `(RectTransform)transform`）——这正是不该手工接的原因。
   支持 Undo、重复执行安全；新增事件模块时照抄这个文件即可。
 
+### VNSnsView.cs / VNSnsMessage.cs —— SNS 手机聊天（九十章）
+
+- **不是事件模块**，是对话的另一种呈现层：`sns open` 之后 `SayCo` 分流到 `SnsSayCo`，
+  台词渲染成气泡。因此存档点/`if` 分支/`flag`/翻译表全部沿用普通台词的机制，
+  聊天中途可以随便存档 —— `event` 是原子的，做成模块就存不了。
+- 命令入口 `VNScriptRunner.SnsCo`（open/close/voice/image/typing/read/time/system/reply），
+  `sns reply` 复用 choice 的 `*` 子行（Parser 里第三个使用者）。
+- **左右判定**：`VNSnsView.IsPlayerSender(sender, alias)` —— `me/我/玩家/主角` +
+  `sns open` 的 `me:` 别名算自己（右侧），其余左侧。静态方法是为了让调试重建共用同一规则。
+- **布局全手工**：不用 `VerticalLayoutGroup`/`ContentSizeFitter`（TMP 的
+  `preferredHeight` 同帧不可靠、气泡还要自适应宽度）。
+  `GetPreferredValues(text, MaxBubbleW, 0)` 当场量 → 定气泡尺寸 → `Layout()` 自己排 y。
+  加新气泡类型 = 写一个 `BuildXxxRow` 返回行 RectTransform，其余不用动。
+- **状态进存档**：`VNSaveData.snsOpen/snsPeerId/snsSessionId/snsTitle/snsPlayerAlias/
+  snsMessages`；`VNStage.CaptureSnapshot/RestoreSnapshot/ClearStage` 三处接线。
+  调试重建（`RebuildStateBefore`）把 sns 命令与 SNS 期间的台词折算进同一份 `snsMessages`，
+  读档与调试走同一条重建路径。
+- **消息存显示文本不存原文**：翻译表按"出现序号"匹配 key，脱离命令流无法单句反查。
+- Canvas `sortingOrder = 300`：盖住对话框/事件层，低于存读档面板（600）。
+  气泡上的 Button 让 `IsPointerOverInteractiveUi` 自动挡掉误推进。
+- **扩展方向**（数据结构已留位）：跨章节永久聊天记录（消息带全局 id + sessionId）、
+  群聊（sender 已是任意角色 id）、随时可开的手机（把 Open 挂到按键 + 未读红点）。
+
 ### VNQuestDef.cs / VNQuestLog.cs —— 任务系统
 
 - **状态即 flags**：`任务_<id>` = 0 未接取 / 1..n 进行中 / 100 完成 / -1 失败。

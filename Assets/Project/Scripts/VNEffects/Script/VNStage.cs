@@ -102,6 +102,8 @@ namespace VNEffects
         public VNAudio vnAudio;
         [Header("玩法事件注册表（event 命令）")]
         public VNEventRegistry eventRegistry;
+        [Header("SNS 手机聊天视图（sns 命令；留空自动创建）")]
+        public VNSnsView sns;
 
         [Header("表情切换的交叉溶解时长（0 = 瞬间切换）")]
         public float expressionCrossfade = 0.25f;
@@ -186,6 +188,12 @@ namespace VNEffects
                 vnAudio = FindFirstObjectByType<VNAudio>();
                 if (vnAudio == null) // 旧场景自愈：自动创建
                     vnAudio = new GameObject("VNAudio").AddComponent<VNAudio>();
+            }
+            if (sns == null)
+            {
+                sns = FindFirstObjectByType<VNSnsView>();
+                if (sns == null) // 旧场景自愈：自动创建（UI 到 sns open 时才搭）
+                    sns = new GameObject("VNSnsView").AddComponent<VNSnsView>();
             }
 
             if (characterLayer == null)
@@ -656,6 +664,9 @@ namespace VNEffects
             foreach (var name in _cgPausedFx)
                 if (!data.fxOn.Contains(name)) data.fxOn.Add(name);
 
+            // SNS 会话（未打开时写入 snsOpen=false，字段留空）
+            if (sns != null) sns.CaptureSnapshot(data);
+
             data.characters.Clear();
             foreach (var kv in _active)
             {
@@ -729,12 +740,19 @@ namespace VNEffects
             // CG 最后重放：立绘/天气/fx 已就位，ShowCg 会按 keep 参数再次隐藏/暂停
             if (!string.IsNullOrEmpty(data.cgId))
                 ShowCg(data.cgId, null, data.cgKeepChars, data.cgKeepFx, 0, true);
+
+            // SNS 最后恢复：会话开着就按消息列表重建整屏气泡，否则确保界面收起
+            if (sns != null) sns.RestoreSnapshot(data, this);
         }
 
-        /// <summary>清空舞台：销毁全部在场角色、关闭残留的选项面板</summary>
+        /// <summary>SNS 手机聊天界面是否打开（Runner 据此把台词渲染成气泡）</summary>
+        public bool IsSnsOpen => sns != null && sns.IsOpen;
+
+        /// <summary>清空舞台：销毁全部在场角色、关闭残留的选项面板与 SNS 界面</summary>
         public void ClearStage()
         {
             StopSpeaking();
+            if (sns != null && sns.IsOpen) sns.Close(true); // 读档/停止剧本时不留残留手机
             ResetCgState(); // CG 状态清零（立绘层复显；天气/fx 由随后的恢复流程接管）
             foreach (var kv in _active)
                 if (kv.Value.go != null) Destroy(kv.Value.go);

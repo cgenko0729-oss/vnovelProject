@@ -289,6 +289,28 @@ namespace VNEffects.EditorTools
                 "     battle 小战斗 / quiz 限时问答（id:题库 count:题数 time:秒 pass:及格线）",
                 Pos("id", "id", VNParamSource.EventId));
             ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
+            // ---- SNS 手机聊天 ----
+            Add("sns", "SNS", "sns open <char> [id:会话] [title:标题] [me:玩家说话者名] / sns close\n" +
+                "sns voice <发送者> <语音id> [text:文字稿] / sns image <发送者> <CG id> [unlock:no]\n" +
+                "sns typing [秒] / sns read / sns time <自由文本> / sns system <自由文本>\n" +
+                "sns reply [timeout:秒] [late:标签] [lateflag:好感-1] + '*' 回复行\n" +
+                "打开后普通台词行渲染成聊天气泡（「我: 内容」= 右侧自己）",
+                Pos("op", "", VNParamSource.Options,
+                    new[] { "open", "close", "voice", "image", "typing", "read",
+                            "time", "system", "reply" }, "open"),
+                Pos("a", "对象/文本", VNParamSource.Text),
+                Pos("b", "素材/秒", VNParamSource.Text, weight: 0.7f),
+                Kw("id", "会话id", VNParamSource.Text, weight: 0.6f),
+                Kw("title", "标题", VNParamSource.Text, weight: 0.6f),
+                Kw("me", "玩家名", VNParamSource.Text, weight: 0.6f),
+                Kw("text", "文字稿", VNParamSource.Text, weight: 0.6f),
+                Kw("unlock", "解锁CG", VNParamSource.Options,
+                    new[] { "yes", "no" }, weight: 0.5f),
+                Kw("timeout", "限时", VNParamSource.Number, weight: 0.5f),
+                Kw("late", "超时去向", VNParamSource.Label, weight: 0.7f),
+                Kw("lateflag", "超时flag", VNParamSource.Text, weight: 0.7f));
+            ByKeyword["sns"].blockChoice = true; // 复用「* 行」编辑与行号换算
+
             Add("quest", "Flow", "quest start|stage|done|fail <id> [阶段]\n" +
                 "状态存 flag「任务_<id>」：1..n 进行中 / 100 完成 / -1 失败，J 键看日志",
                 Pos("op", "", VNParamSource.Options,

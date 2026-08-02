@@ -88,7 +88,7 @@ namespace VNEffects.EditorTools
                 { "return", "返回" }, { "params", "参数声明" }, { "flag", "变量" },
                 { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
                 { "chapter", "章节" }, { "quest", "任务" }, { "letterbox", "电影黑边" },
-                { "mark", "漫符" },
+                { "mark", "漫符" }, { "sns", "手机聊天" },
             };
 
         static readonly Dictionary<string, string> CategoryTranslations =
@@ -96,6 +96,7 @@ namespace VNEffects.EditorTools
             {
                 { "Scene", "场景" }, { "Character", "角色" }, { "Camera", "镜头" },
                 { "FX", "特效" }, { "Audio", "音频" }, { "Flow", "流程" },
+                { "SNS", "手机聊天" },
             };
 
         static readonly Dictionary<string, string> TransitionTranslations =

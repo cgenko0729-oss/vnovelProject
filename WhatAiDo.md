@@ -4183,3 +4183,97 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   （绿色竖条），同时顶栏智力的图标弹跳、数字滚动、条推进、上方冒绿色 `+3`。
 - 连答验证：一题同时涨/跌两个属性时，两张卡片应**纵向排队**而不是互相覆盖。
 - 回归：F5 存档的「已保存」、`quest` 任务提示、背包穿脱装备提示都应变成同款卡片。
+
+---
+
+## 九十、SNS 手机聊天环节（sns 命令）（2026-08-02，分支 `agent/sns-talk`）
+
+### 需求 / 背景
+
+要做"我和女主角用手机通讯软件聊天"的环节：左侧女主、右侧自己，从上往下堆叠可滚动，
+女主能发文字 / 语音 / 图片，玩家可以回复。
+
+动手前先做了架构选型分析（三个方案），最终选**方案 C：SNS 是对话的另一种呈现层 +
+少量专用命令**，而不是做成 `event` 事件模块。理由：
+
+- `event` 是**原子**的 —— 事件没结束前 Runner 停在那一条命令上，
+  一段 30 条消息的聊天玩家中途根本存不了档。这是 galgame 最不能忍的。
+- 聊天内容如果放进 ScriptableObject 资产，就得像 `VNQuizDef` 那样自建三语字段，
+  而写在 `.vn.txt` 里能白嫖现成的翻译抽取工具、`if` 分支、`flag`、跨文件跳转。
+
+于是：`sns open` 之后**普通台词行**就渲染成气泡（说话者是"我/me/玩家/主角"= 右侧），
+存档点、分支、翻译全部沿用普通台词的机制，一行都不用改。
+
+### 用户拍板的边界（第一版不做什么）
+
+| 议题 | 决定 |
+|---|---|
+| 聊天历史 | 只保留本次会话（`sns open ~ close`），但数据结构按"永久历史"设计（消息带全局自增 id + sessionId） |
+| Skip / Auto | SNS 模式**不支持**，打开时自动关闭并屏蔽 A/S |
+| 限时回复期间存档 | 禁止（同 event 模块） |
+| 气泡对象池 | 不做（单次会话消息量不大） |
+| 语音时长显示 | 不显示 |
+| 消息进 H 键回想 | 不进（聊天窗自己就是历史记录） |
+| 群聊 / 随时可开的手机 | 第一版不做，剧情驱动起步 |
+
+### 文件改动清单
+
+**新增**
+
+- `Script/VNSnsMessage.cs` —— 一条消息的可序列化数据（id / sessionId / sender /
+  kind(text·voice·image·system·time) / text / assetId / unlock / read / played）。
+- `Script/VNSnsView.cs` —— 手机聊天视图：程序化 UI（手机外框 + 顶栏头像 + 滚动聊天区 +
+  底部输入栏）、气泡渲染（文字 / 语音 / 图片 / 居中提示）、"正在输入…"三点动画、
+  候选回复面板 + 倒计时条、图片大图查看、存档快照存取。
+- `Assets/Scenarios/SnsDemo.vn.txt` —— 演示剧本（文字/语音/图片/typing/read/限时回复/分支）。
+
+**修改**
+
+- `VNScriptParser.cs` —— `sns` 进 Keywords；`sns reply` 复用 choice 的 `*` 子行机制；
+  `sns time` / `sns system` 的自由文本从第 2 个 token 起不当 kwarg（否则 `23:47` 会被吃成键值对）。
+- `VNScriptRunner.cs` —— `SnsCo` / `SnsReplyCo` / `SnsSayCo` 三个协程；
+  `SayCo` 拆成 `NormalSayCo` + SNS 分支；`RebuildStateBefore` 加 sns 与 say 的静默重建
+  （`ReplaySnsCommand` / `ReplaySnsSay`）；Update 里 SNS 打开时屏蔽 H/滚轮/J/C/I/G/右键/A/S，
+  回复倒计时期间整体让位给面板。
+- `VNStage.cs` —— `sns` 字段 + AutoWire 自愈创建 + `IsSnsOpen`；
+  `CaptureSnapshot` / `RestoreSnapshot` / `ClearStage` 三处接上会话状态。
+- `VNSaveSystem.cs` —— `VNSaveData` 加 `snsOpen / snsPeerId / snsSessionId / snsTitle /
+  snsPlayerAlias / snsMessages`（旧存档全部缺省 = 未打开）。
+- `Editor/VNScenarioSchema.cs` + `VNScenarioEditorWindow.cs` —— 登记 sns 命令与新分类「SNS」。
+- `Editor/VNScenarioLinter.cs` —— `CheckSns` 规则组 + `late:` 标签的跳转目标解析。
+- `Editor/VNEffectsDemoSetup.cs` —— Demo 剧本头部语法速查加 SNS 段。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— `sns.*` 十条 UI 字符串。
+
+### 技术决策与取舍
+
+1. **手工测量布局，不用 `VerticalLayoutGroup` + `ContentSizeFitter`**：
+   TMP 的 `preferredHeight` 在同一帧内不可靠，气泡宽度还要"短消息窄、长消息换行封顶"。
+   改用 `GetPreferredValues(text, maxWidth, 0)` 当场量、自己排 y 坐标、自己算 Content 高度 ——
+   代价是所有位置手写，换来的是完全可控、没有布局重建时序问题。
+
+2. **消息存"显示文本"而不是中文原文**：翻译表按"出现序号"匹配 key，
+   脱离命令流无法单句反查。所以存 `VNScriptLocale.TextOf(cmd)` 的结果。
+   副作用：会话中途切语言时已发出的气泡保持原语言，重开会话即为新语言 —— 可接受。
+
+3. **SNS Canvas 的 sortingOrder = 300**：盖住对话框（40）与事件层（60），
+   但低于存读档/回想面板（600）—— 这样聊天中途按 F5，存档面板仍能叠在手机上面。
+
+4. **回复按钮 / 语音气泡 / 图片气泡都挂 `Button`**：
+   Runner 的推进判定用 `IsPointerOverInteractiveUi`（只拦 `Selectable`），
+   所以点这些控件不会误推进剧情，点手机空白处才推进 —— 天然契合现成机制。
+
+5. **`sns reply` 的 `timeout:` 必须配 `late:`**：超时（已读不回）没有去向就没意义，
+   运行时会告警并退回不限时；Lint 提前抓。超时还会自动插一条居中系统提示"（你没有回复）"。
+
+6. **静默重建走"快照"而不是"重放动画"**：`RebuildStateBefore` 把 sns 命令与 SNS 期间的
+   台词都折算成 `snsMessages` 列表写进快照，`RestoreSnapshot` 一次性重建整屏气泡。
+   读档与调试重建走同一条路径，不会出现两套逻辑不一致。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**（新文件临时加进 csproj 编译后已还原）。
+- Unity 内跑 `SnsDemo.vn.txt`：手机应从下方滑入，气泡逐条弹出并自动滚到底；
+  点语音气泡播放（波条跳动、红点消失）、点图片看大图、8 秒不选走"已读不回"分支。
+- 存档验证：聊到一半按 F5 存档 → 读档后应完整重建"到那条消息为止"的所有气泡。
+- Lint 验证：`Ctrl+Shift+L` 应对 `sns` 拼错的子命令、缺 `late:` 的 `timeout:`、
+  没有 `sns close` 的会话给出对应提示。

@@ -132,6 +132,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNCalendarHud | 右下日历 HUD（flag 月份/剩余月数，time 命令驱动；月份 flag 不存在时自动隐藏） |
 | VNCgUnlocks / VNCgGallery | CG 全局解锁存储（独立 JSON，与存档槽分离）/ G 键鉴赏画廊（目录取 cgLibrary，解锁取 VNCgUnlocks，group 相同的合并成一格翻差分） |
 | VNTitleMenu | 开始菜单（同场景覆盖层 Canvas 500）：开始/继续(最新档含快存)/读档/鉴赏/设置/退出，后四者复用现成面板；Runner 启动时接管 playOnStart，ResumeAt 自动收层；标题文字/背景/BGM 配在 VNGameConfig「标题画面」区 |
+| VNSnsView / VNSnsMessage | SNS 手机聊天视图（`sns open` 后台词行渲染成气泡：「我」在右、对方在左）+ 单条消息数据；支持文字/语音/图片/正在输入/已读/限时回复（`sns reply timeout: late:`）；手工测量布局，会话与消息列表进存档，聊天中途可存档 |
 | VNLocale / VNScriptLocale | 本地化（中/英/日）：语言管理+UI 字符串表 / 剧本台词翻译查表（表在 Resources/VNLocale/，抽取工具 Tools→VN Effects→Localization） |
 
 ### 演示场景
@@ -157,6 +158,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 音频 | 三通道库+基准音量；`bgm/se/voice` 支持 `vol:`，公式=基准×vol×通道 | 四十 |
 | 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result/quiz | 四十一~四十四、七十、八十一 |
 | 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
+| SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
 | 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |

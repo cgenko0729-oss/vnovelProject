@@ -1066,6 +1066,16 @@ namespace VNEffects.EditorTools
 #                  结果 全对/及格/失败，成绩写 flag <前缀>正确数 / <前缀>总数）
 # ---- 任务 ----
 #   quest start|stage|done|fail <id> [阶段]   状态存 flag「任务_<id>」，J 键看日志
+# ---- SNS 手机聊天 ----
+#   sns open <角色> [id:会话] [title:标题] [me:玩家说话者名]  打开聊天界面
+#   sns close                                  关闭并清空本次会话
+#   打开后台词行就是气泡：「角色: 内容」左侧对方，「我: 内容」右侧自己，
+#                        「: 内容」居中系统提示
+#   sns voice <发送者> <语音id> [text:文字稿]   语音气泡（点击播放）
+#   sns image <发送者> <CG id> [unlock:no]      图片气泡（点击看大图，默认解锁进画廊）
+#   sns typing [秒] / sns read / sns time <文本> / sns system <文本>
+#   sns reply [timeout:秒] [late:标签] [lateflag:好感-1]   候选回复，下面用 * 列出
+#   * 回复文本 [if:条件] [flag:好感+1] [-> 标签]
 # ============================================
 
 bg bg1

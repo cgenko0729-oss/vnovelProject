@@ -95,6 +95,7 @@ namespace VNEffects
             "event", "quest",
             "letterbox",
             "ui", "hideHUD",
+            "sns",
         };
 
         /// <summary>命令关键字集合（剧本编辑器等工具用，与解析行为保持单一来源）</summary>
@@ -148,8 +149,10 @@ namespace VNEffects
                 else
                     ParseSay(cmd, raw);
 
-                // event 复用 choice 的「* 附属行」机制：结果名 → 跳转标签
-                if (cmd.keyword == "choice" || cmd.keyword == "event")
+                // event / sns reply 复用 choice 的「* 附属行」机制：
+                // event 是结果名 → 跳转标签，sns reply 是玩家候选回复
+                if (cmd.keyword == "choice" || cmd.keyword == "event" ||
+                    (cmd.keyword == "sns" && cmd.Arg(0) == "reply"))
                 {
                     cmd.options = new List<VNChoiceOption>();
                     lastChoice = cmd;
@@ -279,7 +282,13 @@ namespace VNEffects
                 bool camPointArg =
                     t == 1 && (cmd.keyword == "camto" || cmd.keyword == "camcut");
 
-                if (!qualifiedAddress && !camPointArg && colon > 0 && colon < token.Length - 1)
+                // sns time / sns system 后面跟的是自由文本，可能带冒号
+                // （如 sns time 昨天 23:47），从第 2 个 token 起一律当位置参数。
+                bool snsFreeText = cmd.keyword == "sns" && t >= 2 && cmd.args.Count > 0 &&
+                                   (cmd.args[0] == "time" || cmd.args[0] == "system");
+
+                if (!qualifiedAddress && !camPointArg && !snsFreeText &&
+                    colon > 0 && colon < token.Length - 1)
                     cmd.kwargs[token.Substring(0, colon)] = token.Substring(colon + 1);
                 else
                     cmd.args.Add(token);

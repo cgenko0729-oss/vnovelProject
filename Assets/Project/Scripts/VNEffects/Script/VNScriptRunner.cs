@@ -359,6 +359,8 @@ namespace VNEffects
                         if (!string.IsNullOrEmpty(cmd.expression) &&
                             characters.TryGetValue(cmd.speaker, out var speaking))
                             speaking.expr = cmd.expression;
+                        // SNS 打开期间的台词就是一条气泡消息，必须一并重建
+                        if (snapshot.snsOpen) ReplaySnsSay(snapshot, cmd);
                         break;
                     case "bgm":
                         bool bgmStop = cmd.Arg(0, "play") == "stop";
@@ -412,6 +414,12 @@ namespace VNEffects
                     case "camseq":
                         lastCameraCut = null; // 动画路径状态不做推断，回到默认镜头
                         break;
+                    case "sns":
+                        // SNS 会话与消息列表静默重建（只填数据，不播弹出动画）；
+                        // sns reply 的玩家选择无法推断，与 choice 同处理
+                        if (cmd.Arg(0) == "reply") hasBranching = true;
+                        else ReplaySnsCommand(snapshot, cmd);
+                        break;
                     case "choice":
                     case "jump":
                     case "call":
@@ -440,6 +448,95 @@ namespace VNEffects
             if (hasBranching)
                 Debug.LogWarning("[VNScript] 前置状态包含 choice/jump/if/event；调试重建按文件顺序处理，" +
                                  "不会推断之前的玩家选择路径与事件结果");
+        }
+
+        // ------------------------------------------------------------------
+        // SNS 静默重建（调试「从选中行播放」用；读档直接走存档里的消息列表）
+        // ------------------------------------------------------------------
+
+        /// <summary>把 sns 命令按运行时语义写进快照（只填数据，不建 UI 不播动画）</summary>
+        static void ReplaySnsCommand(VNSaveData snapshot, VNScriptCommand cmd)
+        {
+            switch (cmd.Arg(0, "").ToLower())
+            {
+                case "open":
+                    snapshot.snsOpen = true;
+                    snapshot.snsPeerId = cmd.Arg(1);
+                    snapshot.snsSessionId = cmd.Kw("id", cmd.Arg(1));
+                    snapshot.snsTitle = cmd.Kw("title");
+                    snapshot.snsPlayerAlias = cmd.Kw("me");
+                    snapshot.snsMessages.Clear();
+                    break;
+
+                case "close":
+                    snapshot.snsOpen = false;
+                    snapshot.snsMessages.Clear();
+                    break;
+
+                case "voice":
+                    if (!snapshot.snsOpen) break;
+                    AddSnsMessage(snapshot, cmd.Arg(1), VNSnsMessage.KindVoice,
+                        cmd.Kw("text"), cmd.Arg(2), false);
+                    break;
+
+                case "image":
+                    if (!snapshot.snsOpen) break;
+                    AddSnsMessage(snapshot, cmd.Arg(1), VNSnsMessage.KindImage,
+                        null, cmd.Arg(2), cmd.Kw("unlock", "yes") != "no");
+                    break;
+
+                case "time":
+                case "system":
+                    if (!snapshot.snsOpen) break;
+                    AddSnsMessage(snapshot, "",
+                        cmd.Arg(0) == "time" ? VNSnsMessage.KindTime : VNSnsMessage.KindSystem,
+                        JoinArgs(cmd, 1), null, false);
+                    break;
+
+                case "read":
+                    for (int i = snapshot.snsMessages.Count - 1; i >= 0; i--)
+                    {
+                        if (snapshot.snsMessages[i].sender != VNSnsView.PlayerSender) continue;
+                        snapshot.snsMessages[i].read = true;
+                        break;
+                    }
+                    break;
+
+                // typing 是纯演出，不产生消息；reply 的玩家选择在外层按分支处理
+            }
+        }
+
+        /// <summary>SNS 打开期间的台词行 → 一条气泡消息</summary>
+        static void ReplaySnsSay(VNSaveData snapshot, VNScriptCommand cmd)
+        {
+            string text = VNScriptLocale.TextOf(cmd);
+            if (string.IsNullOrEmpty(cmd.speaker))
+                AddSnsMessage(snapshot, "", VNSnsMessage.KindSystem, text, null, false);
+            else
+                AddSnsMessage(snapshot, cmd.speaker, VNSnsMessage.KindText, text, null, false);
+        }
+
+        static void AddSnsMessage(VNSaveData snapshot, string sender, string kind,
+            string text, string assetId, bool unlock)
+        {
+            snapshot.snsMessages.Add(new VNSnsMessage
+            {
+                id = snapshot.snsMessages.Count + 1,
+                sessionId = snapshot.snsSessionId,
+                sender = VNSnsView.IsPlayerSender(sender, snapshot.snsPlayerAlias)
+                    ? VNSnsView.PlayerSender : sender,
+                kind = kind,
+                text = text,
+                assetId = assetId,
+                unlock = unlock,
+            });
+        }
+
+        /// <summary>把第 from 个位置参数起拼回原始自由文本（sns time / sns system 用）</summary>
+        static string JoinArgs(VNScriptCommand cmd, int from)
+        {
+            if (cmd.args.Count <= from) return "";
+            return string.Join(" ", cmd.args.GetRange(from, cmd.args.Count - from));
         }
 
         void RebuildShowState(Dictionary<string, VNSaveData.CharSave> characters,
@@ -1441,6 +1538,10 @@ namespace VNEffects
 
             if (_eventActive) return; // 事件模块进行中：输入全部交给模块
 
+            // SNS 手机聊天：等玩家挑回复时输入全部交给面板（同 event，顺带挡掉存档）
+            bool snsOpen = stage != null && stage.IsSnsOpen;
+            if (snsOpen && stage.sns.IsBlockingInput) return;
+
             // 隐藏 UI 后，第一次操作只恢复界面，不会顺便推进台词。
             if (_uiHidden)
             {
@@ -1525,49 +1626,55 @@ namespace VNEffects
             // （读档/设置/画廊面板叠在标题之上时，它们的关闭键由上面各自的分支处理。）
             if (_titleMenu != null && _titleMenu.IsOpen) return;
 
-            if (kb.hKey.wasPressedThisFrame ||
-                (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
+            // SNS 打开期间屏蔽会打架的快捷键：
+            // 滚轮要留给聊天记录滚动、聊天消息不进回想、隐藏 UI 也没有意义。
+            // 存读档（F5/F9/Q/L）照常可用——气泡停顿处就是合法存档点。
+            if (!snsOpen)
             {
-                _backlog?.Open();
-                return;
-            }
+                if (kb.hKey.wasPressedThisFrame ||
+                    (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
+                {
+                    _backlog?.Open();
+                    return;
+                }
 
-            if (kb.jKey.wasPressedThisFrame)
-            {
-                _questLog?.Open();
-                return;
-            }
+                if (kb.jKey.wasPressedThisFrame)
+                {
+                    _questLog?.Open();
+                    return;
+                }
 
-            if (kb.cKey.wasPressedThisFrame)
-            {
-                _statsHud?.Open();
-                return;
-            }
+                if (kb.cKey.wasPressedThisFrame)
+                {
+                    _statsHud?.Open();
+                    return;
+                }
 
-            if (kb.iKey.wasPressedThisFrame)
-            {
-                _inventory?.Open();
-                return;
-            }
+                if (kb.iKey.wasPressedThisFrame)
+                {
+                    _inventory?.Open();
+                    return;
+                }
 
-            if (kb.gKey.wasPressedThisFrame)
-            {
-                _cgGallery?.Open();
-                return;
-            }
+                if (kb.gKey.wasPressedThisFrame)
+                {
+                    _cgGallery?.Open();
+                    return;
+                }
 
-            if (mouse != null && mouse.rightButton.wasPressedThisFrame)
-            {
-                SetInterfaceHidden(true);
-                return;
+                if (mouse != null && mouse.rightButton.wasPressedThisFrame)
+                {
+                    SetInterfaceHidden(true);
+                    return;
+                }
             }
 
             if (kb.f5Key.wasPressedThisFrame) { RequestSavePanel(); return; }
             if (kb.f9Key.wasPressedThisFrame) { RequestLoadPanel(); return; }
             if (kb.qKey.wasPressedThisFrame) { QuickSave(); return; }
             if (kb.lKey.wasPressedThisFrame) { QuickLoad(); return; }
-            if (kb.aKey.wasPressedThisFrame) { SetAuto(!_auto); return; }
-            if (kb.sKey.wasPressedThisFrame) { SetSkip(!_skip); return; }
+            if (!snsOpen && kb.aKey.wasPressedThisFrame) { SetAuto(!_auto); return; }
+            if (!snsOpen && kb.sKey.wasPressedThisFrame) { SetSkip(!_skip); return; }
 
             if (!_running) return;
 
@@ -1582,7 +1689,8 @@ namespace VNEffects
             // 手动推进会顺手退出快进（惯例）
             if (_skip) SetSkip(false);
 
-            if (stage != null && stage.dialogue != null && stage.dialogue.IsTyping)
+            // SNS 气泡没有打字机（对话框此时是隐藏的），点击一律等于推进
+            if (!snsOpen && stage != null && stage.dialogue != null && stage.dialogue.IsTyping)
                 stage.dialogue.CompleteTyping();
             else
                 _advance = true;
@@ -1729,6 +1837,9 @@ namespace VNEffects
                     // ui dialogue|choice <皮肤id|default>：切换对话框/选项面板皮肤
                     stage.SetUiSkin(cmd.Arg(0), cmd.Arg(1, "default"), cmd.line);
                     return null;
+
+                case "sns":
+                    return SnsCo(cmd);
 
                 case "camera":
                     return CameraCo(cmd);
@@ -1898,6 +2009,14 @@ namespace VNEffects
 
         IEnumerator SayCo(VNScriptCommand cmd)
         {
+            // SNS 模式：台词不进对话框，改成手机聊天气泡（呈现层不同，语义完全一样，
+            // 因此存档点/分支/翻译表全部沿用普通台词的机制）
+            if (stage != null && stage.IsSnsOpen) return SnsSayCo(cmd);
+            return NormalSayCo(cmd);
+        }
+
+        IEnumerator NormalSayCo(VNScriptCommand cmd)
+        {
             bool followVoice = _voicePendingForNextSay;
             _voicePendingForNextSay = false;
             string sayText = VNScriptLocale.TextOf(cmd); // 当前语言的译文（缺译回退中文）
@@ -1928,6 +2047,178 @@ namespace VNEffects
             }
             _waitingAtSay = false;
             _advance = false;
+        }
+
+        /// <summary>
+        /// SNS 模式下的台词：渲染成聊天气泡后等玩家推进。
+        /// 与普通台词的差别只有呈现——没有打字机、不进回想（聊天窗本身就是历史记录）、
+        /// 不吃 Auto/Skip（sns open 时已关闭并屏蔽）。存档点语义完全一致。
+        /// </summary>
+        IEnumerator SnsSayCo(VNScriptCommand cmd)
+        {
+            _voicePendingForNextSay = false; // SNS 里的语音走 sns voice 气泡
+            var view = stage.sns;
+            string sayText = VNScriptLocale.TextOf(cmd);
+            _lastSayText = sayText;
+
+            if (string.IsNullOrEmpty(cmd.speaker))
+                view.AppendNotice(VNSnsMessage.KindSystem, sayText); // 无名牌旁白 = 居中提示
+            else
+                view.AppendText(cmd.speaker, sayText);
+
+            _waitingAtSay = true;
+            _advance = false;
+            while (!_advance) yield return null;
+            _waitingAtSay = false;
+            _advance = false;
+        }
+
+        /// <summary>
+        /// sns 命令：手机聊天界面。
+        ///   sns open &lt;角色id&gt; [id:会话id] [title:标题] [me:玩家说话者名]
+        ///   sns close
+        ///   sns voice &lt;发送者&gt; &lt;语音id&gt; [text:文字稿]
+        ///   sns image &lt;发送者&gt; &lt;CG id&gt; [unlock:yes|no]
+        ///   sns typing [秒]
+        ///   sns read
+        ///   sns time &lt;自由文本&gt; / sns system &lt;自由文本&gt;
+        ///   sns reply [timeout:秒] [late:标签] [lateflag:好感-1] + 「* 候选回复」子行
+        /// </summary>
+        IEnumerator SnsCo(VNScriptCommand cmd)
+        {
+            var view = stage != null ? stage.sns : null;
+            if (view == null)
+            {
+                Debug.LogError($"[VNScript] 第 {cmd.line} 行：VNStage 未连线 sns（VNSnsView）");
+                yield break;
+            }
+
+            string sub = cmd.Arg(0, "").ToLower();
+            if (sub != "open" && !view.IsOpen)
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：sns {sub} 之前没有 sns open，已忽略");
+                yield break;
+            }
+
+            switch (sub)
+            {
+                case "open":
+                {
+                    string peer = cmd.Arg(1);
+                    if (string.IsNullOrEmpty(peer))
+                    {
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：sns open 需要对方角色 id");
+                        yield break;
+                    }
+                    SetSkip(false); // SNS 模式不做快进/自动：节奏本身就是演出
+                    SetAuto(false);
+                    view.Open(stage, peer, cmd.Kw("id"), cmd.Kw("title"), cmd.Kw("me"));
+                    break;
+                }
+
+                case "close":
+                    view.Close();
+                    break;
+
+                case "voice":
+                    if (string.IsNullOrEmpty(cmd.Arg(2)))
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：" +
+                                         "sns voice 用法为「sns voice <发送者> <语音id>」");
+                    else
+                        view.AppendVoice(cmd.Arg(1), cmd.Arg(2), cmd.Kw("text"));
+                    break;
+
+                case "image":
+                    if (string.IsNullOrEmpty(cmd.Arg(2)))
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：" +
+                                         "sns image 用法为「sns image <发送者> <CG id>」");
+                    else
+                        view.AppendImage(cmd.Arg(1), cmd.Arg(2), cmd.Kw("unlock", "yes") != "no");
+                    break;
+
+                case "time":
+                case "system":
+                    view.AppendNotice(sub == "time"
+                        ? VNSnsMessage.KindTime : VNSnsMessage.KindSystem, JoinArgs(cmd, 1));
+                    break;
+
+                case "read":
+                    view.MarkRead();
+                    break;
+
+                case "typing":
+                    yield return view.TypingCo(Mathf.Max(0.1f, cmd.ArgF(1, 1.4f)));
+                    break;
+
+                case "reply":
+                    yield return SnsReplyCo(cmd, view);
+                    break;
+
+                default:
+                    Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：未知的 sns 子命令「{sub}」" +
+                                     "（open/close/voice/image/typing/read/time/system/reply）");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// sns reply：候选回复面板。选项行语法同 choice（支持 if: / flag: / -&gt; 标签），
+        /// 但不支持 cost:。timeout: 需配 late: 指定"已读不回"的去向。
+        /// </summary>
+        IEnumerator SnsReplyCo(VNScriptCommand cmd, VNSnsView view)
+        {
+            if (cmd.options == null || cmd.options.Count == 0)
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：sns reply 下面没有任何「* 回复」行");
+                yield break;
+            }
+
+            SetSkip(false); // 到玩家抉择必停，同 choice
+
+            var visible = new List<int>();
+            for (int i = 0; i < cmd.options.Count; i++)
+            {
+                var candidate = cmd.options[i];
+                if (!string.IsNullOrEmpty(candidate.costOp))
+                    Debug.LogWarning($"[VNScript] 第 {candidate.line} 行：" +
+                                     "sns reply 不支持 cost:，该参数被忽略");
+                if (!string.IsNullOrEmpty(candidate.condition) &&
+                    !VNFlags.Evaluate(candidate.condition, candidate.line)) continue;
+                visible.Add(i);
+            }
+            if (visible.Count == 0)
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：sns reply 所有回复的 if: 条件都不满足，" +
+                                 "为避免卡死改为全部显示");
+                for (int i = 0; i < cmd.options.Count; i++) visible.Add(i);
+            }
+
+            var texts = new List<string>();
+            foreach (int at in visible) texts.Add(VNScriptLocale.TextOf(cmd.options[at]));
+
+            float timeout = cmd.KwF("timeout", 0f);
+            string lateLabel = cmd.Kw("late");
+            if (timeout > 0.01f && string.IsNullOrEmpty(lateLabel))
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：sns reply 的 timeout: 需要配 " +
+                                 "late:<标签> 指定超时（已读不回）的去向，本次按不限时处理");
+                timeout = 0f;
+            }
+
+            int picked = -1;
+            yield return view.ReplyCo(texts, timeout, i => picked = i);
+
+            if (picked < 0) // 超时 = 已读不回
+            {
+                string lateFlag = cmd.Kw("lateflag");
+                if (!string.IsNullOrEmpty(lateFlag)) VNFlags.Apply(lateFlag);
+                if (!string.IsNullOrEmpty(lateLabel)) JumpTo(lateLabel, cmd.line);
+                yield break;
+            }
+
+            var opt = cmd.options[visible[picked]];
+            if (!string.IsNullOrEmpty(opt.flagOp)) VNFlags.Apply(opt.flagOp);
+            if (!string.IsNullOrEmpty(opt.jumpLabel)) JumpTo(opt.jumpLabel, opt.line);
         }
 
         IEnumerator WaitCo(float seconds)

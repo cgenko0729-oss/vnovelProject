@@ -189,3 +189,14 @@ battle.logGuarded = （防御减伤）
 battle.logEscapeFail = 逃跑失败！
 battle.logEnemyHit = {0} 的攻击！受到 {1} 点伤害
 battle.logEnemyHeavy = {0} 的猛攻！受到 {1} 点伤害！
+
+# —— SNS 手机聊天 ——
+sns.title = 聊天
+sns.online = 在线
+sns.inputHint = 点击继续…
+sns.read = 已读
+sns.voice = 语音消息
+sns.timer = {0}s
+sns.noReply = （你没有回复）
+sns.imageMissing = 图片加载失败
+sns.closeImage = 点击任意处关闭
