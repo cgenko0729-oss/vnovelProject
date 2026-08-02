@@ -58,6 +58,7 @@ namespace VNEffects.EditorTools
                 ["plan"] = new HashSet<string> { "confirm", "next", "end" },
                 ["result"] = new HashSet<string> { "fail", "normal", "good", "great" },
                 ["battle"] = new HashSet<string> { "胜利", "失败", "逃跑" },
+                ["quiz"] = new HashSet<string> { "全对", "及格", "失败" },
                 // map 的结果名 = 地点名，取自场景模板，运行时补
             };
 
@@ -87,6 +88,7 @@ namespace VNEffects.EditorTools
                 new Dictionary<string, HashSet<string>>();
             public HashSet<string> eventModules = new HashSet<string>();
             public HashSet<string> mapLocations = new HashSet<string>();
+            public HashSet<string> quizIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
             public bool sceneRegistryFound;   // 场景里有没有 VNEventRegistry
@@ -252,6 +254,14 @@ namespace VNEffects.EditorTools
             if (map != null)
                 foreach (var l in map.locations)
                     if (l != null && !string.IsNullOrEmpty(l.name)) reg.mapLocations.Add(l.name);
+
+            // 题库 id：扫资产而不是读场景模板——新建题库后不必重建场景就能被校验到
+            foreach (var guid in AssetDatabase.FindAssets("t:VNQuizDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNQuizDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def != null && !string.IsNullOrEmpty(def.quizId)) reg.quizIds.Add(def.quizId);
+            }
 
             return reg;
         }
@@ -578,6 +588,19 @@ namespace VNEffects.EditorTools
                         "模块要登记进场景 VNEventRegistry 的 modules 列表。" +
                         $"当前已注册：{string.Join(" / ", reg.eventModules.OrderBy(s => s))}");
                     continue;
+                }
+
+                // quiz 的题库 id 拼错 = 事件直接返回空结果，整段问答被静默跳过
+                if (module == "quiz")
+                {
+                    string quizId = c.Kw("id");
+                    if (!string.IsNullOrEmpty(quizId) && !Dynamic(quizId) &&
+                        reg.quizIds.Count > 0 && !reg.quizIds.Contains(quizId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-quiz", f, c.line,
+                            $"没有 id 为「{quizId}」的题库资产",
+                            "题库是 VN/Quiz Definition 资产（Assets/VNEffects/Quizzes），" +
+                            $"quizId 要和剧本写的一致。当前已有：" +
+                            $"{string.Join(" / ", reg.quizIds.OrderBy(s => s))}");
                 }
 
                 if (c.options == null || c.options.Count == 0) continue;

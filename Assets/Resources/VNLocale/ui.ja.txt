@@ -125,6 +125,17 @@ qte.success = 成功！
 qte.fail = 失敗…
 map.title = どこへ行く？
 
+# —— 制限時間クイズ ——
+quiz.progress = 第 {0} / {1} 問
+quiz.timer = {0}秒
+quiz.correct = 正解！
+quiz.wrong = 不正解…
+quiz.timeout = 時間切れ！
+quiz.score = {0} / {1} 問正解
+quiz.grade.perfect = 全問正解！
+quiz.grade.pass = ぎりぎり合格
+quiz.grade.fail = 不合格…
+
 # —— スケジュール ——
 plan.title = スケジュールを組もう
 plan.confirm = 決定

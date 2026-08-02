@@ -125,6 +125,17 @@ qte.success = Success!
 qte.fail = Failed...
 map.title = Where to?
 
+# -- Timed quiz --
+quiz.progress = Question {0} / {1}
+quiz.timer = {0}s
+quiz.correct = Correct!
+quiz.wrong = Wrong...
+quiz.timeout = Time's up!
+quiz.score = {0} / {1} correct
+quiz.grade.perfect = Perfect score!
+quiz.grade.pass = Just barely passed
+quiz.grade.fail = Failed...
+
 # -- Schedule planner --
 plan.title = Plan Your Schedule
 plan.confirm = Confirm

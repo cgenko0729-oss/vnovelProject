@@ -138,6 +138,8 @@ namespace VNEffects.EditorTools
             if (shopModule != null) Take(shopModule.shops, config.shops, "商店定义", report);
             var planModule = Object.FindFirstObjectByType<VNPlanModule>(FindObjectsInactive.Include);
             if (planModule != null) Take(planModule.plans, config.plans, "日程定义", report);
+            var quizModule = Object.FindFirstObjectByType<VNQuizModule>(FindObjectsInactive.Include);
+            if (quizModule != null) Take(quizModule.quizzes, config.quizzes, "题库定义", report);
 
             Save(config);
             string summary = report.Count > 0 ? string.Join("\n", report) : "（没有发现新的绑定）";
@@ -186,6 +188,8 @@ namespace VNEffects.EditorTools
             report.Add($"日程定义 ×{config.plans.Count}");
             config.quests = FindAll<VNQuestDef>();
             report.Add($"任务定义 ×{config.quests.Count}");
+            config.quizzes = FindAll<VNQuizDef>();
+            report.Add($"题库定义 ×{config.quizzes.Count}");
 
             config.chapters = ScanChapters();
             report.Add($"章节剧本 ×{config.chapters.Count}");

@@ -285,7 +285,8 @@ namespace VNEffects.EditorTools
             ByKeyword["choice"].blockChoice = true;
             Add("event", "Flow", "event <module id> [key:value…] + '*' outcome lines\n" +
                 "运行 VNEventRegistry 登记的玩法模块（地图/战斗/迷你游戏），按结果分支\n" +
-                "内置：qte 连打 / map 地图 / shop 商店 / plan 周日程排程 / result 结算弹窗",
+                "内置：qte 连打 / map 地图 / shop 商店 / plan 周日程排程 / result 结算弹窗\n" +
+                "     battle 小战斗 / quiz 限时问答（id:题库 count:题数 time:秒 pass:及格线）",
                 Pos("id", "id", VNParamSource.EventId));
             ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
             Add("quest", "Flow", "quest start|stage|done|fail <id> [阶段]\n" +

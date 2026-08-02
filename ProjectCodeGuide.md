@@ -347,6 +347,27 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   敌人 = 光晕色块 + 双眼，零素材依赖。1234 键 = 四个按钮。
 - 示例剧本 `Assets/Scenarios/BattleDemo.vn.txt`（固定数值/属性联动/车轮战三连）。
 
+### VNQuizDef.cs / VNQuizModule.cs —— 示例模块④：限时问答（八十八章）
+
+- 剧本 `event quiz id:社团常识 count:3 time:15 pass:2 [pick:3,4] [title:] [flag:]`，
+  结果固定中文 `全对/及格/失败`；成绩写 flag `<前缀>正确数`、`<前缀>总数`
+  （前缀默认取题库 `flagPrefix`，剧本 `flag:` 可覆盖 → 多套题库互不覆盖）。
+- **题目全在资产**：`VNQuizDef.Question`（三语题干 / 2~4 个选项 / `answerIndex`（0 起）/
+  解析 / 单题 `timeLimit` / `rewardOnCorrect` / `penaltyOnWrong`）。
+  `ValidQuestions()` 过滤填一半的题——坏题只是不出，不会让事件卡住。
+- 选题：`pick:` 指定题号（**按资产原始顺序数**，坏题也占号，所见即所得）优先，
+  否则从有效题里随机抽 `count` 题不重复。
+- 计时：`Update` 里 `Time.unscaledDeltaTime`；最后 3 秒的变红/脉动/轻抖在
+  `RefreshTimer()` 里按 `Time.unscaledTime` **现算，不开 Tween**（每帧新建会堆积）。
+  倒计时归零 = 走 `Answer(-1)`，与答错同一条路径（含扣属性）。
+- 属性联动：逐题的 StatOp 复用 `VNShopDef.StatOp`，统一走 `VNStatsHud.Apply`
+  （钳制+飘字），没有 HUD 时退回 `VNFlags.Add`。模块同样不认识任何具体属性名。
+- 输入双通道：选项按钮 + 数字键 1~4（`TryAnswer` 会挡掉本题不存在的序号）。
+- 示例题库由生成器 `EnsureQuizDef()` 造在 `Assets/VNEffects/Quizzes/`；
+  示例剧本 `Assets/Scenarios/QuizDemo.vn.txt`（随机抽题/指定题号/成绩 flag 细分）。
+- **扩展**：想打乱选项顺序，在 `ShowQuestion()` 里洗一次显示索引映射、
+  `Answer()` 换算回原始下标即可，是加法不是改法。
+
 ### VNQuestDef.cs / VNQuestLog.cs —— 任务系统
 
 - **状态即 flags**：`任务_<id>` = 0 未接取 / 1..n 进行中 / 100 完成 / -1 失败。

@@ -119,6 +119,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
 | VNBattleModule | 回合制小战斗（event battle，结果 胜利/失败/逃跑；patkstat/phpstat/pdefstat 从 flag 读属性=养成联动，结束写 flag 战斗剩余HP 供车轮战） |
+| VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新） |
 | VNShopDef / VNShopModule | 商店定义资产 / 商店事件模块（event shop id:xx，买卖走金钱属性 + 道具_&lt;id&gt; flag） |
@@ -152,7 +153,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 分支/变量/子程序 | label/jump/flag/if（含逻辑运算）/choice/call/params/return，跨文件 `文件::标签` | 十七、七十三~七十六 |
 | 存档/回想/Auto/Skip | F5/F9 20 槽 + 快捷功能条 + H 回想 + A/S；仅台词处可存 | 十九、三十五、五十九 |
 | 音频 | 三通道库+基准音量；`bgm/se/voice` 支持 `vol:`，公式=基准×vol×通道 | 四十 |
-| 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result | 四十一~四十四、七十、八十一 |
+| 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result/quiz | 四十一~四十四、七十、八十一 |
+| 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
 | 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |

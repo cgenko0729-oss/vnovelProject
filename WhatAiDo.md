@@ -4034,3 +4034,78 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   退缩线里 `mark 小雪 clear` 会把爱心清掉并冒省略号。
 - 存档验证：在常驻爱心亮着时 F5 存档 → 读档，爱心应原样挂回（无弹出动画）。
 - 校验器：把符号名故意写错跑 Ctrl+Shift+L，应报 `bad-mark` 并列出可用名。
+
+## 八十八、限时问答事件模块（event quiz）（2026-08-02，分支 `agent/quiz-event`）
+
+### 需求 / 背景
+
+用户要「限时问答小游戏：出一道题给三个选项，限时十五秒」。开工前先把会影响架构的
+六个点问清楚，用户逐条拍板：
+
+1. 题目数据 = **题库资产 VNQuizDef**（不是剧本行内联）——题多时好管理、能随机抽题
+2. 一次事件 **支持连答 N 题**（`count:1` 即退化成单题，一套代码覆盖两种需求）
+3. 结果 = **三档结果行 + 同时写成绩 flag**（分支好写，细分也不堵）
+4. 表现 = **先程序化 UI**（暂不做皮肤槽位）+ **倒计时紧张演出**
+5. 超时 = **按答错处理**（不单开「超时」分支）
+6. 属性联动 = **每题单独配奖励**（难题可以给得多，答错也能扣）
+
+### 文件改动清单
+
+**新增**
+
+- `Script/VNQuizDef.cs` —— 题库资产（`VN/Quiz Definition`）。`Question`（三语题干 /
+  2~4 个 `Option` / `answerIndex` / 解析 / 单题 `timeLimit` / `rewardOnCorrect` /
+  `penaltyOnWrong`）+ 题库级 `defaultTimeLimit`、`flagPrefix`、`ValidQuestions()`。
+- `Script/VNQuizModule.cs` —— 事件模块本体。选题 → 出题 → 倒计时 → 判定 → 反馈 →
+  结算的状态机（`Phase` 四态），程序化 UI（暗幕 / 面板 / 倒计时条 / 4 个选项按钮 /
+  反馈区），鼠标点击与数字键 1~4 双通道输入。
+- `Scenarios/QuizDemo.vn.txt` —— 演示剧本：随机抽题三档结果 / `pick` 指定题号 /
+  成绩 flag 细分三段。
+
+**修改**
+
+- `Script/VNGameConfig.cs` —— 玩法区加 `quizzes` 列表。
+- `Editor/VNGameConfigTools.cs` —— 场景导入与目录扫描都带上题库定义。
+- `Editor/VNEffectsDemoSetup.cs` —— `QuizzesDir` 常量、注册表登记 `quiz` 模板、
+  `EnsureQuizDef()` 示例题库「社团常识」（5 题，够演示随机抽 3 题）+ `MakeQuestion()`
+  辅助、Demo 剧本头部语法速查补 quiz。
+- `Editor/VNScenarioSchema.cs` —— `event` 命令说明补 battle / quiz 两个内置模块。
+- `Editor/VNScenarioLinter.cs` —— `BuiltinOutcomes` 加 quiz 三档结果名；
+  新增 `unknown-quiz` 检查（题库 id 拼错 = 事件直接返回、整段问答被静默跳过）。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— quiz.* 共 9 条 UI 字符串。
+- `CLAUDE.md` / `HowToUse.md` / `ProjectCodeGuide.md` —— 文档同步。
+
+### 技术决策与取舍
+
+1. **成绩只走 flag，不进存档字段**：模块内部状态（第几题、剩余秒数）随事件结束即弃，
+   与剧情通信只留 `<前缀>正确数` / `<前缀>总数` 两个 flag。这样存档/读档/调试重建
+   三处一行都不用改（事件期间本来就不可存档）。前缀可被剧本 `flag:` 覆盖，
+   多套题库同场出现时成绩互不覆盖。
+
+2. **紧张演出不开 Tween**：最后 3 秒的变红 / 数字脉动 / 面板轻抖全部在
+   `RefreshTimer()` 里按 `Time.unscaledTime` 现算。每帧新建补间会堆积几百个 Tween，
+   而这类周期性效果本来就只是一个正弦函数。
+
+3. **`pick` 的题号按资产原始顺序数**：不是按「有效题」的顺序。Inspector 里第几条
+   就是第几号，某题填一半也不会让后面的题号错位——所见即所得优先于实现方便。
+
+4. **选项顺序不打乱**：用户没选这项。要加的话是在 `ShowQuestion()` 里洗一次
+   显示索引映射，判定处换算回原始下标即可，属于加法。
+
+5. **奖励复用 `VNShopDef.StatOp`**：项目里「属性 id + 增量」的条目类型已经存在
+   （装备加成 / 道具使用效果都用它），再定义一个同形结构只会让 Inspector 手感不一致。
+   写入统一走 `VNStatsHud.Apply()`（钳制 + 飘字），没有 HUD 时退回 `VNFlags.Add`。
+
+6. **及格线放在剧本行**：`pass:` 是关卡难度而不是题库属性——同一套题在序章
+   可以宽松、在终章可以严格。默认值 = 题数一半向上取整。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**。
+- Unity 内先跑 Tools → VN Effects → Create Script Demo Scene 重建场景
+  （生成 `Assets/VNEffects/Quizzes/社团常识.asset` 并注册 `quiz` 模板），
+  再用 Scenario Editor 打开 `QuizDemo.vn.txt` → ▶ 从选中行播放。
+- 检查点：倒计时最后 3 秒变红脉动 / 答错时正确项高亮绿、误选项标红 /
+  答对涨智力、答错涨压力的飘字 / 结算大字与三档分支 / `pick:3,4` 固定出那两题。
+- 校验器：把 `id:社团常识` 改成不存在的 id 跑 Ctrl+Shift+L，应报 `unknown-quiz`；
+  把 `* 全对` 写成 `* 满分`，应报 `bad-event-outcome`。

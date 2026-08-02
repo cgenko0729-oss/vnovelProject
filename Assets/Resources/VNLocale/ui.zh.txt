@@ -126,6 +126,17 @@ qte.success = 成功！
 qte.fail = 失败…
 map.title = 要去哪里？
 
+# —— 限时问答 ——
+quiz.progress = 第 {0} / {1} 题
+quiz.timer = {0}s
+quiz.correct = 答对了！
+quiz.wrong = 答错了…
+quiz.timeout = 时间到！
+quiz.score = 答对 {0} / {1} 题
+quiz.grade.perfect = 全部答对！
+quiz.grade.pass = 勉强及格
+quiz.grade.fail = 不及格…
+
 # —— 日程排程 ——
 plan.title = 安排日程
 plan.confirm = 确定

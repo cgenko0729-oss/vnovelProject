@@ -25,6 +25,7 @@ namespace VNEffects.EditorTools
         const string StatsDir = "Assets/VNEffects/Stats";
         const string ShopsDir = "Assets/VNEffects/Shops";
         const string PlansDir = "Assets/VNEffects/Plans";
+        const string QuizzesDir = "Assets/VNEffects/Quizzes";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -582,6 +583,16 @@ namespace VNEffects.EditorTools
             battleGo.SetActive(false);
             var battleModule = battleGo.AddComponent<VNBattleModule>();
             registry.modules.Add(new VNEventRegistry.Entry { id = "battle", template = battleModule });
+
+            // 限时问答模块（event quiz id:社团常识 count:3 time:15；结果 全对/及格/失败）
+            EnsureFolder(QuizzesDir);
+            var quizGo = new GameObject("QuizTemplate", typeof(RectTransform));
+            quizGo.transform.SetParent(registry.transform, false);
+            quizGo.SetActive(false);
+            var quizModule = quizGo.AddComponent<VNQuizModule>();
+            EnsureQuizDef();
+            quizModule.quizzes.AddRange(FindAllAssets<VNQuizDef>());
+            registry.modules.Add(new VNEventRegistry.Entry { id = "quiz", template = quizModule });
             stage.eventRegistry = registry;
 
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------
@@ -868,6 +879,95 @@ namespace VNEffects.EditorTools
             return def;
         }
 
+        /// <summary>示例题库：社团常识（event quiz id:社团常识），5 题够演示随机抽 3 题</summary>
+        static VNQuizDef EnsureQuizDef()
+        {
+            string path = $"{QuizzesDir}/社团常识.asset";
+            var def = AssetDatabase.LoadAssetAtPath<VNQuizDef>(path);
+            if (def != null) return def;
+
+            def = ScriptableObject.CreateInstance<VNQuizDef>();
+            def.quizId = "社团常识";
+            def.title = "社团常识小测验";
+            def.titleEn = "Club Trivia Quiz";
+            def.titleJa = "部活常識クイズ";
+            def.defaultTimeLimit = 15f;
+            def.flagPrefix = "答题";
+
+            def.questions.Add(MakeQuestion(
+                "文化祭在每年的几月举办？", "Which month is the school festival held?", "文化祭は毎年何月に行われる？",
+                new[] { "9 月", "10 月", "11 月" },
+                new[] { "September", "October", "November" },
+                new[] { "9月", "10月", "11月" },
+                1, "文化祭固定在 10 月的第二个周末。",
+                "The festival is always the second weekend of October.",
+                "文化祭は毎年10月の第2週末に開催される。"));
+
+            def.questions.Add(MakeQuestion(
+                "社团活动室在哪一栋楼？", "Which building is the clubroom in?", "部室はどの棟にある？",
+                new[] { "旧校舍", "新校舍", "体育馆" },
+                new[] { "Old Building", "New Building", "Gymnasium" },
+                new[] { "旧校舎", "新校舎", "体育館" },
+                0, "旧校舍三楼最里面那间就是社团活动室。",
+                "Third floor of the old building, at the very end of the hall.",
+                "旧校舎3階、廊下の一番奥が部室。"));
+
+            def.questions.Add(MakeQuestion(
+                "社团成立时最少需要几名成员？", "How many members are needed to found a club?",
+                "部を設立するには最低何人必要？",
+                new[] { "3 人", "5 人", "7 人" },
+                new[] { "3", "5", "7" },
+                new[] { "3人", "5人", "7人" },
+                1, "校规规定满 5 人才能正式登记成社团。",
+                "School rules require five members for official registration.",
+                "校則では5人揃って初めて正式な部として登録できる。"));
+
+            def.questions.Add(MakeQuestion(
+                "社团预算申请的截止日是？", "When is the club budget request due?", "部費申請の締切は？",
+                new[] { "学期第一周", "学期第三周", "学期最后一周" },
+                new[] { "First week of term", "Third week of term", "Last week of term" },
+                new[] { "学期の第1週", "学期の第3週", "学期の最終週" },
+                0, "错过第一周就只能等下学期了。",
+                "Miss the first week and you wait a whole term.",
+                "第1週を逃すと来学期まで待つことになる。"));
+
+            def.questions.Add(MakeQuestion(
+                "社团顾问老师教的是哪一科？", "What subject does the club advisor teach?",
+                "顧問の先生の担当科目は？",
+                new[] { "国语", "物理", "美术" },
+                new[] { "Literature", "Physics", "Art" },
+                new[] { "国語", "物理", "美術" },
+                2, "顾问是美术科的老师，所以社团海报总是特别讲究。",
+                "The advisor teaches art — that's why the club posters look so good.",
+                "顧問は美術の先生。だから部のポスターはいつも凝っている。"));
+
+            AssetDatabase.CreateAsset(def, path);
+            return def;
+        }
+
+        /// <summary>示例题构造：三语题干/选项 + 答对涨智力、答错涨压力</summary>
+        static VNQuizDef.Question MakeQuestion(string text, string textEn, string textJa,
+            string[] options, string[] optionsEn, string[] optionsJa,
+            int answerIndex, string explain, string explainEn, string explainJa)
+        {
+            var q = new VNQuizDef.Question
+            {
+                text = text, textEn = textEn, textJa = textJa,
+                answerIndex = answerIndex,
+                explain = explain, explainEn = explainEn, explainJa = explainJa,
+            };
+            for (int i = 0; i < options.Length; i++)
+                q.options.Add(new VNQuizDef.Option
+                {
+                    text = options[i],
+                    textEn = i < optionsEn.Length ? optionsEn[i] : null,
+                    textJa = i < optionsJa.Length ? optionsJa[i] : null,
+                });
+            q.rewardOnCorrect.Add(new VNShopDef.StatOp { statId = "智力", amount = 3 });
+            q.penaltyOnWrong.Add(new VNShopDef.StatOp { statId = "压力", amount = 4 });
+            return q;
+        }
+
         static VNQuestDef EnsureQuestDef()
         {
             string path = $"{QuestsDir}/告白大作战.asset";
@@ -959,6 +1059,8 @@ namespace VNEffects.EditorTools
 #                                     整数结果会同时写入 flag「事件结果」
 #   示例模块：qte（连打条 time:/target:/title:）
 #            map（地图选地点 title:/bg:，地点选中自动 flag 去过_<地点>+1）
+#            quiz（限时问答 id:题库 count:题数 time:秒 pass:及格线 pick:题号；
+#                  结果 全对/及格/失败，成绩写 flag <前缀>正确数 / <前缀>总数）
 # ---- 任务 ----
 #   quest start|stage|done|fail <id> [阶段]   状态存 flag「任务_<id>」，J 键看日志
 # ============================================

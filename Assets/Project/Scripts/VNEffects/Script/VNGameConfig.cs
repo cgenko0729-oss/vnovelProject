@@ -177,11 +177,12 @@ namespace VNEffects
         [Header("地图地点（名字 = 剧本结果名；坐标 0~1；条件为 VNFlags 表达式）")]
         public List<VNMapModule.Location> mapLocations = new List<VNMapModule.Location>();
 
-        [Header("属性 / 商店 / 日程 / 任务定义\n留空 = 生成器扫对应目录自动登记")]
+        [Header("属性 / 商店 / 日程 / 任务 / 题库定义\n留空 = 生成器扫对应目录自动登记")]
         public List<VNStatDef> stats = new List<VNStatDef>();
         public List<VNShopDef> shops = new List<VNShopDef>();
         public List<VNPlanDef> plans = new List<VNPlanDef>();
         public List<VNQuestDef> quests = new List<VNQuestDef>();
+        public List<VNQuizDef> quizzes = new List<VNQuizDef>();
 
         // ==============================================================
         // 应用辅助

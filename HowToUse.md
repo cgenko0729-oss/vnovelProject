@@ -715,9 +715,57 @@ event qte time:3 target:12 title:鼓起勇气连打！
 | `shop` | `event shop id:服装店` | 商店购物（见下） |
 | `plan` | `event plan slots:7 pool:打工,学习` | 周日程排程面板（见下） |
 | `result` | `event result grade:great title:剑术训练` | GOOD!/COMPLETE! 结算大弹窗（见下） |
+| `battle` | `event battle enemy:史莱姆 ehp:22` | 回合制小战斗，结果 `胜利` / `失败` / `逃跑` |
+| `quiz` | `event quiz id:社团常识 count:3 time:15` | 限时问答（见下） |
 
 新玩法（战斗/钓鱼/番长镇日程……）就是照 VNQteModule 的样子再写一个模块类，
 接口/铁律见 `ProjectCodeGuide.md`。
+
+### 限时问答：quiz ❓
+
+```
+event quiz id:社团常识 count:3 time:15 pass:2
+* 全对 -> 满分
+* 及格 -> 及格
+* 失败 -> 不及格
+```
+
+一题一屏、限时选择，可连答多题，最后按正确率给三档结果。玩家点选项或按 **1~4** 作答；
+**倒计时归零 = 答错**（最后 3 秒条与数字变红脉动、面板轻抖）。
+
+| 参数 | 说明 |
+|---|---|
+| `id:` | 题库资产 id（只登记了一套时可省略） |
+| `count:` | 出几题，从题库**随机抽取**不重复（默认全部） |
+| `pick:` | 指定题号，1 开始逗号分隔，如 `pick:3,4`（写了则忽略 `count` 与随机） |
+| `time:` | 每题限时秒（默认取题库的默认限时；单题填了 timeLimit 则以单题为准） |
+| `pass:` | 及格线 = 至少答对几题（默认题数的一半，向上取整） |
+| `title:` | 面板标题覆盖 |
+| `flag:` | 成绩 flag 前缀覆盖（默认取题库的 flagPrefix） |
+
+**结果**：`全对`（全部答对）/ `及格`（答对数 ≥ pass）/ `失败`。
+同时写入两个 flag —— `<前缀>正确数`、`<前缀>总数`（默认前缀 `答题`），
+剧本可以再用 if 细分：
+
+```
+if 答题正确数>=3 jump 学霸称号
+```
+
+**题目配置在 VNQuizDef 资产**（`Assets/VNEffects/Quizzes/`，右键
+**Create → VN → Quiz Definition**）：
+
+| 字段 | 含义 |
+|---|---|
+| 题库 quizId | 剧本 `id:` 引用的 id（可中文，永远不翻译） |
+| 每题默认限时 | 剧本 `time:` 可覆盖 |
+| 成绩 flag 前缀 | 默认 `答题`；多套题库同场时改掉即可互不覆盖 |
+| 题干 / 选项 | 2~4 个选项（超过 4 个只显示前 4 个），三语字段留空自动回退中文 |
+| 正确答案序号 | **0 = 第一个选项** |
+| 解析 | 答完后显示（留空 = 不显示，反馈停留也更短） |
+| 答对奖励 / 答错惩罚 | 属性 id + 增量，逐题单独配（走 VNStatDef 钳制 + 飘字），超时按答错算 |
+
+题干为空、选项少于 2 个、答案序号越界的题会被自动跳过，不会让事件卡住。
+新建题库资产后跑一次 **Tools → VN Effects → Game Config → Rescan Asset Folders** 登记。
 
 ### 商店与物品栏 🛒
 
@@ -1204,6 +1252,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `all-options-conditional` | 一组 choice 的选项**全部**带 `if:` → 可能一个都不显示、流程卡死 |
 | | `bad-event-outcome` | event 结果名不在该模块的返回值里（拼错会**静默**走顺序继续） |
 | | `unknown-event-module` | 模块 id 没注册进 VNEventRegistry |
+| | `unknown-quiz` | `event quiz` 的 `id:` 没有对应的 VNQuizDef 题库资产（整段问答会被静默跳过） |
 | | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
 | | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
 | **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
@@ -1249,6 +1298,8 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | `日程方案里没有行动「xx」` | `pool:` 里的 id 与 VNPlanDef 的行动 id 对不上（id 不翻译，注意别写显示名） |
 | `event plan op:next` 立刻返回 end | `日程数` flag 为 0——先跑过排程面板（或手动 `flag 日程数 7`） |
 | 执行循环卡住不动 | 行动分支末尾忘了 `jump 执行日程` |
+| `event quiz` 一闪而过、直接往下走 | 题库 id 拼错（Lint 会报 `unknown-quiz`），或题库里没有一道填全的题（题干空 / 选项少于 2 个 / 答案序号越界） |
+| 问答里点了正确选项却判错 | 「正确答案序号」是 **0 起**：第一个选项填 0，不是 1 |
 | 改了剧本没生效 | Unity 需要焦点回到编辑器让它重新导入 .txt；然后重新 Play |
 | 新加的字段/功能报"未连线" | VNStage 会自动补线；仍报错就重新 Tools → Create Script Demo Scene（内容绑定在 VNGameConfig 里，重建不会丢） |
 | 切语言后台词没翻译 | 跑过 Extract 了吗？表里该句填了吗？跑 Validate 查缺译 |
@@ -1301,6 +1352,8 @@ choice + * 文本 [if:条件] [cost:花费] [flag:op] [-> 标签]   选项
 event <模块> [key:value…] + * 结果 [flag:op] [-> 标签]      小游戏事件
 event plan slots:7 pool:… / event plan op:next   周日程排程 / 逐格派发
 event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
+event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
+                                                 结果 全对/及格/失败
 quest <start|stage|done|fail> <id> [阶段]        任务
 stat <名> <+n|-n|值>                             属性（钳制+飘字）
 time set <月> [remain:N] / time pass [months:N] [refill:]   日程
