@@ -138,7 +138,9 @@ namespace VNEffects.EditorTools
                 if (Keywords.Contains(first))
                 {
                     ParseCommand(row, body);
-                    lastChoice = row.keyword == "choice" || row.keyword == "event"
+                    // sns reply 与 choice / event 一样带「* 子行」
+                    lastChoice = row.keyword == "choice" || row.keyword == "event" ||
+                                 (row.keyword == "sns" && row.Get("op") == "reply")
                         ? row : null;
                     lastCamseq = row.keyword == "camseq" ? row : null;
                 }
@@ -167,7 +169,8 @@ namespace VNEffects.EditorTools
             row.keyword = tokens[0];
             var def = VNScenarioSchema.Find(row.keyword);
 
-            if (row.keyword == "choice" || row.keyword == "event")
+            if (row.keyword == "choice" || row.keyword == "event" ||
+                (row.keyword == "sns" && tokens.Length > 1 && tokens[1] == "reply"))
                 row.options = new List<VNChoiceOptionRow>();
             if (row.keyword == "camseq") row.camLines = new List<string>();
 
@@ -207,6 +210,16 @@ namespace VNEffects.EditorTools
             {
                 if (tokens.Length > 1)
                     row.Set("declaration", string.Join(" ", tokens, 1, tokens.Length - 1));
+                return;
+            }
+            // sns time / sns system 的尾部是自由文本，可能含空格与冒号
+            // （如 `sns time 今天 21:34`）——整段收进一个参数，别被拆成 kwarg。
+            if (row.keyword == "sns" && tokens.Length > 1 &&
+                (tokens[1] == "time" || tokens[1] == "system"))
+            {
+                row.Set("op", tokens[1]);
+                if (tokens.Length > 2)
+                    row.Set("a", string.Join(" ", tokens, 2, tokens.Length - 2));
                 return;
             }
 
@@ -479,6 +492,10 @@ namespace VNEffects.EditorTools
                     Err(i, $"{what} target label \"{label}\" does not exist in \"{file}\"");
             }
 
+            // SNS 会话里的「我: …」是玩家侧气泡的正常写法，不该报"未注册角色"
+            bool snsOpen = false;
+            string snsPlayerAlias = null;
+
             for (int i = 0; i < rows.Count; i++)
             {
                 var r = rows[i];
@@ -487,7 +504,7 @@ namespace VNEffects.EditorTools
                 {
                     // 孤儿选项行 / 路径点行（前面没有对应块命令）
                     if (r.raw.StartsWith("*"))
-                        Err(i, "option line has no preceding \"choice\" command");
+                        Err(i, "option line has no preceding \"choice\" / \"sns reply\" command");
                     else if (r.raw.StartsWith(">"))
                         Err(i, "waypoint line has no preceding \"camseq\" command");
                     continue;
@@ -499,7 +516,8 @@ namespace VNEffects.EditorTools
                     if (string.IsNullOrEmpty(r.speaker) && LooksLikeTypoKeyword(r.text, out var kw))
                         Warn(i, $"looks like a mistyped command (did you mean \"{kw}\"?)");
                     if (!string.IsNullOrEmpty(r.speaker) && ctx.HasCharacters &&
-                        System.Array.IndexOf(ctx.characterIds, r.speaker) < 0)
+                        System.Array.IndexOf(ctx.characterIds, r.speaker) < 0 &&
+                        !(snsOpen && VNSnsView.IsPlayerSender(r.speaker, snsPlayerAlias)))
                         Warn(i, $"speaker \"{r.speaker}\" is not a registered character " +
                                 "(name will show as-is / narration)");
                     if (!string.IsNullOrEmpty(r.expression) &&
@@ -509,6 +527,21 @@ namespace VNEffects.EditorTools
                 }
 
                 // ---- Command ----
+                if (r.keyword == "sns")
+                {
+                    string snsOp = r.Get("op");
+                    if (snsOp == "open")
+                    {
+                        snsOpen = true;
+                        snsPlayerAlias = r.Get("me");
+                    }
+                    else if (snsOp == "close")
+                    {
+                        snsOpen = false;
+                        snsPlayerAlias = null;
+                    }
+                }
+
                 var def = VNScenarioSchema.Find(r.keyword);
                 if (def == null)
                 {
