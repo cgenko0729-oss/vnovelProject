@@ -31,6 +31,8 @@ namespace VNEffects
         // ---- 尺寸常量（1920×1080 画布下的手机外观）----
         const float PhoneW = 780f, PhoneH = 960f;
         const float HeaderH = 112f, FooterH = 104f;
+        const float ChatSidePad = 6f;      // 聊天区左右留边
+        const float ReplyPanelGap = 8f;    // 回复面板顶边与聊天区之间的呼吸
         const float PadX = 26f, RowGap = 18f, EdgePad = 22f;
         const float AvatarSize = 72f, AvatarGap = 16f;
         const float BubblePadX = 26f, BubblePadY = 18f;
@@ -61,11 +63,12 @@ namespace VNEffects
         VNCharacterDef _peer;
 
         // ---- UI ----
-        RectTransform _root, _phone, _content, _viewport, _replyPanel, _imageViewer;
+        RectTransform _root, _phone, _chat, _content, _viewport, _replyPanel, _imageViewer;
         TextMeshProUGUI _titleText, _statusText, _inputHint, _timerText;
         Image _avatarImage, _timerFill;
         RectTransform _typingRow;
-        Tween _scrollTween;
+        Tween _scrollTween, _chatBottomTween;
+        float _chatBottom = FooterH; // 聊天区底边距手机底部的距离（回复面板弹出时抬高）
 
         // ---- 回复交互 ----
         int _replyPick = -2;      // -2 = 未选，-1 = 超时，>=0 = 选项索引
@@ -120,6 +123,8 @@ namespace VNEffects
 
             Build();
             ClearRows();
+            ClearReplyPanel();
+            SetChatBottom(FooterH, false); // 上一次会话可能停在回复面板上，高度先归位
             _messages.Clear();
 
             _titleText.text = _title;
@@ -159,6 +164,9 @@ namespace VNEffects
             _replyPick = -2;
             HideTyping();
             CloseImageViewer();
+            // 在等玩家回复时被读档/停止剧本打断：面板必须销毁，否则下次开手机它还在
+            ClearReplyPanel();
+            SetChatBottom(FooterH, false);
 
             if (_stage != null && _stage.dialogue != null)
                 _stage.dialogue.SetInterfaceVisible(true);
@@ -453,6 +461,9 @@ namespace VNEffects
             _replyPanel.localScale = new Vector3(1f, 0.9f, 1f);
             _replyPanel.DOScaleY(1f, 0.2f).SetEase(Ease.OutBack).SetLink(gameObject);
             if (_inputHint != null) _inputHint.gameObject.SetActive(false);
+
+            // 聊天区让位给面板，最后一条消息才不会被压住
+            SetChatBottom(PadX * 0.5f + panelH + ReplyPanelGap, true);
         }
 
         void RefreshTimer(float left, float total)
@@ -479,6 +490,7 @@ namespace VNEffects
             _timerFill = null;
             _timerText = null;
             if (_inputHint != null) _inputHint.gameObject.SetActive(true);
+            SetChatBottom(FooterH, true); // 聊天区滑回原高度
         }
 
         // ------------------------------------------------------------------
@@ -815,7 +827,37 @@ namespace VNEffects
         float ViewportHeight =>
             _viewport != null && _viewport.rect.height > 1f
                 ? _viewport.rect.height
-                : PhoneH - HeaderH - 8f - FooterH;
+                : PhoneH - HeaderH - 8f - _chatBottom;
+
+        /// <summary>
+        /// 把聊天可视区的底边抬到 bottom（距手机底部的距离）。
+        /// 回复面板是浮在手机上的，聊天区本身不知道它存在——不顶上去的话
+        /// 最后一条消息会被压在面板下面。同真机弹出键盘时聊天列表被顶起的行为。
+        /// </summary>
+        void SetChatBottom(float bottom, bool animate)
+        {
+            if (_chat == null) return;
+            _chatBottomTween?.Kill();
+
+            if (!animate || Mathf.Abs(_chat.offsetMin.y - bottom) < 0.5f)
+            {
+                ApplyChatBottom(bottom);
+                return;
+            }
+            _chatBottomTween = DOTween.To(() => _chat.offsetMin.y, ApplyChatBottom, bottom, 0.22f)
+                                      .SetEase(Ease.OutCubic).SetLink(gameObject);
+        }
+
+        /// <summary>补间每帧回调：改高度 → 重排 → 直接贴底（贴底不能再开补间，会打架）</summary>
+        void ApplyChatBottom(float bottom)
+        {
+            _chatBottom = bottom;
+            _chat.offsetMin = new Vector2(ChatSidePad, bottom);
+            Layout();
+            _scrollTween?.Kill();
+            _content.anchoredPosition =
+                new Vector2(0f, Mathf.Max(0f, _content.sizeDelta.y - ViewportHeight));
+        }
 
         void Layout()
         {
@@ -967,9 +1009,10 @@ namespace VNEffects
             var chat = CreateImage("Chat", _phone, null, ChatColor);
             chat.anchorMin = new Vector2(0f, 0f);
             chat.anchorMax = new Vector2(1f, 1f);
-            chat.offsetMin = new Vector2(6f, FooterH);
-            chat.offsetMax = new Vector2(-6f, -HeaderH - 8f);
+            chat.offsetMin = new Vector2(ChatSidePad, FooterH);
+            chat.offsetMax = new Vector2(-ChatSidePad, -HeaderH - 8f);
 
+            _chat = chat;
             _viewport = CreateImage("Viewport", chat, null, new Color(0f, 0f, 0f, 0f));
             Stretch(_viewport);
             _viewport.gameObject.AddComponent<RectMask2D>();
