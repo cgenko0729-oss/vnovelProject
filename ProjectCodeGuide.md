@@ -450,9 +450,18 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
   + 悬浮/呼吸循环动作。几乎所有角色/背景效果最终都落到它的 `Mat` 上。
   **扩展特效参数时**：shader（VNImageEffect.shader）加参数 → 这里加包装
   属性/Tween 方法。
-- **VNEntranceAnimator**：出场预设×6（溶解辉光/滑入/弹出/扫光/爆闪/残影冲入）
-  + 退场×2 + `StartIdleEffects`（出场完自动开呼吸/悬浮）。组合
-  ImageEffectController + CanvasGroup + RectTransform。
+- **VNEntranceAnimator**：出场预设×10 + 退场×4 + `StartIdleEffects`
+  （出场完自动开呼吸/悬浮）。组合 ImageEffectController + CanvasGroup + RectTransform。
+  - 日常向 `Crossfade`(默认)/`SlideIn`/`StepIn`/`WalkIn` —— 无粒子无光环，
+    `IsCasual()` 判定，登场后**不开周期扫光**（差别进存档，见 `CharSave.casualEntrance`）。
+  - 华丽向 `DissolveGlow`/`FadeSlideUp`/`ScaleBounce`/`ShineReveal`/`FlashBloom`/
+    `AfterimageDash`；退场 `Fade`(默认)/`Dissolve`/`RunOut`/`Sink`。
+  - `VNSide` 方向由 VNStage.SideFor 按站位推断（剧本 `from:` / `to:` 可覆盖）；
+    `BaseDuration()` 基准时长表把剧本的 `dur:秒` 换算成倍率。
+  - **加新预设**：写一个 `BuildXxx(k, side)` 返回 Sequence → 枚举加一项 →
+    `BaseDuration` 补一行 → Schema 的候选自动来自枚举反射，只需在编辑器的
+    `EntranceTranslations` 补中文名。位移类预设记得在 `OnComplete` 归位
+    旋转/缩放（`PrepareHidden` 只兜底一部分）。
 - **VNProceduralTextures**：静态贴图工厂（柔圆/四芒星/光晕/光束/花瓣/圆环/
   圆角面板/描边框…全部代码生成、缓存、`hideFlags=DontSave`）。**零美术依赖
   的基石**——新 UI/粒子先来这里找现成贴图。
@@ -461,6 +470,9 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 
 - **VNGlowBackdrop**：立绘背后光环脉动（Additive shader）。
 - **VNFootShadow**：脚下椭圆影，跟随横移/悬浮高度/溶解度联动。
+  `Impact(strength, duration)` = 落地冲击（横向摊开+纵向压扁再缓回），
+  由 `stepin` 登场在落地那一帧调用；冲击倍率在 LateUpdate 里乘进 localScale，
+  不干扰原有的悬浮/淡入联动。
 - **VNCharacterEmotes**：情绪动作六连（惊讶跳/生气抖/害羞缩/沮丧垂
   (+Recover)/点头/摇头），剧本 `emote 角色 动作` 直达。
 - **VNSpeakerHighlight**：说话者亮、其他人压暗（明度+缩放双通道）。

@@ -50,6 +50,9 @@ namespace VNEffects
             public float x;
             public string expr;
             public string marks;   // 常驻漫符的英文正名，逗号分隔（空 = 无，旧存档兼容）
+            // 登场用的是日常向预设（crossfade/slidein/stepin/walkin）→ 不开周期扫光。
+            // 旧存档缺省 false = 保持原来"一律开扫光"的行为。
+            public bool casualEntrance;
         }
         public List<CharSave> characters = new List<CharSave>();
 

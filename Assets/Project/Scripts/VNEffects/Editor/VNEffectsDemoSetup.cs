@@ -1035,8 +1035,11 @@ namespace VNEffects.EditorTools
 # VN 剧本演示（P0+P1）— 直接编辑本文件后重新 Play 即可
 # 语法速查：
 #   bg <背景id> [transition:转场名]
-#   show <角色> [at:left|center|right] [expr:表情] [with:出场预设]
-#   hide <角色> [with:dissolve|fade]
+#   show <角色> [at:left|center|right] [expr:表情] [with:预设] [from:方向] [dur:秒]
+#     日常向 crossfade(默认)/slidein/stepin/walkin，华丽向 DissolveGlow/
+#     FadeSlideUp/ScaleBounce/ShineReveal/FlashBloom/AfterimageDash
+#   hide <角色> [with:fade|dissolve|runout|sink] [to:方向] [dur:秒]
+#     from:/to: 留空 = 按站位推断（站左的从左边进来、往左边离开）
 #   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake>
 #   角色 [表情]: 台词        /  旁白: 台词  /  : 无名牌旁白
 #   wait <秒> | shake <light|medium|heavy> | sakura

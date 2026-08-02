@@ -165,9 +165,10 @@ cg off transition:NoiseDissolve
 ### show — 角色登场
 
 ```
-show 亚里沙
-show 亚里沙 at:left with:DissolveGlow
-show 小雪 at:right expr:微笑 with:FadeSlideUp @
+show 亚里沙                                  # 原地淡入（默认）
+show 亚里沙 at:left with:slidein             # 从左边滑入（方向按站位自动推断）
+show 亚里沙 at:left with:slidein from:right  # 手动指定：从右边滑到左边的位置
+show 小雪 at:right expr:微笑 with:walkin dur:1.6 @
 ```
 
 | 参数 | 说明 |
@@ -175,9 +176,20 @@ show 小雪 at:right expr:微笑 with:FadeSlideUp @
 | 第 1 个参数 | 角色 id（角色定义资产里配置） |
 | `at:` | 站位：`left` / `center` / `right`，或直接写横坐标像素如 `at:-200` |
 | `expr:` | 登场表情（默认用表情列表第一个） |
-| `with:` | 出场演出预设（默认 DissolveGlow） |
+| `with:` | 出场演出预设（**默认 `crossfade`**；大小写随意） |
+| `from:` | 进场方向 `left`/`right`/`top`/`bottom`（**留空 = 按站位推断**） |
+| `dur:` | 目标时长秒（留空 = 用预设自己的节奏） |
 
-**全部出场预设**：
+**日常向预设**（不带粒子/光环，适合频繁的对话切换）：
+
+| 名称 | 演出 | 适合 |
+|---|---|---|
+| `crossfade` | 原地淡入，无位移无粒子 | **默认**，日常切立绘 |
+| `slidein` | 从画面外滑入 + 淡入（四方向） | 有来向的登场 |
+| `stepin` | 滑入 + 落地小弹跳，脚下影同步压扁扩散 | 有重量的登场 |
+| `walkin` | 匀速位移 + 左右轻摆 + 步伐起伏（4 步） | 人真的走进来 |
+
+**华丽向预设**（带粒子/光环/闪光，留给关键场面）：
 
 | 名称 | 演出 | 适合 |
 |---|---|---|
@@ -188,17 +200,33 @@ show 小雪 at:right expr:微笑 with:FadeSlideUp @
 | `FlashBloom` | 爆闪中显形+光环大闪耀 | 高潮/重要角色 |
 | `AfterimageDash` | 高速冲入+三道冷色残影 | 战斗系/紧急登场 |
 
-角色登场后自动带常驻"活图"效果：呼吸起伏、悬浮飘动、周期扫光、背后光环、脚下影子。
+**方向推断规则**：`from:` / `to:` 留空时，站画面左侧（x < -60）的角色从左边进来 /
+往左边离开，右侧反之；站中间的进场默认从下方——`walkin` / `runout` 只走水平方向，
+中间位会折成左边。
+
+角色登场后自动带常驻"活图"效果：呼吸起伏、悬浮飘动、背后光环、脚下影子。
+**日常向预设不开周期扫光**（每隔几秒闪一下对频繁的对话切换太吵），华丽向照常开。
+这个差别会存进存档，读档后不会突然开始闪。
 对已在场的角色再次 `show` = 换位置/表情并重播出场演出。
 
 ### hide — 角色退场
 
 ```
-hide 亚里沙
-hide 亚里沙 with:dissolve
+hide 亚里沙                        # 淡出下滑（默认）
+hide 亚里沙 with:runout            # 往站位那侧跑出画面
+hide 亚里沙 with:runout to:right   # 手动指定往右跑
+hide 亚里沙 with:sink dur:1.4      # 慢慢下沉消失
 ```
 
-`with:` 可选 `fade`（淡出下滑，默认）或 `dissolve`（化作光点消散）。退场后角色销毁。
+| 预设 | 演出 | 适合 |
+|---|---|---|
+| `fade` | 淡出 + 轻微下滑 | **默认**，日常 |
+| `dissolve` | 溶解成光点消散 | 幻想/离场演出 |
+| `runout` | 快速冲出画面 + 前倾 + 淡出 | 吵架跑开 / 逃跑 |
+| `sink` | 下沉 + 失焦模糊 + 变暗 + 淡出 | 昏迷 / 意识远去 |
+
+`to:` = 离开方向（只有 `runout` 用，留空按站位推断）；`dur:` = 目标时长秒。
+退场后角色销毁。
 
 ### emote — 情绪演出动作
 
@@ -1300,6 +1328,8 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `call-missing-arg` | call 少传必填参数 |
 | | `bad-emote` | `emote` 写了中文表情名（它要的是英文动作枚举） |
 | | `bad-mark` | `mark` 的符号名不在漫符清单里（会列出可用名） |
+| | `bad-preset` | `show` / `hide` 的 `with:` 预设名拼错（运行时会静默退回默认预设） |
+| | `bad-side` | `from:` / `to:` 不是 left/right/top/bottom |
 | | `bad-mark-mode` | `mark` 第三个参数不是 `keep` / `off` |
 | | `choice-flag-assign` | 选项里写 `flag:名 值` —— **静默失效**的经典坑 |
 | | `empty-choice` | choice 下面没有选项行 |
@@ -1376,8 +1406,13 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 ── 演出 ──
 bg <背景> [transition:类型]                      切背景
 cg <id> [transition:] [chars:keep] [fx:keep]     全屏CG / cg off 关闭
-show <角色> [at:位置] [expr:表情] [with:预设]     登场
-hide <角色> [with:dissolve|fade]                 退场
+show <角色> [at:位置] [expr:] [with:预设] [from:方向] [dur:秒]   登场
+  日常向 crossfade(默认) / slidein / stepin / walkin
+  华丽向 DissolveGlow / FadeSlideUp / ScaleBounce / ShineReveal /
+        FlashBloom / AfterimageDash
+hide <角色> [with:预设] [to:方向] [dur:秒]        退场
+  fade(默认) / dissolve / runout / sink
+  from: 与 to: 留空 = 按站位推断（站左从左进、往左出）
 emote <角色> <动作>                              情绪动作
 mark <角色> <符号|clear> [keep|off] [pos:x,y] [size:] [dur:]  立绘漫符
 <角色> [表情]: 台词                              说话

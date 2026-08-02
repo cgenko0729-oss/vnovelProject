@@ -443,7 +443,18 @@ namespace VNEffects.EditorTools
                     case "move":
                         CheckCharacter(issues, f, c.line, c.Arg(0), reg);
                         if (c.keyword == "show")
+                        {
                             CheckExpression(issues, f, c.line, c.Arg(0), c.Kw("expr"), reg);
+                            CheckEnum<VNEntrancePreset>(issues, f, c.line, c.Kw("with"),
+                                "show 的登场预设");
+                            CheckSide(issues, f, c.line, c.Kw("from"), "show 的 from:");
+                        }
+                        else if (c.keyword == "hide")
+                        {
+                            CheckEnum<VNExitPreset>(issues, f, c.line, c.Kw("with"),
+                                "hide 的退场预设");
+                            CheckSide(issues, f, c.line, c.Kw("to"), "hide 的 to:");
+                        }
                         break;
 
                     case "mark":
@@ -488,6 +499,34 @@ namespace VNEffects.EditorTools
                         break;
                 }
             }
+        }
+
+        /// <summary>
+        /// 枚举值校验：拼错时运行时只会告警并静默退回默认预设，
+        /// 演出变了但没人发现——所以这里提前抓。大小写不敏感（同运行时 ParseEnum）。
+        /// </summary>
+        static void CheckEnum<T>(List<VNLintIssue> issues, ScriptFile f, int line,
+            string value, string what) where T : struct
+        {
+            if (string.IsNullOrEmpty(value) || Dynamic(value)) return;
+            if (System.Enum.TryParse<T>(value, true, out _)) return;
+            Add(issues, VNLintSeverity.Error, "bad-preset", f, line,
+                $"{what}「{value}」不是合法预设",
+                $"可用：{string.Join(" / ", System.Enum.GetNames(typeof(T)))}" +
+                "（大小写随意）。拼错时运行时会静默退回默认预设。");
+        }
+
+        static readonly HashSet<string> SideNames =
+            new HashSet<string> { "left", "right", "top", "bottom", "auto" };
+
+        static void CheckSide(List<VNLintIssue> issues, ScriptFile f, int line,
+            string value, string what)
+        {
+            if (string.IsNullOrEmpty(value) || Dynamic(value)) return;
+            if (SideNames.Contains(value.ToLower())) return;
+            Add(issues, VNLintSeverity.Error, "bad-side", f, line,
+                $"{what}「{value}」不是合法方向",
+                "可用 left / right / top / bottom；留空 = 按角色站位自动推断。");
         }
 
         static void CheckId(List<VNLintIssue> issues, ScriptFile f, int line, string id,

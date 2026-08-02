@@ -91,8 +91,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 组件 | 职责 |
 |---|---|
 | VNImageEffectController | 单图特效总控：溶解/扫光/发光/闪白/HSV/波浪/轮廓光/波光/模糊 + 悬浮/呼吸动作 |
-| VNEntranceAnimator | 出场预设×6(溶解辉光/滑入/弹出/扫光/爆闪/残影冲入) + 退场×2 + StartIdleEffects |
-| VNGlowBackdrop / VNFootShadow | 背后光环脉动 / 脚下椭圆影（悬浮联动） |
+| VNEntranceAnimator | 出场预设×10（日常向 crossfade默认/slidein/stepin/walkin + 华丽向 溶解辉光/滑入/弹出/扫光/爆闪/残影冲入）+ 退场×4（fade默认/dissolve/runout/sink）+ StartIdleEffects；方向 `from:`/`to:` 留空按站位推断，`dur:` 给目标秒数，日常向不开周期扫光（进存档） |
+| VNGlowBackdrop / VNFootShadow | 背后光环脉动 / 脚下椭圆影（悬浮联动 + `Impact()` 落地摊开，stepin 用） |
 | VNCharacterEmotes | 情绪动作：惊讶/生气/害羞/沮丧(+Recover)/点头/摇头 |
 | VNAmbientParticles | 粒子预设×8：尘埃/星光/光斑/花瓣/雨(+溅落)/雪/萤火虫/雾 + PlaySparkleBurst |
 | VNWeatherController | 天气切换 + 调色联动 |

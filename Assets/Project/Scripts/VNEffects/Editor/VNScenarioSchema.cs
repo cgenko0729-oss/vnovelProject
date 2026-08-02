@@ -79,6 +79,9 @@ namespace VNEffects.EditorTools
 
         public static readonly string[] Slots = { "left", "center", "right" };
 
+        /// <summary>出入场方向（留空 = 按站位自动推断）</summary>
+        public static readonly string[] Sides = { "left", "right", "top", "bottom" };
+
         public static readonly string[] EmoteNames =
             { "Surprise", "Angry", "Shy", "Dejected", "Recover", "Nod", "HeadShake" };
 
@@ -152,14 +155,21 @@ namespace VNEffects.EditorTools
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNTransition>(), "NoiseDissolve"));
 
             // ---- Character ----
-            Add("show", "Character", "show <char> [at:] [expr:] [with:preset]",
+            Add("show", "Character", "show <char> [at:] [expr:] [with:预设] [from:方向] [dur:秒]\n" +
+                "with 留空 = crossfade（原地淡入）；from 留空 = 按站位推断" +
+                "（站左从左边进来）；dur = 目标时长秒，留空用预设自己的节奏",
                 Pos("character", "char", VNParamSource.Character),
                 Kw("at", "at", VNParamSource.Options, Slots),
                 Kw("expr", "expr", VNParamSource.Expression, dependsOn: "character"),
-                Kw("with", "with", VNParamSource.Options, EnumNames<VNEntrancePreset>()));
-            Add("hide", "Character", "hide <char> [with:dissolve|fade]",
+                Kw("with", "with", VNParamSource.Options, EnumNames<VNEntrancePreset>()),
+                Kw("from", "从", VNParamSource.Options, Sides, weight: 0.6f),
+                Kw("dur", "时长", VNParamSource.Number, weight: 0.5f));
+            Add("hide", "Character", "hide <char> [with:预设] [to:方向] [dur:秒]\n" +
+                "with 留空 = fade（淡出下滑）；to 留空 = 按站位推断（站左往左边走）",
                 Pos("character", "char", VNParamSource.Character),
-                Kw("with", "with", VNParamSource.Options, new[] { "dissolve", "fade" }, "fade"));
+                Kw("with", "with", VNParamSource.Options, EnumNames<VNExitPreset>(), "Fade"),
+                Kw("to", "往", VNParamSource.Options, Sides, weight: 0.6f),
+                Kw("dur", "时长", VNParamSource.Number, weight: 0.5f));
             Add("emote", "Character", "emote <char> <motion>",
                 Pos("character", "char", VNParamSource.Character),
                 Pos("emote", "motion", VNParamSource.Options, EmoteNames));

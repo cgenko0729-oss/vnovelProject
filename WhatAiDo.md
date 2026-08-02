@@ -4340,3 +4340,87 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   选中中间某行按 Enter，应在其**下方**出现一条空台词行、光标已在台词框里可直接打字；
   Shift+Enter 应插在**上方**；连按两次 Enter 可连续开行；Ctrl+Z 应能整条撤销掉。
 - 回归：footer 的 `+`、Duplicate、多选拖动排序、`▶ 从选中行播放` 行为不变。
+
+---
+
+## 九十一、日常向出入场预设 + 出入场参数化（2026-08-02，分支 `agent/entrance-presets`）
+
+### 需求 / 背景
+
+之前的六个登场预设**全是华丽向**（都带粒子/光环/闪光），日常对话切立绘时太吵；
+退场更是只有 `fade` / `dissolve` 两种，"华丽登场→随便消失"的观感断层明显。
+而且 `show` / `hide` 除了选预设之外**一个参数都不能调**——
+`PlayEntrance` 早就有 `durationScale` 参数，但从没暴露到剧本层。
+
+本批加四个日常向登场 + 两个新退场，并把方向与时长做成剧本参数。
+
+### 用户拍板的三个决策
+
+| 议题 | 决定 |
+|---|---|
+| 方向默认值 | **按角色站位自动推断**：站左的从左边进来 / 往左边离开，中间位进场从下方；`from:` / `to:` 可覆盖 |
+| 要不要加 `dur:` | 要。写的是**目标秒数**（内部按各预设的基准时长换算成倍率），不是倍率 |
+| 日常向的常驻效果 | 关掉**周期扫光**，保留呼吸发光 + 悬浮 |
+
+默认预设从 `DissolveGlow` 改成 `crossfade` —— 事先统计过：现有 26 条 `show`
+**全部**显式写了 `with:`，所以改默认值不影响任何既有剧本的观感。
+
+### 文件改动清单
+
+**新增**
+
+- `Assets/Scenarios/EntranceDemo.vn.txt` —— 逐个演示四个日常登场、方向推断/覆盖、
+  `dur:` 控速、两个新退场，以及华丽向对照组。
+
+**修改**
+
+- `VNEntranceAnimator.cs` —— `VNEntrancePreset` 加 `Crossfade`/`SlideIn`/`StepIn`/`WalkIn`
+  （放在枚举最前，Crossfade 成为默认）；新增 `VNExitPreset`（Fade/Dissolve/RunOut/Sink）
+  与 `VNSide`（Auto/Left/Right/Top/Bottom）；`BaseDuration()` 基准时长表、
+  `IsCasual()` 日常向判定、`PlayEntrance(preset, side, scale)` 与 `PlayExit(...)` 新签名
+  （旧签名保留为重载，Demo 场景不用改）。
+- `VNFootShadow.cs` —— 新增 `Impact(strength, duration)`：影子横向摊开 + 纵向压扁再缓回，
+  供 `stepin` 在落地那一帧调用（LateUpdate 里乘进 localScale，不打断原有的悬浮联动）。
+- `VNStage.cs` —— `SideFor()` 方向推断；`Show` / `Hide` 加 `from`/`to` + `duration` 重载；
+  `ActiveCharacter.casualEntrance` 记录是否日常向登场。
+- `VNScriptRunner.cs` —— show/hide 传 `from:` / `to:` / `dur:`；
+  `RebuildShowState` 把 `with:` 折算成 `casualEntrance` 一起重建。
+- `VNSaveSystem.cs` —— `CharSave.casualEntrance`（旧存档缺省 false = 保持原行为）。
+- `Editor/VNScenarioSchema.cs` —— show/hide 补 `from:`/`to:`/`dur:` 参数与新预设候选。
+- `Editor/VNScenarioEditorWindow.cs` —— 三张中文名表：`EntranceTranslations`
+  （如 `Crossfade（原地淡入·日常）`）、`ExitTranslations`、`SideTranslations`，
+  下拉里直接看得懂每个预设做什么。
+- `Editor/VNScenarioLinter.cs` —— 通用 `CheckEnum<T>` + `CheckSide`：
+  预设名/方向拼错直接报错（运行时只会静默退回默认预设，最容易漏）。
+- `Editor/VNEffectsDemoSetup.cs`、`HowToUse.md`（show/hide 两节 + 速查卡 + 校验器表）同步。
+
+### 技术决策与取舍
+
+1. **`dur:` 是秒不是倍率**：写 `dur:1.2` 就是大约 1.2 秒。每个预设有一张基准时长表，
+   内部换算 `scale = dur / base`。倍率对实现更诚实，但对写剧本的人不直观 ——
+   代价是复合演出（含 Insert 重叠段）的实际时长只是近似值。
+
+2. **`casualEntrance` 进存档**：不存的话，读档摆台一律走 `StartIdleEffects()` 默认参数，
+   日常向登场的角色读档后会**突然开始每 7 秒闪一次**。一个 bool 字段解决，
+   旧存档缺省 false = 保持原来的行为。
+
+3. **`WalkIn` 用分轴 tween**：横向 `DOAnchorPosX` 匀速（走路不该有加减速），
+   纵向 `DOAnchorPosY` 做步伐起伏，两者互不冲突；轻摆与踩地压缩用同一步长的 Yoyo，
+   循环次数取偶数保证自然回位，`OnComplete` 再强制归零一次防抖动残留。
+   `PrepareHidden()` 也补上了 `localRotation` 重置——出场被打断时不会留下歪着头的立绘。
+
+4. **`StepIn` 不震屏**：落地只做脚下影的压扁扩散。屏幕震动留给将来的冲击型登场（slam），
+   日常预设一震屏就不日常了。
+
+5. **`Sink` 复用现成的 shader 通道**：`DOBlur` + `DOBrightness` + 下沉 + 淡出四条并行，
+   没有新增 shader 或贴图。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**。
+- Unity 内跑 `EntranceDemo.vn.txt`：逐段验证四个日常登场、方向自动/手动、
+  `dur:` 快慢、`runout` 往站位那侧跑出、`sink` 下沉模糊变暗。
+- 重点看 `walkin` 结束时立绘**不歪不缩**（旋转/缩放归位）、
+  `stepin` 落地时脚下影确实摊开一下。
+- 存档验证：日常向登场的角色存档→读档后**不应该**出现周期扫光。
+- Lint 验证：把 `with:` 故意写错（如 `with:crossfad`）应报 `bad-preset`。

@@ -116,6 +116,39 @@ namespace VNEffects.EditorTools
                 { "Ripple", "水波扩散" }, { "InkBleed", "墨水晕染" },
             };
 
+        /// <summary>show 的 with:（登场预设）—— 前四个是日常向</summary>
+        static readonly Dictionary<string, string> EntranceTranslations =
+            new Dictionary<string, string>
+            {
+                { "Crossfade", "原地淡入·日常" },
+                { "SlideIn", "滑入·日常" },
+                { "StepIn", "滑入落地·日常" },
+                { "WalkIn", "走入·日常" },
+                { "DissolveGlow", "溶解辉光·华丽" },
+                { "FadeSlideUp", "下方滑入淡入" },
+                { "ScaleBounce", "弹跳登场·俏皮" },
+                { "ShineReveal", "扫光登场·优雅" },
+                { "FlashBloom", "爆闪登场·高潮" },
+                { "AfterimageDash", "残影冲入·战斗" },
+            };
+
+        /// <summary>hide 的 with:（退场预设）</summary>
+        static readonly Dictionary<string, string> ExitTranslations =
+            new Dictionary<string, string>
+            {
+                { "Fade", "淡出下滑·日常" },
+                { "Dissolve", "溶解消散" },
+                { "RunOut", "跑出画面" },
+                { "Sink", "下沉模糊·昏迷" },
+            };
+
+        /// <summary>show 的 from: / hide 的 to:（方向；留空 = 按站位推断）</summary>
+        static readonly Dictionary<string, string> SideTranslations =
+            new Dictionary<string, string>
+            {
+                { "left", "左" }, { "right", "右" }, { "top", "上" }, { "bottom", "下" },
+            };
+
         static readonly Dictionary<string, string> EmoteTranslations =
             new Dictionary<string, string>
             {
@@ -1294,6 +1327,13 @@ namespace VNEffects.EditorTools
                 displayOptions = BuildTranslatedOptions(options, EmoteTranslations);
             else if (IsMarkParameter(r, p))
                 displayOptions = BuildTranslatedOptions(options, MarkTranslations);
+            else if (r.keyword == "show" && p.id == "with")
+                displayOptions = BuildTranslatedOptions(options, EntranceTranslations);
+            else if (r.keyword == "hide" && p.id == "with")
+                displayOptions = BuildTranslatedOptions(options, ExitTranslations);
+            else if ((r.keyword == "show" && p.id == "from") ||
+                     (r.keyword == "hide" && p.id == "to"))
+                displayOptions = BuildTranslatedOptions(options, SideTranslations);
             string nv2 = PopupString(rect, v, options, "-", (r, p.id), displayOptions);
             if (nv2 != v) r.Set(p.id, nv2);
         }

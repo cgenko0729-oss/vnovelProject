@@ -124,6 +124,8 @@ namespace VNEffects
             public VNCharacterMouth mouth;
             public VNCharacterMarks marks;
             public string expression;
+            /// <summary>登场用的是日常向预设 → 常驻效果里不开周期扫光（进存档）</summary>
+            public bool casualEntrance;
         }
 
         readonly Dictionary<string, ActiveCharacter> _active =
@@ -237,8 +239,41 @@ namespace VNEffects
         float HeightFor(VNCharacterDef def) =>
             characterHeight * Mathf.Max(0.05f, def.sizeScale);
 
+        /// <summary>
+        /// 出入场方向：剧本没写 from:/to: 时按站位推断——
+        /// 站画面左侧的角色就从左边进来 / 往左边离开，右侧反之，
+        /// 站中间的进场默认从下方（只走水平的预设会在 Animator 里折成左）。
+        /// </summary>
+        static VNSide SideFor(string keyword, float x, int line)
+        {
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                switch (keyword.ToLower())
+                {
+                    case "left": return VNSide.Left;
+                    case "right": return VNSide.Right;
+                    case "top": return VNSide.Top;
+                    case "bottom": return VNSide.Bottom;
+                    case "auto": break;
+                    default:
+                        Debug.LogWarning($"[VNScript] 第 {line} 行：未知方向「{keyword}」" +
+                                         "（left/right/top/bottom），改为按站位推断");
+                        break;
+                }
+            }
+            return x < -60f ? VNSide.Left : x > 60f ? VNSide.Right : VNSide.Bottom;
+        }
+
         /// <summary>角色登场（已在场则换位置/表情并重播出场）</summary>
-        public Sequence Show(string id, string at, string expr, string presetName, int line = 0)
+        public Sequence Show(string id, string at, string expr, string presetName, int line = 0) =>
+            Show(id, at, expr, presetName, null, 0f, line);
+
+        /// <summary>
+        /// 角色登场。from = 进场方向（空 = 按站位推断）；
+        /// duration = 目标时长秒（&lt;= 0 用预设基准时长）。
+        /// </summary>
+        public Sequence Show(string id, string at, string expr, string presetName,
+            string from, float duration, int line = 0)
         {
             var def = characters.Find(c => c.id == id);
             if (def == null)
@@ -260,14 +295,28 @@ namespace VNEffects
             }
             ApplyExpression(c, expr);
 
-            var preset = VNScriptParser.ParseEnum(presetName, VNEntrancePreset.DissolveGlow, line);
-            var seq = c.animator.PlayEntrance(preset);
-            seq.OnComplete(() => c.animator.StartIdleEffects());
+            var preset = VNScriptParser.ParseEnum(presetName, VNEntrancePreset.Crossfade, line);
+            var side = SideFor(from, c.rect.anchoredPosition.x, line);
+            float scale = duration > 0.01f
+                ? duration / VNEntranceAnimator.BaseDuration(preset) : 1f;
+
+            var seq = c.animator.PlayEntrance(preset, side, scale);
+            // 日常向预设不开周期扫光：每隔几秒闪一下对频繁的对话切换太吵
+            c.casualEntrance = VNEntranceAnimator.IsCasual(preset);
+            float shine = c.casualEntrance ? 0f : 7f;
+            seq.OnComplete(() => c.animator.StartIdleEffects(shineInterval: shine));
             return seq;
         }
 
-        /// <summary>角色退场（style: dissolve / fade），完成后销毁</summary>
-        public Sequence Hide(string id, string style, int line = 0)
+        /// <summary>角色退场（预设 fade / dissolve / runout / sink），完成后销毁</summary>
+        public Sequence Hide(string id, string style, int line = 0) =>
+            Hide(id, style, null, 0f, line);
+
+        /// <summary>
+        /// 角色退场。to = 离开方向（空 = 按站位推断，只有 runout 用）；
+        /// duration = 目标时长秒（&lt;= 0 用预设基准时长）。
+        /// </summary>
+        public Sequence Hide(string id, string style, string to, float duration, int line = 0)
         {
             var c = Get(id);
             if (c == null)
@@ -279,7 +328,12 @@ namespace VNEffects
             _active.Remove(id);
             RefreshRegistries();
 
-            var seq = style == "dissolve" ? c.animator.PlayExitDissolve() : c.animator.PlayExitFade();
+            var preset = VNScriptParser.ParseEnum(style, VNExitPreset.Fade, line);
+            var side = SideFor(to, c.rect.anchoredPosition.x, line);
+            float scale = duration > 0.01f
+                ? duration / VNEntranceAnimator.BaseDuration(preset) : 1f;
+
+            var seq = c.animator.PlayExit(preset, side, scale);
             seq.OnComplete(() => Destroy(c.go));
             return seq;
         }
@@ -677,6 +731,7 @@ namespace VNEffects
                     expr = kv.Value.expression,
                     // 只有 keep 漫符是持续状态；一次性符号播完即逝，不进存档
                     marks = kv.Value.marks != null ? kv.Value.marks.SerializeKeep() : null,
+                    casualEntrance = kv.Value.casualEntrance,
                 });
             }
         }
@@ -735,7 +790,7 @@ namespace VNEffects
             SetPortraitEnabled(!data.portraitOff);
 
             foreach (var cs in data.characters)
-                ShowInstant(cs.id, cs.x, cs.expr, cs.marks);
+                ShowInstant(cs.id, cs.x, cs.expr, cs.marks, cs.casualEntrance);
 
             // CG 最后重放：立绘/天气/fx 已就位，ShowCg 会按 keep 参数再次隐藏/暂停
             if (!string.IsNullOrEmpty(data.cgId))
@@ -762,10 +817,18 @@ namespace VNEffects
         }
 
         /// <summary>瞬间摆台一个角色（无出场动画，读档用）</summary>
-        public void ShowInstant(string id, float x, string expr) => ShowInstant(id, x, expr, null);
+        public void ShowInstant(string id, float x, string expr) =>
+            ShowInstant(id, x, expr, null, false);
 
         /// <summary>瞬间摆台一个角色，并还原常驻漫符（marks = 英文正名逗号串，旧存档为空）</summary>
-        public void ShowInstant(string id, float x, string expr, string marks)
+        public void ShowInstant(string id, float x, string expr, string marks) =>
+            ShowInstant(id, x, expr, marks, false);
+
+        /// <summary>
+        /// 瞬间摆台一个角色。casual = 登场时用的是日常向预设，
+        /// 恢复常驻效果时同样不开周期扫光（否则读档后画面会突然开始闪）。
+        /// </summary>
+        public void ShowInstant(string id, float x, string expr, string marks, bool casual)
         {
             var def = characters.Find(c => c.id == id);
             if (def == null)
@@ -788,7 +851,8 @@ namespace VNEffects
             c.fx.SetFlash(0f);
             var group = c.go.GetComponent<CanvasGroup>();
             if (group != null) group.alpha = 1f;
-            c.animator.StartIdleEffects();
+            c.casualEntrance = casual;
+            c.animator.StartIdleEffects(shineInterval: casual ? 0f : 7f);
 
             // 常驻漫符：先清干净再按存档重挂，避免同一角色被反复摆台时越堆越多
             if (c.marks != null)

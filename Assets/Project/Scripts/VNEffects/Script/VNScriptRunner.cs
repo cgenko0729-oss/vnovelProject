@@ -562,6 +562,9 @@ namespace VNEffects
             {
                 id = id, x = x, expr = cmd.Kw("expr"),
                 marks = previous != null ? previous.marks : null,
+                // 日常向预设登场的角色不开周期扫光，重建时也要一致
+                casualEntrance = VNEntranceAnimator.IsCasual(
+                    VNScriptParser.ParseEnum(cmd.Kw("with"), VNEntrancePreset.Crossfade, 0)),
             };
         }
 
@@ -1779,11 +1782,15 @@ namespace VNEffects
                         cmd.Kw("chars") == "keep", cmd.Kw("fx") == "keep", cmd.line));
 
                 case "show":
+                    // show <角色> [at:] [expr:] [with:预设] [from:方向] [dur:秒]
                     return WaitTween(stage.Show(cmd.Arg(0), cmd.Kw("at"),
-                        cmd.Kw("expr"), cmd.Kw("with"), cmd.line));
+                        cmd.Kw("expr"), cmd.Kw("with"),
+                        cmd.Kw("from"), cmd.KwF("dur", 0f), cmd.line));
 
                 case "hide":
-                    return WaitTween(stage.Hide(cmd.Arg(0), cmd.Kw("with", "fade"), cmd.line));
+                    // hide <角色> [with:预设] [to:方向] [dur:秒]
+                    return WaitTween(stage.Hide(cmd.Arg(0), cmd.Kw("with", "fade"),
+                        cmd.Kw("to"), cmd.KwF("dur", 0f), cmd.line));
 
                 case "emote":
                     return WaitTween(stage.Emote(cmd.Arg(0), cmd.Arg(1), cmd.line));

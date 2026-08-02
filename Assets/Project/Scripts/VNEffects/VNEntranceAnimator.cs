@@ -3,12 +3,20 @@ using UnityEngine;
 
 namespace VNEffects
 {
-    /// <summary>出场演出预设</summary>
+    /// <summary>出场演出预设（前四个是日常向：不带粒子/光环，适合频繁的对话切换）</summary>
     public enum VNEntrancePreset
     {
-        /// <summary>噪声溶解显形 + 辉光边缘 + 星光爆发（最华丽，推荐立绘首次登场）</summary>
+        /// <summary>原地淡入，无位移无粒子（最朴素，默认值）</summary>
+        Crossfade,
+        /// <summary>从画面外滑入 + 淡入（方向默认按站位推断）</summary>
+        SlideIn,
+        /// <summary>滑入 + 落地小弹跳 + 脚下影同步扩散（有重量的登场）</summary>
+        StepIn,
+        /// <summary>走入：匀速位移 + 左右轻摆 + 步伐起伏（人真的走进来）</summary>
+        WalkIn,
+        /// <summary>噪声溶解显形 + 辉光边缘 + 星光爆发（最华丽，推荐重要角色首次登场）</summary>
         DissolveGlow,
-        /// <summary>从下方轻盈滑入 + 淡入（日常对话切换立绘）</summary>
+        /// <summary>从下方轻盈滑入 + 淡入</summary>
         FadeSlideUp,
         /// <summary>弹性缩放弹出 + 微闪白（俏皮/惊喜登场）</summary>
         ScaleBounce,
@@ -18,6 +26,29 @@ namespace VNEffects
         FlashBloom,
         /// <summary>高速冲入 + 身后拖出递减残影（惊喜/战斗系登场）</summary>
         AfterimageDash,
+    }
+
+    /// <summary>退场演出预设</summary>
+    public enum VNExitPreset
+    {
+        /// <summary>淡出并轻微下滑（日常，默认值）</summary>
+        Fade,
+        /// <summary>溶解成光点消散</summary>
+        Dissolve,
+        /// <summary>快速跑出画面 + 前倾（吵架/逃跑；方向默认按站位推断）</summary>
+        RunOut,
+        /// <summary>下沉 + 模糊 + 变暗（消失/昏迷/失去意识）</summary>
+        Sink,
+    }
+
+    /// <summary>出入场的方向（Auto = 由站位推断）</summary>
+    public enum VNSide
+    {
+        Auto,
+        Left,
+        Right,
+        Top,
+        Bottom,
     }
 
     /// <summary>
@@ -37,7 +68,8 @@ namespace VNEffects
 
         VNImageEffectController _fx;
         CanvasGroup _group;
-        VNGlowBackdrop _backdrop; // 可选
+        VNGlowBackdrop _backdrop;   // 可选
+        VNFootShadow _footShadow;   // 可选（StepIn 落地时联动）
         Sequence _current;
 
         Vector2 _basePos;
@@ -50,6 +82,7 @@ namespace VNEffects
             _group = GetComponent<CanvasGroup>();
             if (_group == null) _group = gameObject.AddComponent<CanvasGroup>();
             _backdrop = GetComponent<VNGlowBackdrop>();
+            _footShadow = GetComponent<VNFootShadow>();
             CacheBase();
         }
 
@@ -89,6 +122,7 @@ namespace VNEffects
             _fx.SetFlash(0f);
             _fx.Rect.anchoredPosition = _basePos;
             _fx.Rect.localScale = _baseScale;
+            _fx.Rect.localRotation = Quaternion.identity; // WalkIn 的轻摆被打断时不留歪头
             _backdrop?.Hide();
         }
 
@@ -104,22 +138,176 @@ namespace VNEffects
         // 出场
         // ------------------------------------------------------------------
 
-        /// <summary>播放指定预设的出场演出</summary>
-        public Sequence PlayEntrance(VNEntrancePreset preset, float durationScale = 1f)
+        /// <summary>
+        /// 各预设的基准时长（秒）。剧本写 dur:1.2 时按 dur / 基准 换算成倍率，
+        /// 这样"想要多久"是直接写秒数，而不用去猜每个预设本来多长。
+        /// </summary>
+        public static float BaseDuration(VNEntrancePreset preset)
         {
-            PrepareHidden();
             switch (preset)
             {
-                case VNEntrancePreset.DissolveGlow: _current = BuildDissolveGlow(durationScale); break;
-                case VNEntrancePreset.FadeSlideUp: _current = BuildFadeSlideUp(durationScale); break;
-                case VNEntrancePreset.ScaleBounce: _current = BuildScaleBounce(durationScale); break;
-                case VNEntrancePreset.ShineReveal: _current = BuildShineReveal(durationScale); break;
-                case VNEntrancePreset.FlashBloom: _current = BuildFlashBloom(durationScale); break;
-                case VNEntrancePreset.AfterimageDash: _current = BuildAfterimageDash(durationScale); break;
-                default: _current = BuildFadeSlideUp(durationScale); break;
+                case VNEntrancePreset.Crossfade: return 0.55f;
+                case VNEntrancePreset.SlideIn: return 0.8f;
+                case VNEntrancePreset.StepIn: return 0.9f;
+                case VNEntrancePreset.WalkIn: return 1.1f;
+                case VNEntrancePreset.DissolveGlow: return 1.6f;
+                case VNEntrancePreset.FadeSlideUp: return 0.8f;
+                case VNEntrancePreset.ScaleBounce: return 0.65f;
+                case VNEntrancePreset.ShineReveal: return 1.3f;
+                case VNEntrancePreset.FlashBloom: return 1.6f;
+                case VNEntrancePreset.AfterimageDash: return 0.4f;
+                default: return 0.8f;
+            }
+        }
+
+        public static float BaseDuration(VNExitPreset preset)
+        {
+            switch (preset)
+            {
+                case VNExitPreset.Dissolve: return 1f;
+                case VNExitPreset.RunOut: return 0.5f;
+                case VNExitPreset.Sink: return 0.9f;
+                default: return 0.6f;
+            }
+        }
+
+        /// <summary>
+        /// 日常向预设：登场后不开周期扫光（每隔几秒闪一下对日常对话太吵），
+        /// 只保留呼吸发光与悬浮。VNStage 据此决定 StartIdleEffects 的参数。
+        /// </summary>
+        public static bool IsCasual(VNEntrancePreset preset) =>
+            preset == VNEntrancePreset.Crossfade || preset == VNEntrancePreset.SlideIn ||
+            preset == VNEntrancePreset.StepIn || preset == VNEntrancePreset.WalkIn;
+
+        /// <summary>播放指定预设的出场演出（旧签名：倍率版，无方向）</summary>
+        public Sequence PlayEntrance(VNEntrancePreset preset, float durationScale = 1f) =>
+            PlayEntrance(preset, VNSide.Auto, durationScale);
+
+        /// <summary>
+        /// 播放出场演出。side = 从哪个方向进来（Auto 由调用方按站位换算好，
+        /// 这里再兜一层）；durationScale 是相对预设基准时长的倍率。
+        /// </summary>
+        public Sequence PlayEntrance(VNEntrancePreset preset, VNSide side, float durationScale)
+        {
+            PrepareHidden();
+            float k = durationScale > 0.01f ? durationScale : 1f;
+            switch (preset)
+            {
+                case VNEntrancePreset.Crossfade: _current = BuildCrossfade(k); break;
+                case VNEntrancePreset.SlideIn: _current = BuildSlideIn(k, side); break;
+                case VNEntrancePreset.StepIn: _current = BuildStepIn(k, side); break;
+                case VNEntrancePreset.WalkIn: _current = BuildWalkIn(k, side); break;
+                case VNEntrancePreset.DissolveGlow: _current = BuildDissolveGlow(k); break;
+                case VNEntrancePreset.FadeSlideUp: _current = BuildFadeSlideUp(k); break;
+                case VNEntrancePreset.ScaleBounce: _current = BuildScaleBounce(k); break;
+                case VNEntrancePreset.ShineReveal: _current = BuildShineReveal(k); break;
+                case VNEntrancePreset.FlashBloom: _current = BuildFlashBloom(k); break;
+                case VNEntrancePreset.AfterimageDash: _current = BuildAfterimageDash(k); break;
+                default: _current = BuildCrossfade(k); break;
             }
             _current.SetLink(gameObject);
             return _current;
+        }
+
+        /// <summary>方向兜底：没给方向时默认从下方；只走水平的预设把上下折成左</summary>
+        static VNSide Resolve(VNSide side, bool horizontalOnly)
+        {
+            if (side == VNSide.Auto) side = horizontalOnly ? VNSide.Left : VNSide.Bottom;
+            if (horizontalOnly && (side == VNSide.Top || side == VNSide.Bottom))
+                side = VNSide.Left;
+            return side;
+        }
+
+        /// <summary>该方向的进场偏移向量（角色从 base + 此偏移 滑到 base）</summary>
+        static Vector2 EnterOffset(VNSide side, float horizontal, float vertical)
+        {
+            switch (side)
+            {
+                case VNSide.Left: return new Vector2(-horizontal, 0f);
+                case VNSide.Right: return new Vector2(horizontal, 0f);
+                case VNSide.Top: return new Vector2(0f, vertical);
+                default: return new Vector2(0f, -vertical);
+            }
+        }
+
+        // ---- 日常向四件套（不带粒子/光环，适合频繁的对话切换）----
+
+        /// <summary>原地淡入：没有位移、没有粒子、没有闪光</summary>
+        Sequence BuildCrossfade(float k)
+        {
+            _fx.SetDissolve(1f);
+            return DOTween.Sequence()
+                .Append(_group.DOFade(1f, 0.55f * k).SetEase(Ease.InOutSine));
+        }
+
+        /// <summary>四方向滑入 + 淡入</summary>
+        Sequence BuildSlideIn(float k, VNSide side)
+        {
+            _fx.SetDissolve(1f);
+            _fx.Rect.anchoredPosition = _basePos + EnterOffset(Resolve(side, false), 190f, 110f);
+            return DOTween.Sequence()
+                .Append(_group.DOFade(1f, 0.5f * k).SetEase(Ease.OutQuad))
+                .Join(_fx.Rect.DOAnchorPos(_basePos, 0.8f * k).SetEase(Ease.OutCubic));
+        }
+
+        /// <summary>
+        /// 滑入 + 落地：先滑到略高处，落下时脚下影同步压扁扩散，再弹一下收住。
+        /// 不震屏——那是给冲击型登场（slam）留的。
+        /// </summary>
+        Sequence BuildStepIn(float k, VNSide side)
+        {
+            _fx.SetDissolve(1f);
+            var from = _basePos + EnterOffset(Resolve(side, false), 170f, 90f);
+            _fx.Rect.anchoredPosition = from + new Vector2(0f, 26f);
+
+            var seq = DOTween.Sequence();
+            seq.Append(_fx.Rect.DOAnchorPos(_basePos + new Vector2(0f, 26f), 0.46f * k)
+                              .SetEase(Ease.OutQuad));
+            seq.Join(_group.DOFade(1f, 0.4f * k).SetEase(Ease.OutQuad));
+            // 落地
+            seq.Append(_fx.Rect.DOAnchorPosY(_basePos.y, 0.14f * k).SetEase(Ease.InQuad));
+            seq.AppendCallback(() => _footShadow?.Impact(1.4f, 0.3f));
+            // 落地反弹（小）
+            seq.Append(_fx.Rect.DOAnchorPosY(_basePos.y + 11f, 0.13f * k).SetEase(Ease.OutQuad));
+            seq.Append(_fx.Rect.DOAnchorPosY(_basePos.y, 0.17f * k).SetEase(Ease.InQuad));
+            return seq;
+        }
+
+        /// <summary>
+        /// 走入：横向匀速位移，同时纵向做步伐起伏、左右轻摆、纵向微压缩，
+        /// 三条节奏用同一个步长对齐。到位后强制把旋转/缩放归位，不留残迹。
+        /// </summary>
+        Sequence BuildWalkIn(float k, VNSide side)
+        {
+            _fx.SetDissolve(1f);
+            var resolved = Resolve(side, true);
+            float dir = resolved == VNSide.Right ? 1f : -1f;
+            _fx.Rect.anchoredPosition = _basePos + new Vector2(dir * 300f, 0f);
+            _fx.Rect.localRotation = Quaternion.Euler(0f, 0f, -1.3f * dir);
+
+            float total = 1.1f * k;
+            const int steps = 4;                 // 4 步走到位
+            float half = total / (steps * 2f);   // 半步 = 一次起伏
+
+            var seq = DOTween.Sequence();
+            // 横向匀速（走路不该有加减速），淡入只占前段
+            seq.Append(_fx.Rect.DOAnchorPosX(_basePos.x, total).SetEase(Ease.Linear));
+            seq.Join(_group.DOFade(1f, total * 0.45f).SetEase(Ease.OutQuad));
+            // 步伐起伏 / 左右轻摆 / 踩地压缩：同一步长，Yoyo 回到原值
+            seq.Join(_fx.Rect.DOAnchorPosY(_basePos.y + 8f, half)
+                             .SetEase(Ease.InOutSine).SetLoops(steps * 2, LoopType.Yoyo));
+            seq.Join(_fx.Rect.DOLocalRotate(new Vector3(0f, 0f, 1.3f * dir), half * 2f)
+                             .SetEase(Ease.InOutSine).SetLoops(steps, LoopType.Yoyo));
+            seq.Join(_fx.Rect.DOScaleY(_baseScale.y * 0.988f, half)
+                             .SetEase(Ease.InOutSine).SetLoops(steps * 2, LoopType.Yoyo));
+            seq.OnComplete(() =>
+            {
+                // Yoyo 的循环次数是偶数，理论上自然回到原值；这里兜底防抖动残留
+                _fx.Rect.localRotation = Quaternion.identity;
+                _fx.Rect.localScale = _baseScale;
+                _fx.Rect.anchoredPosition = _basePos;
+            });
+            return seq;
         }
 
         Sequence BuildDissolveGlow(float k)
@@ -245,6 +433,58 @@ namespace VNEffects
         // ------------------------------------------------------------------
         // 退场
         // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 播放退场演出。side = 往哪边走（只有 RunOut 用），
+        /// durationScale 是相对预设基准时长的倍率。
+        /// </summary>
+        public Sequence PlayExit(VNExitPreset preset, VNSide side, float durationScale)
+        {
+            float k = durationScale > 0.01f ? durationScale : 1f;
+            switch (preset)
+            {
+                case VNExitPreset.Dissolve: return PlayExitDissolve(BaseDuration(preset) * k);
+                case VNExitPreset.RunOut: return BuildRunOut(k, side);
+                case VNExitPreset.Sink: return BuildSink(k);
+                default: return PlayExitFade(BaseDuration(preset) * k);
+            }
+        }
+
+        /// <summary>快速跑出画面：横向冲出 + 前倾 + 淡出</summary>
+        Sequence BuildRunOut(float k, VNSide side)
+        {
+            KillCurrent();
+            _fx.StopAllLoops();
+            _backdrop?.Hide();
+
+            float dir = Resolve(side, true) == VNSide.Right ? 1f : -1f;
+            float total = 0.5f * k;
+            _current = DOTween.Sequence()
+                .Append(_fx.Rect.DOAnchorPos(_basePos + new Vector2(dir * 1250f, 0f), total)
+                                .SetEase(Ease.InQuad))
+                .Join(_fx.Rect.DOLocalRotate(new Vector3(0f, 0f, -6f * dir), total * 0.35f)
+                                .SetEase(Ease.OutQuad))
+                .Join(_group.DOFade(0f, total).SetEase(Ease.InQuad))
+                .SetLink(gameObject);
+            return _current;
+        }
+
+        /// <summary>下沉消失：往下沉 + 失焦模糊 + 变暗 + 淡出（昏迷/意识远去）</summary>
+        Sequence BuildSink(float k)
+        {
+            KillCurrent();
+            _fx.StopAllLoops();
+            _backdrop?.Hide();
+
+            float total = 0.9f * k;
+            _current = DOTween.Sequence()
+                .Append(_fx.Rect.DOAnchorPosY(_basePos.y - 95f, total).SetEase(Ease.InQuad))
+                .Join(_fx.DOBlur(0.006f, total).SetEase(Ease.InQuad))
+                .Join(_fx.DOBrightness(0.3f, total).SetEase(Ease.InQuad))
+                .Join(_group.DOFade(0f, total).SetEase(Ease.InCubic))
+                .SetLink(gameObject);
+            return _current;
+        }
 
         /// <summary>溶解退场（化作光点消散）</summary>
         public Sequence PlayExitDissolve(float duration = 1f)

@@ -1,0 +1,79 @@
+# ============================================================
+# EntranceDemo.vn.txt —— 角色出入场预设演示
+# 示范：① 四个日常向登场预设 ② 方向自动推断与手动指定 ③ dur: 控速
+#       ④ 两个新退场预设（跑出画面 / 下沉消失）
+# 播放方式：Scenario Editor 打开本文件 → 选中首行 → ▶ 从选中行播放
+#
+# 要点：
+#   with 留空 = crossfade（原地淡入），日常对话切立绘用它就好
+#   from / to 留空 = 按站位推断：站左边的从左边进来、往左边离开
+#   dur:0.8 = 目标时长（秒），留空用预设自己的节奏
+# ============================================================
+
+bg bg1
+mood Morning
+
+# ---------- ① 日常向四件套 ----------
+
+: （crossfade：原地淡入，没有位移、没有粒子。这是 with 留空时的默认。）
+show 星野结衣 at:center
+星野结衣: 早安。
+hide 星野结衣
+
+: （slidein：从画面外滑入。站中间时默认从下方进来。）
+show 星野结衣 at:center with:slidein
+星野结衣: 这样是从下面滑上来的。
+hide 星野结衣
+
+: （站左边的角色，方向自动变成"从左边进来"。）
+show 星野结衣 at:left with:slidein
+星野结衣: 现在是从左边。
+hide 星野结衣
+
+: （也可以手动指定 from:right —— 从右边滑到左边的位置。）
+show 星野结衣 at:left with:slidein from:right
+星野结衣: 这次我从右边过来。
+hide 星野结衣
+
+: （stepin：滑入 + 落地小弹跳，脚下影会同步压扁扩散。）
+show 星野结衣 at:right with:stepin
+星野结衣: 落地的时候影子会跟着摊开。
+hide 星野结衣
+
+: （walkin：真的"走"进来——匀速位移 + 左右轻摆 + 步伐起伏。）
+show 星野结衣 at:center with:walkin
+星野结衣: 走路的节奏是四步。
+hide 星野结衣
+
+# ---------- ② dur: 控速 ----------
+
+: （同一个 walkin，dur:2 = 慢慢走进来。）
+show 星野结衣 at:left with:walkin dur:2
+星野结衣: 慢慢走。
+hide 星野结衣
+
+: （dur:0.4 = 快步冲进来。）
+show 星野结衣 at:right with:walkin dur:0.4
+星野结衣: 快步走！
+hide 星野结衣
+
+# ---------- ③ 两个新退场 ----------
+
+show 星野结衣 at:left with:crossfade
+星野结衣: 我要跑了。
+: （runout：快速跑出画面 + 前倾。站左边所以默认往左边跑。）
+hide 星野结衣 with:runout
+
+show 星野结衣 at:center with:crossfade
+星野结衣: 头有点晕……
+: （sink：下沉 + 模糊 + 变暗，用在昏迷 / 意识远去。）
+hide 星野结衣 with:sink
+
+# ---------- ④ 华丽向（原有预设）对照 ----------
+
+: （对照组：DissolveGlow 这类华丽预设保留原样，重要角色首次登场用。）
+show 星野结衣 at:center with:DissolveGlow
+星野结衣: 这是华丽登场。
+hide 星野结衣 with:dissolve
+
+: —— 出入场演示结束 ——

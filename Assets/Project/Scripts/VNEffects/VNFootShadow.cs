@@ -1,3 +1,4 @@
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -35,6 +36,8 @@ namespace VNEffects
         float _baseY;       // 角色基准 Y（无出场器时的后备）
         float _halfHeight;  // 角色半高（算脚底位置用）
         bool _built;
+        float _impact = 1f; // 落地冲击的横向倍率（1 = 静止；stepin 登场时被推高再回落）
+        Tween _impactTween;
 
         void Awake()
         {
@@ -76,6 +79,19 @@ namespace VNEffects
             _shadow.color = new Color(0f, 0f, 0f, baseAlpha);
         }
 
+        /// <summary>
+        /// 落地冲击：影子瞬间横向摊开、纵向压扁，再缓回原状。
+        /// 供 StepIn 登场在"脚落地"那一帧调用——影子跟着动，重量感才成立。
+        /// </summary>
+        public void Impact(float strength = 1.4f, float duration = 0.3f)
+        {
+            Build(); // Start 还没跑到时也能用
+            _impactTween?.Kill();
+            _impact = Mathf.Max(1f, strength);
+            _impactTween = DOTween.To(() => _impact, v => _impact = v, 1f, duration)
+                                  .SetEase(Ease.OutCubic).SetLink(gameObject);
+        }
+
         void LateUpdate()
         {
             if (_shadow == null) return;
@@ -93,7 +109,9 @@ namespace VNEffects
             alpha *= Mathf.Clamp01(_fx.GetDissolve() * 1.5f);     // 溶解出场联动
 
             _shadow.color = new Color(0f, 0f, 0f, alpha);
-            _shadowRect.localScale = new Vector3(shrink, shrink, 1f);
+            // 落地冲击期间横向摊开、纵向压扁（体积守恒的观感）
+            _shadowRect.localScale = new Vector3(
+                shrink * _impact, shrink * (2f - _impact), 1f);
             _shadowRect.anchoredPosition = new Vector2(
                 _charRect.anchoredPosition.x + offset.x, groundY);
         }
