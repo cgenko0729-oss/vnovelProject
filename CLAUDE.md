@@ -122,7 +122,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → Install Quiz Module To Scene）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
 | VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
-| VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新） |
+| VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
+| VNToast | 左上角堆叠提示卡片（多条排队不覆盖，上限 5）+ 右上角 AUTO/SKIP 角标；`Show(msg)` 中性卡、`Show(msg, icon, iconColor, accent, hold)` 带图标色条 |
 | VNShopDef / VNShopModule | 商店定义资产 / 商店事件模块（event shop id:xx，买卖走金钱属性 + 道具_&lt;id&gt; flag） |
 | VNPlanDef / VNPlanModule | 日程方案资产 / 周日程排程模块（event plan 排格写 flag 日程_&lt;N&gt;；op:next 逐格派发到 flag 当前行动）；外观走系统主题 planPrefab + VNPlanSkin 槽位，缺失退回程序化 UI |
 | VNResultPopupModule | 结算大弹窗事件模块（event result grade:fail\|normal\|good\|great，判定冲条 0→100 悬念演出 → 四档大字+星光爆发）；外观走系统主题 resultPopupPrefab + VNResultPopupSkin 槽位，缺失退回程序化 UI，皮肤没配冲条三槽则直接揭晓 |

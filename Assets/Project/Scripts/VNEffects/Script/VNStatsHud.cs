@@ -31,9 +31,17 @@ namespace VNEffects
             public VNStatDef def;
             public TextMeshProUGUI value;
             public Image bar;
+            public Image icon;
+            public RectTransform root;   // 就地演出（图标弹跳 / +N 上飘）的定位基准
             public int lastValue;
             public Tween tween;
+            public Tween barTween;
+            public Tween rollTween;
         }
+
+        /// <summary>属性涨/跌的统一配色（HUD 数字、飘字、提示卡片色条共用）</summary>
+        static readonly Color GainColor = new Color(0.45f, 1f, 0.62f, 1f);
+        static readonly Color LoseColor = new Color(1f, 0.48f, 0.5f, 1f);
         readonly List<HudEntry> _hudEntries = new List<HudEntry>();
 
         public bool IsOpen => _open;
@@ -141,13 +149,19 @@ namespace VNEffects
             if (silent) return;
             string display = def != null ? def.DisplayName : name;
             int delta = target - old;
-            if (isDelta)
-                VNToast.Show(delta > 0
+
+            // 卡片：图标+主题色认属性，左侧竖条认涨跌（HUD 的就地演出由 RefreshHud 负责）
+            Sprite icon = def != null && def.icon != null ? def.icon : null;
+            Color iconColor = def != null ? def.color : new Color(0.8f, 0.85f, 1f);
+            Color accent = delta > 0 ? GainColor : delta < 0 ? LoseColor : iconColor;
+
+            string message = isDelta
+                ? (delta > 0
                     ? VNLocale.T("stats.toastGain", display, delta)
-                    : VNLocale.T("stats.toastLose", display, -delta), 1.8f);
-            else
-                VNToast.Show(VNLocale.T("stats.toastSet", display,
-                    def != null ? def.Format(target) : target.ToString()), 1.8f);
+                    : VNLocale.T("stats.toastLose", display, -delta))
+                : VNLocale.T("stats.toastSet", display,
+                    def != null ? def.Format(target) : target.ToString());
+            VNToast.Show(message, icon, iconColor, accent, 1.8f);
         }
 
         // ------------------------------------------------------------------
@@ -273,6 +287,8 @@ namespace VNEffects
                 def = def,
                 value = skin.valueText,
                 bar = hasBar ? skin.barFill : null,
+                icon = skin.icon,
+                root = (RectTransform)go.transform,
                 lastValue = VNFlags.Get(def.id),
             };
         }
@@ -292,28 +308,117 @@ namespace VNEffects
             {
                 if (e.value == null) continue;
                 int v = VNFlags.Get(e.def.id);
-                e.value.text = e.def.Format(v);
+                bool changed = v != e.lastValue;
+                bool play = animate && changed;
+
+                // 数值：变化时滚动到新值，否则直接落位
+                if (play) RollValue(e, e.lastValue, v);
+                else
+                {
+                    e.rollTween?.Kill();
+                    e.value.text = e.def.Format(v);
+                }
+
+                // 进度条：变化时补间推进，否则瞬切
                 if (e.bar != null)
                 {
-                    float n = Mathf.Max(0f, e.def.Normalized(v));
+                    float n = Mathf.Clamp01(Mathf.Max(0f, e.def.Normalized(v)));
                     var rect = (RectTransform)e.bar.transform;
-                    rect.anchorMax = new Vector2(n, 1f);
+                    e.barTween?.Kill();
+                    if (play)
+                    {
+                        float from = rect.anchorMax.x;
+                        e.barTween = DOVirtual.Float(from, n, 0.45f,
+                                x => rect.anchorMax = new Vector2(x, 1f))
+                            .SetEase(Ease.OutCubic).SetUpdate(true).SetLink(e.bar.gameObject);
+                    }
+                    else rect.anchorMax = new Vector2(n, 1f);
                 }
-                if (animate && v != e.lastValue)
+
+                if (play)
                 {
+                    bool gain = v > e.lastValue;
+                    var tint = gain ? GainColor : LoseColor;
+
+                    // 数字弹一下并染色，随后回到常态白
                     e.tween?.Kill(true);
-                    e.value.color = v > e.lastValue
-                        ? new Color(0.55f, 1f, 0.6f, 1f)
-                        : new Color(1f, 0.5f, 0.5f, 1f);
+                    e.value.color = tint;
                     e.value.transform.localScale = Vector3.one * 1.35f;
                     e.tween = DOTween.Sequence()
                         .Append(e.value.transform.DOScale(1f, 0.3f).SetEase(Ease.OutBack))
                         .Join(e.value.DOColor(new Color(0.97f, 0.97f, 1f, 1f), 0.6f))
                         .SetUpdate(true)
                         .SetLink(e.value.gameObject);
+
+                    // 图标弹跳：把视线拉到"是哪个属性动了"
+                    if (e.icon != null)
+                    {
+                        e.icon.transform.DOKill(true);
+                        e.icon.transform.DOPunchScale(Vector3.one * 0.35f, 0.42f, 9, 0.7f)
+                              .SetUpdate(true).SetLink(e.icon.gameObject);
+                    }
+
+                    SpawnFloatingDelta(e, v - e.lastValue, tint);
                 }
+
                 e.lastValue = v;
             }
+        }
+
+        /// <summary>数值滚动：20 → 23 逐格跳，比瞬间换字更容易被注意到</summary>
+        void RollValue(HudEntry e, int from, int to)
+        {
+            e.rollTween?.Kill();
+            if (Mathf.Abs(to - from) <= 1)
+            {
+                e.value.text = e.def.Format(to);
+                return;
+            }
+            e.rollTween = DOVirtual.Int(from, to, 0.45f, x => e.value.text = e.def.Format(x))
+                .SetEase(Ease.OutCubic).SetUpdate(true).SetLink(e.value.gameObject);
+        }
+
+        /// <summary>
+        /// HUD 条目上方冒一个 +3 / -2 并向上飘散。
+        /// 挂在 Canvas 根而不是条目下面：HUD 皮肤 prefab 可能带裁剪（Mask/RectMask2D），
+        /// 挂在条目里会被切掉一半。
+        /// </summary>
+        void SpawnFloatingDelta(HudEntry e, int delta, Color color)
+        {
+            if (delta == 0 || e.root == null || _canvas == null) return;
+
+            var go = new GameObject("Delta",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(_canvas.transform, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(160f, 44f);
+
+            // 条目的世界坐标 → Canvas 本地坐标（同一个 Overlay Canvas，直接换算即可）
+            var canvasRect = (RectTransform)_canvas.transform;
+            Vector2 local = canvasRect.InverseTransformPoint(e.root.position);
+            rect.anchoredPosition = local + new Vector2(0f, 6f);
+
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.font = VNFont.Asset;
+            text.fontSize = 30;
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Center;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.raycastTarget = false;
+            text.color = color;
+            text.text = delta > 0 ? $"+{delta}" : delta.ToString();
+
+            rect.localScale = Vector3.one * 0.7f;
+            DOTween.Sequence()
+                .Append(rect.DOScale(1f, 0.22f).SetEase(Ease.OutBack))
+                .Join(rect.DOAnchorPosY(local.y + 54f, 0.95f).SetEase(Ease.OutCubic))
+                .Insert(0.45f, text.DOFade(0f, 0.5f))
+                .OnComplete(() => { if (go != null) Destroy(go); })
+                .SetUpdate(true)
+                .SetLink(go);
         }
 
         Sprite DotSprite()

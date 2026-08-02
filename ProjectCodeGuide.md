@@ -406,7 +406,7 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 | VNConfigPanel.cs | 设置面板 | 三路音量/文字速度/自动速度/显示模式，PlayerPrefs 持久化，启动时 Runner 调它回放设置 |
 | VNQuickToolbar.cs | 对话框右下功能条 | Save/Load/Auto/Skip/Log/任务/Config/隐藏UI；挂在对话框 Canvas 下排序 +1；**加按钮记得改总宽**（现 693） |
 | VNBacklog.cs | H 键回想 | 独立 Overlay Canvas 600；`Record()` 由 SayCo/ChoiceCo/EventCo 调 |
-| VNToast.cs | 右上角提示 + 模式角标 | 静态 `Show(msg)`；任务/自动/快进都走它 |
+| VNToast.cs | 左上角堆叠卡片 + 右上角模式角标 | 静态 `Show(msg)` / `Show(msg, icon, iconColor, accent, hold)`；**多条排队不覆盖**（新卡占最上格、旧卡下移，上限 5 张超出提前退场）；卡片宽度跟文字走（`GetPreferredValues`，`preferredWidth` 要等一次布局才有值）；全部 Tween `SetUpdate(true)` 不受 Skip 变速影响；任务/存档/装备/属性变动都走它 |
 | VNQuestLog.cs | J 键任务日志 | 见第六节；UI 结构与 Backlog 同构 |
 | VNInventory.cs | I 键背包 | 左道具列表+右 7 装备格+介绍区；右键菜单走 `ClickRelay`（IPointerClickHandler 区分左右键，Button 只管按压视觉）；皮肤 prefab（`VNSystemUiSkinSet.inventoryPrefab` + VNInventorySkin/RowSkin/SlotSkin 槽位）优先，缺失退回程序化 UI，**两条路径都产出 VNInventorySkin 引用**，下游单一代码路径；装备逻辑全部委托 VNEquipment |
 | VNDialogueSkin.cs / VNChoiceSkin.cs | UI 皮肤槽位声明 | 挂皮肤 prefab 根；VNDialogueBox/VNChoicePanel 实例化后按槽位 Bind()，行为逻辑与装饰节点解耦；全槽位可选（留空=降级）；头像避让声明式（portraitBodyInset/TagShift）；`ui dialogue\|choice <id>` 切换、id 在 VNGameConfig 登记、状态进存档；**程序化默认也走同一条 Bind 路径**（DefaultSkin 子物体），改行为逻辑两边同时生效 |
