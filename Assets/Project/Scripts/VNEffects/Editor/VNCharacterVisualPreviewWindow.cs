@@ -10,7 +10,9 @@ namespace VNEffects.EditorTools
         public float sizeScale = 1f;
         public Vector2 positionOffset;
         public bool enableBlink;
+        public VNBlinkMode blinkMode = VNBlinkMode.FullSprite;
         public Sprite blinkSprite;
+        public Sprite blinkOverlaySprite;
         public float blinkIntervalMin = 2.5f;
         public float blinkIntervalMax = 5f;
         public float blinkDuration = 0.1f;
@@ -28,7 +30,9 @@ namespace VNEffects.EditorTools
             sizeScale = character.sizeScale;
             positionOffset = character.positionOffset;
             enableBlink = character.enableBlink;
+            blinkMode = character.blinkMode;
             blinkSprite = character.blinkSprite;
+            blinkOverlaySprite = character.blinkOverlaySprite;
             blinkIntervalMin = character.blinkIntervalMin;
             blinkIntervalMax = character.blinkIntervalMax;
             blinkDuration = character.blinkDuration;
@@ -273,6 +277,8 @@ namespace VNEffects.EditorTools
                 var localRect = new Rect(spriteRect.x - rect.x, spriteRect.y - rect.y,
                     spriteRect.width, spriteRect.height);
                 DrawSprite(sprite, localRect, Color.white);
+                Sprite blinkOverlay = BlinkOverlayPreviewSprite();
+                if (blinkOverlay != null) DrawSprite(blinkOverlay, localRect, Color.white);
                 Sprite mouth = MouthPreviewSprite();
                 if (mouth != null) DrawSprite(mouth, localRect, Color.white);
                 GUI.EndClip();
@@ -386,40 +392,70 @@ namespace VNEffects.EditorTools
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField("默认表情眨眼", EditorStyles.boldLabel);
                     bool enableBlink = EditorGUILayout.Toggle("enableBlink", _draft.enableBlink);
-                    Sprite blinkSprite = (Sprite)EditorGUILayout.ObjectField(
-                        "完整闭眼立绘", _draft.blinkSprite, typeof(Sprite), false);
+                    var blinkMode = (VNBlinkMode)EditorGUILayout.EnumPopup(
+                        "眨眼方式", _draft.blinkMode);
+                    bool overlayMode = blinkMode == VNBlinkMode.Overlay;
+                    Sprite blinkSprite = _draft.blinkSprite;
+                    Sprite blinkOverlaySprite = _draft.blinkOverlaySprite;
+                    if (overlayMode)
+                        blinkOverlaySprite = (Sprite)EditorGUILayout.ObjectField(
+                            "透明闭眼叠加图", _draft.blinkOverlaySprite, typeof(Sprite), false);
+                    else
+                        blinkSprite = (Sprite)EditorGUILayout.ObjectField(
+                            "完整闭眼立绘", _draft.blinkSprite, typeof(Sprite), false);
                     float intervalMin = Mathf.Max(0.1f,
                         EditorGUILayout.FloatField("最短间隔（秒）", _draft.blinkIntervalMin));
                     float intervalMax = Mathf.Max(intervalMin,
                         EditorGUILayout.FloatField("最长间隔（秒）", _draft.blinkIntervalMax));
                     float duration = EditorGUILayout.Slider(
                         "闭眼时间（秒）", _draft.blinkDuration, 0.03f, 0.5f);
-                    if (enableBlink != _draft.enableBlink || blinkSprite != _draft.blinkSprite ||
+                    if (enableBlink != _draft.enableBlink || blinkMode != _draft.blinkMode ||
+                        blinkSprite != _draft.blinkSprite ||
+                        blinkOverlaySprite != _draft.blinkOverlaySprite ||
                         !Mathf.Approximately(intervalMin, _draft.blinkIntervalMin) ||
                         !Mathf.Approximately(intervalMax, _draft.blinkIntervalMax) ||
                         !Mathf.Approximately(duration, _draft.blinkDuration))
                     {
                         RecordDraft("调整角色眨眼设置草稿");
                         _draft.enableBlink = enableBlink;
+                        _draft.blinkMode = blinkMode;
                         _draft.blinkSprite = blinkSprite;
+                        _draft.blinkOverlaySprite = blinkOverlaySprite;
                         _draft.blinkIntervalMin = intervalMin;
                         _draft.blinkIntervalMax = intervalMax;
                         _draft.blinkDuration = duration;
                         ChangedDraft();
                     }
 
-                    bool canPreviewBlink = _expressionIndex == 0 && _draft.blinkSprite != null;
+                    Sprite closedSource = overlayMode
+                        ? _draft.blinkOverlaySprite : _draft.blinkSprite;
+                    bool canPreviewBlink = _expressionIndex == 0 && closedSource != null;
                     using (new EditorGUI.DisabledScope(!canPreviewBlink))
                         _previewBlinkClosed = EditorGUILayout.Toggle(
                             "预览闭眼状态", _previewBlinkClosed);
 
-                    if (_draft.enableBlink && _draft.blinkSprite == null)
-                        EditorGUILayout.HelpBox("已开启眨眼，但尚未指定完整闭眼立绘。运行时会保持睁眼。",
+                    if (_draft.enableBlink && closedSource == null)
+                        EditorGUILayout.HelpBox(overlayMode
+                            ? "已开启眨眼（分层叠加），但尚未指定透明闭眼叠加图。运行时会保持睁眼。"
+                            : "已开启眨眼，但尚未指定完整闭眼立绘。运行时会保持睁眼。",
                             MessageType.Warning);
                     else if (BlinkSpritesMisaligned())
-                        EditorGUILayout.HelpBox(
-                            "闭眼图与默认立绘的宽高比或 Pivot 不一致，眨眼时可能发生跳动。",
+                        EditorGUILayout.HelpBox(overlayMode
+                            ? "闭眼叠加图与默认立绘的宽高比或 Pivot 不一致，眼部叠加可能错位。"
+                            : "闭眼图与默认立绘的宽高比或 Pivot 不一致，眨眼时可能发生跳动。",
                             MessageType.Warning);
+
+                    if (overlayMode)
+                        EditorGUILayout.HelpBox(
+                            "分层叠加：闭眼图请保留与默认立绘完全相同的整张透明画布，" +
+                            "只在眼部留像素，且该块像素要能盖住原立绘睁开的眼睛。仅默认表情生效。",
+                            MessageType.Info);
+
+                    if (GUILayout.Button("选中闭眼图") && closedSource != null)
+                    {
+                        Selection.activeObject = closedSource;
+                        EditorGUIUtility.PingObject(closedSource);
+                    }
 
                     EditorGUILayout.Space(4f);
                     EditorGUILayout.LabelField("说话口型", EditorStyles.boldLabel);
@@ -560,7 +596,9 @@ namespace VNEffects.EditorTools
             _character.sizeScale = _draft.sizeScale;
             _character.positionOffset = _draft.positionOffset;
             _character.enableBlink = _draft.enableBlink;
+            _character.blinkMode = _draft.blinkMode;
             _character.blinkSprite = _draft.blinkSprite;
+            _character.blinkOverlaySprite = _draft.blinkOverlaySprite;
             _character.blinkIntervalMin = _draft.blinkIntervalMin;
             _character.blinkIntervalMax = _draft.blinkIntervalMax;
             _character.blinkDuration = _draft.blinkDuration;
@@ -794,7 +832,9 @@ namespace VNEffects.EditorTools
             (!Mathf.Approximately(_draft.sizeScale, _character.sizeScale) ||
              _draft.positionOffset != _character.positionOffset ||
              _draft.enableBlink != _character.enableBlink ||
+             _draft.blinkMode != _character.blinkMode ||
              _draft.blinkSprite != _character.blinkSprite ||
+             _draft.blinkOverlaySprite != _character.blinkOverlaySprite ||
              !Mathf.Approximately(_draft.blinkIntervalMin, _character.blinkIntervalMin) ||
              !Mathf.Approximately(_draft.blinkIntervalMax, _character.blinkIntervalMax) ||
              !Mathf.Approximately(_draft.blinkDuration, _character.blinkDuration) ||
@@ -894,20 +934,33 @@ namespace VNEffects.EditorTools
             if (_character == null || _character.expressions == null ||
                 _character.expressions.Count == 0) return null;
             int index = Mathf.Clamp(_expressionIndex, 0, _character.expressions.Count - 1);
+            // 整张替换模式才换底图；分层叠加模式的闭眼图另外叠一层画（见 BlinkOverlayPreviewSprite）
             if (index == 0 && _previewBlinkClosed && _draft != null &&
-                _draft.blinkSprite != null)
+                _draft.blinkMode == VNBlinkMode.FullSprite && _draft.blinkSprite != null)
                 return _draft.blinkSprite;
             return _character.expressions[index].sprite;
         }
 
+        /// <summary>分层眨眼预览：叠在立绘之上的那张透明闭眼图（不适用时 null）。</summary>
+        Sprite BlinkOverlayPreviewSprite()
+        {
+            if (!_previewBlinkClosed || _draft == null ||
+                _draft.blinkMode != VNBlinkMode.Overlay ||
+                _draft.blinkOverlaySprite == null || _expressionIndex != 0)
+                return null;
+            return _draft.blinkOverlaySprite;
+        }
+
         bool BlinkSpritesMisaligned()
         {
-            if (_character == null || _character.DefaultSprite == null ||
-                _draft == null || _draft.blinkSprite == null)
+            if (_character == null || _character.DefaultSprite == null || _draft == null)
                 return false;
 
+            Sprite closed = _draft.blinkMode == VNBlinkMode.Overlay
+                ? _draft.blinkOverlaySprite : _draft.blinkSprite;
+            if (closed == null) return false;
+
             Sprite open = _character.DefaultSprite;
-            Sprite closed = _draft.blinkSprite;
             float openAspect = open.rect.width / Mathf.Max(1f, open.rect.height);
             float closedAspect = closed.rect.width / Mathf.Max(1f, closed.rect.height);
             return Mathf.Abs(openAspect - closedAspect) > 0.01f ||

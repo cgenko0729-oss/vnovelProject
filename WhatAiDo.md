@@ -4544,3 +4544,87 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 - 存档验证：飘落中存档 → 读档，天气 id 与四个覆盖参数都应复原；
   旧存档（`weather` 字段为 `"Petals"`/`"Rain"`）仍能正确读出。
 - Lint 验证：`weather 枫葉`（错别字）应报 `unknown-weather`。
+
+---
+
+## 九十三、分层眨眼（眼部叠加图，与整张替换二选一）（2026-08-03，分支 `agent/blink-overlay`）
+
+### 需求 / 背景
+
+原有眨眼（第十九批 `VNCharacterBlink`）是**整张立绘替换**：到点把 `Image.sprite` 换成
+一张完整的闭眼全身图，闭眼时间到再换回来。这要求每个角色额外准备一张与睁眼图
+像素级对齐的整图，AI 生成立绘时很难保证除眼睛外一模一样，稍有偏差就"整个人抖一下"。
+
+而说话口型 `VNCharacterMouth` 用的是另一条路：原立绘不动，在其上方叠一张**同画布
+坐标的透明张嘴图**，只有嘴那一块有像素。这条路对素材友好得多。
+
+本批把口型那套做法照搬给眨眼，作为**新增的第二种方式**：
+原有整张替换的代码路径原样保留、行为一字不改，由角色资产上的 `blinkMode` 二选一。
+
+### 文件改动清单
+
+**新增**
+
+- `Script/VNCharacterBlinkOverlay.cs` —— 分层眨眼组件。结构 = `VNCharacterMouth` 的
+  overlay 建法（子物体 `BlinkOverlay`，anchor 全拉伸、`preserveAspect=false`、
+  `raycastTarget=false`、共用 `VNImageEffectController.Mat`）+ `VNCharacterBlink` 的
+  DOTween 计时序列（随机间隔 → 显示 → `blinkDuration` → 隐藏 → 重排）。
+  只在默认表情工作；`blinkMode != Overlay` 时整个组件自然静默。
+
+**修改**
+
+- `Script/VNCharacterDef.cs` —— 新增枚举 `VNBlinkMode { FullSprite=0, Overlay=1 }`、
+  字段 `blinkMode`（默认 `FullSprite`）、`blinkOverlaySprite`，
+  以及便捷属性 `ActiveBlinkSprite`（按当前方式返回实际会用到的那张图）。
+  `blinkIntervalMin/Max`、`blinkDuration` 两种方式**共用**。
+- `Script/VNCharacterBlink.cs` —— `CanBlink()` 与 `ValidateSpriteAlignment()` 各加一条
+  `blinkMode == FullSprite` 守卫，选了分层时完全让路。其余逻辑一字未动。
+- `Script/VNStage.cs` —— `ActiveCharacter` 加 `blinkOverlay` 字段；
+  `CreateCharacter()` 挂载并 `Initialize(img, def, c.fx.Mat)`；
+  `ApplyExpression()` 的两个分支各补 `PrepareForExpressionChange()` / `SetExpression(isDefault)`。
+- `Editor/VNCharacterVisualPreviewWindow.cs` —— 草稿加 `blinkMode` / `blinkOverlaySprite`
+  （ReadFrom / 应用 / 脏检查三处同步）；眨眼区块改为先选方式再显示对应图槽位；
+  「预览闭眼状态」在分层模式下改成**叠一层画**而不是换底图；新增素材要求 HelpBox、
+  错位警告文案分模式、「选中闭眼图」按钮。
+
+### 技术决策与取舍
+
+1. **为什么开新组件而不是在 VNCharacterBlink 里加分支**：用户明确要求"整张替换的功能
+   保留不让动"。两套的状态机不同（一个改 `Image.sprite` 要记 `_openSprite`/
+   `_showingClosedSprite`，一个只开关 overlay 的 `enabled`），混在一起反而会互相牵连。
+   现在两个组件都挂在角色上，靠 `blinkMode` 保证任何时候只有一个真的在跑。
+
+2. **枚举默认值必须是 `FullSprite = 0`**：Unity 序列化的枚举缺省就是 0，
+   所以所有现有角色资产不用改任何一个字段，行为与本批之前完全一致。
+
+3. **overlay 共用 `c.fx.Mat`**：与口型层同一处理。溶解 / 闪白 / HSV / 模糊等单图特效
+   是走材质属性的，不共用材质的话眨眼那一瞬间眼睛会"跳出"特效之外。
+
+4. **只支持默认表情**：与整张替换版保持一致。其他表情眼部构图/角度不同，
+   叠同一张闭眼图必然错位；需要的话未来再扩成「表情名 → 闭眼图」列表。
+
+5. **单帧硬切而不是多帧序列**：与整张替换版行为对齐，素材只需 1 张。
+   `blinkDuration` 默认 0.1s，人眼看来就是一次干净的眨眼。
+
+6. **换表情时先收 overlay**：`ApplyExpression` 会生成旧表情残像做交叉溶解，
+   若此刻闭眼层还开着，闭眼帧会被一起卷进溶解里。所以在残像生成前调
+   `PrepareForExpressionChange()`。
+
+### 素材要求（新方式）
+
+- 闭眼图必须与**默认表情立绘保持完全相同的画布尺寸与 Pivot**，
+  只在眼部留下像素、其余 alpha = 0（做法与张嘴图完全一样）。
+- 眼部那块像素要能**完整盖住原立绘睁开的眼睛**（含眼白、瞳孔、睫毛，
+  一般要连眼周皮肤一起画），否则会露出底下的眼睛。
+- 尺寸/Pivot 不一致时，预览窗口与运行时都会给告警。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**（109 条 warning 全是既有的
+  `FindFirstObjectByType` 过时提示）。
+- 回归：不改任何角色资产 → 原本会眨眼的角色行为完全不变（`blinkMode` 缺省 = 整张替换）。
+- 新方式：角色资产把「眨眼方式」改成**分层叠加**、指定透明闭眼叠加图 →
+  Tools → VN Effects → Character Visual Preview 勾「预览闭眼状态」，
+  应看到只有眼睛变了、身体一动不动；Play Mode 里 `show 角色` 后自动间歇眨眼。
+- 表情切换：切到非默认表情应立刻停止眨眼且不残留闭眼层，切回默认恢复。
+- 特效联动：眨眼期间跑 `fx dissolve` / `fx flash`，闭眼层应与立绘同步溶解/闪白。

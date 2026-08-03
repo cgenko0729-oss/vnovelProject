@@ -151,8 +151,8 @@
 - **背景**：`backgrounds` 列表（id→Sprite），`SetBackground(id, transition)`
 - **角色**：`characters`（VNCharacterDef 列表）；`CreateCharacter/Show/Hide/Move/
   SetExpression`——运行时给每个角色组装 `rect + VNImageEffectController +
-  VNEntranceAnimator + VNCharacterEmotes + VNCharacterBlink + VNCharacterMouth +
-  光环 + 脚影` 的完整堆叠
+  VNEntranceAnimator + VNCharacterEmotes + VNCharacterBlink + VNCharacterBlinkOverlay +
+  VNCharacterMouth + 光环 + 脚影` 的完整堆叠
 - **台词**：`Say()` 把说话者/表情/文本分发给对话框、高亮、口型
 - **fx 路由**：`Fx(name, value)` 把 `fx godrays on` 这类开关转发给对应组件，
   `_fxStates` 记录开关状态供存档
@@ -181,17 +181,31 @@
 
 - **职责**：角色定义 ScriptableObject（`Assets/VNEffects/Characters/*.asset`）。
   id、名牌显示名/颜色、表情列表（名字→Sprite）、站位偏移、缩放标定、
-  对话头像参数、眨眼配置（闭眼图/间隔）、口型配置（张嘴图/间隔/仅默认表情）。
+  对话头像参数、眨眼配置（方式 `blinkMode` + 整张闭眼立绘 / 透明闭眼叠加图 + 间隔）、
+  口型配置（张嘴图/间隔/仅默认表情）。
+- **枚举 `VNBlinkMode`** 也定义在本文件：`FullSprite=0`（整张替换，缺省，
+  保证旧资产行为不变）/ `Overlay=1`（眼部叠加层）。便捷属性 `ActiveBlinkSprite`
+  按当前方式返回实际用到的那张图。
 - **扩展**：给角色加新的"每角色可配"能力时字段加在这里，然后在
   `VNCharacterVisualPreviewWindow` 里补预览 UI（保持"确认后写入资产"流程）。
 
-### VNCharacterBlink.cs / VNCharacterMouth.cs（`Script/`）
+### VNCharacterBlink.cs / VNCharacterBlinkOverlay.cs / VNCharacterMouth.cs（`Script/`）
 
-- **职责**：自动眨眼（默认表情下随机间隔换闭眼 Sprite）/ 说话口型
-  （台词+语音期间在叠加子 Image 上随机开合张嘴图）。
+- **职责**：自动眨眼两种实现 / 说话口型（台词+语音期间在叠加子 Image 上随机开合张嘴图）。
+- **眨眼两条路径互斥，由 `VNCharacterDef.blinkMode` 二选一**，两个组件都会挂在角色上，
+  各自在 `CanBlink` 里检查 `blinkMode` 后决定是否工作：
+  - `VNCharacterBlink`（`FullSprite`）：默认表情下随机间隔把 `Image.sprite`
+    换成完整闭眼立绘再换回。素材要整张像素级对齐。
+  - `VNCharacterBlinkOverlay`（`Overlay`）：底图不动，开关一张只有眼部有像素的
+    透明闭眼图，做法与口型层完全一致。素材只要画布尺寸/Pivot 一致即可。
+  - 间隔与闭眼时长字段（`blinkIntervalMin/Max`、`blinkDuration`）两者共用。
 - **共同设计**：整张透明画布叠加、与主体共享 `VNImageEffectController.Mat`
   材质（溶解/调色同步）、DOTween 随机间隔驱动。
+- **接线**：`VNStage.CreateCharacter()` 挂三个组件；`ApplyExpression()` 必须对
+  blink / blinkOverlay / mouth **三个都**调 `PrepareForExpressionChange()`
+  与 `SetExpression()`，漏一个就会有旧帧被卷进表情交叉溶解。
 - **扩展提示**：这套"透明画布叠加层"就是漫符系统（下条）的蓝本。
+  再要加"分表情闭眼图"就把 `blinkOverlaySprite` 扩成 `表情名 → Sprite` 列表。
 
 ### VNCharacterMarks.cs（`Script/`）—— 立绘漫符
 

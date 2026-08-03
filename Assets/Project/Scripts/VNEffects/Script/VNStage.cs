@@ -121,6 +121,8 @@ namespace VNEffects
             public VNEntranceAnimator animator;
             public VNCharacterEmotes emotes;
             public VNCharacterBlink blink;
+            /// <summary>分层眨眼；与 blink 互斥，按 def.blinkMode 只有一个会真正工作</summary>
+            public VNCharacterBlinkOverlay blinkOverlay;
             public VNCharacterMouth mouth;
             public VNCharacterMarks marks;
             public string expression;
@@ -410,12 +412,14 @@ namespace VNEffects
 
             bool isDefault = c.def.IsDefaultExpression(expr);
             c.blink?.PrepareForExpressionChange();
+            c.blinkOverlay?.PrepareForExpressionChange();
             c.mouth?.PrepareForExpressionChange();
 
             if (sprite == c.image.sprite)
             {
                 c.expression = expr;
                 c.blink?.SetExpression(sprite, isDefault);
+                c.blinkOverlay?.SetExpression(isDefault);
                 c.mouth?.SetExpression(expr);
                 return;
             }
@@ -433,6 +437,7 @@ namespace VNEffects
             float aspect = sprite.rect.width / sprite.rect.height;
             c.rect.sizeDelta = new Vector2(h * aspect, h);
             c.blink?.SetExpression(sprite, isDefault);
+            c.blinkOverlay?.SetExpression(isDefault);
             c.mouth?.SetExpression(expr);
         }
 
@@ -520,6 +525,8 @@ namespace VNEffects
             c.emotes = go.AddComponent<VNCharacterEmotes>();
             c.blink = go.AddComponent<VNCharacterBlink>();
             c.blink.Initialize(img, def);
+            c.blinkOverlay = go.AddComponent<VNCharacterBlinkOverlay>();
+            c.blinkOverlay.Initialize(img, def, c.fx.Mat);
             c.mouth = go.AddComponent<VNCharacterMouth>();
             c.mouth.Initialize(img, def, c.fx.Mat);
             c.marks = go.AddComponent<VNCharacterMarks>();

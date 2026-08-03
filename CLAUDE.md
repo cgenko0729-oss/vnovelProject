@@ -118,7 +118,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技（走 VNFoliageSystem：起手阵风冲击+Burst、中途补风、尾声风力衰减、近景大瓣横掠） |
-| VNCharacterBlink / VNCharacterMouth | 默认表情自动眨眼 / 说话口型（透明画布叠加层） |
+| VNCharacterBlink / VNCharacterBlinkOverlay / VNCharacterMouth | 默认表情自动眨眼两选一：整张闭眼立绘替换 / 只在眼部叠一张透明闭眼图（角色资产 `blinkMode` 切换，间隔与闭眼时长共用）；说话口型（透明画布叠加层） |
 | VNCharacterMarks | 立绘漫符（汗滴/井字怒气/感叹号/问号/爱心/音符/红晕/灯泡/省略号/眩晕星/蒸汽）：`mark <角色> <符号\|clear> [keep\|off] [pos:x,y] [size:] [dur:]`；符号图程序化生成、角色资产可用自定义图覆盖；位置取 VNCharacterDef.markAnchor（归一化偏移）；keep 常驻符号进存档 |
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |

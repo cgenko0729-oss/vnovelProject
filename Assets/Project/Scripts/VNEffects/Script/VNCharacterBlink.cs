@@ -5,8 +5,10 @@ using UnityEngine.UI;
 namespace VNEffects
 {
     /// <summary>
-    /// 默认表情自动眨眼：用完整闭眼立绘短暂替换当前 Image，不经过表情交叉溶解。
+    /// 默认表情自动眨眼（整张替换版）：用完整闭眼立绘短暂替换当前 Image，不经过表情交叉溶解。
     /// 非默认表情、未启用或未配置闭眼图时不会改写角色立绘。
+    /// 角色资产选了分层叠加（<see cref="VNBlinkMode.Overlay"/>）时本组件完全让路，
+    /// 改由 <see cref="VNCharacterBlinkOverlay"/> 负责。
     /// </summary>
     public class VNCharacterBlink : MonoBehaviour
     {
@@ -69,6 +71,7 @@ namespace VNEffects
             isActiveAndEnabled &&
             _definition != null &&
             _definition.enableBlink &&
+            _definition.blinkMode == VNBlinkMode.FullSprite &&
             _definition.blinkSprite != null &&
             _image != null &&
             _openSprite != null &&
@@ -117,6 +120,7 @@ namespace VNEffects
         void ValidateSpriteAlignment()
         {
             if (_definition == null || !_definition.enableBlink ||
+                _definition.blinkMode != VNBlinkMode.FullSprite ||
                 _definition.DefaultSprite == null || _definition.blinkSprite == null)
                 return;
 

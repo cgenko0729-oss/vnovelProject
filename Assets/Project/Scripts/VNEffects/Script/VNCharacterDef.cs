@@ -4,6 +4,17 @@ using UnityEngine;
 namespace VNEffects
 {
     /// <summary>
+    /// 眨眼的实现方式，二选一（两条运行时代码路径互不干扰）。
+    /// </summary>
+    public enum VNBlinkMode
+    {
+        [InspectorName("整张替换（换成完整闭眼立绘）")]
+        FullSprite = 0,
+        [InspectorName("分层叠加（只在眼部叠一张透明图）")]
+        Overlay = 1,
+    }
+
+    /// <summary>
     /// 角色定义资产：剧本里用 id 引用角色，立绘表情在这里集中管理。
     /// 每个角色一个 .asset（Create → VN → Character Definition）。
     /// </summary>
@@ -59,8 +70,15 @@ namespace VNEffects
         [Header("是否允许这个角色在默认表情时自动眨眼。关闭后即使配置了闭眼图也不会眨眼")]
         public bool enableBlink;
 
-        [Header("闭眼状态的完整全身立绘。应与默认表情使用相同画布尺寸、人物位置和 Pivot")]
+        [Header("眨眼方式：整张替换用下面的完整闭眼立绘；分层叠加只在眼部叠一张透明图（同口型的做法）")]
+        public VNBlinkMode blinkMode = VNBlinkMode.FullSprite;
+
+        [Header("【整张替换用】闭眼状态的完整全身立绘。应与默认表情使用相同画布尺寸、人物位置和 Pivot")]
         public Sprite blinkSprite;
+
+        [Header("【分层叠加用】透明背景的闭眼局部图。保留与默认立绘完全相同的整张透明画布，" +
+                "只在眼部留下像素；该块像素要能盖住原立绘睁开的眼睛")]
+        public Sprite blinkOverlaySprite;
 
         [Header("两次眨眼之间的最短随机间隔（秒）")]
         [Min(0.1f)]
@@ -152,6 +170,16 @@ namespace VNEffects
 
             Debug.LogWarning($"[VNScript] 角色 {id} 没有表情「{expressionName}」，使用默认表情", this);
             return expressions[0].sprite;
+        }
+
+        /// <summary>当前眨眼方式实际会用到的那张图（没开眨眼或没配图 = null）。</summary>
+        public Sprite ActiveBlinkSprite
+        {
+            get
+            {
+                if (!enableBlink) return null;
+                return blinkMode == VNBlinkMode.Overlay ? blinkOverlaySprite : blinkSprite;
+            }
         }
 
         /// <summary>第一张立绘是项目约定的默认表情。</summary>
