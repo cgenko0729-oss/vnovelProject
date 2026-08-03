@@ -124,6 +124,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
 | VNBattleModule | 回合制小战斗（event battle，结果 胜利/失败/逃跑；patkstat/phpstat/pdefstat 从 flag 读属性=养成联动，结束写 flag 战斗剩余HP 供车轮战） |
+| VNLiquidInstaller (Editor) | 把液体喷溅**增量装进当前场景**（Tools → VN Effects → Install Liquid Splash To Scene）：Canvas 下补 WetScreen + 场外补 LiquidSplash + 两层互连并回填 VNStage，不重建场景、可重复执行。老场景不跑它的话 `liquid` 命令会静默无效果 |
 | VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → Install Quiz Module To Scene）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
 | VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |

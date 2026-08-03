@@ -490,6 +490,11 @@ liquid cover on                                # 水渍盖到对话框上面
 `spray` / `click` / `wet` / `cover` 是持续状态，**进存档**；`splash` / `dry` 是一次性演出，
 读档和「从选中行播放」都不会重放。
 
+> ⚠️ **老场景要先装一次**：`liquid` 命令依赖场景里的 `VNWetScreen` + `VNLiquidSplash`
+> 两个物体，缺了会**静默无效果**（连报错都没有）。已有的剧本场景跑一次
+> **Tools → VN Effects → Install Liquid Splash To Scene** 即可，它只做加法、
+> 不重建场景、可以重复执行。用 Create Script Demo Scene 新造的场景已自带。
+
 ### letterbox — 电影黑边
 
 ```

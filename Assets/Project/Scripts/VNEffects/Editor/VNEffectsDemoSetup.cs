@@ -1333,6 +1333,12 @@ hide 亚里沙 with:dissolve
             AssetDatabase.CreateFolder(parent, leaf);
         }
 
+        /// <summary>材质资产目录（增量安装器要往同一处放，避免各造一份）</summary>
+        internal const string SharedMaterialsDir = MaterialsDir;
+
+        internal static Material EnsureMaterialAsset(string path, string shaderName)
+            => EnsureMaterial(path, shaderName);
+
         static Material EnsureMaterial(string path, string shaderName)
         {
             var mat = AssetDatabase.LoadAssetAtPath<Material>(path);

@@ -4684,7 +4684,14 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 - `Editor/VNScenarioLinter.cs` —— 4 项检查：未知子命令、未知液体类型、x/y 超出屏幕
   比例范围、开关位不是 on/off。
 - `Editor/VNEffectsDemoSetup.cs` —— 生成器创建两个组件并接线；`AssignSourceMaterial`
-  拆出按字段名的 `AssignMaterialField`（`VNLiquidSplash` 要 alpha + additive 两份材质）。
+  拆出按字段名的 `AssignMaterialField`（`VNLiquidSplash` 要 alpha + additive 两份材质）；
+  材质目录与 `EnsureMaterial` 开放给增量安装器共用。
+- `Editor/VNLiquidInstaller.cs`（新增）—— 增量安装器
+  （Tools → VN Effects → Install Liquid Splash To Scene）。**这条不是可选的**：
+  `VNStage.AutoWire` 只能「找得到才接」，老场景里根本没有这两个物体时
+  `liquid` 命令会静默无效果——每个分支都是 `if (xxx == null) break;`，
+  连报错都没有。而 Create Script Demo Scene 会 NewScene 重造、丢掉手工整理过的
+  Hierarchy，为了两个物体重建整个场景代价太大。照 `VNQuizInstaller` 的思路只做加法。
 - `VNEffectsDemo.cs` —— 演示按键 `` ` `` 鼠标处爆溅 / F1 间歇喷射 / F2 换液体 / F3 湿镜头。
 - `Assets/Scenarios/Demo.vn.txt` —— 头部语法速查补 `liquid`。
 
