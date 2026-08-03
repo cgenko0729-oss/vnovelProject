@@ -699,9 +699,14 @@ namespace VNEffects
         {
             data.backgroundId = CurrentBackgroundId;
             // CG 暂停环境特效期间：存的是"CG 背后"的天气与 fx（读档重放 CG 时会再次暂停）
-            data.weather = _cgFxPaused && _cgSavedWeather != VNWeather.None
-                ? _cgSavedWeather.ToString()
-                : weather != null ? weather.Current.ToString() : null;
+            data.weather = _cgFxPaused && !string.IsNullOrEmpty(_cgSavedWeatherId)
+                ? _cgSavedWeatherId
+                : weather != null ? weather.CurrentId : null;
+            data.weatherDensity = _weatherDensity;
+            data.weatherSpeed = _weatherSpeed;
+            data.weatherSize = _weatherSize;
+            data.weatherWindSet = _weatherWindSet;
+            data.weatherWind = _weatherWind;
             data.mood = mood != null ? mood.Current.ToString() : null;
             data.bgm = vnAudio != null ? vnAudio.CurrentBgm : null;
             data.bgmVol = vnAudio != null ? vnAudio.CurrentBgmVol : 1f;
@@ -761,10 +766,11 @@ namespace VNEffects
                 if (backgroundImage != null) backgroundImage.sprite = null;
             }
 
-            if (weather != null)
-                weather.SetWeather(
-                    VNScriptParser.ParseEnum(data.weather, VNWeather.None, 0),
-                    instant ? 0.01f : 0.1f);
+            // 旧存档里 weather 是 VNWeather 枚举名（"Petals"/"Rain"），
+            // SetWeatherId 的三级解析照常认得，不需要迁移
+            SetWeather(data.weather, data.weatherDensity, data.weatherWind,
+                data.weatherWindSet, data.weatherSpeed, data.weatherSize,
+                instant ? 0.01f : 0.1f);
             var restoredMood = VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0);
             if (mood != null)
                 mood.SetMood(restoredMood, instant ? 0.01f : 0.3f);
@@ -1000,7 +1006,7 @@ namespace VNEffects
         bool _cgKeepFx;                    // 本次 CG 是否保留环境特效（fx:keep）
         bool _cgFxPaused;                  // 环境特效当前被 CG 暂停中
         readonly List<string> _cgPausedFx = new List<string>(); // 被暂停的 fx 名（恢复用）
-        VNWeather _cgSavedWeather = VNWeather.None;             // 被暂停的天气（恢复用）
+        string _cgSavedWeatherId = "";                          // 被暂停的天气 id（恢复用）
         CanvasGroup _charLayerGroup;       // 立绘层整体显隐（保持 GO 活跃，状态无损）
 
         /// <summary>CG 期间被暂停的环境特效集合（演出类 fx 如黑边/滤镜/心跳不受影响）</summary>
@@ -1069,9 +1075,9 @@ namespace VNEffects
                     Fx(name, "off");
                 }
             }
-            _cgSavedWeather = weather != null ? weather.Current : VNWeather.None;
-            if (weather != null && _cgSavedWeather != VNWeather.None)
-                weather.SetWeather(VNWeather.None, instant ? 0.01f : 0.6f);
+            _cgSavedWeatherId = weather != null ? weather.CurrentId : "";
+            if (weather != null && !string.IsNullOrEmpty(_cgSavedWeatherId))
+                weather.SetWeatherId("", instant ? 0.01f : 0.6f);
         }
 
         void ResumeCgAmbientFx(bool instant)
@@ -1080,9 +1086,9 @@ namespace VNEffects
             _cgFxPaused = false;
             foreach (var name in _cgPausedFx) Fx(name, "on");
             _cgPausedFx.Clear();
-            if (weather != null && _cgSavedWeather != VNWeather.None)
-                weather.SetWeather(_cgSavedWeather, instant ? 0.01f : 0.6f);
-            _cgSavedWeather = VNWeather.None;
+            if (weather != null && !string.IsNullOrEmpty(_cgSavedWeatherId))
+                ApplyWeather(_cgSavedWeatherId, instant ? 0.01f : 0.6f);
+            _cgSavedWeatherId = "";
         }
 
         /// <summary>
@@ -1112,7 +1118,7 @@ namespace VNEffects
             _cgKeepFx = false;
             _cgFxPaused = false;
             _cgPausedFx.Clear();
-            _cgSavedWeather = VNWeather.None;
+            _cgSavedWeatherId = "";
             FadeCharLayer(1f, true);
         }
 
@@ -1184,6 +1190,45 @@ namespace VNEffects
             }
         }
 
+        // ------------------------------------------------------------------
+        // 天气（飘落类的剧本覆盖参数由 VNStage 统一持有 —— 存档、CG 暂停恢复、
+        // 调试重建三处都从这里取，避免各自维护一份而走样）
+        // ------------------------------------------------------------------
+
+        float _weatherDensity, _weatherSpeed, _weatherSize, _weatherWind;
+        bool _weatherWindSet;
+
+        void ClearWeatherOverrides()
+        {
+            _weatherDensity = _weatherSpeed = _weatherSize = _weatherWind = 0f;
+            _weatherWindSet = false;
+        }
+
+        /// <summary>用当前记录的覆盖参数应用一个天气 id（CG 恢复 / 读档共用）</summary>
+        void ApplyWeather(string id, float transition)
+        {
+            weather?.SetWeatherId(id, transition, _weatherDensity,
+                _weatherWindSet ? _weatherWind : float.NaN, _weatherSpeed, _weatherSize);
+        }
+
+        /// <summary>
+        /// weather 命令入口：weather &lt;id&gt; [density:] [wind:] [speed:] [size:]
+        /// 覆盖参数留空 = 用资产里的值；换天气时覆盖参数一并重置。
+        /// </summary>
+        public void SetWeather(string id, float density, float wind, bool windSet,
+            float speed, float size, float transition = 1.5f)
+        {
+            _weatherDensity = density;
+            _weatherSpeed = speed;
+            _weatherSize = size;
+            _weatherWind = wind;
+            _weatherWindSet = windSet;
+            ApplyWeather(id, transition);
+        }
+
+        /// <summary>一次性阵风冲击（剧本 wind gust）</summary>
+        public void WeatherGust(float strength) => weather?.Gust(strength);
+
         /// <summary>letterbox 命令入口：手动控制会接管自动黑边</summary>
         public void SetLetterbox(bool on, float height = -1f, float duration = -1f)
         {
@@ -1199,8 +1244,9 @@ namespace VNEffects
         {
             // CG 期间 reset effects：暂停恢复清单一并作废，cg off 后不再回放旧特效/天气
             _cgPausedFx.Clear();
-            _cgSavedWeather = VNWeather.None;
-            weather?.SetWeather(VNWeather.None, 0.8f);
+            _cgSavedWeatherId = "";
+            ClearWeatherOverrides();
+            weather?.SetWeatherId("", 0.8f);
             mood?.SetMood(VNMood.Neutral, 0.8f);
             foreach (var name in ToggleFxNames) Fx(name, "off");
             Fx("focus", "off");

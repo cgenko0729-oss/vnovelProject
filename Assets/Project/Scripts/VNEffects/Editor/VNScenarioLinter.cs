@@ -89,6 +89,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> eventModules = new HashSet<string>();
             public HashSet<string> mapLocations = new HashSet<string>();
             public HashSet<string> quizIds = new HashSet<string>();
+            public HashSet<string> weatherIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
             public bool sceneRegistryFound;   // 场景里有没有 VNEventRegistry
@@ -262,6 +263,14 @@ namespace VNEffects.EditorTools
                 var def = AssetDatabase.LoadAssetAtPath<VNQuizDef>(
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (def != null && !string.IsNullOrEmpty(def.quizId)) reg.quizIds.Add(def.quizId);
+            }
+
+            // 自定义飘落天气资产（内置叶型别名与 VNWeather 枚举另行判定，不进这个集合）
+            foreach (var guid in AssetDatabase.FindAssets("t:VNWeatherDef"))
+            {
+                var wd = AssetDatabase.LoadAssetAtPath<VNWeatherDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (wd != null && !string.IsNullOrEmpty(wd.id)) reg.weatherIds.Add(wd.id);
             }
 
             return reg;
@@ -475,6 +484,25 @@ namespace VNEffects.EditorTools
                             Add(issues, VNLintSeverity.Error, "bad-mark-mode", f, c.line,
                                 $"mark 的第三个参数「{markMode}」不合法",
                                 "第三个参数只能是 keep（常驻）或 off（移除该符号），留空 = 弹一下就消失。");
+                        break;
+                    }
+
+                    case "weather":
+                    {
+                        // 认不出的天气 id 运行时会静默变成「无天气」——画面少了一整层演出
+                        // 而没有任何报错，所以这里必须提前抓
+                        string wid = c.Arg(0);
+                        if (!string.IsNullOrEmpty(wid) && !Dynamic(wid) &&
+                            !wid.Equals("none", System.StringComparison.OrdinalIgnoreCase) &&
+                            !wid.Equals("off", System.StringComparison.OrdinalIgnoreCase) &&
+                            !reg.weatherIds.Contains(wid) &&
+                            VNWeatherDef.ParseBuiltinId(wid) == null &&
+                            !System.Enum.TryParse<VNWeather>(wid, true, out _))
+                            Add(issues, VNLintSeverity.Error, "unknown-weather", f, c.line,
+                                $"天气「{wid}」不认识",
+                                "飘落类可写 petals/sakura/落樱、maple/枫叶、ginkgo/银杏、" +
+                                "leaves/落叶、bamboo/竹叶；其余写 Rain / Snow / Fireflies / None；" +
+                                "自定义参数资产要在 VNGameConfig 的飘落天气库里登记 id。");
                         break;
                     }
 

@@ -4424,3 +4424,123 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   `stepin` 落地时脚下影确实摊开一下。
 - 存档验证：日常向登场的角色存档→读档后**不应该**出现周期扫光。
 - Lint 验证：把 `with:` 故意写错（如 `with:crossfad`）应报 `bad-preset`。
+
+---
+
+## 九十二、飘落天气系统重做（落樱真实感 + 落叶/秋叶）（2026-08-03，分支 `agent/foliage-weather`）
+
+### 需求 / 背景
+
+用户反馈原来的落樱效果「有点假、不够专业、可调的地方不够多、樱花还是白色的」，
+并希望加入落叶 / 秋叶 / 树叶等类型。逐条定位到旧实现
+（`VNAmbientParticles.Preset.Petals`）的根因：
+
+1. **白色的根因是混合模式，不是颜色配错**：`VN/Additive` 是 `Blend SrcAlpha One`，
+   加法混合只能给背景加亮、永远无法遮挡背景。粉色 `(1, 0.72, 0.82)` 再乘
+   `hdrBoost 1.8` 后三个通道全部 >1，经 Bloom（阈值 1.0）+ Tonemapping 必然被压成白。
+   把 tint 调成任何粉色都没用。
+2. **每片长得一模一样**：全屏共用一张柔边椭圆贴图（`VNProceduralTextures.Petal`），
+   人眼几帧内就识破重复。
+3. **纸片感**：只有 `rotationOverLifetime.z`（画面内平面自转），没有绕自身长轴的翻转，
+   宽度与亮度恒定 —— 这是业余落樱与商业落樱最大的观感差距。
+4. **集体同步**：全体共享一个 velocity 区间 + 一个全局 Perlin 噪声场。噪声空间连续，
+   相邻花瓣会同步摆动，看起来像有人在整体拨一张网，最出戏。
+5. **画面平**：只有一层，没有景深分层。
+6. **不可调**：参数硬编码在 `Configure()` 的大 switch 里，剧本层只有 `weather petals` 一句话。
+7. **凭空消失**：花瓣按 lifetime 淡出，与它在屏幕上的位置无关，经常飘到半空就没了。
+
+### 文件改动清单
+
+**新增（运行时）**
+
+- `Art/Shaders/VNParticleAlpha.shader` —— 实体粒子的普通 Alpha 混合
+  （`SrcAlpha OneMinusSrcAlpha`，会遮挡背景）；`_SoftBlur` 提供 5-tap 十字模糊给近景虚焦用。
+- `VNFoliageTextures.cs` —— 叶型枚举 `VNLeafShape`（Sakura/Maple/Ginkgo/Broadleaf/Bamboo）
+  + 程序化图集烘焙。图集布局 **列 = 12 翻转帧，行 = 4 形态变体**，
+  RGB 存明暗（叶脉/折痕/根深尖浅/背面压暗），A 存形状，色相交给粒子 startColor。
+- `VNWeatherDef.cs` —— 全部可调参数的 ScriptableObject（含五套内置预设，
+  不建任何资产也能用）+ id 解析（认英文正名与中文别名）。
+- `VNFoliageSystem.cs` —— 三层景深飘落系统：图集翻转、每粒子独立相位横摆、
+  全局阵风、尺寸↔速度联动、地面堆积。
+
+**新增（编辑器）**
+
+- `Editor/VNWeatherPreviewWindow.cs` —— Tools → VN Effects → **Weather Preview**：
+  编辑模式下播放翻转帧预览（四种变体并排、按色带着色），运行模式下滑杆实时应用到场景，
+  另存为资产 + 一键登记进 VNGameConfig。
+
+**修改**
+
+- `VNWeatherController.cs` —— 双后端：飘落类走 `VNFoliageSystem`，
+  雨/雪/萤火虫仍走 `VNAmbientParticles`。统一入口 `SetWeatherId(id, …)` 三级解析
+  （自定义资产 id → 内置叶型别名 → `VNWeather` 枚举名），新增 `CurrentId`、
+  `Gust()`、`SetAmbient()`、`PreviewDef()`。
+- `VNSakuraBurst.cs` —— 改走 `VNFoliageSystem`，自动继承全部底层改进；
+  另加起手阵风冲击 + Burst、中途补两记阵风、尾声风力衰减、近景层权重大幅拉高。
+- `VNAmbientParticles.cs` —— `Preset.Petals` 标注弃用（仅为旧场景兼容保留）。
+- `Script/VNGameConfig.cs` —— 新增「飘落天气库」`weatherDefs`。
+- `Script/VNSaveSystem.cs` —— `weather` 语义改为 id 字符串（旧存档的枚举名照常认得），
+  新增四个覆盖参数字段（`weatherDensity/Speed/Size` + `weatherWindSet/Wind`）。
+- `Script/VNStage.cs` —— 天气覆盖参数由 VNStage 统一持有；
+  `SetWeather(id, …)` 命令入口、`ApplyWeather()`、`WeatherGust()`；
+  CG 暂停恢复由 `_cgSavedWeather`（枚举）改为 `_cgSavedWeatherId`（字符串）。
+- `Script/VNScriptRunner.cs` —— `weather` 命令支持 `density:/wind:/speed:/size:`；
+  `RebuildStateBefore` 同步重放这四个参数。
+- `Editor/VNScenarioSchema.cs` —— 新增 `VNParamSource.WeatherId`，weather 条目改四参数版。
+- `Editor/VNScenarioDoc.cs`、`VNScenarioEditorWindow.cs` —— 天气候选与校验
+  （`IsKnownWeatherId` 与运行时三级解析同构，中文别名也认）。
+- `Editor/VNScenarioLinter.cs` —— 新增 `unknown-weather` 检查。
+- `Editor/VNEffectsDemoSetup.cs` —— 生成 `VNParticleAlpha.mat` 并接到天气控制器与樱吹雪。
+- `VNEffectsDemo.cs` —— 提示文字改显示 `CurrentId`（新叶型在枚举里统统算 Petals）。
+
+### 技术决策与取舍
+
+1. **翻转用图集序列帧，不用 Mesh 粒子**：Mesh + Custom Vertex Streams 能做真 3D 旋转，
+   但要写 shader，且与 Screen Space-Camera Canvas 的排序、Bloom 配合都麻烦。
+   序列帧方案纯程序化、零运行时开销（只是 UV），与项目「零美术依赖」的约定一致。
+   实现靠 `SingleRow + rowMode Random`：每颗粒子随机抽一行（= 一种形态变体），
+   在该行内播 12 帧完成一整圈翻转；`frameOverTime` 用「两条斜率不同的直线 + multiplier」
+   表达随机翻转圈数，所以每片翻转快慢都不同。
+
+2. **横摆写成「已存活时间的纯函数」**：`offset(t) = amp·sin(2πf·t + φ)`，
+   每帧只加 `offset(t) - offset(t-dt)`，相位/频率/幅度全部由 `particle.randomSeed` 散列得到。
+   **完全无状态** —— 不需要任何平行数组，粒子死亡重排也不会错位。
+   这是替掉全局噪声场（集体同步的元凶）的关键。
+
+3. **阵风把 Perlin 阈值化成脉冲**：直接用原始 Perlin 会变成「一直在晃」，反而不像风。
+   `pow(clamp01(n·1.45 - 0.42), 1.7)` 让大部分时间接近 0、偶尔冲高，再用 Lerp 平滑跟随
+   给起落加惯性。
+
+4. **不 reparent 到 LayerBack/Mid/Front**：那三层是 Canvas（Screen Space-Camera）下的
+   RectTransform，其 lossyScale 不是 1，粒子挂上去尺寸单位会全乱。
+   三层改为独立世界空间物体 + `sortingOrder` 插进 UI 层之间（与旧天气一致）。
+
+5. **地面堆积靠压缩 `remainingLifetime`**：`colorOverLifetime` 取值用
+   `remaining/start` 的比例，把剩余寿命压到 1.4 秒就等于立刻推进到淡出段，
+   不需要额外的状态标记；判定条件 `position.y <= groundY` 本身幂等，重复执行无副作用。
+
+6. **存档用 bool 标记而不是 NaN**：`wind` 可以是负数（向左吹），没法用 0 表示「未覆盖」；
+   而 `JsonUtility` 序列化 `float.NaN` 会写出非法 JSON。所以另加 `weatherWindSet`，
+   旧存档缺省 `false` = 未覆盖。density/speed/size 本来就必须 >0，直接用 0 表示未覆盖。
+
+7. **形状函数各用最省事的数学构造**：樱花瓣 = 两枚竖椭圆并集（顶端天然形成 V 缺口）；
+   枫叶 = 五个裂片取极坐标最大值 + 正弦锯齿；银杏 = 张角随半径张开的扇形
+   （小半径自动收窄成叶柄）+ 中央裂口；阔叶 = 纺锤形 + 中脉侧脉；竹叶 = 细长微弯。
+
+8. **运动学差异比形状差异更重要**：花瓣轻（慢、幅大频低地飘），
+   落叶重（快、幅小频高地抖 + 剧烈翻转 + 色差极大）。秋叶的「秋天味道」主要来自
+   `colors` 渐变的大色差随机取色，而不是叶子的轮廓。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**。
+- Weather Preview 窗口：编辑模式下切五种叶型，看翻转预览
+  **宽度随帧呼吸、背面明显更暗** —— 这两条对上了就不会是纸片。
+- Play Mode：`weather petals` 应该看到**粉色**花瓣（不再是白的）、
+  每片形状不同、时不时一阵风把整屏花瓣斜掠过去。
+- `weather maple` / `ginkgo` / `leaves` / `bamboo` 各看一遍，落叶应明显比花瓣落得快、
+  翻得凶、颜色杂，并在画面下缘堆积后淡出。
+- 参数覆盖：`weather maple density:20 wind:-1.5 size:1.4` 立刻生效。
+- 存档验证：飘落中存档 → 读档，天气 id 与四个覆盖参数都应复原；
+  旧存档（`weather` 字段为 `"Petals"`/`"Rain"`）仍能正确读出。
+- Lint 验证：`weather 枫葉`（错别字）应报 `unknown-weather`。

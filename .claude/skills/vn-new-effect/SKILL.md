@@ -16,6 +16,11 @@ description: 加新特效/演出组件（发光、粒子、全屏运动、转场
 - UI 不写深度缓冲 → 不能用真 DoF/深度后处理，模糊走 VNImageEffect 的 9-tap。
 - 所有 Tween `SetLink(gameObject)`；**循环效果提供 Start/Stop 成对 API**。
 - 粒子 velocityOverLifetime 三轴曲线**模式必须一致**（都用 `MinMaxCurve(min,max)`）。
+- **粒子选 shader 先问「这是光还是实体」**：光（星光/萤火虫/尘埃/光斑）用 `VN/Additive`；
+  实体（花瓣/落叶/雨/雪）用 `VN/ParticleAlpha`。加法混合无法遮挡背景，彩色粒子叠明亮背景
+  会通道溢出被 Bloom 洗成白色（旧版落樱「樱花是白的」就是这么来的）。
+- 粒子模块是 **struct**：`ps.noise.enabled = false` 编译不过，必须
+  `var noise = ps.noise; noise.enabled = false;`。
 - 运行时创建带 Awake 配置的组件：先 `SetActive(false)` 挂组件赋值再激活（见 VNAmbientParticles.Create）。
 - 立绘缩放走「倍率」机制（`CurrentBaseScale = 原始 × _scaleMultiplier`，`DOScaleMultiplier`），
   别直接改 localScale，否则和呼吸/高亮打架。

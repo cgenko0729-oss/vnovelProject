@@ -339,6 +339,23 @@ namespace VNEffects.EditorTools
             }
             _ctx.questIds = questIds.ToArray();
 
+            // 天气候选：内置叶型正名 + 雨雪萤火虫 + None，再补上项目里的 VNWeatherDef 资产 id。
+            // （中文别名 落樱/枫叶/… 剧本里照样能写，只是不塞进下拉免得列表太长）
+            var weatherIds = new List<string> { "None" };
+            foreach (VNLeafShape shape in System.Enum.GetValues(typeof(VNLeafShape)))
+                weatherIds.Add(VNWeatherDef.DefaultId(shape));
+            weatherIds.Add(VNWeather.Rain.ToString());
+            weatherIds.Add(VNWeather.Snow.ToString());
+            weatherIds.Add(VNWeather.Fireflies.ToString());
+            foreach (var guid in AssetDatabase.FindAssets("t:VNWeatherDef"))
+            {
+                var wd = AssetDatabase.LoadAssetAtPath<VNWeatherDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (wd != null && !string.IsNullOrEmpty(wd.id) && !weatherIds.Contains(wd.id))
+                    weatherIds.Add(wd.id);
+            }
+            _ctx.weatherIds = weatherIds.ToArray();
+
             _ctx.scenarioLabels.Clear();
             _ctx.scenarioPaths.Clear();
             var qualifiedLabels = new List<string>();
@@ -1382,6 +1399,7 @@ namespace VNEffects.EditorTools
                 case VNParamSource.AudioVoice: return _ctx.voiceIds;
                 case VNParamSource.EventId: return _ctx.eventIds;
                 case VNParamSource.QuestId: return _ctx.questIds;
+                case VNParamSource.WeatherId: return _ctx.weatherIds;
                 case VNParamSource.Label: return LabelAddressOptions();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框

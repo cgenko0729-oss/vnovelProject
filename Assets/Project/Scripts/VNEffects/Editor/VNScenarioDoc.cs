@@ -618,6 +618,13 @@ namespace VNEffects.EditorTools
                                 Warn(i, $"{r.keyword}: quest \"{v}\" has no VNQuestDef asset " +
                                         "(works, but no title/stage text)");
                             break;
+                        case VNParamSource.WeatherId:
+                            // 认不出的天气 id 会静默变成「无天气」，属于真错误。
+                            // 判定走运行时同一套三级解析，中文别名（落樱/枫叶…）也认得
+                            if (!IsKnownWeatherId(v, ctx))
+                                Err(i, $"{r.keyword}: unknown weather \"{v}\" " +
+                                       "(not a builtin leaf type, a VNWeatherDef id, or a VNWeather value)");
+                            break;
                     }
                 }
 
@@ -770,6 +777,23 @@ namespace VNEffects.EditorTools
             return true; // 没写时长 → 默认 0.8，不是瞬切
         }
 
+        /// <summary>
+        /// 天气 id 是否认得。与运行时 VNWeatherController.SetWeatherId 的三级解析同构：
+        /// 自定义资产 id → 内置叶型别名（含中文）→ VNWeather 枚举名。
+        /// </summary>
+        static bool IsKnownWeatherId(string v, VNScenarioSourceContext ctx)
+        {
+            if (string.IsNullOrEmpty(v)) return true;
+            string t = v.Trim();
+            if (t.Equals("none", System.StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("off", System.StringComparison.OrdinalIgnoreCase)) return true;
+            if (ctx != null && System.Array.FindIndex(ctx.weatherIds,
+                    s => string.Equals(s, t, System.StringComparison.OrdinalIgnoreCase)) >= 0)
+                return true;
+            if (VNWeatherDef.ParseBuiltinId(t) != null) return true;
+            return System.Enum.TryParse<VNWeather>(t, true, out _);
+        }
+
         /// <summary>首词是否疑似打错的命令关键字（编辑距离 ≤1 的纯 ASCII 词）</summary>
         static bool LooksLikeTypoKeyword(string text, out string keyword)
         {
@@ -826,6 +850,7 @@ namespace VNEffects.EditorTools
         public string[] voiceIds = System.Array.Empty<string>();
         public string[] eventIds = System.Array.Empty<string>();
         public string[] questIds = System.Array.Empty<string>();
+        public string[] weatherIds = System.Array.Empty<string>();
         public readonly Dictionary<string, string[]> scenarioLabels =
             new Dictionary<string, string[]>();
         public readonly Dictionary<string, string> scenarioPaths =
@@ -840,6 +865,7 @@ namespace VNEffects.EditorTools
         public bool HasVoice => voiceIds.Length > 0;
         public bool HasEvents => eventIds.Length > 0;
         public bool HasQuests => questIds.Length > 0;
+        public bool HasWeathers => weatherIds.Length > 0;
 
         public bool HasExpression(string characterId, string expr)
         {

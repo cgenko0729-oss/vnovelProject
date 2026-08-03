@@ -358,12 +358,41 @@ shake heavy      # 强震：爆炸、冲击（带旋转抖动）
 ### weather — 天气
 
 ```
-weather Petals
-weather None
+weather petals                                  # 落樱
+weather maple                                   # 秋枫
+weather Rain
+weather None                                    # 关闭
+
+weather maple density:20 wind:-1.5 size:1.4     # 临时覆盖参数
 ```
 
-`Petals` 落樱 / `Rain` 雨（带底部溅落）/ `Snow` 雪 / `Fireflies` 萤火虫 / `None` 关闭。
-切天气自动带**调色联动**（下雨变冷灰、雪天清透、萤火虫之夜变暗）。
+**飘落类**（樱花 / 落叶，走三层景深 + 翻转 + 自动阵风）：
+
+| id | 别名 | 感觉 |
+|---|---|---|
+| `petals` | `sakura` / `落樱` / `樱花` | 轻、慢，幅大频低地飘；粉白微差 |
+| `maple` | `枫叶` / `红叶` | 重、快，翻转剧烈；红橙黄褐色差极大 |
+| `ginkgo` | `银杏` | 金黄扇形，打旋明显 |
+| `leaves` | `落叶` / `树叶` / `秋叶` | 阔叶，初秋绿黄到深秋褐 |
+| `bamboo` | `竹叶` / `柳叶` | 细长轻盈，飘忽 |
+
+**其余**：`Rain` 雨（带底部溅落）/ `Snow` 雪 / `Fireflies` 萤火虫 / `None` 关闭。
+
+切天气自动带**调色联动**（下雨变冷灰、雪天清透、萤火虫之夜变暗、秋叶偏暖偏浓）。
+阵风是自动的 —— 系统会不定时刮一阵风把整屏叶子斜掠过去，剧本不用管。
+
+四个可选覆盖参数（留空 = 用资产里调好的值）：
+
+| 参数 | 含义 |
+|---|---|
+| `density:` | 每秒发射片数（默认 5~7） |
+| `wind:` | 基础风力，**负数 = 向左吹**（默认 -0.25 ~ -0.45） |
+| `speed:` | 下落速度倍率 |
+| `size:` | 尺寸倍率 |
+
+想调更多（摆幅/翻转速度/三层景深/堆积/颜色…）就建资产：
+**Tools → VN Effects → Weather Preview** 里边看边调 → 「另存为资产」→
+「登记进 VNGameConfig」，之后剧本直接写你起的 id（可以是中文）。
 
 ### mood — 场景色调（电影级调色）
 
@@ -1422,7 +1451,8 @@ camera <pushin|snapzoom|pan|dolly|reset> [...]   预设运镜
 camseq + > 目标点 [zoom] [秒] [ease:名]          多段镜头路径
 camto <目标点> [zoom] [秒] / camcut <目标点> [zoom]  单段直达/瞬切
 shake <light|medium|heavy>                       震动
-weather <Petals|Rain|Snow|Fireflies|None>        天气
+weather <id> [density:] [wind:] [speed:] [size:]  天气
+         id = petals|maple|ginkgo|leaves|bamboo|Rain|Snow|Fireflies|None
 mood <Neutral|Morning|Sunset|Night|Memory|Tension|Horror|Dream>  色调
 fx <名称> <on|off|burst|light|heavy> / fx focus <角色|off>   特效
 letterbox <on|off> [height:] [time:]             电影黑边

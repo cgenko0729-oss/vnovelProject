@@ -20,6 +20,7 @@ namespace VNEffects.EditorTools
         Flag,        // flag 名（当前文档收集）
         EventId,     // 事件模块 id（场景 VNEventRegistry.modules）
         QuestId,     // 任务 id（项目中的 VNQuestDef 资产）
+        WeatherId,   // 天气 id（内置叶型 + VNWeatherDef 资产 + 雨雪萤火虫枚举）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -145,8 +146,17 @@ namespace VNEffects.EditorTools
                 Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
                 Kw("chars", "chars", VNParamSource.Options, new[] { "keep" }),
                 Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }));
-            Add("weather", "Scene", "weather <type>",
-                Pos("type", "type", VNParamSource.Options, EnumNames<VNWeather>(), "None"));
+            Add("weather", "Scene",
+                "weather <id> [density:] [wind:] [speed:] [size:]\n" +
+                "飘落类：petals/sakura（落樱）· maple（枫叶）· ginkgo（银杏）· " +
+                "leaves（阔叶）· bamboo（竹叶/柳叶），也可用 VNGameConfig 飘落天气库里登记的自定义 id；\n" +
+                "其余：Rain / Snow / Fireflies / None。\n" +
+                "四个覆盖参数留空 = 用资产里的值；wind 为负表示向左吹（阵风由系统自动生成）",
+                Pos("id", "id", VNParamSource.WeatherId, def: "None"),
+                Kw("density", "密度", VNParamSource.Number, weight: 0.6f),
+                Kw("wind", "风力", VNParamSource.Number, weight: 0.6f),
+                Kw("speed", "速度×", VNParamSource.Number, weight: 0.6f),
+                Kw("size", "大小×", VNParamSource.Number, weight: 0.6f));
             Add("mood", "Scene", "mood <type>",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNMood>(), "Neutral"));
             Add("reset", "Scene", "reset effects  (weather + mood + persistent VFX)",

@@ -75,6 +75,9 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 ### 关键技术约定（一行版，展开细节见技能 vn-new-effect / vn-ui-skin / vn-localize）
 
 - **发光=HDR 颜色(>1) + Bloom(阈值1.0)**；uGUI 顶点色被钳到 1，HDR 走材质属性
+- **粒子分两类，别用错混合模式**：会发光的（星光/萤火虫/尘埃/光斑）用 `VN/Additive`
+  加法混合；**有实体的（花瓣/落叶/雨/雪）必须用 `VN/ParticleAlpha` 普通透明混合** ——
+  加法只能加亮不能遮挡背景，彩色粒子叠明亮背景后通道溢出会被 Bloom 洗成白色
 - **贴图全程序化生成**（`VNProceduralTextures`），零美术依赖
 - **每张图独立材质实例**（`VNImageEffectController` 管理）；uGUI 自定义 shader 走 CGPROGRAM
 - **UI 不写深度缓冲** → 无真 DoF，模糊走 `VNImageEffect` 9-tap
@@ -95,7 +98,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNGlowBackdrop / VNFootShadow | 背后光环脉动 / 脚下椭圆影（悬浮联动 + `Impact()` 落地摊开，stepin 用） |
 | VNCharacterEmotes | 情绪动作：惊讶/生气/害羞/沮丧(+Recover)/点头/摇头 |
 | VNAmbientParticles | 粒子预设×8：尘埃/星光/光斑/花瓣/雨(+溅落)/雪/萤火虫/雾 + PlaySparkleBurst |
-| VNWeatherController | 天气切换 + 调色联动 |
+| VNWeatherController | 天气总控（双后端）：飘落类走 VNFoliageSystem，雨/雪/萤火虫走 VNAmbientParticles；`SetWeatherId` 三级解析 id（自定义资产 → 内置叶型别名含中文 → VNWeather 枚举），带调色联动 |
+| VNFoliageSystem / VNWeatherDef / VNFoliageTextures | 落樱/落叶三层景深系统（Alpha 混合实体粒子 + 图集翻转 + **每粒子独立相位横摆** + 自动阵风 + 尺寸↔速度伪透视 + 地面堆积）/ 全部参数的 ScriptableObject（五套内置预设，不建资产也能用）/ 五种叶型的程序化图集（列=12 翻转帧、行=4 形态变体，RGB 存明暗、A 存形状） |
 | VNMoodGrading | 八种情绪色调（双 Volume 权重交叉过渡，含 Dream 梦境） |
 | VNScreenTransition | 全屏转场×8：噪声溶解/百叶窗/瓦片/圆扩散/水墨/爆闪/光斑/眨眼 |
 | VNCamera / VNScreenShake / VNDutchAngle / VNHeartbeat | 运镜×5 / 三级震动 / 荷兰角 / 心跳脉动 |
@@ -113,7 +117,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页/背包/排程面板/结算弹窗分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章）；只重导排程/结算两项用 Export Event Panel Prefabs（详见八十六章） |
 | VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
-| VNSakuraBurst | 樱吹雪告白组合技 |
+| VNSakuraBurst | 樱吹雪告白组合技（走 VNFoliageSystem：起手阵风冲击+Burst、中途补风、尾声风力衰减、近景大瓣横掠） |
 | VNCharacterBlink / VNCharacterMouth | 默认表情自动眨眼 / 说话口型（透明画布叠加层） |
 | VNCharacterMarks | 立绘漫符（汗滴/井字怒气/感叹号/问号/爱心/音符/红晕/灯泡/省略号/眩晕星/蒸汽）：`mark <角色> <符号\|clear> [keep\|off] [pos:x,y] [size:] [dur:]`；符号图程序化生成、角色资产可用自定义图覆盖；位置取 VNCharacterDef.markAnchor（归一化偏移）；keep 常驻符号进存档 |
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
@@ -159,6 +163,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result/quiz | 四十一~四十四、七十、八十一 |
 | 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
 | SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
+| 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → **Weather Preview** | 九十二 |
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
 | 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |

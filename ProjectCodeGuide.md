@@ -492,7 +492,25 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 - **VNAmbientParticles**：粒子预设×8（尘埃/星光/光斑/花瓣/雨+溅落/雪/萤火虫/雾）
   + `PlaySparkleBurst`。**注意**：velocityOverLifetime 三轴曲线模式必须一致；
   运行时创建用"先 SetActive(false) 配好再激活"（`Create` 是范本）。
-- **VNWeatherController**：天气切换（驱动上面的粒子组）+ 调色联动。
+  ⚠ `Preset.Petals` 已弃用（加法混合 + 单一贴图 + 全局噪声，就是「白色纸片同步飘」的老实现），
+  花瓣/落叶一律改用下面的 VNFoliageSystem。
+- **VNFoliageTextures**：五种叶型（樱花/枫/银杏/阔叶/竹叶）的程序化图集。
+  布局是**列 = 12 翻转帧、行 = 4 形态变体**，RGB 存明暗（叶脉/折痕/根深尖浅/背面压暗）、
+  A 存形状，色相不入贴图 → 一张图集适用任意颜色。
+  改形状只改 `Sakura()/Maple()/Ginkgo()/Broadleaf()/Bamboo()` 五个纯函数。
+- **VNWeatherDef**：飘落天气的全部参数（ScriptableObject）。五套内置预设走
+  `CreateBuiltin()`，**不建任何资产也能用**；自定义资产登记进 `VNGameConfig.weatherDefs`。
+  新增参数字段时记得同步 `CopyFrom()` 与 `EnsureLayers()`。
+- **VNFoliageSystem**：三层景深飘落系统。六件事都在这里：
+  Alpha 混合（`VN/ParticleAlpha`）、图集翻转（`SingleRow + rowMode Random`）、
+  **每粒子独立相位横摆**、全局阵风、尺寸↔速度伪透视、地面堆积。
+  横摆写成「已存活时间的纯函数」只加相邻两帧之差，**完全无状态** ——
+  改这块时千万别改成需要平行数组记录上帧状态的写法，粒子死亡重排会立刻错位。
+- **VNWeatherController**：天气总控，两套后端并存 ——
+  飘落类走 VNFoliageSystem，雨/雪/萤火虫仍走 VNAmbientParticles。
+  入口 `SetWeatherId(id, …)` 三级解析：自定义资产 id → 内置叶型别名（含中文）→
+  `VNWeather` 枚举名，所以旧存档里的 `"Petals"`/`"Rain"` 不需要迁移。
+  存档取 `CurrentId`（字符串）而不是 `Current`（枚举）—— 新叶型在枚举里统统算 Petals。
 - **VNMoodGrading**：七种情绪色调，双 Volume 权重交叉过渡（URP 后处理）。
 - **VNGodRays / VNCloudShadows / VNHeatHaze / VNFakeDoF / VNEdgeGlow /
   VNVignetteFocus**：光束/云影/热浪扭曲+雾/伪景深(UI 不写深度所以是"伪")/
@@ -509,7 +527,8 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 ### 8.6 输入反馈与组合技
 
 - **VNMouseStardust**：鼠标星尘拖尾。**VNClickRipple**：点击涟漪。
-- **VNSakuraBurst**：樱吹雪告白组合技（`sakura` 命令）。
+- **VNSakuraBurst**：樱吹雪告白组合技（`sakura` 命令）。走 VNFoliageSystem，
+  自己造一份「暴风版」def；起手 `Gust()` + `Burst()`、中途补两记阵风、尾声风力衰减。
 - **VNChoicePanel**：选项演出（飞入/悬停扫光/落选溶解），`choice` 的 UI，
   需要场景有 EventSystem。
 - **VNEffectsDemo**：特效演示场景的键盘驱动器（按键触发各组件，
@@ -527,6 +546,7 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNScenarioSchema.cs | （模式表） | **命令参数的单一数据来源**：每个命令的位置/kwarg 参数、控件类型（VNParamSource）、默认值。加命令时在这里登记，编辑器 UI 自动长出来 |
 | VNCamseqEditorWindow.cs | Tools → VN Effects → （镜头编辑器） | camseq 路径的可视化编辑：Game 视图取点、路径预览、交叉叠化支持 |
 | VNCharacterVisualPreviewWindow.cs | Tools → VN Effects → （角色预览） | 角色立绘/头像/眨眼/口型的实时预览与标定，**确认后才写入资产** |
+| VNWeatherPreviewWindow.cs | Tools → VN Effects → Weather Preview | 飘落天气调参：编辑模式播放翻转帧预览（判断叶型像不像就看这里——宽度随帧呼吸 + 背面变暗），Play Mode 滑杆实时应用到场景，另存资产 + 一键登记进 VNGameConfig |
 
 **编辑器铁律**：文本是唯一真相（编辑器状态不落存档）；`say` 的角色/表情走
 `VNRow.speaker/expression` 专用字段，`show` 才用普通参数——两条路径不能混。
@@ -538,12 +558,18 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | 文件 | 用途 |
 |---|---|
 | VNImageEffect.shader | 单图特效主 shader（溶解/扫光/HSV/波浪/轮廓光/模糊 9-tap…），VNImageEffectController 的载体。传统 CGPROGRAM（Canvas 不走 URP 光照），保留 UI 裁剪兼容 |
-| VNAdditive.shader | 加法混合发光（光环/光束/粒子），HDR 颜色 >1 配合 Bloom 阈值 1.0 出辉光 |
+| VNAdditive.shader | 加法混合发光（光环/光束/**发光类**粒子），HDR 颜色 >1 配合 Bloom 阈值 1.0 出辉光 |
+| VNParticleAlpha.shader | 普通透明混合（`SrcAlpha OneMinusSrcAlpha`），**实体类**粒子专用：花瓣/落叶/雨/雪。`_SoftBlur` 做 5-tap 十字模糊供近景层虚焦 |
 | VNScreenTransition.shader | 全屏转场图案生成（噪声/百叶窗/圆扩散…的数学都在这） |
 | VNDirectBackgroundTransition.shader | 背景直切转场（新旧背景在材质内交叉，不经全屏遮罩） |
 
 **发光的公式**：HDR 顶点色会被 uGUI 钳到 1，所以发光=**材质属性**里给 >1 的
 HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质别走 Image.color。
+
+**粒子选哪个 shader**：问「这东西是光还是实体」。光（星光/萤火虫/尘埃/光斑）用
+`VN/Additive`；实体（花瓣/落叶/雨/雪）用 `VN/ParticleAlpha`。用错的代价很具体 ——
+加法混合永远无法遮挡背景，彩色粒子叠上明亮背景后三个通道溢出，
+被 Bloom + Tonemapping 一压就全变成白色（旧版落樱「樱花是白的」就是这么来的）。
 
 ---
 

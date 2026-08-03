@@ -146,6 +146,11 @@ namespace VNEffects
         [Header("CG 库（留空 = 生成器扫 Assets/CG 自动登记，文件名 = id）")]
         public List<VNStage.CgEntry> cgLibrary = new List<VNStage.CgEntry>();
 
+        [Header("飘落天气库：剧本 weather 命令的 id → 参数资产（落樱/枫叶/银杏/落叶/竹叶）\n" +
+                "留空也能用 —— 内置五套预设走 petals/maple/ginkgo/leaves/bamboo 这些名字；\n" +
+                "登记自定义资产后可以用中文 id，并覆盖同名内置预设")]
+        public List<VNWeatherDef> weatherDefs = new List<VNWeatherDef>();
+
         // ==============================================================
         // 音频
         // ==============================================================

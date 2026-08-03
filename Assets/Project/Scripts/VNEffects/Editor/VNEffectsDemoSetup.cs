@@ -67,7 +67,7 @@ namespace VNEffects.EditorTools
             public VNDialogueBox dialogueBox;
             public VNSpeakerHighlight speakerHighlight;
             public VNAmbientParticles[] particles;
-            public Material imageMat, additiveMat, transitionMat;
+            public Material imageMat, additiveMat, transitionMat, particleAlphaMat;
             public Sprite charSprite, charSprite2, bgSprite;
             public System.Collections.Generic.List<Sprite> allSprites;
         }
@@ -92,6 +92,9 @@ namespace VNEffects.EditorTools
             EnsureFolder(MaterialsDir);
             rig.imageMat = EnsureMaterial($"{MaterialsDir}/VNImageEffect.mat", "VN/ImageEffect");
             rig.additiveMat = EnsureMaterial($"{MaterialsDir}/VNAdditive.mat", "VN/Additive");
+            // 花瓣/落叶用普通透明混合（会遮挡背景）；加法混合只能加亮，粉色会被 Bloom 洗成白
+            rig.particleAlphaMat = EnsureMaterial(
+                $"{MaterialsDir}/VNParticleAlpha.mat", "VN/ParticleAlpha");
             rig.transitionMat = EnsureMaterial($"{MaterialsDir}/VNScreenTransition.mat", "VN/ScreenTransition");
 
             // ---------- 3. 后处理 Volume Profile（Bloom + Vignette）----------
@@ -209,6 +212,7 @@ namespace VNEffects.EditorTools
             var weatherGo = new GameObject("WeatherController");
             rig.weather = weatherGo.AddComponent<VNWeatherController>();
             rig.weather.additiveMaterial = rig.additiveMat;
+            rig.weather.particleAlphaMaterial = rig.particleAlphaMat;
             rig.weather.moodTargets = rig.bgFx != null
                 ? new[] { rig.bgFx } : new VNImageEffectController[0];
 
@@ -281,6 +285,7 @@ namespace VNEffects.EditorTools
 
             rig.sakura = new GameObject("SakuraBurst").AddComponent<VNSakuraBurst>();
             rig.sakura.additiveMaterial = rig.additiveMat;
+            rig.sakura.particleAlphaMaterial = rig.particleAlphaMat;
             rig.sakura.heartbeat = rig.heartbeat;
 
             // ---------- 14. 说话者高亮 / 对话框 ----------

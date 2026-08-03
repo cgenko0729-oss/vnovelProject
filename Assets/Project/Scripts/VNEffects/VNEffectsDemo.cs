@@ -470,7 +470,10 @@ namespace VNEffects
         {
             if (hintText == null) return;
             string emotion = edgeGlow != null ? edgeGlow.Current.ToString() : "-";
-            string weatherName = weather != null ? weather.Current.ToString() : "-";
+            // CurrentId 而非 Current：新的叶型（maple/ginkgo/leaves/bamboo）在枚举里
+            // 统统算 Petals，只有 id 分得清是哪一种
+            string weatherName = weather != null && !string.IsNullOrEmpty(weather.CurrentId)
+                ? weather.CurrentId : "None";
             string moodName = mood != null ? mood.Current.ToString() : "-";
             string transName = _transitionIndex >= 0
                 ? ((VNTransition)_transitionIndex).ToString() : "-";

@@ -266,8 +266,17 @@ namespace VNEffects
                         }
                         break;
                     case "weather":
+                    {
                         snapshot.weather = cmd.Arg(0, VNWeather.None.ToString());
+                        // 覆盖参数与运行时一致：换天气时整组重置，只保留本行显式写了的
+                        snapshot.weatherDensity = cmd.KwF("density", 0f);
+                        snapshot.weatherSpeed = cmd.KwF("speed", 0f);
+                        snapshot.weatherSize = cmd.KwF("size", 0f);
+                        float w = cmd.KwF("wind", float.NaN);
+                        snapshot.weatherWindSet = !float.IsNaN(w);
+                        snapshot.weatherWind = snapshot.weatherWindSet ? w : 0f;
                         break;
+                    }
                     case "mood":
                     {
                         snapshot.mood = cmd.Arg(0, VNMood.Neutral.ToString());
@@ -323,6 +332,11 @@ namespace VNEffects
                         if (cmd.Arg(0) == "effects" || cmd.Arg(0) == "all")
                         {
                             snapshot.weather = VNWeather.None.ToString();
+                            snapshot.weatherDensity = 0f;
+                            snapshot.weatherSpeed = 0f;
+                            snapshot.weatherSize = 0f;
+                            snapshot.weatherWindSet = false;
+                            snapshot.weatherWind = 0f;
                             snapshot.mood = VNMood.Neutral.ToString();
                             snapshot.fxOn.Clear();
                             snapshot.fxOn.Add("kenburns"); // 重置回默认开（与 ResetEffects 一致）
@@ -1802,9 +1816,18 @@ namespace VNEffects
                         cmd.KwF("size", 1f), cmd.KwF("dur", 1.1f), cmd.line));
 
                 case "weather":
-                    stage.weather?.SetWeather(
-                        VNScriptParser.ParseEnum(cmd.Arg(0), VNWeather.None, cmd.line));
+                {
+                    // weather <id> [density:] [wind:] [speed:] [size:]
+                    //   id：petals/sakura/落樱 · maple/枫叶 · ginkgo/银杏 · leaves/落叶 ·
+                    //       bamboo/竹叶 · Rain · Snow · Fireflies · none
+                    //       （也可以是 VNGameConfig 飘落天气库里登记的自定义 id）
+                    //   覆盖参数留空 = 用资产里的值；wind 可为负（向左吹）
+                    float wind = cmd.KwF("wind", float.NaN);
+                    stage.SetWeather(cmd.Arg(0), cmd.KwF("density", 0f),
+                        float.IsNaN(wind) ? 0f : wind, !float.IsNaN(wind),
+                        cmd.KwF("speed", 0f), cmd.KwF("size", 0f));
                     return null;
+                }
 
                 case "mood":
                     // 走 VNStage 包装：Memory（回忆）色调自动联动电影黑边

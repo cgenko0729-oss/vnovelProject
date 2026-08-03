@@ -31,7 +31,16 @@ namespace VNEffects
         public List<int> flagValues = new List<int>();
 
         public string backgroundId;
+        // 天气 id：飘落类为 VNWeatherDef 的 id（petals/maple/… 或自定义中文 id），
+        // 其余为 VNWeather 枚举名。旧存档存的 "Petals"/"Rain" 照常认得。
         public string weather;
+        // 飘落天气的剧本覆盖参数。density/speed/size 用 0 表示「未覆盖」；
+        // wind 可以是负数（向左吹），所以另用一个 bool 标记，旧存档缺省 false = 未覆盖。
+        public float weatherDensity;
+        public float weatherSpeed;
+        public float weatherSize;
+        public bool weatherWindSet;
+        public float weatherWind;
         public string mood;
         public string bgm;
         public float bgmVol = 1f;         // bgm 命令的 vol: 参数（旧存档缺省 = 1）
