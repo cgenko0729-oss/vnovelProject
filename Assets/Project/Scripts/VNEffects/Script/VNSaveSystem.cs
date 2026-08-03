@@ -52,6 +52,32 @@ namespace VNEffects
         public string dialogueSkin;                    // 对话框皮肤 id（空 = 默认，旧存档兼容）
         public string choiceSkin;                      // 选项面板皮肤 id（空 = 默认）
 
+        /// <summary>
+        /// 液体喷溅的持续状态（liquid 命令）。
+        /// 空中飞的水珠和屏幕上已经溅好的水渍都是瞬态的，读档不还原也不违和——
+        /// 存的只是"还在喷 / 镜头是湿的 / 点击喷水模式开着"这三个会一直持续下去的开关。
+        /// 旧存档缺这一段时 JsonUtility 会给出一个全 false 的实例，等价于"什么都没开"。
+        /// </summary>
+        [System.Serializable]
+        public class LiquidSave
+        {
+            public bool sprayOn;
+            public string sprayType;
+            public float sprayX, sprayY;
+            public float sprayPower, sprayDir, spraySpread, sprayRate, sprayScreen;
+
+            public bool clickOn;
+            public string clickType;
+            public float clickPower, clickScreen;
+
+            public bool wetOn;
+            public string wetType;
+            public float wetAmount;
+
+            public bool cover;   // 水渍层是否盖住对话框
+        }
+        public LiquidSave liquid = new LiquidSave();
+
         [System.Serializable]
         public class CharSave
         {

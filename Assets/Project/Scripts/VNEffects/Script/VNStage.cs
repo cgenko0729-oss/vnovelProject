@@ -104,6 +104,10 @@ namespace VNEffects
         public VNEventRegistry eventRegistry;
         [Header("SNS 手机聊天视图（sns 命令；留空自动创建）")]
         public VNSnsView sns;
+        [Header("液体喷溅（舞台层：空中飞的水珠）")]
+        public VNLiquidSplash liquidSplash;
+        [Header("镜头水渍（屏幕层：溅在镜头玻璃上挂着往下淌的）")]
+        public VNWetScreen wetScreen;
 
         [Header("表情切换的交叉溶解时长（0 = 瞬间切换）")]
         public float expressionCrossfade = 0.25f;
@@ -199,6 +203,12 @@ namespace VNEffects
                 if (sns == null) // 旧场景自愈：自动创建（UI 到 sns open 时才搭）
                     sns = new GameObject("VNSnsView").AddComponent<VNSnsView>();
             }
+
+            if (wetScreen == null) wetScreen = FindFirstObjectByType<VNWetScreen>();
+            if (liquidSplash == null) liquidSplash = FindFirstObjectByType<VNLiquidSplash>();
+            // 两层是一个效果的两半：喷溅拿不到水渍层就只剩"有水在飞"，接上才完整
+            if (liquidSplash != null && liquidSplash.wetScreen == null)
+                liquidSplash.wetScreen = wetScreen;
 
             if (characterLayer == null)
             {
@@ -724,6 +734,8 @@ namespace VNEffects
             data.dialogueSkin = CurrentDialogueSkinId;
             data.choiceSkin = CurrentChoiceSkinId;
 
+            CaptureLiquid(data);
+
             data.fxOn.Clear();
             foreach (var kv in _fxStates)
                 if (kv.Value) data.fxOn.Add(kv.Key);
@@ -801,6 +813,7 @@ namespace VNEffects
             }
 
             SetPortraitEnabled(!data.portraitOff);
+            RestoreLiquid(data);
 
             foreach (var cs in data.characters)
                 ShowInstant(cs.id, cs.x, cs.expr, cs.marks, cs.casualEntrance);
@@ -1236,6 +1249,148 @@ namespace VNEffects
         /// <summary>一次性阵风冲击（剧本 wind gust）</summary>
         public void WeatherGust(float strength) => weather?.Gust(strength);
 
+        // ------------------------------------------------------------------
+        // 液体喷溅（liquid 命令）
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// liquid 命令入口。子动作：
+        ///   splash  一次性大爆溅（瞬发）
+        ///   spray   间歇喷射开关（噗——噗——，持续状态，进存档）
+        ///   click   点击喷水模式开关（持续状态，进存档）
+        ///   wet     常驻湿镜头开关（隔窗看雨，持续状态，进存档）
+        ///   dry     擦干现有水渍（瞬发）
+        ///   cover   水渍层盖不盖对话框（持续状态，进存档）
+        /// 参数含义见 <see cref="VNLiquidArgs"/>。
+        /// </summary>
+        public void Liquid(string action, VNLiquidArgs a, int line = 0)
+        {
+            action = string.IsNullOrEmpty(action) ? "splash" : action.ToLower();
+            var preset = VNLiquidPreset.Get(a.type, line);
+
+            switch (action)
+            {
+                case "splash":
+                    if (liquidSplash == null) break;
+                    liquidSplash.Burst(new Vector2(a.x, a.y), preset,
+                        a.power, a.dir, a.spread, a.screen);
+                    break;
+
+                case "spray":
+                    if (liquidSplash == null) break;
+                    if (a.on)
+                        liquidSplash.StartSpray(new Vector2(a.x, a.y), preset,
+                            a.power, a.dir, a.spread, a.rate, a.screen);
+                    else
+                        liquidSplash.StopSpray();
+                    break;
+
+                case "click":
+                    if (liquidSplash == null) break;
+                    liquidSplash.SetClickMode(a.on, preset, a.power, a.screen);
+                    break;
+
+                case "wet":
+                    if (wetScreen == null) break;
+                    if (a.on) wetScreen.SetWet(true, preset, a.amount);
+                    else wetScreen.SetWet(false);
+                    break;
+
+                case "dry":
+                    wetScreen?.Dry();
+                    break;
+
+                case "cover":
+                    wetScreen?.SetCover(a.on);
+                    break;
+
+                default:
+                    Debug.LogWarning($"[VNScript] 第 {line} 行：未知 liquid 子命令「{action}」，" +
+                                     "可用 splash / spray / click / wet / dry / cover");
+                    break;
+            }
+        }
+
+        /// <summary>把液体的持续状态全部停掉并清干净（清场 / 读档 / 章节转场）</summary>
+        public void ResetLiquid()
+        {
+            liquidSplash?.ClearInstant();
+            wetScreen?.ClearInstant();
+        }
+
+        /// <summary>
+        /// 液体状态写入存档。直接从两个组件读，不在 VNStage 另存一份镜像——
+        /// 天气那边之所以要 VNStage 持有覆盖参数，是因为 CG 暂停期间组件上的值会被改掉；
+        /// 液体没有暂停语义，组件上的值任何时刻都是权威。
+        /// </summary>
+        void CaptureLiquid(VNSaveData data)
+        {
+            var l = data.liquid ?? (data.liquid = new VNSaveData.LiquidSave());
+
+            if (liquidSplash != null)
+            {
+                l.sprayOn = liquidSplash.IsSpraying;
+                l.sprayType = liquidSplash.SprayType.ToString();
+                l.sprayX = liquidSplash.SprayPos.x;
+                l.sprayY = liquidSplash.SprayPos.y;
+                l.sprayPower = liquidSplash.SprayPower;
+                l.sprayDir = liquidSplash.SprayDir;
+                l.spraySpread = liquidSplash.SpraySpread;
+                l.sprayRate = liquidSplash.SprayRate;
+                l.sprayScreen = liquidSplash.SprayScreen;
+
+                l.clickOn = liquidSplash.IsClickMode;
+                l.clickType = liquidSplash.ClickType.ToString();
+                l.clickPower = liquidSplash.ClickPower;
+                l.clickScreen = liquidSplash.ClickScreen;
+            }
+            else
+            {
+                l.sprayOn = false;
+                l.clickOn = false;
+            }
+
+            if (wetScreen != null)
+            {
+                l.wetOn = wetScreen.IsWet;
+                l.wetType = wetScreen.WetType.ToString();
+                l.wetAmount = wetScreen.WetAmount;
+                l.cover = wetScreen.coverDialogue;
+            }
+            else
+            {
+                l.wetOn = false;
+            }
+        }
+
+        /// <summary>按存档恢复液体状态（先清干净再按开关重开，避免叠加上一次的残留）</summary>
+        void RestoreLiquid(VNSaveData data)
+        {
+            ResetLiquid();
+            var l = data.liquid;
+            if (l == null) return; // 旧存档：等价于什么都没开
+
+            wetScreen?.SetCover(l.cover);
+
+            if (l.wetOn && wetScreen != null)
+                wetScreen.SetWet(true, VNLiquidPreset.Get(l.wetType),
+                    l.wetAmount > 0f ? l.wetAmount : 1f);
+
+            if (liquidSplash == null) return;
+
+            if (l.sprayOn)
+                liquidSplash.StartSpray(new Vector2(l.sprayX, l.sprayY),
+                    VNLiquidPreset.Get(l.sprayType),
+                    l.sprayPower > 0f ? l.sprayPower : 1f,
+                    l.sprayDir, l.spraySpread,
+                    l.sprayRate > 0f ? l.sprayRate : 1f,
+                    l.sprayScreen);
+
+            if (l.clickOn)
+                liquidSplash.SetClickMode(true, VNLiquidPreset.Get(l.clickType),
+                    l.clickPower > 0f ? l.clickPower : 1f, l.clickScreen);
+        }
+
         /// <summary>letterbox 命令入口：手动控制会接管自动黑边</summary>
         public void SetLetterbox(bool on, float height = -1f, float duration = -1f)
         {
@@ -1255,6 +1410,7 @@ namespace VNEffects
             ClearWeatherOverrides();
             weather?.SetWeatherId("", 0.8f);
             mood?.SetMood(VNMood.Neutral, 0.8f);
+            ResetLiquid();
             foreach (var name in ToggleFxNames) Fx(name, "off");
             Fx("focus", "off");
             // Ken Burns 是默认开启的常驻氛围（"永不静止"），重置回默认开而非关

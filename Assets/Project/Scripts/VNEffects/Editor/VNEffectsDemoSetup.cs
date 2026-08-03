@@ -60,6 +60,8 @@ namespace VNEffects.EditorTools
             public VNLetterbox letterbox;
             public VNShootingStars shootingStars;
             public VNDriftingClouds driftingClouds;
+            public VNWetScreen wetScreen;
+            public VNLiquidSplash liquidSplash;
             public VNToneMatch toneMatch;
             public VNChoicePanel choicePanel;
             public VNMouseStardust stardust;
@@ -204,6 +206,14 @@ namespace VNEffects.EditorTools
             letterboxGo.transform.SetParent(canvasGo.transform, false);
             rig.letterbox = letterboxGo.AddComponent<VNLetterbox>();
 
+            // ---------- 8.65 镜头水渍（液体喷溅的屏幕层）----------
+            // 默认排序 30：压过粒子与水波，但让开对话框 40——
+            // 想让水糊住对话框时剧本写 liquid cover on 即可。
+            var wetGo = new GameObject("WetScreen", typeof(RectTransform));
+            wetGo.transform.SetParent(canvasGo.transform, false);
+            rig.wetScreen = wetGo.AddComponent<VNWetScreen>();
+            AssignSourceMaterial(rig.wetScreen, rig.additiveMat);
+
             // ---------- 9. 聚焦渐晕（挂在 Volume 上）----------
             rig.vignetteFocus = volGo.AddComponent<VNVignetteFocus>();
             rig.vignetteFocus.volume = vol;
@@ -239,6 +249,15 @@ namespace VNEffects.EditorTools
             var rippleGo = new GameObject("ClickRipple", typeof(ParticleSystem));
             var clickRipple = rippleGo.AddComponent<VNClickRipple>();
             AssignSourceMaterial(clickRipple, rig.additiveMat);
+
+            // ---------- 11.5 液体喷溅（舞台层：空中飞的水珠）----------
+            // 场外物体、世界空间粒子，和其它粒子一样靠 sortingOrder 排序，
+            // 不进 Canvas 层级——它是"场景里的水"，不该跟着 UI 走。
+            var splashGo = new GameObject("LiquidSplash");
+            rig.liquidSplash = splashGo.AddComponent<VNLiquidSplash>();
+            rig.liquidSplash.wetScreen = rig.wetScreen;
+            AssignMaterialField(rig.liquidSplash, "alphaSourceMaterial", rig.particleAlphaMat);
+            AssignMaterialField(rig.liquidSplash, "additiveSourceMaterial", rig.additiveMat);
 
             // ---------- 12. 伪景深 / 云影 / 色调匹配 / 选项面板 / EventSystem ----------
             rig.fakeDoF = new GameObject("FakeDoF").AddComponent<VNFakeDoF>();
@@ -396,6 +415,8 @@ namespace VNEffects.EditorTools
             demo.cloudShadows = rig.cloudShadows;
             demo.speedLines = rig.speedLines;
             demo.shockwave = rig.shockwave;
+            demo.liquidSplash = rig.liquidSplash;
+            demo.wetScreen = rig.wetScreen;
             demo.retroFilter = rig.retroFilter;
             demo.kenBurns = rig.kenBurns;
             demo.letterbox = rig.letterbox;
@@ -508,6 +529,8 @@ namespace VNEffects.EditorTools
             stage.shootingStars = rig.shootingStars;
             stage.driftingClouds = rig.driftingClouds;
             stage.heatHaze = rig.heatHaze;
+            stage.wetScreen = rig.wetScreen;
+            stage.liquidSplash = rig.liquidSplash;
             stage.vignetteFocus = rig.vignetteFocus;
             stage.speakerHighlight = rig.speakerHighlight;
             stage.toneMatch = rig.toneMatch;
@@ -1417,10 +1440,17 @@ hide 亚里沙 with:dissolve
 
         /// <summary>给组件的私有 [SerializeField] sourceMaterial 字段赋材质资产</summary>
         static void AssignSourceMaterial(Component comp, Material mat)
+            => AssignMaterialField(comp, "sourceMaterial", mat);
+
+        /// <summary>
+        /// 按字段名回填材质资产。VNLiquidSplash 同时要 alpha 与 additive 两份
+        /// （水既要遮挡又要反光），所以字段名不能像其它组件那样固定成 sourceMaterial。
+        /// </summary>
+        static void AssignMaterialField(Component comp, string fieldName, Material mat)
         {
-            if (mat == null) return;
+            if (mat == null || comp == null) return;
             var so = new SerializedObject(comp);
-            var prop = so.FindProperty("sourceMaterial");
+            var prop = so.FindProperty(fieldName);
             if (prop != null)
             {
                 prop.objectReferenceValue = mat;

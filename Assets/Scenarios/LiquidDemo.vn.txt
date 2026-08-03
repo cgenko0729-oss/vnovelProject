@@ -1,0 +1,119 @@
+# ============================================================
+# LiquidDemo.vn.txt —— 液体喷溅演示（喷射 / 爆溅 / 溅到镜头上）
+# 示范：① 一次性大爆溅 ② 间歇噗噗喷 ③ 四种液体 ④ 点击喷水 ⑤ 湿镜头
+# 播放方式：Scenario Editor 打开本文件 → 选中首行 → ▶ 从选中行播放
+#
+# 看什么：
+#   空中的水珠是**被速度拉长的**，不是圆点 —— 水感的一大半来自这里
+#   主水花之外还有一层**低速碎珠**，没有它整发喷溅会干净得很假
+#   有几颗会"啪"地**溅到镜头玻璃上**：先横向拍扁再弹回圆形
+#   镜头上的水渍会**挂一会儿**（表面张力），然后开始往下淌，拖出越来越淡的水痕
+#   **大滴先流、流得快**，小滴挂得更久 —— 同一场雨里最容易被察觉的真实感
+#   水渍会慢慢**干掉**：清水七秒左右，血几乎不干
+#
+# 三层结构：空中水珠（VNLiquidSplash）+ 镜头水渍（VNWetScreen），
+# 少了任何一层都不成立 —— 只有前者是"有水在飞"，只有后者是"水凭空出现"。
+# ============================================================
+
+bg 天台
+mood Neutral
+
+# ---------- ① 一次性大爆溅 ----------
+
+: （最基础的一发：画面正下方，向上喷。）
+liquid splash x:0.5 y:0.15
+wait 1.2
+
+: （力度拉到 2.2，张角收窄到 18 度 —— 高压水柱。）
+liquid splash x:0.5 y:0.1 power:2.2 spread:18
+wait 1.5
+
+: （dir 控制方向：0 = 向右，90 = 向上。这一发从左边斜着扫过来。）
+liquid splash x:0.12 y:0.5 power:1.8 dir:25 spread:30
+wait 1.5
+
+: （screen:0 = 只有空中水花，一滴都不许溅到镜头上。）
+liquid splash x:0.5 y:0.15 power:2 screen:0
+wait 1.2
+
+: （screen:2.5 = 反过来，糊我一脸。）
+liquid splash x:0.5 y:0.2 power:2 screen:2.5
+wait 2.5
+
+liquid dry
+wait 1
+
+# ---------- ② 间歇噗噗喷 ----------
+
+: （spray 是持续状态：一顿一顿地喷，偶尔来一记大的，然后泄压停顿。）
+: （均匀喷射看起来像洒水器，真实的水压是有起伏的。）
+liquid spray on x:0.5 y:0.08 power:1.2 spread:22
+: （它会一直喷下去，剧本照常往下走。）
+wait 4
+
+: （rate 调频率，power 调力度 —— 重新下一次 spray on 即可改参数。）
+liquid spray on x:0.5 y:0.08 power:1.6 rate:2 spread:16
+wait 4
+
+liquid spray off
+liquid dry
+wait 1.5
+
+# ---------- ③ 四种液体 ----------
+# 黏度不是一个参数，是四个参数的合谋：下坠快慢、空中被拉多长、
+# 在镜头上往下流多快、多久干。所以"红色的水"不会像血。
+
+: （清水：透亮、落得快、流得快、干得快。）
+liquid splash x:0.3 y:0.2 power:1.8 type:water
+wait 2.5
+
+: （血：浓稠、下坠慢、拖尾短、在镜头上几乎是爬的，而且很久不干。）
+liquid splash x:0.5 y:0.35 power:1.6 type:blood screen:1.8
+wait 3
+
+: （墨：最不透明，而且**没有高光** —— 黑色液体上做足反光会变成"发光的黑水"。）
+liquid splash x:0.7 y:0.3 power:1.5 type:ink screen:1.5
+wait 3
+
+: （黏液：最慢、最拉丝，而且自己会发光。）
+liquid splash x:0.5 y:0.15 power:1.4 type:slime screen:1.8
+wait 3
+
+liquid dry
+wait 1.5
+
+# ---------- ④ 水渍盖住对话框 ----------
+
+: （默认水渍在对话框下面，不挡字。)
+liquid cover on
+: （cover on 之后水渍盖到对话框上面 —— 要糊玩家一脸时才用。）
+liquid splash x:0.5 y:0.25 power:2.4 type:blood screen:3
+wait 3
+liquid cover off
+liquid dry
+wait 1
+
+# ---------- ⑤ 常驻湿镜头 ----------
+
+: （wet 是另一种用法：不喷，只是镜头一直是湿的 —— 隔着车窗看雨那种。）
+weather Rain
+liquid wet on amount:1.2
+: （水滴会持续补充、各自下滑、各自干掉，维持一个稳定的"湿"。）
+wait 5
+
+liquid wet off
+liquid dry
+weather None
+wait 1.5
+
+# ---------- ⑥ 点击喷水模式 ----------
+
+: （最后是交互模式：开启后左键点哪喷哪，点击**不再推进台词**。）
+: （要往下走请按 Enter 或空格 —— 这是故意留的出路，否则会卡死在这一句。）
+liquid click on type:water power:1.6
+: （随便点几下试试。点画面右上，水就往右上飞：方向按"从画面中心朝点击点"推断。）
+: （试完按 Enter 继续。）
+
+liquid click off
+liquid dry
+: （演示结束。）

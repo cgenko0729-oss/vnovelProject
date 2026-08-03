@@ -543,6 +543,20 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 - **VNMouseStardust**：鼠标星尘拖尾。**VNClickRipple**：点击涟漪。
 - **VNSakuraBurst**：樱吹雪告白组合技（`sakura` 命令）。走 VNFoliageSystem，
   自己造一份「暴风版」def；起手 `Gust()` + `Burst()`、中途补两记阵风、尾声风力衰减。
+- **VNLiquidSplash / VNWetScreen / VNLiquidPreset**：液体喷溅（`liquid` 命令，九十四章）。
+  **一个效果两层，缺一层就不成立**：
+  - `VNLiquidSplash`（场外世界空间粒子，sortingOrder 28）= 空中飞的水珠。三个发射器
+    各司其职：Body 走 `VN/ParticleAlpha` + `ParticleSystemRenderMode.Stretch`
+    （拉伸公告板是水感的一大半，球形粒子怎么调都像泡泡）、Glow 走 `VN/Additive`
+    吃 Bloom、Splinter 是低速碎珠。速度/方向逐颗用 `EmitParams` 给，不用 shape 模块。
+  - `VNWetScreen`（Canvas 下 overlay，默认 30 让开对话框 40）= 溅在镜头玻璃上的水渍。
+    **不是粒子**：每滴要挂住、按各自节奏下滑、拖一条渐淡的痕、慢慢干，
+    是逐个体的四段状态机，ParticleSystem 的曲线模型表达不了 → uGUI 对象池 + 手动模拟。
+  - 假折射（C1）：不采样背景，玻璃感全烘进 `VNProceduralTextures.WaterDrop` 的 RGB
+    剖面（中心压暗 + 内亮环 + 外圈菲涅尔暗边）。要升级成真折射见九十四章的取舍记录。
+  - HDR 两边给法相反：水渍高光按液体各建一份材质，`_TintColor` 给颜色与亮度、
+    顶点色只给淡入淡出；粒子那边材质给固定白色 HDR 天花板、`startColor` 给色相，
+    这样四种液体共用一份材质不串色。
 - **VNChoicePanel**：选项演出（飞入/悬停扫光/落选溶解），`choice` 的 UI，
   需要场景有 EventSystem。
 - **VNEffectsDemo**：特效演示场景的键盘驱动器（按键触发各组件，

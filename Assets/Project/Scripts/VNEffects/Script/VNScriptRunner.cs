@@ -265,6 +265,42 @@ namespace VNEffects
                             snapshot.cgKeepFx = cmd.Kw("fx") == "keep";
                         }
                         break;
+                    case "liquid":
+                    {
+                        // 只重放会一直持续下去的开关；splash 是一次性演出、dry 是一次性擦除，
+                        // 两者都不属于"跳到这一行时画面应该是什么样"的状态
+                        var la = ParseLiquidArgs(cmd);
+                        var lsave = snapshot.liquid;
+                        switch (cmd.Arg(0, "splash"))
+                        {
+                            case "spray":
+                                lsave.sprayOn = la.on;
+                                lsave.sprayType = la.type;
+                                lsave.sprayX = la.x;
+                                lsave.sprayY = la.y;
+                                lsave.sprayPower = la.power;
+                                lsave.sprayDir = la.dir;
+                                lsave.spraySpread = la.spread;
+                                lsave.sprayRate = la.rate;
+                                lsave.sprayScreen = la.screen;
+                                break;
+                            case "click":
+                                lsave.clickOn = la.on;
+                                lsave.clickType = la.type;
+                                lsave.clickPower = la.power;
+                                lsave.clickScreen = la.screen;
+                                break;
+                            case "wet":
+                                lsave.wetOn = la.on;
+                                lsave.wetType = la.type;
+                                lsave.wetAmount = la.amount;
+                                break;
+                            case "cover":
+                                lsave.cover = la.on;
+                                break;
+                        }
+                        break;
+                    }
                     case "weather":
                     {
                         snapshot.weather = cmd.Arg(0, VNWeather.None.ToString());
@@ -338,6 +374,7 @@ namespace VNEffects
                             snapshot.weatherWindSet = false;
                             snapshot.weatherWind = 0f;
                             snapshot.mood = VNMood.Neutral.ToString();
+                            snapshot.liquid = new VNSaveData.LiquidSave(); // 与 ResetLiquid 一致
                             snapshot.fxOn.Clear();
                             snapshot.fxOn.Add("kenburns"); // 重置回默认开（与 ResetEffects 一致）
                             focus = null;
@@ -1698,8 +1735,12 @@ namespace VNEffects
             // 左键推进：整个画面都是 uGUI（背景/立绘/对话框都是 Canvas 里的 Image），
             // IsPointerOverGameObject() 恒为 true 会把点击全部拦掉；
             // 只有点在可交互控件（按钮/滑条等 Selectable）上才不推进。
+            // 点击喷水模式（liquid click on）期间左键归喷水，不推进台词。
+            // Enter/Space 一定要留着：玩家没有别的出路时会被卡死在这一句里。
+            bool liquidClick = stage != null && stage.liquidSplash != null &&
+                               stage.liquidSplash.clickMode;
             bool pressed = kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame ||
-                           (mouse != null && mouse.leftButton.wasPressedThisFrame &&
+                           (!liquidClick && mouse != null && mouse.leftButton.wasPressedThisFrame &&
                             !IsPointerOverInteractiveUi(mouse));
             if (!pressed) return;
 
@@ -1828,6 +1869,11 @@ namespace VNEffects
                         cmd.KwF("speed", 0f), cmd.KwF("size", 0f));
                     return null;
                 }
+
+                case "liquid":
+                    // liquid splash|spray|click|wet|dry|cover [on|off] [x:] [y:] [type:] …
+                    stage.Liquid(cmd.Arg(0, "splash"), ParseLiquidArgs(cmd), cmd.line);
+                    return null;
 
                 case "mood":
                     // 走 VNStage 包装：Memory（回忆）色调自动联动电影黑边
@@ -2460,6 +2506,30 @@ namespace VNEffects
             Debug.LogWarning($"[VNScript] 第 {line} 行：mark 的 pos 应写成 pos:0.2,0.36（两个数字、逗号分隔、不能有空格），" +
                              $"当前为「{value}」，本次改用角色资产里的默认锚点");
             return null;
+        }
+
+        /// <summary>
+        /// 解析 liquid 命令的参数。运行时执行与"从选中行播放"的状态重建共用它，
+        /// 两边各写一份迟早会漂移出不一致的默认值。
+        /// 开关位取第二个位置参数（liquid spray on / liquid spray off），省略视作 on。
+        /// </summary>
+        static VNLiquidArgs ParseLiquidArgs(VNScriptCommand cmd)
+        {
+            var a = VNLiquidArgs.Default;
+            a.type = cmd.Kw("type");
+
+            string sw = cmd.Arg(1);
+            a.on = sw != "off" && sw != "false" && sw != "0";
+
+            a.x = cmd.KwF("x", a.x);
+            a.y = cmd.KwF("y", a.y);
+            a.power = cmd.KwF("power", a.power);
+            a.dir = cmd.KwF("dir", a.dir);
+            a.spread = cmd.KwF("spread", a.spread);
+            a.rate = cmd.KwF("rate", a.rate);
+            a.screen = cmd.KwF("screen", a.screen);
+            a.amount = cmd.KwF("amount", a.amount);
+            return a;
         }
 
         /// <summary>已由 bg 转场在盖屏瞬间应用过首镜头的 camseq（该 camseq 要跳过首点）</summary>

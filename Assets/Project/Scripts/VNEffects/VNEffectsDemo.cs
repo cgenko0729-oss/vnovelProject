@@ -95,6 +95,16 @@ namespace VNEffects
         [Header("全屏情绪水波（agent/screen-shockwave）")]
         public VNScreenShockwave shockwave;
 
+        [Header("液体喷溅（agent/liquid-splash）")]
+        public VNLiquidSplash liquidSplash;
+        [Header("镜头水渍（agent/liquid-splash）")]
+        public VNWetScreen wetScreen;
+
+        /// <summary>演示用的液体类型循环（F2 切换）</summary>
+        int _liquidIndex;
+        bool _wetOn;
+        VNLiquidPreset CurrentLiquid => VNLiquidPreset.Get((VNLiquidType)_liquidIndex);
+
         [Header("胶片/CRT 复古滤镜（agent/retro-film-filter）")]
         public VNRetroFilter retroFilter;
 
@@ -307,6 +317,43 @@ namespace VNEffects
             if (kb.semicolonKey.wasPressedThisFrame && driftingClouds != null)
                 driftingClouds.Toggle();
 
+            // ---- 液体喷溅（每处现取预设：F2 换类型后同一帧的其它分支也要用新值）----
+
+            // ` 在鼠标处来一发大爆溅，方向按"从画面中心朝点击点"，和点击喷水模式一致
+            if (kb.backquoteKey.wasPressedThisFrame && liquidSplash != null)
+            {
+                var mouse = Mouse.current;
+                Vector2 pos01 = mouse != null
+                    ? new Vector2(mouse.position.ReadValue().x / Mathf.Max(1f, Screen.width),
+                                  mouse.position.ReadValue().y / Mathf.Max(1f, Screen.height))
+                    : new Vector2(0.5f, 0.3f);
+                Vector2 fromCenter = pos01 - new Vector2(0.5f, 0.5f);
+                float dir = fromCenter.sqrMagnitude < 0.0004f
+                    ? 90f : Mathf.Atan2(fromCenter.y, fromCenter.x) * Mathf.Rad2Deg;
+                liquidSplash.Burst(pos01, CurrentLiquid, 1.6f, dir, 42f, 1.4f);
+            }
+
+            if (kb.f1Key.wasPressedThisFrame && liquidSplash != null)
+            {
+                if (liquidSplash.IsSpraying) liquidSplash.StopSpray();
+                else liquidSplash.StartSpray(new Vector2(0.5f, 0.12f), CurrentLiquid, 1.2f, 90f, 22f);
+                UpdateHint();
+            }
+
+            if (kb.f2Key.wasPressedThisFrame)
+            {
+                _liquidIndex = (_liquidIndex + 1) % System.Enum.GetValues(typeof(VNLiquidType)).Length;
+                UpdateHint();
+            }
+
+            if (kb.f3Key.wasPressedThisFrame && wetScreen != null)
+            {
+                _wetOn = !_wetOn;
+                if (_wetOn) wetScreen.SetWet(true, CurrentLiquid);
+                else wetScreen.Dry();
+                UpdateHint();
+            }
+
             if (kb.tabKey.wasPressedThisFrame && character != null)
                 character.PlayEntrance(VNEntrancePreset.AfterimageDash)
                          .OnComplete(() => character.StartIdleEffects());
@@ -490,7 +537,9 @@ namespace VNEffects
                 "[ 伪景深 | ] 云影 | Tab 残影冲入 | 退格 选项演出（色调匹配/脚影自动）\n" +
                 ", 速度线开关 | . 速度线冲击 | ' 电影黑边 | / 流星 | ; 云缓移 | - 全屏水波\n" +
                 $"= 复古滤镜循环({(retroFilter != null ? retroFilter.Mode.ToString() : "-")}：无→胶片→CRT) | " +
-                "\\ 背景 Ken Burns 漂移";
+                "\\ 背景 Ken Burns 漂移\n" +
+                $"` 鼠标处爆溅 | F1 间歇喷射({(liquidSplash != null && liquidSplash.IsSpraying ? "开" : "关")}) | " +
+                $"F2 液体({(VNLiquidType)_liquidIndex}) | F3 湿镜头({(_wetOn ? "开" : "关")})";
         }
     }
 }

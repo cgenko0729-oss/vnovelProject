@@ -94,7 +94,7 @@ namespace VNEffects.EditorTools
                 { "return", "返回" }, { "params", "参数声明" }, { "flag", "变量" },
                 { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
                 { "chapter", "章节" }, { "quest", "任务" }, { "letterbox", "电影黑边" },
-                { "mark", "漫符" }, { "sns", "手机聊天" },
+                { "mark", "漫符" }, { "sns", "手机聊天" }, { "liquid", "液体喷溅" },
             };
 
         static readonly Dictionary<string, string> CategoryTranslations =

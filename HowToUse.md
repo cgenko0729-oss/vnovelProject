@@ -442,6 +442,54 @@ fx speedlines burst
 | `kenburns on/off` | 背景 Ken Burns 缓慢漂移（**默认开启**） |
 | `meteor on/off` | 夜晚偶发流星 |
 
+### liquid — 液体喷溅（水 / 血 / 墨 / 黏液）
+
+```
+liquid splash x:0.5 y:0.15                     # 从画面下方喷一发
+liquid splash x:0.5 y:0.2 power:2.2 spread:18  # 高压水柱（力度大、张角窄）
+liquid splash x:0.12 y:0.5 dir:25 type:blood   # 从左边斜着扫过来的血
+liquid spray on x:0.5 y:0.08 power:1.2 rate:2  # 间歇噗噗喷（持续）
+liquid spray off
+liquid click on type:water                     # 点击喷水模式
+liquid click off
+liquid wet on amount:1.2                       # 常驻湿镜头（隔窗看雨）
+liquid wet off
+liquid dry                                     # 把镜头上的水渍擦干
+liquid cover on                                # 水渍盖到对话框上面
+```
+
+效果分**两层**：空中飞的水珠，以及**溅到「镜头玻璃」上挂着往下淌的水渍**。
+后者是这个效果的重点——水渍会先横向拍扁再弹回圆形（撞上来的那一下），
+挂一会儿（表面张力），然后往下淌并拖出越来越淡的水痕，最后慢慢干掉。
+大滴挂得更短、流得更快。
+
+| 子命令 | 说明 |
+|---|---|
+| `splash` | 一次性大爆溅（瞬发，不进存档） |
+| `spray on/off` | 间歇噗噗喷：一顿一顿地喷，偶尔来一记大的再泄压停顿 |
+| `click on/off` | 点击喷水模式：左键点哪喷哪、**不推进台词**（Enter/空格照常推进） |
+| `wet on/off` | 常驻湿镜头：持续补水滴维持一个稳定的「湿」 |
+| `dry` | 擦干现有水渍（瞬发） |
+| `cover on/off` | 水渍层盖不盖住对话框（默认不盖） |
+
+| 参数 | 默认 | 说明 |
+|---|---|---|
+| `type:` | water | `water` / `blood` / `ink` / `slime`（中文 水 / 血 / 墨 / 黏液） |
+| `x:` `y:` | 0.5 / 0.35 | 喷射点，**屏幕比例 0~1**（不是像素！左下角是 0,0） |
+| `power:` | 1 | 力度倍率，2 以上是爆开 |
+| `dir:` | 90 | 喷射方向角：0 = 向右，90 = 向上，180 = 向左 |
+| `spread:` | 40 | 扇形张角的半角（越小越像高压水柱） |
+| `rate:` | 1 | 仅 `spray`：脉冲频率倍率 |
+| `screen:` | 1 | 溅到镜头上的概率倍率。**`screen:0` = 只有空中水花，一滴都不上屏** |
+| `amount:` | 1 | 仅 `wet`：湿镜头的浓度 |
+
+四种液体不只是颜色不同：血比水下坠慢、拖尾短、在镜头上几乎是爬的、而且很久不干；
+墨最不透明且**没有高光**；黏液最慢最拉丝还自己发光。
+所以想要血就写 `type:blood`，把清水调成红色只会得到「轻飘飘的红水」。
+
+`spray` / `click` / `wet` / `cover` 是持续状态，**进存档**；`splash` / `dry` 是一次性演出，
+读档和「从选中行播放」都不会重放。
+
 ### letterbox — 电影黑边
 
 ```
@@ -1455,6 +1503,9 @@ weather <id> [density:] [wind:] [speed:] [size:]  天气
          id = petals|maple|ginkgo|leaves|bamboo|Rain|Snow|Fireflies|None
 mood <Neutral|Morning|Sunset|Night|Memory|Tension|Horror|Dream>  色调
 fx <名称> <on|off|burst|light|heavy> / fx focus <角色|off>   特效
+liquid <splash|spray|click|wet|dry|cover> [on|off] [...]   液体喷溅
+       [x:] [y:] 屏幕比例0~1  [type:water|blood|ink|slime]
+       [power:] [dir:0=右 90=上] [spread:] [rate:] [screen:上屏概率×] [amount:]
 letterbox <on|off> [height:] [time:]             电影黑边
 portrait <on|off>                                对话头像
 reset effects                                    清空全部特效

@@ -4628,3 +4628,121 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   应看到只有眼睛变了、身体一动不动；Play Mode 里 `show 角色` 后自动间歇眨眼。
 - 表情切换：切到非默认表情应立刻停止眨眼且不残留闭眼层，切回默认恢复。
 - 特效联动：眨眼期间跑 `fx dissolve` / `fx flash`，闭眼层应与立绘同步溶解/闪白。
+
+## 九十四、液体喷溅（喷射 / 爆溅 / 溅到镜头玻璃上）（2026-08-04，分支 `agent/liquid-splash`）
+
+### 需求 / 背景
+
+要一个「水从某一点喷出来，而且有机会溅到屏幕上」的效果：既能鼠标点哪喷哪，
+也能由剧本命令驱动；既要一次性大爆溅，也要能从一个点持续间歇地噗噗喷。
+
+拆需求时的关键判断是：这**不是一个效果，是三层**，而且三层的实现手段互不相同。
+
+| 层 | 内容 | 空间 | 手段 |
+|---|---|---|---|
+| A 喷射源 | 喷口的水花根部 | 世界 | 密集短命粒子 |
+| B 飞行水珠 | 抛物线飞散的水滴 | 世界 | 拉伸公告板粒子 |
+| C 镜头水渍 | 溅在「摄影机玻璃」上挂着往下淌的 | **屏幕** | uGUI 元素池 + 手动模拟 |
+
+很多人做这个效果失败，是想用一个粒子系统全包。A/B 做得再好、没有 C，观感只是
+「有水在飞」；只有 C 没有 A/B，水会像凭空出现在屏幕上。**C 层才是「溅到屏幕上」
+这句话真正指的东西，而它不该是粒子**——水渍要挂住、要按各自节奏开始下滑、
+要留一条越来越淡的痕、要慢慢干，全是逐个体的状态机，ParticleSystem 的曲线模型
+表达不了。
+
+### 文件改动清单
+
+**新增**
+
+- `VNLiquidPreset.cs` —— 四套内置液体预设（water / blood / ink / slime）+ `VNLiquidArgs`
+  参数结构。预设覆盖空中飞行与屏幕水渍两段的全部手感参数；`VNLiquidArgs` 由剧本层、
+  舞台层、存档重建三方共用，避免各写一份默认值而慢慢漂移。
+- `VNLiquidSplash.cs` —— 舞台层喷溅。三个发射器：Body（`VN/ParticleAlpha` 拉伸公告板
+  主水珠）/ Glow（`VN/Additive` + HDR 高光）/ Splinter（低速碎珠）。提供 `Burst`
+  一次性爆溅、`StartSpray`/`StopSpray` 间歇喷射、`SetClickMode` 点击喷水。
+- `VNWetScreen.cs` —— 屏幕层水渍。对象池 + 每帧手动模拟的四段状态机：
+  撞击形变 → 挂住 → 下滑拖痕 → 蒸发。默认排序 30（让开对话框 40），
+  `liquid cover on` 切到 50 盖住对话框。
+- `Assets/Scenarios/LiquidDemo.vn.txt` —— 六段演示剧本（爆溅 / 间歇喷 / 四种液体 /
+  盖对话框 / 湿镜头 / 点击喷水）。
+
+**修改**
+
+- `VNProceduralTextures.cs` —— 新增 5 张程序化贴图（`LiquidBlob` 头重尾轻的水珠、
+  `LiquidSplinter` 碎珠、`WaterDrop` 假折射水渍、`DropSpec` HDR 高光、
+  `LiquidStreak` 水痕）+ `GenerateRgba` 彩色生成器重载。
+- `Script/VNStage.cs` —— `liquidSplash`/`wetScreen` 两个引用 + AutoWire 自动接线（含
+  两层互连）+ `Liquid()` 命令入口 + `ResetLiquid()` + `CaptureLiquid`/`RestoreLiquid`
+  存档三处 + `ResetEffects` 联动。
+- `Script/VNSaveSystem.cs` —— `VNSaveData.LiquidSave` 子结构（spray/click/wet/cover
+  四个持续开关及其参数）。
+- `Script/VNScriptParser.cs` —— 关键字 `liquid`。
+- `Script/VNScriptRunner.cs` —— `case "liquid"` 派发 + `ParseLiquidArgs` + 调试重建
+  静默重放 + `reset effects` 清空 + **点击喷水模式下屏蔽左键推进**。
+- `Editor/VNScenarioSchema.cs` / `VNScenarioEditorWindow.cs` —— 命令模式登记（11 个参数）
+  + 中文名「液体喷溅」。
+- `Editor/VNScenarioLinter.cs` —— 4 项检查：未知子命令、未知液体类型、x/y 超出屏幕
+  比例范围、开关位不是 on/off。
+- `Editor/VNEffectsDemoSetup.cs` —— 生成器创建两个组件并接线；`AssignSourceMaterial`
+  拆出按字段名的 `AssignMaterialField`（`VNLiquidSplash` 要 alpha + additive 两份材质）。
+- `VNEffectsDemo.cs` —— 演示按键 `` ` `` 鼠标处爆溅 / F1 间歇喷射 / F2 换液体 / F3 湿镜头。
+- `Assets/Scenarios/Demo.vn.txt` —— 头部语法速查补 `liquid`。
+
+### 技术决策与取舍
+
+**1. C1 假折射，不做真折射。** 真实水滴是凸透镜，要折射它背后的画面。但 Canvas 里的
+shader 拿不到已渲染的背景（URP 无 GrabPass），要么加一个相机把背景渲进 RT，要么改
+渲染架构。这次按需求选了最省的一条：把「玻璃感」全部烘进 `WaterDrop` 贴图的 RGB
+剖面——**中心压暗 0.5 + 内侧亮环 + 最外圈急剧变暗到 0.16 的菲涅尔暗边**，再叠一层
+HDR 高光吃 Bloom。代价是看不见水滴里倒立的背景，正常观看距离下几乎分辨不出。
+真折射的接法已在预研里留好（`_DropletNormal` 走 `VNImageEffect` 局部 UV 偏移，
+或第二相机渲背景 RT + `uv = center - (uv-center)*k`，注意是**减号**，凸透镜成像倒立），
+要升级不需要重构现有代码。
+
+**2. HDR 只能挂材质，不能挂顶点色。** 这条踩了两次：`RawImage.color` 与粒子
+`startColor` 都是顶点色，>1 的分量会被钳掉，挂在那里等于没有 Bloom。
+最终：水渍高光按液体类型各建一份材质，`_TintColor` 承载「什么颜色、多亮」，
+顶点色只承载「淡入淡出到几成」；粒子这边反过来——材质给一个固定的白色 HDR 天花板
+（`glowHdrCeiling`），粒子 `startColor` 只给色相和 0~1 的相对亮度，
+这样四种液体**共用一份材质也不串色**，切换液体时还在飞的粒子也不会突然变颜色。
+
+**3. 拉伸公告板是水感的一大半。** `ParticleSystemRenderMode.Stretch` +
+`velocityScale`。球形粒子无论怎么调参都像泡泡不像水，这条比颜色重要得多。
+配套的 `LiquidBlob` 贴图做成左圆右尖，拉伸后自然得到「头重尾轻」而不是对称胶囊。
+
+**4. 主体走 `VN/ParticleAlpha` 而不是 `VN/Additive`。** 沿用落樱那次的教训：
+水是实体、要遮挡背景，加法混合只能加亮。但水又确实反光，所以拆成 Body + Glow
+两层同时发射——单一混合模式表达不了「既遮挡又反光」。
+
+**5. 液体的「黏度」是四个参数的合谋**，不是一个。`gravityScale`（下坠快慢）、
+`stretch`（空中被拉多长）、`dripSpeed`（在镜头上往下流多快）、`drySeconds`（多久干）
+必须一起调。只把清水调成红色得到的是「轻飘飘的血」——血的辨识度里，
+`dripSpeed` 只有清水三分之一这一条比颜色更关键。
+
+**6. 命中屏幕是「配额」不是物理判定。** 没做真的飞行碰撞检测。VN 是演出驱动，
+剧本需要「这一发一定要溅到镜头上」的确定性；物理判定可能整场都不溅到，演出性差。
+现在每发按 `screen:` 概率掷出几个命中名额，各自延迟一段飞行时间后通知水渍层，
+而且飞得越远的落点等得越久——一发喷溅的水渍会前后错开着「啪、啪、啪」。
+
+**7. 参数先内置不做 ScriptableObject。** 天气那套资产化是因为要在 Preview 窗口反复
+微调形态；液体参数量少一个数量级，`power`/`screen` 已覆盖日常调整。真要精调时把
+`VNLiquidPreset` 的字段原样搬进 SO 即可，调用方全部走 `Get()`，不会有第二处要改。
+
+**8. 点击喷水模式必须留键盘出路。** 左键被喷水接管后，`Enter`/`Space` **一定**保持
+推进——否则玩家会被卡死在这一句台词里。同时喷水模式会顺手让 `VNClickRipple` 让位，
+一发水花上再叠一圈柔光星环，两种点击反馈会互相打架。
+
+**9. 只有开关进存档，水本身不进。** 空中飞的水珠和屏幕上已经溅好的水渍都是瞬态的，
+读档不还原也不违和；存的只是「还在喷 / 镜头是湿的 / 点击模式开着 / 水渍盖不盖对话框」
+这四个会一直持续下去的状态。`splash` 与 `dry` 是一次性演出，调试重建也跳过它们。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**。
+- 演示场景：Tools → VN Effects → Create Demo Scene 重建后，
+  `` ` `` 在鼠标处爆溅、F1 间歇喷射、F2 循环四种液体、F3 常驻湿镜头。
+- 剧本：Scenario Editor 打开 `LiquidDemo.vn.txt` → 选中首行 → ▶ 从选中行播放。
+- 存档：`liquid spray on` / `liquid wet on` 后存档 → 读档，应仍在喷 / 镜头仍是湿的；
+  `liquid splash` 之后存读档**不应**重放那一发。
+- 校验器：Ctrl+Shift+L，故意写 `liquid splash x:960`（像素而非比例）应报
+  `liquid-coord-range`；写 `liquid spry` 应报 `bad-liquid-action`。

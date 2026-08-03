@@ -85,7 +85,7 @@ namespace VNEffects
         static readonly HashSet<string> Keywords = new HashSet<string>
         {
             "bg", "cg", "show", "hide", "emote", "mark", "wait",
-            "camera", "shake", "weather", "mood", "fx",
+            "camera", "shake", "weather", "mood", "fx", "liquid",
             "sakura", "transition", "reset",
             "label", "jump", "call", "return", "params", "flag", "stat", "time", "if", "choice",
             "chapter",

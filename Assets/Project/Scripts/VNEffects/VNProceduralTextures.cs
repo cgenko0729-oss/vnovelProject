@@ -698,6 +698,150 @@ namespace VNEffects
             return body * Mathf.Clamp01(1.15f - t); // 顶端渐隐 = 蒸汽消散
         }
 
+        // ------------------------------------------------------------------
+        // 液体喷溅（VNLiquidSplash / VNWetScreen）
+        // ------------------------------------------------------------------
+
+        static Texture2D _liquidBlob;
+        static Texture2D _liquidSplinter;
+        static Texture2D _waterDrop;
+        static Texture2D _dropSpec;
+        static Texture2D _liquidStreak;
+
+        /// <summary>
+        /// 空中飞行的水珠（拉伸公告板粒子用）。左端圆润、右端收尖：
+        /// StretchedBillboard 沿速度方向拉伸贴图的水平轴，所以尖端会自然指向运动方向的反侧，
+        /// 得到"头重尾轻"的水滴，而不是对称的胶囊。
+        /// </summary>
+        public static Texture2D LiquidBlob
+        {
+            get
+            {
+                if (_liquidBlob == null)
+                    _liquidBlob = Generate("VN_LiquidBlob", 64, 64, (dx, dy) =>
+                    {
+                        // 沿 x 收窄：x 越大越尖
+                        float t = Mathf.Clamp01(dx + 0.5f);          // 0 = 左（头）, 1 = 右（尾）
+                        float halfHeight = Mathf.Lerp(0.30f, 0.055f, Mathf.Pow(t, 1.5f));
+                        float ny = Mathf.Abs(dy) / halfHeight;
+                        if (ny >= 1f) return 0f;
+                        float body = Mathf.Pow(1f - ny, 0.75f);
+                        // 两端收口，避免出现硬边
+                        float capL = Mathf.Clamp01((dx + 0.47f) / 0.10f);
+                        float capR = Mathf.Clamp01((0.48f - dx) / 0.06f);
+                        return body * capL * capR;
+                    });
+                return _liquidBlob;
+            }
+        }
+
+        /// <summary>爆溅碎珠：单纯的小圆点，比 SoftCircle 边缘更实（是水不是光）</summary>
+        public static Texture2D LiquidSplinter
+        {
+            get
+            {
+                if (_liquidSplinter == null)
+                    _liquidSplinter = Generate("VN_LiquidSplinter", 32, (dx, dy) =>
+                    {
+                        float r = Mathf.Sqrt(dx * dx + dy * dy) / 0.44f;
+                        if (r >= 1f) return 0f;
+                        return Mathf.Clamp01((1f - r) / 0.22f); // 实心 + 两像素柔边
+                    });
+                return _liquidSplinter;
+            }
+        }
+
+        /// <summary>
+        /// 溅在镜头上的水渍本体（C1 假折射）。RGB 存明暗、A 存形状与厚度：
+        ///   · 中心压暗到 0.5      —— 透过水看到的画面本来就更暗
+        ///   · 内侧一圈亮环        —— 液面隆起处的反光
+        ///   · 最外圈急剧变暗到 0.16 —— 菲涅尔暗边，"这是玻璃不是贴纸"全靠它
+        ///   · 中心 alpha 低、边缘 alpha 高 —— 中间透得过去，边缘厚实
+        /// 不做真折射（不采样背景），因此不需要 GrabPass / 额外相机，
+        /// 代价是看不到水滴里倒立的背景——远看几乎分辨不出。
+        /// </summary>
+        public static Texture2D WaterDrop
+        {
+            get
+            {
+                if (_waterDrop == null)
+                    _waterDrop = GenerateRgba("VN_WaterDrop", 128, (dx, dy) =>
+                    {
+                        float r = Mathf.Sqrt(dx * dx + dy * dy);
+                        const float R = 0.47f;
+                        float t = r / R;                      // 0 中心 → 1 边缘
+                        if (t >= 1f) return new Color(0f, 0f, 0f, 0f);
+
+                        // 明暗剖面：中心暗 → 内亮环 → 外暗边
+                        float shade = 0.50f;
+                        shade += 0.55f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.55f, 0.85f, t));
+                        shade *= 1f - 0.80f * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.86f, 1f, t));
+
+                        // 厚度：中心薄（透）、边缘厚（实），最外沿再柔化两像素消锯齿
+                        float a = Mathf.Lerp(0.62f, 1f, Mathf.Pow(t, 1.6f));
+                        a *= Mathf.Clamp01((1f - t) / 0.04f);
+
+                        return new Color(shade, shade, shade, a);
+                    });
+                return _waterDrop;
+            }
+        }
+
+        /// <summary>
+        /// 水渍高光层（叠在 WaterDrop 上，走 VN/Additive + HDR 才吃得到 Bloom）。
+        /// 一个偏左上的小亮斑 + 一道细弧——真实水滴反射的是环境里最亮的那一小块，
+        /// 位置固定在同一侧才像"同一个光源"，随机化反而会散掉。
+        /// </summary>
+        public static Texture2D DropSpec
+        {
+            get
+            {
+                if (_dropSpec == null)
+                    _dropSpec = Generate("VN_DropSpec", 64, (dx, dy) =>
+                    {
+                        // 主高光：左上小圆斑
+                        float hx = (dx + 0.17f) / 0.115f;
+                        float hy = (dy - 0.16f) / 0.085f;
+                        float spot = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Sqrt(hx * hx + hy * hy)), 1.4f);
+
+                        // 副高光：右下贴着边缘的一道细弧（液面反射的地平线）
+                        float r = Mathf.Sqrt(dx * dx + dy * dy);
+                        float ring = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(r - 0.375f) / 0.045f), 2f);
+                        float ang = Mathf.Atan2(dy, dx);
+                        float arc = Mathf.Clamp01(Mathf.Cos(ang + 1.15f)); // 只保留右下一段
+                        ring *= Mathf.Pow(arc, 3.5f) * 0.55f;
+
+                        return Mathf.Clamp01(spot + ring);
+                    });
+                return _dropSpec;
+            }
+        }
+
+        /// <summary>
+        /// 水渍下滑留下的水痕（竖向，pivot 放底部后向上拉伸即可）。
+        /// 顶端（最早流过的地方）最淡：水痕是边流边被表面张力收干的。
+        /// </summary>
+        public static Texture2D LiquidStreak
+        {
+            get
+            {
+                if (_liquidStreak == null)
+                    _liquidStreak = GenerateRgba("VN_LiquidStreak", 32, 256, (dx, dy) =>
+                    {
+                        float across = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Abs(dx) / 0.34f), 0.9f);
+                        if (across <= 0f) return new Color(0f, 0f, 0f, 0f);
+                        float t = dy + 0.5f;                        // 0 底（新）→ 1 顶（旧）
+                        float along = Mathf.Pow(Mathf.Clamp01(1f - t), 0.85f);
+
+                        // 和水滴同一套明暗语言：中间偏暗、两侧亮边
+                        float edge = Mathf.Pow(Mathf.Clamp01(Mathf.Abs(dx) / 0.34f), 2.2f);
+                        float shade = Mathf.Lerp(0.55f, 1.05f, edge);
+                        return new Color(shade, shade, shade, across * along * 0.85f);
+                    });
+                return _liquidStreak;
+            }
+        }
+
         /// <summary>
         /// 通用生成器：alphaFunc 以中心为原点（dx, dy ∈ [-0.5, 0.5]）返回 alpha。
         /// RGB 恒为白色，颜色交给顶点色 / 材质 Tint 控制。
@@ -724,6 +868,46 @@ namespace VNEffects
                     float dx = (x + 0.5f) / width - 0.5f;
                     byte a = (byte)Mathf.RoundToInt(Mathf.Clamp01(alphaFunc(dx, dy)) * 255f);
                     pixels[y * width + x] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+            return tex;
+        }
+
+        /// <summary>
+        /// 彩色生成器：colorFunc 返回带 RGB 的颜色（RGB 会与顶点色相乘）。
+        /// 用于明暗信息必须写进贴图的形状——液体的菲涅尔暗边、内亮环靠顶点色做不出来，
+        /// 顶点色只能整体染色，没法在一张图里既有暗边又有亮环。
+        /// RGB 允许写到 1 以上的意图请改用 Additive 图层，Color32 存不下 HDR。
+        /// </summary>
+        static Texture2D GenerateRgba(string name, int size, System.Func<float, float, Color> colorFunc)
+            => GenerateRgba(name, size, size, colorFunc);
+
+        static Texture2D GenerateRgba(string name, int width, int height,
+            System.Func<float, float, Color> colorFunc)
+        {
+            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontSave
+            };
+
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                float dy = (y + 0.5f) / height - 0.5f;
+                for (int x = 0; x < width; x++)
+                {
+                    float dx = (x + 0.5f) / width - 0.5f;
+                    Color c = colorFunc(dx, dy);
+                    pixels[y * width + x] = new Color32(
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.r) * 255f),
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.g) * 255f),
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.b) * 255f),
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(c.a) * 255f));
                 }
             }
             tex.SetPixels32(pixels);

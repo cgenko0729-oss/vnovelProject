@@ -49,6 +49,17 @@ namespace VNEffects.EditorTools
             "Surprise", "Angry", "Shy", "Dejected", "Recover", "Nod", "HeadShake",
         };
 
+        // liquid 的子命令与液体类型的中文别名（英文名走 VNLiquidType 枚举反射）
+        static readonly HashSet<string> LiquidActions = new HashSet<string>
+        {
+            "splash", "spray", "click", "wet", "dry", "cover",
+        };
+
+        static readonly HashSet<string> LiquidTypeAliases = new HashSet<string>
+        {
+            "水", "清水", "血", "鲜血", "墨", "墨水", "黏液", "粘液",
+        };
+
         // 内置事件模块的结果名（用于拼写校验；未知模块跳过不报）
         static readonly Dictionary<string, HashSet<string>> BuiltinOutcomes =
             new Dictionary<string, HashSet<string>>
@@ -506,6 +517,43 @@ namespace VNEffects.EditorTools
                         break;
                     }
 
+                    case "liquid":
+                    {
+                        // 子命令拼错时运行时只有一条 Console 警告，画面上什么都不会发生
+                        string act = c.Arg(0, "splash");
+                        if (!Dynamic(act) && !LiquidActions.Contains(act))
+                            Add(issues, VNLintSeverity.Error, "bad-liquid-action", f, c.line,
+                                $"liquid 子命令「{act}」不认识",
+                                "可用 splash（一次性爆溅）/ spray（间歇喷射开关）/ " +
+                                "click（点击喷水模式）/ wet（常驻湿镜头）/ dry（擦干）/ " +
+                                "cover（水渍盖不盖对话框）。");
+
+                        string ltype = c.Kw("type");
+                        if (!string.IsNullOrEmpty(ltype) && !Dynamic(ltype) &&
+                            !System.Enum.TryParse<VNLiquidType>(ltype, true, out _) &&
+                            !LiquidTypeAliases.Contains(ltype))
+                            Add(issues, VNLintSeverity.Error, "bad-liquid-type", f, c.line,
+                                $"液体类型「{ltype}」不认识",
+                                "可写 water / blood / ink / slime，或中文 水 / 血 / 墨 / 黏液。");
+
+                        // x/y 是屏幕比例 0~1，按像素写（如 x:960）会把喷射点甩到画面外，
+                        // 运行时完全没有提示，只会看到"命令好像没生效"
+                        CheckLiquidRange(issues, f, c, "x");
+                        CheckLiquidRange(issues, f, c, "y");
+
+                        // spray/click/wet/cover 是开关型，第二个参数必须写 on 或 off；
+                        // 省略视作 on，写别的（比如 start / true 之外的词）会被当成 on 而无声吞掉
+                        string sw = c.Arg(1);
+                        if (!string.IsNullOrEmpty(sw) && !Dynamic(sw) &&
+                            sw != "on" && sw != "off" && sw != "true" && sw != "false" &&
+                            sw != "0" && sw != "1")
+                            Add(issues, VNLintSeverity.Warning, "bad-liquid-switch", f, c.line,
+                                $"liquid 的开关位「{sw}」不是 on/off",
+                                "第二个位置参数只能是 on 或 off（省略 = on）；" +
+                                "其它参数一律写成 key:value，比如 power:1.5 type:blood。");
+                        break;
+                    }
+
                     case "emote":
                         CheckCharacter(issues, f, c.line, c.Arg(0), reg);
                         string action = c.Arg(1);
@@ -566,6 +614,23 @@ namespace VNEffects.EditorTools
             if (known.Contains(id)) return;
             Add(issues, VNLintSeverity.Warning, code, f, line,
                 $"未登记的{label}「{id}」", hint);
+        }
+
+        /// <summary>
+        /// liquid 的 x/y 是屏幕比例（0~1）。写成像素（x:960）是最容易犯的错，
+        /// 而且运行时喷射点直接飞到画面外，什么提示都没有，只会以为命令没生效。
+        /// </summary>
+        static void CheckLiquidRange(List<VNLintIssue> issues, ScriptFile f,
+            VNScriptCommand c, string key)
+        {
+            string raw = c.Kw(key);
+            if (string.IsNullOrEmpty(raw) || Dynamic(raw)) return;
+            if (!float.TryParse(raw, out float v)) return;
+            if (v >= -0.5f && v <= 1.5f) return;
+            Add(issues, VNLintSeverity.Warning, "liquid-coord-range", f, c.line,
+                $"liquid 的 {key}:{raw} 超出屏幕比例范围",
+                "x/y 用 0~1 的屏幕比例，不是像素：画面正中是 x:0.5 y:0.5，" +
+                "左下角是 x:0 y:0。");
         }
 
         static void CheckCharacter(List<VNLintIssue> issues, ScriptFile f, int line,
