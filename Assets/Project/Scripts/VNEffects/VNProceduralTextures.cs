@@ -709,9 +709,14 @@ namespace VNEffects
         static Texture2D _liquidStreak;
 
         /// <summary>
-        /// 空中飞行的水珠（拉伸公告板粒子用）。左端圆润、右端收尖：
-        /// StretchedBillboard 沿速度方向拉伸贴图的水平轴，所以尖端会自然指向运动方向的反侧，
-        /// 得到"头重尾轻"的水滴，而不是对称的胶囊。
+        /// 空中飞行的水珠（拉伸公告板粒子用）。
+        ///
+        /// 【为什么是近圆形而不是长条】
+        /// StretchedBillboard 会把贴图沿速度方向再拉一次（`lengthScale`）。
+        /// 贴图本身画成长条的话，两次拉伸叠起来就是一根面条——第一版又粗又长正是栽在这。
+        /// 现有的雨干脆用纯圆的 SoftCircle + lengthScale 5 来拉出雨丝，这里同理：
+        /// 只画一个**略带尖尾的近圆**，长度交给 lengthScale 决定。
+        /// 尖尾朝 +x，拉伸后自然成为"头重尾轻"而不是对称胶囊。
         /// </summary>
         public static Texture2D LiquidBlob
         {
@@ -720,15 +725,19 @@ namespace VNEffects
                 if (_liquidBlob == null)
                     _liquidBlob = Generate("VN_LiquidBlob", 64, 64, (dx, dy) =>
                     {
-                        // 沿 x 收窄：x 越大越尖
-                        float t = Mathf.Clamp01(dx + 0.5f);          // 0 = 左（头）, 1 = 右（尾）
-                        float halfHeight = Mathf.Lerp(0.30f, 0.055f, Mathf.Pow(t, 1.5f));
+                        // 只占中间一小块：形状紧凑，长度全部交给 lengthScale
+                        const float halfWidth = 0.30f;
+                        float t = Mathf.InverseLerp(-halfWidth, halfWidth, dx); // 0 = 头, 1 = 尾
+                        if (t <= 0f || t >= 1f) return 0f;
+
+                        // 头部近圆（半高 ≈ 半宽），尾部收到三分之一
+                        float halfHeight = Mathf.Lerp(0.26f, 0.085f, Mathf.Pow(t, 1.35f));
                         float ny = Mathf.Abs(dy) / halfHeight;
                         if (ny >= 1f) return 0f;
-                        float body = Mathf.Pow(1f - ny, 0.75f);
-                        // 两端收口，避免出现硬边
-                        float capL = Mathf.Clamp01((dx + 0.47f) / 0.10f);
-                        float capR = Mathf.Clamp01((0.48f - dx) / 0.06f);
+
+                        float body = Mathf.Pow(1f - ny, 0.7f);
+                        float capL = Mathf.Clamp01((dx + halfWidth) / 0.09f);
+                        float capR = Mathf.Clamp01((halfWidth - dx) / 0.05f);
                         return body * capL * capR;
                     });
                 return _liquidBlob;

@@ -1334,7 +1334,10 @@ namespace VNEffects
                 l.sprayX = liquidSplash.SprayPos.x;
                 l.sprayY = liquidSplash.SprayPos.y;
                 l.sprayPower = liquidSplash.SprayPower;
-                l.sprayDir = liquidSplash.SprayDir;
+                // NaN 不能进 JSON，拆成「有没有指定」+「指定的值」两个字段
+                float dir = liquidSplash.SprayDir;
+                l.sprayDirSet = !float.IsNaN(dir);
+                l.sprayDir = l.sprayDirSet ? dir : 0f;
                 l.spraySpread = liquidSplash.SpraySpread;
                 l.sprayRate = liquidSplash.SprayRate;
                 l.sprayScreen = liquidSplash.SprayScreen;
@@ -1382,7 +1385,7 @@ namespace VNEffects
                 liquidSplash.StartSpray(new Vector2(l.sprayX, l.sprayY),
                     VNLiquidPreset.Get(l.sprayType),
                     l.sprayPower > 0f ? l.sprayPower : 1f,
-                    l.sprayDir, l.spraySpread,
+                    l.sprayDirSet ? l.sprayDir : float.NaN, l.spraySpread,
                     l.sprayRate > 0f ? l.sprayRate : 1f,
                     l.sprayScreen);
 

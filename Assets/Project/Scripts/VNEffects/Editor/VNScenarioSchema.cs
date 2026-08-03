@@ -240,7 +240,8 @@ namespace VNEffects.EditorTools
             Add("sakura", "FX", "sakura  (petal burst combo)");
             Add("liquid", "FX",
                 "liquid splash|spray|click|wet|dry|cover [on|off] [x:] [y:] …\n" +
-                "  splash  一次性大爆溅（x/y 为屏幕比例 0~1，dir 0=右 90=上）\n" +
+                "  splash  一次性大爆溅（x/y 为屏幕比例 0~1）\n" +
+                "  dir 留空 = 朝镜头扑面而来（默认）；填了才是侧喷：0=右 90=上 180=左\n" +
                 "  spray   间歇噗噗喷开关（rate 越大喷得越频繁）\n" +
                 "  click   点击喷水模式：开着时左键点哪喷哪、不推进台词（Enter/空格照常推进）\n" +
                 "  wet     常驻湿镜头开关（隔着车窗看雨那种，amount 是浓度）\n" +
@@ -253,7 +254,9 @@ namespace VNEffects.EditorTools
                 Kw("x", "x", VNParamSource.Number, def: "0.5", weight: 0.45f),
                 Kw("y", "y", VNParamSource.Number, def: "0.35", weight: 0.45f),
                 Kw("power", "力度", VNParamSource.Number, def: "1", weight: 0.5f),
-                Kw("dir", "方向°", VNParamSource.Number, def: "90", weight: 0.5f),
+                // def 留空：填了多少就生成多少。若把默认写成 90，用户手填 90 会被当成
+                // "等于默认可省略"而消失，反而永远得不到 dir:90（那才是真正的侧喷向上）
+                Kw("dir", "方向°", VNParamSource.Number, weight: 0.5f),
                 Kw("spread", "张角°", VNParamSource.Number, def: "40", weight: 0.5f),
                 Kw("rate", "频率×", VNParamSource.Number, def: "1", weight: 0.5f),
                 Kw("screen", "上屏×", VNParamSource.Number, def: "1", weight: 0.5f),

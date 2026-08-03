@@ -64,7 +64,12 @@ namespace VNEffects
             public bool sprayOn;
             public string sprayType;
             public float sprayX, sprayY;
-            public float sprayPower, sprayDir, spraySpread, sprayRate, sprayScreen;
+            public float sprayPower, spraySpread, sprayRate, sprayScreen;
+            // 喷射方向：内部用 float.NaN 表示"朝镜头"，但 JsonUtility 会把 NaN 写成
+            // 非法 JSON，读回来是垃圾值。所以照 weatherWindSet 的先例另用一个 bool 标记，
+            // 旧存档缺省 false = 朝镜头（也正是新的默认行为）。
+            public bool sprayDirSet;
+            public float sprayDir;
 
             public bool clickOn;
             public string clickType;

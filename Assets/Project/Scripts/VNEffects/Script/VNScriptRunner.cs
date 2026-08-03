@@ -279,7 +279,8 @@ namespace VNEffects
                                 lsave.sprayX = la.x;
                                 lsave.sprayY = la.y;
                                 lsave.sprayPower = la.power;
-                                lsave.sprayDir = la.dir;
+                                lsave.sprayDirSet = !float.IsNaN(la.dir); // NaN = 朝镜头
+                                lsave.sprayDir = lsave.sprayDirSet ? la.dir : 0f;
                                 lsave.spraySpread = la.spread;
                                 lsave.sprayRate = la.rate;
                                 lsave.sprayScreen = la.screen;

@@ -62,7 +62,7 @@ namespace VNEffects
         bool _spraying;
         VNLiquidPreset _sprayPreset;
         Vector2 _sprayPos01;
-        float _sprayPower = 1f, _sprayDir = 90f, _spraySpread = 26f;
+        float _sprayPower = 1f, _sprayDir = float.NaN, _spraySpread = 26f;
         float _sprayRate = 1f, _sprayScreen = 1f;
         float _sprayTimer;
 
@@ -191,19 +191,72 @@ namespace VNEffects
                 });
             col.color = new ParticleSystem.MinMaxGradient(g);
 
-            // 越飞越小：水珠在空中会被拉断、蒸发
+            // sizeOverLifetime / velocityOverLifetime 由 ApplyMode 按喷射模式设置：
+            // 侧喷要越飞越小（蒸发），朝镜头要越飞越大（逼近）——曲线正好相反。
             var sol = ps.sizeOverLifetime;
             sol.enabled = true;
-            sol.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(
-                new Keyframe(0f, 1f, 0f, 0f),
-                new Keyframe(0.7f, 0.85f, -0.3f, -0.3f),
-                new Keyframe(1f, 0.45f, -1.2f, 0f)));
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.x = vel.y = vel.z = new ParticleSystem.MinMaxCurve(0f);
 
             renderer = go.GetComponent<ParticleSystemRenderer>();
             renderer.sortingOrder = sortingOrder;
 
             ps.Play();
             return ps;
+        }
+
+        // ------------------------------------------------------------------
+        // 喷射模式：侧喷 vs 朝镜头
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 相机是**正交**的（`orthographic = true`），所以真给粒子一个 z 速度不会有
+        /// 任何近大远小——正交投影下远近一样大。「朝镜头扑面而来」只能做伪透视：
+        ///   · 从喷射点向四周放射（朝你飞来的东西在屏幕上就是从一点向外扩散）
+        ///   · 径向速度取平方分布 → 多数粒子几乎不动只变大（正对着你飞），
+        ///     少数快速向外掠过（擦着镜头过去）
+        ///   · 边飞边加速、边飞边放大（越近越快越大）
+        /// 拉伸公告板沿速度方向拉伸这件事在这里刚好白送：中心那些慢粒子几乎是圆点，
+        /// 外围快的被拉成放射状短线——正是正对镜头的雨该有的样子。
+        /// </summary>
+        bool _modeTowardCamera = true;
+        bool _modeApplied;
+
+        void ApplyMode(bool towardCamera)
+        {
+            if (_modeApplied && _modeTowardCamera == towardCamera) return;
+            _modeApplied = true;
+            _modeTowardCamera = towardCamera;
+
+            // 逼近曲线：先慢后快，模拟透视下越近位移越大
+            var speedCurve = towardCamera
+                ? new AnimationCurve(
+                    new Keyframe(0f, 0.55f, 0f, 0.6f),
+                    new Keyframe(0.6f, 1.5f, 2.4f, 2.4f),
+                    new Keyframe(1f, 3.2f, 4f, 0f))
+                : new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(1f, 1f));
+
+            // 尺寸曲线：朝镜头是越来越大（逼近），侧喷是越飞越小（蒸发/拉断）
+            var sizeCurve = towardCamera
+                ? new AnimationCurve(
+                    new Keyframe(0f, 0.42f, 0.6f, 0.6f),
+                    new Keyframe(0.65f, 1f, 1.4f, 1.4f),
+                    new Keyframe(1f, 2.1f, 3.2f, 0f))
+                : new AnimationCurve(
+                    new Keyframe(0f, 1f, 0f, 0f),
+                    new Keyframe(0.7f, 0.85f, -0.3f, -0.3f),
+                    new Keyframe(1f, 0.45f, -1.2f, 0f));
+
+            foreach (var ps in new[] { _body, _glow, _splinter })
+            {
+                if (ps == null) continue;
+                var sol = ps.sizeOverLifetime;
+                sol.size = new ParticleSystem.MinMaxCurve(1f, sizeCurve);
+                var vel = ps.velocityOverLifetime;
+                vel.speedModifier = new ParticleSystem.MinMaxCurve(1f, speedCurve);
+            }
         }
 
         Material CreateMaterial(string shaderName, Material source, Texture2D texture)
@@ -242,13 +295,14 @@ namespace VNEffects
         /// <param name="spreadDeg">扇形张角的半角</param>
         /// <param name="screenScale">命中镜头概率的倍率，0 = 绝不溅到屏幕上</param>
         public void Burst(Vector2 pos01, VNLiquidPreset preset, float power = 1f,
-            float dirDeg = 90f, float spreadDeg = 40f, float screenScale = 1f)
+            float dirDeg = float.NaN, float spreadDeg = 40f, float screenScale = 1f)
         {
             Build();
             if (preset == null) preset = VNLiquidPreset.Get(VNLiquidType.Water);
             power = Mathf.Clamp(power, 0.1f, 5f);
 
-            ApplyPreset(preset);
+            ApplyMode(float.IsNaN(dirDeg));
+            ApplyPreset(preset, float.IsNaN(dirDeg));
 
             int count = Mathf.RoundToInt(preset.burstCount * Mathf.Lerp(0.7f, 1.8f, Mathf.Min(power, 2f) / 2f));
             EmitCluster(pos01, preset, count, power, dirDeg, spreadDeg, 1f);
@@ -264,7 +318,7 @@ namespace VNEffects
         /// rate 是脉冲频率倍率：1 = 大约每 0.45 秒一下。
         /// </summary>
         public void StartSpray(Vector2 pos01, VNLiquidPreset preset, float power = 1f,
-            float dirDeg = 90f, float spreadDeg = 26f, float rate = 1f, float screenScale = 1f)
+            float dirDeg = float.NaN, float spreadDeg = 26f, float rate = 1f, float screenScale = 1f)
         {
             Build();
             _sprayPreset = preset ?? VNLiquidPreset.Get(VNLiquidType.Water);
@@ -316,27 +370,43 @@ namespace VNEffects
         // 发射
         // ------------------------------------------------------------------
 
-        /// <summary>预设里那些"只能整组生效"的参数（重力/阻力）在发射前同步到粒子系统</summary>
-        void ApplyPreset(VNLiquidPreset preset)
+        /// <summary>
+        /// 预设里那些"只能整组生效"的参数（重力/阻力/拉伸）在发射前同步到粒子系统。
+        /// 拉伸走 <c>lengthScale</c>（固定倍率）而不是 <c>velocityScale</c>（随速度）：
+        /// 后者会把初速高的粒子拉成面条，而现有的雨也是用 lengthScale 做的，
+        /// 想"像下雨那样"就得用同一套。velocityScale 只留一点点，让快的略长一些。
+        /// </summary>
+        void ApplyPreset(VNLiquidPreset preset, bool towardCamera)
         {
-            if (_lastEmitPreset == preset) return;
+            if (_lastEmitPreset == preset && _lastEmitToward == towardCamera) return;
             _lastEmitPreset = preset;
+            _lastEmitToward = towardCamera;
 
             foreach (var ps in new[] { _body, _glow, _splinter })
             {
                 if (ps == null) continue;
                 var main = ps.main;
-                main.gravityModifier = preset.gravityScale * 0.55f;
+                // 朝镜头时几乎看不出重力：位移主要发生在观众看不见的深度方向上
+                main.gravityModifier = preset.gravityScale * (towardCamera ? 0.16f : 0.55f);
                 var lim = ps.limitVelocityOverLifetime;
                 lim.drag = preset.drag;
             }
-            if (_bodyRenderer != null) _bodyRenderer.velocityScale = preset.stretch;
+
+            if (_bodyRenderer != null)
+            {
+                // 朝镜头的水珠是正对着你来的，投影到屏幕上更短
+                _bodyRenderer.lengthScale = preset.stretch * (towardCamera ? 0.62f : 1f);
+                _bodyRenderer.velocityScale = 0.035f;
+            }
         }
 
-        /// <summary>发射一簇主水珠 + 配套高光</summary>
+        bool _lastEmitToward = true;
+
+        /// <summary>发射一簇主水珠 + 配套高光。dirDeg 为 NaN = 朝镜头扑面而来。</summary>
         void EmitCluster(Vector2 pos01, VNLiquidPreset p, int count, float power,
             float dirDeg, float spreadDeg, float speedMul)
         {
+            bool toward = float.IsNaN(dirDeg);
             Vector3 origin = WorldPoint(pos01);
             Color bodyColor = p.tint;
             bodyColor.a = p.bodyAlpha;
@@ -347,16 +417,34 @@ namespace VNEffects
 
             for (int i = 0; i < count; i++)
             {
-                float ang = (dirDeg + Random.Range(-spreadDeg, spreadDeg)) * Mathf.Deg2Rad;
-                // 速度平方分布：多数中速、少数飞得特别远，均匀分布会像喷头而不像爆开
-                float speed = p.speedScale * power * speedMul *
-                              Mathf.Lerp(2.6f, 7.4f, Mathf.Pow(Random.value, 1.6f));
-                var vel = new Vector3(Mathf.Cos(ang) * speed, Mathf.Sin(ang) * speed, 0f);
+                Vector3 vel;
+                if (toward)
+                {
+                    // 朝镜头：360° 放射 + 径向速度平方分布。
+                    // 平方分布是关键——多数粒子几乎不动只变大（正对着你飞过来），
+                    // 少数快速向外掠过（擦着镜头过去）。均匀分布会变成一个平面上的烟花。
+                    float ang = Random.value * Mathf.PI * 2f;
+                    float radial = Mathf.Pow(Random.value, 2.2f) *
+                                   (spreadDeg / 40f) * 4.2f * p.speedScale * power * speedMul;
+                    // 给个下限：速度为 0 时拉伸公告板的朝向未定义，会抖
+                    radial = Mathf.Max(radial, 0.35f);
+                    vel = new Vector3(Mathf.Cos(ang) * radial, Mathf.Sin(ang) * radial, 0f);
+                }
+                else
+                {
+                    float ang = (dirDeg + Random.Range(-spreadDeg, spreadDeg)) * Mathf.Deg2Rad;
+                    // 速度平方分布：多数中速、少数飞得特别远，均匀分布会像喷头而不像爆开
+                    float speed = p.speedScale * power * speedMul *
+                                  Mathf.Lerp(2.6f, 7.4f, Mathf.Pow(Random.value, 1.6f));
+                    vel = new Vector3(Mathf.Cos(ang) * speed, Mathf.Sin(ang) * speed, 0f);
+                }
+
                 float size = Random.Range(p.sizeMin, p.sizeMax) * Mathf.Lerp(1f, 1.3f, power / 3f);
-                float life = Random.Range(p.lifeMin, p.lifeMax);
+                // 朝镜头的整个过程很短——水扑到脸上就那么一下
+                float life = Random.Range(p.lifeMin, p.lifeMax) * (toward ? 0.62f : 1f);
 
                 // 喷口附近抖一点，否则所有水珠从同一个点出发像烟花
-                var jitter = (Vector3)(Random.insideUnitCircle * 0.09f);
+                var jitter = (Vector3)(Random.insideUnitCircle * (toward ? 0.05f : 0.09f));
 
                 _body.Emit(new ParticleSystem.EmitParams
                 {
@@ -385,21 +473,35 @@ namespace VNEffects
         void EmitSplinters(Vector2 pos01, VNLiquidPreset p, int count, float power,
             float dirDeg, float spreadDeg)
         {
+            bool toward = float.IsNaN(dirDeg);
             Vector3 origin = WorldPoint(pos01);
             Color c = p.tint;
             c.a = p.bodyAlpha * 0.9f;
 
             for (int i = 0; i < count; i++)
             {
-                // 碎珠散得比主喷射宽得多（1.9 倍张角），这是"炸开"的观感来源
-                float ang = (dirDeg + Random.Range(-spreadDeg, spreadDeg) * 1.9f) * Mathf.Deg2Rad;
-                float speed = p.speedScale * power * Random.Range(0.8f, 3.2f);
+                float ang, speed;
+                if (toward)
+                {
+                    // 朝镜头的碎珠散得更开：它们是被主水柱撞碎后甩到边上的
+                    ang = Random.value * Mathf.PI * 2f;
+                    speed = Mathf.Pow(Random.value, 1.5f) *
+                            (spreadDeg / 40f) * 5.5f * p.speedScale * power;
+                    speed = Mathf.Max(speed, 0.5f);
+                }
+                else
+                {
+                    // 碎珠散得比主喷射宽得多（1.9 倍张角），这是"炸开"的观感来源
+                    ang = (dirDeg + Random.Range(-spreadDeg, spreadDeg) * 1.9f) * Mathf.Deg2Rad;
+                    speed = p.speedScale * power * Random.Range(0.8f, 3.2f);
+                }
+
                 _splinter.Emit(new ParticleSystem.EmitParams
                 {
                     position = origin + (Vector3)(Random.insideUnitCircle * 0.12f),
                     velocity = new Vector3(Mathf.Cos(ang) * speed, Mathf.Sin(ang) * speed, 0f),
-                    startSize = Random.Range(p.sizeMin, p.sizeMax) * 0.4f,
-                    startLifetime = Random.Range(p.lifeMin, p.lifeMax) * 0.7f,
+                    startSize = Random.Range(p.sizeMin, p.sizeMax) * 0.55f,
+                    startLifetime = Random.Range(p.lifeMin, p.lifeMax) * (toward ? 0.45f : 0.7f),
                     startColor = c,
                 }, 1);
             }
@@ -422,8 +524,19 @@ namespace VNEffects
             {
                 if (Random.value >= chance) continue;
 
-                float ang = (dirDeg + Random.Range(-spreadDeg, spreadDeg) * 1.3f) * Mathf.Deg2Rad;
-                float dist = Random.Range(0.04f, 0.30f) * Mathf.Clamp(power, 0.6f, 2f);
+                float ang, dist;
+                if (float.IsNaN(dirDeg))
+                {
+                    // 朝镜头：命中点绕着喷射点铺开一圈，越靠近喷射点越密
+                    // （正对着飞来的那些就落在原地附近）
+                    ang = Random.value * Mathf.PI * 2f;
+                    dist = Mathf.Pow(Random.value, 1.8f) * 0.26f * Mathf.Clamp(power, 0.6f, 2f);
+                }
+                else
+                {
+                    ang = (dirDeg + Random.Range(-spreadDeg, spreadDeg) * 1.3f) * Mathf.Deg2Rad;
+                    dist = Random.Range(0.04f, 0.30f) * Mathf.Clamp(power, 0.6f, 2f);
+                }
                 var hit = pos01 + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang) * 0.75f) * dist;
                 hit += Random.insideUnitCircle * 0.07f;
 
@@ -433,7 +546,8 @@ namespace VNEffects
                     at = Time.time + Mathf.Lerp(0.08f, 0.42f, dist / 0.34f) * Random.Range(0.8f, 1.25f),
                     pos01 = hit,
                     preset = p,
-                    cluster = Random.value < 0.45f ? Random.Range(2, 5) : 1,
+                    // 水珠小了以后成簇比单颗更像"被溅到"，提高成簇概率与颗数
+                    cluster = Random.value < 0.62f ? Random.Range(2, 7) : 1,
                 });
             }
         }
@@ -471,7 +585,8 @@ namespace VNEffects
             if (_sprayTimer > 0f) return;
 
             var p = _sprayPreset;
-            ApplyPreset(p);
+            ApplyMode(float.IsNaN(_sprayDir));
+            ApplyPreset(p, float.IsNaN(_sprayDir));
 
             bool bigOne = Random.value < 0.22f;      // 偶尔一记大的，节奏才不呆板
             float pulsePower = _sprayPower * (bigOne ? Random.Range(1.35f, 1.8f)
@@ -508,8 +623,7 @@ namespace VNEffects
         }
 
         /// <summary>
-        /// 点击喷水模式。方向按"从画面中心朝点击点"推断——
-        /// 玩家点画面右上，水就该往右上飞，固定朝上会很违和。
+        /// 点击喷水模式：点哪，水就从哪一点朝镜头冲过来。
         /// </summary>
         void TickClick()
         {
@@ -522,13 +636,10 @@ namespace VNEffects
                 Mathf.Clamp01(screen.x / Mathf.Max(1f, Screen.width)),
                 Mathf.Clamp01(screen.y / Mathf.Max(1f, Screen.height)));
 
-            Vector2 fromCenter = pos01 - new Vector2(0.5f, 0.5f);
-            float dir = fromCenter.sqrMagnitude < 0.0004f
-                ? 90f
-                : Mathf.Atan2(fromCenter.y, fromCenter.x) * Mathf.Rad2Deg;
-
+            // 朝镜头喷：点哪，水就从哪儿冲着你来。
+            // （想要旧的"从画面中心朝点击点侧喷"，把 float.NaN 换成算出来的角度即可。）
             Burst(pos01, _clickPreset ?? VNLiquidPreset.Get(VNLiquidType.Water),
-                _clickPower, dir, 42f, _clickScreen);
+                _clickPower, float.NaN, 42f, _clickScreen);
         }
     }
 }

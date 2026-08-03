@@ -21,8 +21,12 @@ namespace VNEffects
         public bool on;       // spray/click/wet/cover 的开关位
         public float x, y;    // 喷射点，屏幕比例 0~1
         public float power;   // 力度倍率
-        public float dir;     // 喷射方向角（0 = 右，90 = 上）
-        public float spread;  // 扇形张角半角
+        /// <summary>
+        /// 喷射方向角（0 = 右，90 = 上）。**NaN = 朝镜头扑面而来**，这是默认。
+        /// 剧本写了 dir: 才回到侧向喷射。
+        /// </summary>
+        public float dir;
+        public float spread;  // 侧喷时的扇形张角半角；朝镜头时是放射锥的宽窄
         public float rate;    // 间歇喷射的频率倍率
         public float screen;  // 命中镜头的概率倍率（0 = 绝不溅到屏幕上）
         public float amount;  // 常驻湿镜头的浓度倍率
@@ -35,7 +39,7 @@ namespace VNEffects
             x = 0.5f,
             y = 0.35f,
             power = 1f,
-            dir = 90f,
+            dir = float.NaN,   // 默认朝镜头；写了 dir: 才是侧喷
             spread = 40f,
             rate = 1f,
             screen = 1f,
@@ -78,8 +82,12 @@ namespace VNEffects
         [Tooltip("空气阻尼：黏液拖得住速度")]
         public float drag;
         public float lifeMin, lifeMax;
+        [Tooltip("水珠直径（世界单位）。对标现有雨滴的 0.02~0.04，液体取约 1.8 倍")]
         public float sizeMin, sizeMax;
-        [Tooltip("拉伸公告板的速度系数——水感的一大半来自这里，球形水珠永远像泡泡")]
+        [Tooltip(
+            "拉伸公告板的**固定**长度倍率（renderer.lengthScale），与雨同一套做法。\n" +
+            "不用 velocityScale：那个随速度拉伸，喷射初速高的粒子会被拉成两米长的面条——" +
+            "第一版又粗又长就是栽在这里。长度 ≈ size × 本值，配合近圆形贴图才像雨滴。")]
         public float stretch;
         [Tooltip("初速倍率")]
         public float speedScale;
@@ -146,11 +154,11 @@ namespace VNEffects
                 gravityScale = 1f,
                 drag = 0.02f,
                 lifeMin = 0.65f, lifeMax = 1.15f,
-                sizeMin = 0.10f, sizeMax = 0.26f,
-                stretch = 0.36f,
+                sizeMin = 0.038f, sizeMax = 0.075f,
+                stretch = 3.6f,
                 speedScale = 1f,
-                burstCount = 34,
-                splinterCount = 18,
+                burstCount = 58,
+                splinterCount = 30,
                 screenChance = 0.32f,
                 dripSpeed = 185f,
                 drySeconds = 7f,
@@ -172,11 +180,11 @@ namespace VNEffects
                 gravityScale = 0.78f,
                 drag = 0.16f,
                 lifeMin = 0.95f, lifeMax = 1.6f,
-                sizeMin = 0.13f, sizeMax = 0.34f,
-                stretch = 0.19f,
+                sizeMin = 0.048f, sizeMax = 0.095f,
+                stretch = 2.2f,
                 speedScale = 0.88f,
-                burstCount = 30,
-                splinterCount = 22,
+                burstCount = 52,
+                splinterCount = 34,
                 screenChance = 0.42f,
                 dripSpeed = 58f,
                 drySeconds = 26f,
@@ -198,11 +206,11 @@ namespace VNEffects
                 gravityScale = 0.92f,
                 drag = 0.10f,
                 lifeMin = 0.85f, lifeMax = 1.45f,
-                sizeMin = 0.11f, sizeMax = 0.30f,
-                stretch = 0.24f,
+                sizeMin = 0.042f, sizeMax = 0.085f,
+                stretch = 2.6f,
                 speedScale = 0.95f,
-                burstCount = 32,
-                splinterCount = 20,
+                burstCount = 55,
+                splinterCount = 32,
                 screenChance = 0.38f,
                 dripSpeed = 82f,
                 drySeconds = 18f,
@@ -224,11 +232,11 @@ namespace VNEffects
                 gravityScale = 0.55f,
                 drag = 0.30f,
                 lifeMin = 1.25f, lifeMax = 2.1f,
-                sizeMin = 0.14f, sizeMax = 0.36f,
-                stretch = 0.15f,
+                sizeMin = 0.055f, sizeMax = 0.11f,
+                stretch = 1.9f,
                 speedScale = 0.8f,
-                burstCount = 26,
-                splinterCount = 16,
+                burstCount = 46,
+                splinterCount = 26,
                 screenChance = 0.45f,
                 dripSpeed = 36f,
                 drySeconds = 30f,

@@ -38,13 +38,15 @@ namespace VNEffects
         public bool coverDialogue;
 
         [Header("同时存在的水渍上限（超出时回收最老的）")]
-        public int maxDrops = 48;
+        public int maxDrops = 96;
 
-        [Header("水滴基准直径（1080p 画布下的像素，实际再乘液体的 dropScale 与随机尺寸）")]
-        public float baseDropSize = 62f;
+        [Header(
+            "水滴基准直径（1080p 画布下的像素，实际再乘液体的 dropScale 与随机尺寸）。\n" +
+            "22px 是照真实雨天车窗的尺度定的——大而少看起来像贴纸，小而多才像被溅到。")]
+        public float baseDropSize = 22f;
 
         [Header("常驻湿镜头（liquid wet on）的目标水滴数")]
-        public int wetTargetDrops = 22;
+        public int wetTargetDrops = 40;
 
         [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
@@ -190,12 +192,14 @@ namespace VNEffects
         /// 单独一颗孤零零的水滴永远不像"被溅到"，成簇才像。
         /// </summary>
         public void SplatBurst(Vector2 screen01, VNLiquidPreset preset,
-            int count = 3, float spread = 0.06f)
+            int count = 4, float spread = 0.035f)
         {
             Splat(screen01, preset);
             for (int i = 1; i < count; i++)
             {
-                Vector2 offset = Random.insideUnitCircle * spread;
+                // 平方根分布：卫星滴挤在主滴附近，而不是均匀铺满整个圆
+                Vector2 offset = Random.insideUnitCircle.normalized *
+                                 (Mathf.Sqrt(Random.value) * spread);
                 // 画布是横的，同样的比例偏移在纵向看起来更大，压一下
                 offset.y *= 0.62f;
                 Splat(screen01 + offset, preset, Random.Range(0.35f, 0.7f));
@@ -347,7 +351,9 @@ namespace VNEffects
             // 水痕：长度封顶，太长会像挂面
             if (p.trailAlpha > 0f && d.streakLen > 1f)
             {
-                float maxLen = d.size * 9f;
+                // 水痕长度不随水滴尺寸线性缩放：小水滴一样能划出很长一道，
+                // 所以这里用较大的倍率（相对 22px 的小滴才不会显得只有一小截）
+                float maxLen = d.size * 14f;
                 float len = Mathf.Min(d.streakLen, maxLen);
                 d.streakRt.sizeDelta = new Vector2(d.size * 0.42f, len);
                 var sc = p.tint;

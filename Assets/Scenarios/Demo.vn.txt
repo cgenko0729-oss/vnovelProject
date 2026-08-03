@@ -12,11 +12,12 @@
 #   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]
 #   weather <Petals|Rain|Snow|Fireflies|None> | mood <Sunset|Night|...>
 #   fx <godrays|dof|clouds|haze|shimmer|heartbeat|dutch> <on|off>
-#   liquid splash [x:0.5] [y:0.35] [type:water] [power:1] [dir:90] [spread:40] [screen:1]
+#   liquid splash [x:0.5] [y:0.35] [type:water] [power:1] [dir:] [spread:40] [screen:1]
 #          spray on|off …    间歇噗噗喷（rate: 频率）  click on|off  点击喷水模式
 #          wet on|off [amount:1]  常驻湿镜头   dry  擦干   cover on|off  水渍盖不盖对话框
 #        type = water|blood|ink|slime（中文 水|血|墨|黏液）；x/y 是屏幕比例 0~1；
-#        dir 0=向右 90=向上；screen = 溅上镜头的概率倍率，0 = 只有空中水花
+#        dir 留空=朝镜头扑面而来（默认），填了才侧喷（0=右 90=上）；
+#        screen = 溅上镜头的概率倍率，0 = 只有空中水花
 #   行尾加 @ = 不等待该演出完成（异步）
 # ---- P1 分支 ----
 #   label <名字> / jump <名字>
