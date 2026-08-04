@@ -21,12 +21,11 @@ namespace VNEffects
     /// 只有大滴（默认 15%）会挂住→下滑→拖水痕；小水点现实中根本不会流，
     /// 表面张力足够撑住它自己。
     ///
-    /// 【C1 假折射，而且只给大滴】
-    /// 不采样背景做真折射（Canvas 里的 shader 拿不到已渲染画面，要么 GrabPass 要么加相机）。
-    /// 大滴的"玻璃感"烘在 VNProceduralTextures.WaterDrop 的 RGB 剖面里：
-    /// 中心压暗 + 内亮环 + 外圈菲涅尔暗边，再叠一层 HDR 高光吃 Bloom。
-    /// 但这套剖面缩到 5~8px 就会糊成一圈灰环——那正是"肥皂泡感"的来源，
-    /// 所以小水点改用 WaterSpeck：一条细的、边比中间亮，仅此而已。
+    /// 【形状：一律 WaterSpeck，不用带折射剖面的 WaterDrop】
+    /// WaterDrop 那套"中心压暗 + 内亮环 + 菲涅尔暗边"是给几十像素的大水滴设计的，
+    /// 缩到十几像素就退化成一个白圈——屏幕上是一串肥皂泡。大滴也不例外。
+    /// 这个尺度的水只需要两条信息：**是一条细的**、**边比中间亮**，仅此而已。
+    /// （WaterDrop 本身保留，将来做特写大水滴时还用得上。）
     ///
     /// 【朝向】
     /// 刚溅上时沿撞击方向拉长、圆头朝外（和空中那层的放射感对上）；
@@ -50,21 +49,33 @@ namespace VNEffects
         [Header("水渍是否盖住对话框（剧本 liquid cover on|off 可切）")]
         public bool coverDialogue;
 
-        [Header("同时存在的水渍上限（超出时回收最老的）")]
-        public int maxDrops = 240;
+        // ------------------------------------------------------------------
+        // 手感参数（常量，不是 Inspector 字段）
+        //
+        // ⚠ 这些**故意**不做成 public 序列化字段。踩过一次：字段一旦被存进场景，
+        //   改代码里的默认值对已存在的实例完全无效——场景里躺着 baseDropSize: 62，
+        //   代码改成 6 也没用，而运行时才计算的"拉长比"却生效了，
+        //   结果是 62px 的水渍被拉成三百多像素的烟雾状长条，比不改还糟。
+        //   参数本来就决定跟着代码走（不做 ScriptableObject，见 VNLiquidPreset 注释），
+        //   那就不该有第二个真相来源。要调手感，改这里，改完 Play 立刻生效。
+        // ------------------------------------------------------------------
 
-        [Header(
-            "水滴基准**宽度**（1080p 画布下的像素）。长度 = 宽度 × 拉长比。\n" +
-            "6px 是照着空中喷射粒子的屏幕尺寸定的：相机 orthographicSize=5 → " +
-            "1 世界单位 = 108px，粒子直径 0.038~0.075 世界单位 ≈ 4~8px。\n" +
-            "镜头上的水点和空中的水珠本来就该是同一个尺度，大一圈就立刻变成肥皂泡。")]
-        public float baseDropSize = 6f;
+        /// <summary>同时存在的水渍上限（超出时回收最老的）</summary>
+        const int MaxDrops = 240;
 
-        [Header("大水滴的比例（只有这些会挂住、往下流、拖水痕；其余是不动的小水点）")]
-        [Range(0f, 0.5f)] public float bigDropRatio = 0.15f;
+        /// <summary>
+        /// 水滴基准**宽度**（1080p 画布下的像素）。长度 = 宽度 × 拉长比。
+        /// 5px 是照着空中喷射粒子的屏幕尺寸定的：相机 orthographicSize=5 →
+        /// 1 世界单位 = 108px，粒子直径 0.038~0.075 世界单位 ≈ 4~8px。
+        /// 镜头上的水点和空中的水珠本来就该是同一个尺度。
+        /// </summary>
+        const float BaseDropSize = 5f;
 
-        [Header("常驻湿镜头（liquid wet on）的目标水滴数")]
-        public int wetTargetDrops = 120;
+        /// <summary>大水滴的比例（只有这些会挂住、往下流、拖水痕；其余是不动的小水点）</summary>
+        const float BigDropRatio = 0.12f;
+
+        /// <summary>常驻湿镜头（liquid wet on）的目标水滴数</summary>
+        const int WetTargetDrops = 130;
 
         [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material sourceMaterial;
@@ -194,13 +205,14 @@ namespace VNEffects
 
             // 尺寸分两档而不是一条连续曲线：真实的镜头水渍就是"一大片细点 + 零星几颗大的"，
             // 连续分布会得到一堆不上不下的中等水珠，那是最假的尺寸。
-            d.big = Random.value < bigDropRatio;
+            d.big = Random.value < BigDropRatio;
             float widthMul = d.big ? Random.Range(1.7f, 2.7f)
                                    : Mathf.Lerp(0.7f, 1.4f, Random.value);
-            d.size = baseDropSize * preset.dropScale * sizeScale * widthMul *
+            d.size = BaseDropSize * preset.dropScale * sizeScale * widthMul *
                      (canvasSize.y / 1080f);
-            // 小水点细长（被甩上去抹开的），大水滴接近圆（表面张力把它收住）
-            d.elongation = d.big ? Random.Range(1.25f, 1.9f) : Random.Range(1.8f, 3.4f);
+            // 小水点细长（被甩上去抹开的），大水滴接近圆（表面张力把它收住）。
+            // 上限压到 2.8：再长就不像水点像划痕了。
+            d.elongation = d.big ? Random.Range(1.15f, 1.6f) : Random.Range(1.6f, 2.8f);
 
             // 圆头（贴图 -Y 端）朝撞击方向：贴图长轴默认 +Y，所以要 +90°
             d.angle = float.IsNaN(splashAngleDeg)
@@ -261,7 +273,7 @@ namespace VNEffects
             _wetAmount = Mathf.Clamp(amount <= 0f ? 1f : amount, 0.1f, 3f);
             _wetTimer = 0f;
             // 开场先铺一批，否则要等好几秒才看得出"镜头是湿的"
-            int seed = Mathf.RoundToInt(wetTargetDrops * _wetAmount * 0.6f);
+            int seed = Mathf.RoundToInt(WetTargetDrops * _wetAmount * 0.6f);
             for (int i = 0; i < seed; i++)
             {
                 // 湿镜头不是"被溅到"，是水本来就在玻璃上：朝向该竖着，不是放射状
@@ -328,7 +340,7 @@ namespace VNEffects
                 if (d.age >= d.cling)
                 {
                     // 下滑：加速到该尺寸对应的终速。大滴 = 重 = 快，白送的物理直觉。
-                    float sizeFactor = Mathf.Clamp(d.size / (baseDropSize * d.preset.dropScale),
+                    float sizeFactor = Mathf.Clamp(d.size / (BaseDropSize * d.preset.dropScale),
                         0.35f, 2.5f);
                     float target = d.preset.dripSpeed * sizeFactor * (canvasSize.y / 1080f);
                     d.vel = Mathf.MoveTowards(d.vel, target, target * 2.2f * dt);
@@ -359,7 +371,7 @@ namespace VNEffects
         /// <summary>常驻湿镜头：维持目标数量，随机补新水滴</summary>
         void TickWet(float dt)
         {
-            int target = Mathf.RoundToInt(wetTargetDrops * _wetAmount);
+            int target = Mathf.RoundToInt(WetTargetDrops * _wetAmount);
             int alive = 0;
             foreach (var d in _pool) if (d.active) alive++;
             if (alive >= target) return;
@@ -381,8 +393,8 @@ namespace VNEffects
             // 撞击形变：前 0.16 秒从"垂直于撞击方向被拍扁"弹回本来的形状。
             // squash 作用在**局部**坐标上，所以 X = 宽、Y = 长，和旋转无关。
             float impact = Mathf.Clamp01(d.age / 0.16f);
-            float squashX = Mathf.Lerp(1.6f, 1f, EaseOutBack(impact));
-            float squashY = Mathf.Lerp(0.5f, 1f, EaseOutBack(impact));
+            float squashX = Mathf.Lerp(1.35f, 1f, EaseOutBack(impact));
+            float squashY = Mathf.Lerp(0.65f, 1f, EaseOutBack(impact));
 
             d.root.anchoredPosition = d.pos;
             d.root.sizeDelta = new Vector2(d.size * squashX,
@@ -399,7 +411,7 @@ namespace VNEffects
             d.body.color = bodyColor;
 
             // 颜色与 HDR 强度在材质上（见 ApplyVisual），顶点色这里只管淡入淡出
-            d.spec.color = new Color(1f, 1f, 1f, alpha * 0.9f);
+            d.spec.color = new Color(1f, 1f, 1f, alpha * 0.5f);
 
             // 水痕：只有大滴会流，所以也只有大滴有痕。长度封顶，太长会像挂面。
             if (d.big && p.trailAlpha > 0f && d.streakLen > 1f)
@@ -442,7 +454,7 @@ namespace VNEffects
             foreach (var d in _pool)
                 if (!d.active) return d;
 
-            if (_pool.Count >= maxDrops)
+            if (_pool.Count >= MaxDrops)
             {
                 // 池满：回收最老的一颗（age/dry 比例最大 = 最接近消失，牺牲它最不显眼）
                 Drop oldest = null;
@@ -526,11 +538,11 @@ namespace VNEffects
         /// </summary>
         void ApplyVisual(Drop d)
         {
-            // 两种质感分开：大滴用带折射剖面的 WaterDrop（它接近圆，撑得住那套明暗），
-            // 小水点用 WaterSpeck（几像素宽的东西放不下明暗剖面，硬塞就糊成肥皂泡）
-            d.body.texture = d.big
-                ? VNProceduralTextures.WaterDrop
-                : VNProceduralTextures.WaterSpeck;
+            // 一律用 WaterSpeck。曾经想让大滴用带折射剖面的 WaterDrop，
+            // 但那套"中心暗 + 亮环 + 暗边"在**任何**只有十几像素的尺寸下都会退化成
+            // 一个白圈——大滴也不例外，屏幕上就是一串肥皂泡。
+            // 镜头上的水在这个尺度只需要：是一条细的、边比中间亮。
+            d.body.texture = VNProceduralTextures.WaterSpeck;
 
             var type = d.preset.type;
             if (!_specMats.TryGetValue(type, out var mat) || mat == null)

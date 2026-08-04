@@ -42,8 +42,13 @@ namespace VNEffects
         [Header("可选：预制的 VN/Additive 材质资产；留空则运行时创建")]
         [SerializeField] Material additiveSourceMaterial;
 
-        [Header("Glow 材质的固定 HDR 增益（预设的 glowBoost 会按它归一化）")]
-        public float glowHdrCeiling = 2.4f;
+        /// <summary>
+        /// Glow 材质的固定 HDR 增益（预设的 glowBoost 会按它归一化）。
+        /// 常量而非 Inspector 字段：手感参数一旦序列化进场景，改代码默认值对已存在的
+        /// 实例就完全无效了——VNWetScreen 的水滴尺寸在这上面栽过一次（见那边的注释）。
+        /// 本组件其余手感参数都在 VNLiquidPreset（纯代码），这里保持同一套规矩。
+        /// </summary>
+        const float GlowHdrCeiling = 2.4f;
 
         // ---- 点击喷水模式（剧本 liquid click on 开启）----
         [Header("点击喷水模式：开启时左键点哪喷哪")]
@@ -133,7 +138,7 @@ namespace VNEffects
                 VNProceduralTextures.SoftCircle);
             if (_glowMat != null)
                 _glowMat.SetColor("_TintColor",
-                    new Color(glowHdrCeiling, glowHdrCeiling, glowHdrCeiling, 1f));
+                    new Color(GlowHdrCeiling, GlowHdrCeiling, GlowHdrCeiling, 1f));
             glowRenderer.material = _glowMat;
 
             // 碎珠：小圆点，实体混合
@@ -413,7 +418,7 @@ namespace VNEffects
             bodyColor.a = p.bodyAlpha;
 
             // 高光色：材质已经承担 HDR 增益，这里只给色相和相对亮度（0~1）
-            Color glowColor = p.glowTint * Mathf.Clamp01(p.glowBoost / glowHdrCeiling);
+            Color glowColor = p.glowTint * Mathf.Clamp01(p.glowBoost / GlowHdrCeiling);
             glowColor.a = 1f;
 
             for (int i = 0; i < count; i++)

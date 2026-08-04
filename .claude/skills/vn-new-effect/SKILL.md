@@ -22,6 +22,11 @@ description: 加新特效/演出组件（发光、粒子、全屏运动、转场
 - 粒子模块是 **struct**：`ps.noise.enabled = false` 编译不过，必须
   `var noise = ps.noise; noise.enabled = false;`。
 - 运行时创建带 Awake 配置的组件：先 `SetActive(false)` 挂组件赋值再激活（见 VNAmbientParticles.Create）。
+- **手感参数（尺寸/密度/速度这类要反复微调的）写成 `const`，不要写成 public 序列化字段**。
+  组件是生成器或安装器建进场景的 → 字段值被序列化 → 之后改代码默认值对那个实例
+  完全无效，而运行时才计算的参数照常生效，两者打架会出现"越改越糟"。
+  要可视化调参就走 ScriptableObject（如 VNWeatherDef），别用 Inspector 字段兼职。
+  排查：`grep <字段名> Assets/Project/Scenes/*.unity` 看场景里实际存的值。
 - 立绘缩放走「倍率」机制（`CurrentBaseScale = 原始 × _scaleMultiplier`，`DOScaleMultiplier`），
   别直接改 localScale，否则和呼吸/高亮打架。
 - 文字一律 TextMeshPro + `VNFont.Asset`；输入一律新 Input System。
