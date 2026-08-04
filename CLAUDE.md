@@ -106,7 +106,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNGodRays / VNEdgeGlow / VNCloudShadows / VNHeatHaze / VNFakeDoF | 光束/情绪泛光/云影/热浪+雾/伪景深 |
 | VNSpeedLines | 漫画速度线/集中线 overlay（3 变体贴图闪帧，fx speedlines on/off/burst） |
 | VNScreenShockwave | 全屏情绪水波（fx shockwave [light\|heavy]：波峰环 overlay + 背景波浪脉冲 + 轻震动） |
-| VNLiquidSplash / VNWetScreen / VNLiquidPreset | 液体喷溅**两层**（缺一层就不成立）：舞台层空中水珠（拉伸公告板 Body + HDR Glow + 碎珠三发射器，`Burst` 爆溅 / `StartSpray` 间歇噗噗喷 / `SetClickMode` 点击喷水）/ 屏幕层镜头水渍（uGUI 对象池，撞击形变→挂住→下滑拖痕→蒸发四段状态机，C1 假折射不采样背景）/ 四套内置液体预设（water·blood·ink·slime，黏度=重力+拉伸+下滑速度+干涸时间四参数合谋） |
+| VNLiquidSplash / VNWetScreen / VNLiquidPreset | 液体喷溅**两层**（缺一层就不成立）：舞台层空中水珠（拉伸公告板 Body + HDR Glow + 碎珠三发射器，`Burst` 爆溅 / `StartSpray` 间歇噗噗喷 / `SetClickMode` 点击喷水）/ 屏幕层镜头水渍（uGUI 对象池；尺寸与空中水珠同量级 4~8px，分小水点/大滴两档，只有大滴走撞击形变→挂住→下滑拖痕→蒸发四段状态机；小水点用 WaterSpeck 细长图，大滴才用 WaterDrop 假折射剖面——那套剖面缩到几像素会糊成灰环变肥皂泡）/ 四套内置液体预设（water·blood·ink·slime，黏度=重力+拉伸+下滑速度+干涸时间四参数合谋） |
 | VNRetroFilter | 胶片/CRT 复古滤镜（fx filmgrain/crt；mood Memory 自动胶片、Dream 自动 CRT） |
 | VNKenBurns | 背景 Ken Burns 漂移（60~90s 随机航点缓慢缩放+平移，默认开启永不静止，fx kenburns on/off） |
 | VNLetterbox | 电影黑边上下滑入（letterbox on/off [height:][time:]，mood Memory 回忆自动联动） |

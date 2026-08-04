@@ -796,6 +796,45 @@ namespace VNEffects
             }
         }
 
+        static Texture2D _waterSpeck;
+
+        /// <summary>
+        /// 溅在镜头上的**小水点**（竖向细长，长轴 = +Y）。屏幕水渍的主力形状。
+        ///
+        /// 【为什么不用 WaterDrop】
+        /// WaterDrop 那张假折射图有完整的明暗剖面（中心压暗 + 内亮环 + 菲涅尔暗边），
+        /// 那是给几十像素的大水滴看的。缩到 5~8 像素时整套剖面糊成一圈灰环，
+        /// 看起来就是个肥皂泡——那正是第二版屏幕水珠"假"的根源。
+        /// 这么小的东西只需要两条信息：**是一条细的**，**边上比中间亮**。
+        ///
+        /// 形状：底端（-Y）圆钝是"头"，顶端（+Y）收尖是"尾"。
+        /// 静止下滑时长轴竖直、圆头朝下；刚溅上时整体旋转到撞击方向，圆头朝外。
+        /// </summary>
+        public static Texture2D WaterSpeck
+        {
+            get
+            {
+                if (_waterSpeck == null)
+                    _waterSpeck = GenerateRgba("VN_WaterSpeck", 32, 96, (dx, dy) =>
+                    {
+                        float t = dy + 0.5f;                     // 0 = 底（头）, 1 = 顶（尾）
+                        float halfWidth = Mathf.Lerp(0.42f, 0.09f, Mathf.Pow(t, 1.25f));
+                        float nx = Mathf.Abs(dx) / halfWidth;
+                        if (nx >= 1f) return new Color(0f, 0f, 0f, 0f);
+
+                        // 比空中水珠更实：镜头上的水是贴着玻璃的一小摊，不是半透明气泡
+                        float body = Mathf.Pow(1f - nx, 0.5f);
+                        float capBottom = Mathf.Clamp01((dy + 0.48f) / 0.055f);
+                        float capTop = Mathf.Clamp01((0.49f - dy) / 0.035f);
+
+                        // 只保留最基本的一条：边缘比中间亮。几像素宽的东西放不下更多信息
+                        float shade = Mathf.Lerp(0.60f, 1f, Mathf.Pow(nx, 2f));
+                        return new Color(shade, shade, shade, body * capBottom * capTop);
+                    });
+                return _waterSpeck;
+            }
+        }
+
         /// <summary>
         /// 水渍高光层（叠在 WaterDrop 上，走 VN/Additive + HDR 才吃得到 Bloom）。
         /// 一个偏左上的小亮斑 + 一道细弧——真实水滴反射的是环境里最亮的那一小块，

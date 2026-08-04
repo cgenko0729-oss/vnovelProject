@@ -75,6 +75,7 @@ namespace VNEffects
             public Vector2 pos01;
             public VNLiquidPreset preset;
             public int cluster;          // 这一下溅开几颗
+            public float angleDeg;       // 撞击方向：水点沿它拉长，圆头朝外
         }
         readonly List<PendingHit> _pending = new List<PendingHit>();
 
@@ -519,7 +520,7 @@ namespace VNEffects
 
             float chance = Mathf.Clamp01(p.screenChance * screenScale);
             // 名额从"这发有多少颗水珠"里抽，但压一下上限，免得一发糊满整屏
-            int trials = Mathf.Clamp(Mathf.RoundToInt(emitted * 0.22f), 1, 9);
+            int trials = Mathf.Clamp(Mathf.RoundToInt(emitted * 0.22f), 1, 12);
             for (int i = 0; i < trials; i++)
             {
                 if (Random.value >= chance) continue;
@@ -547,7 +548,8 @@ namespace VNEffects
                     pos01 = hit,
                     preset = p,
                     // 水珠小了以后成簇比单颗更像"被溅到"，提高成簇概率与颗数
-                    cluster = Random.value < 0.62f ? Random.Range(2, 7) : 1,
+                    cluster = Random.value < 0.75f ? Random.Range(4, 11) : 2,
+                    angleDeg = ang * Mathf.Rad2Deg,
                 });
             }
         }
@@ -617,8 +619,10 @@ namespace VNEffects
                 var h = _pending[i];
                 if (now < h.at) continue;
                 _pending.RemoveAt(i);
-                if (h.cluster > 1) wetScreen.SplatBurst(h.pos01, h.preset, h.cluster);
-                else wetScreen.Splat(h.pos01, h.preset);
+                if (h.cluster > 1)
+                    wetScreen.SplatBurst(h.pos01, h.preset, h.cluster, 0.045f, h.angleDeg);
+                else
+                    wetScreen.Splat(h.pos01, h.preset, 1f, h.angleDeg);
             }
         }
 
