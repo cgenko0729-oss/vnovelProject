@@ -102,6 +102,21 @@ namespace VNEffects
         static readonly Dictionary<Profile, TMP_FontAsset> _cache =
             new Dictionary<Profile, TMP_FontAsset>();
 
+        /// <summary>
+        /// 场景加载前抢跑三语解析，把缺字兜底表提前挂好。
+        /// 不这样做的话：UI 皮肤 prefab 直接烘焙引用的中文字体对象，
+        /// 如果在本局游戏里第一次显示文字时还没人调用过 VNFont.Asset(Chinese)，
+        /// fallback 还没挂上去，缺字就会先露一次方框（标题/存档界面常见，
+        /// 因为它们往往在对话框第一次 Say() 之前就显示了）。
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void Warmup()
+        {
+            AssetFor(VNLanguage.Chinese);
+            AssetFor(VNLanguage.English);
+            AssetFor(VNLanguage.Japanese);
+        }
+
         /// <summary>全项目共用的 TMP 字体资产（当前语言，惰性解析，进程内缓存）</summary>
         public static TMP_FontAsset Asset => AssetFor(VNLocale.Language);
 
