@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: b473919ba4d186843b243457db6b4ee6
+guid: 7329c44d954e63347a88e402937a6400
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
@@ -9,7 +9,7 @@ TrueTypeFontImporter:
   characterPadding: 1
   includeFontData: 1
   fontNames:
-  - MaoKenTangYuan (beta)
+  - LXGW WenKai TC
   fallbackFontReferences: []
   customCharacters: 
   fontRenderingMode: 0

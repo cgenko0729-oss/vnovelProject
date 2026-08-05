@@ -10,10 +10,10 @@ namespace VNEffects
     /// 取代原先各处 Resources.GetBuiltinResource&lt;Font&gt;("LegacyRuntime.ttf") 的写法。
     ///
     /// 多语言：按 VNLocale.Language 返回对应字体 ——
-    ///   中文：毛笔糖圆体 MaoKenTangYuan（装饰性手写字形），生僻字缺字时兜底 Noto Sans SC
+    ///   中文：霞鹜文楷 LXGW WenKai（手写楷体），生僻字缺字时兜底 Noto Sans SC
     ///   英文：Noto Sans SC（拉丁字形齐全）
     ///   日文：Noto Sans JP（SC 的假名字形不合日文排印规范，必须独立字体），
-    ///        生僻字缺字时同样兜底 Noto Sans SC（不用中文的毛笔体，避免风格突兀且缺字覆盖不如 Noto 全）
+    ///        生僻字缺字时同样兜底 Noto Sans SC（不用中文的楷体，避免风格突兀且缺字覆盖不如 Noto 全）
     ///
     /// 每种语言的解析顺序（三级兜底，保证任何情况下都能显示）：
     ///   1. 预烘焙动态 TMP 字体资产（Assets/Resources/VNFonts/&lt;名字&gt;-Dynamic.asset，
@@ -32,8 +32,8 @@ namespace VNEffects
     {
         /// <summary>中文预烘焙 TMP 字体资产的 Resources 路径（编辑器场景生成器也引用它）</summary>
         public const string BakedAssetPath = "VNFonts/NotoSansSC-Dynamic";
-        /// <summary>中文随包源字体（MaoKenTangYuan）的 Resources 路径</summary>
-        public const string SourceFontPath = "VNFonts/MaoKenTangYuan-Regular";
+        /// <summary>中文随包源字体（霞鹜文楷 LXGW WenKai）的 Resources 路径</summary>
+        public const string SourceFontPath = "VNFonts/LXGWWenKaiTC-Regular";
         /// <summary>英文 / 兜底通用 CJK 预烘焙 TMP 字体资产（Noto Sans SC）的 Resources 路径</summary>
         public const string BakedAssetPathGeneral = "VNFonts/NotoSansSC-General-Dynamic";
         /// <summary>英文 / 兜底通用 CJK 随包源字体（Noto Sans SC）的 Resources 路径</summary>
