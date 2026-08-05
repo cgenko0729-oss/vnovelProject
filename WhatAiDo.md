@@ -4861,3 +4861,53 @@ Inspector 副本。场景里遗留的那三行 Unity 会直接忽略，用户什
 **教训已写进** `ProjectCodeGuide` 十二节坑清单与 `vn-new-effect` 技能的硬约定：
 手感参数写 `const`，要可视化调参就走 ScriptableObject，别用 Inspector 字段兼职。
 排查手法：`grep <字段名> Assets/Project/Scenes/*.unity` 看场景里实际存的是什么。
+
+## 九十五、中文字体换成毛笔糖圆体 MaoKenTangYuan（2026-08-05，分支 `agent/maokentangyuan-font`）
+
+### 需求/背景
+
+用户把 `MaoKenTangYuan-beta0.12-20210702.ttf`（毛笔手写体）拖进了 `Assets/Font/`，
+要求全项目中文文字改用这个字体。此前 `VNFont.cs` 里中文和英文共用同一套
+Noto Sans SC 字体档案（`ScProfile`），日文缺字时也是兜底到这同一套档案。
+
+### 文件改动
+
+- `Assets/Resources/VNFonts/MaoKenTangYuan-Regular.ttf`（+`.meta`）：
+  从 `Assets/Font/` 移动改名到此处——`Resources.Load` 要求字体必须在
+  Resources 目录下，运行时 tier-2/tier-3 兜底逻辑才能找到它。
+- `VNFont.cs`：把原来 zh/en 共用一套的 `ScProfile` 拆成三套独立档案——
+  `ZhProfile`（主字体 MaoKenTangYuan，`fallback` 指向下面的通用档案）、
+  `GeneralCjkProfile`（Noto Sans SC，英文主用 + 中/日的缺字兜底）、
+  `JaProfile`（不变，`fallback` 也改指向通用档案而不是"中文档案"）。
+  原来写死在 `AssetFor()` 里的"日文专属 fallback 挂载"逻辑泛化成
+  `Profile.fallback` 通用字段，解析失败时退到 fallback 档案、解析成功时
+  把 fallback 字体挂进 TMP 的 `fallbackFontAssetTable` 补缺字，两种语言共用一套代码。
+- `VNFontAssetBuilder.cs`：中文烘焙源指向新 ttf；新增
+  `EnsureGeneralFontAsset()` 烘焙英文/兜底用的 `NotoSansSC-General-Dynamic.asset`；
+  `CreateMenu()` 里一并调用。
+- `Assets/Resources/VNFonts/NotoSansSC-Dynamic.asset`（+`.meta`）：删掉旧的
+  （内容是 Noto Sans SC）后用 `Ensure()` 从新字体源重新生成。
+- `Assets/Resources/VNFonts/NotoSansJP-Dynamic.asset`：内嵌的
+  `m_FallbackFontAssetTable` 手动改指向新生成的通用资产 GUID
+  （原来指向的旧中文资产 GUID 现在语义变成"毛笔体"了，日文缺字不该兜底到它）。
+
+### 技术决策与取舍
+
+- **应用范围只限中文**，英文继续用 Noto Sans SC——手写体拉丁字形风格突兀、
+  覆盖也未必齐全，用户确认后拍板。
+- **中文缺字兜底 Noto Sans SC**，做法照抄原来日文兜底中文的模式（现在反过来）。
+- **原地重烘焙保留 GUID**：中文烘焙资产被 26 个文件（1 场景 + 25 个 UI 皮肤
+  prefab）硬引用。删除旧 `.asset`+`.meta` 后在 Unity 编辑器里点
+  `Tools → VN Effects → Create TMP Font Asset` 重新生成，Unity 原地复用了
+  同一路径的旧 GUID（`fdf08363d8a023d4d929f785c67e4c59`），26 处硬引用全部
+  不用动——只有 `NotoSansJP-Dynamic.asset` 内部的 fallback 引用需要手动改。
+- **烘焙这一步必须由用户在已打开的 Unity 编辑器里点菜单完成**：AI 只能改文件，
+  没有 Unity 编辑器控制通道，`TMP_FontAsset.CreateFontAsset` 属于编辑器 API。
+
+### 验证方法
+
+- 烘焙完成后确认 `Assets/Resources/VNFonts/` 下多出
+  `NotoSansSC-General-Dynamic.asset`，`NotoSansSC-Dynamic.asset` 时间戳更新。
+- 进剧本场景走一段中文台词，字形应变成毛笔体；切到英文/日文语言应保持
+  Noto Sans SC / Noto Sans JP 不受影响。
+- 用一个生僻字（比如剧本里没预热过的字）验证中文缺字时能兜底显示而不是方框。
