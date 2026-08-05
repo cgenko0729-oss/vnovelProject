@@ -6,8 +6,8 @@ using UnityEngine.TextCore.LowLevel;
 namespace VNEffects.EditorTools
 {
     /// <summary>
-    /// 预烘焙 TMP 字体资产生成器（中文 Noto Sans SC + 日文 Noto Sans JP）。
-    /// 由随包 OTF 创建"动态填充 + 多图集"模式的 TMP_FontAsset，
+    /// 预烘焙 TMP 字体资产生成器（中文 MaoKenTangYuan + 英文/兜底 Noto Sans SC + 日文 Noto Sans JP）。
+    /// 由随包字体文件创建"动态填充 + 多图集"模式的 TMP_FontAsset，
     /// 存到 Assets/Resources/VNFonts/ 供 VNFont 运行时按语言加载。
     ///
     /// 为什么要预烘焙成资产而不是每次运行时创建：
@@ -16,8 +16,10 @@ namespace VNEffects.EditorTools
     /// </summary>
     public static class VNFontAssetBuilder
     {
-        const string ScAssetPath = "Assets/Resources/VNFonts/NotoSansSC-Dynamic.asset";
-        const string ScSourcePath = "Assets/Resources/VNFonts/NotoSansSC-Regular.otf";
+        const string ZhAssetPath = "Assets/Resources/VNFonts/NotoSansSC-Dynamic.asset";
+        const string ZhSourcePath = "Assets/Resources/VNFonts/MaoKenTangYuan-Regular.ttf";
+        const string GeneralAssetPath = "Assets/Resources/VNFonts/NotoSansSC-General-Dynamic.asset";
+        const string GeneralSourcePath = "Assets/Resources/VNFonts/NotoSansSC-Regular.otf";
         const string JaAssetPath = "Assets/Resources/VNFonts/NotoSansJP-Dynamic.asset";
         const string JaSourcePath = "Assets/Resources/VNFonts/NotoSansJP-Regular.otf";
 
@@ -25,15 +27,20 @@ namespace VNEffects.EditorTools
         public static void CreateMenu()
         {
             var asset = EnsureFontAsset();
+            EnsureGeneralFontAsset(); // 英文 / 缺字兜底用，源缺失时只警告，不阻塞中文流程
             EnsureJapaneseFontAsset(); // 日文源字体缺失时只警告，不阻塞中文流程
             if (asset != null) EditorGUIUtility.PingObject(asset);
         }
 
-        /// <summary>确保中文预烘焙字体资产存在（场景生成器在生成前调用），已存在则直接返回。</summary>
+        /// <summary>确保中文（MaoKenTangYuan）预烘焙字体资产存在（场景生成器在生成前调用），已存在则直接返回。</summary>
         public static TMP_FontAsset EnsureFontAsset() =>
-            Ensure(ScAssetPath, ScSourcePath, "NotoSansSC-Dynamic");
+            Ensure(ZhAssetPath, ZhSourcePath, "NotoSansSC-Dynamic");
 
-        /// <summary>确保日文预烘焙字体资产存在；源 OTF 缺失时返回 null（运行时回退中文字体）。</summary>
+        /// <summary>确保英文 / 缺字兜底（Noto Sans SC）预烘焙字体资产存在，已存在则直接返回。</summary>
+        public static TMP_FontAsset EnsureGeneralFontAsset() =>
+            Ensure(GeneralAssetPath, GeneralSourcePath, "NotoSansSC-General-Dynamic");
+
+        /// <summary>确保日文预烘焙字体资产存在；源字体缺失时返回 null（运行时回退兜底档案）。</summary>
         public static TMP_FontAsset EnsureJapaneseFontAsset() =>
             Ensure(JaAssetPath, JaSourcePath, "NotoSansJP-Dynamic");
 

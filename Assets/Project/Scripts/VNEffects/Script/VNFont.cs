@@ -10,16 +10,17 @@ namespace VNEffects
     /// 取代原先各处 Resources.GetBuiltinResource&lt;Font&gt;("LegacyRuntime.ttf") 的写法。
     ///
     /// 多语言：按 VNLocale.Language 返回对应字体 ——
-    ///   中文 / 英文：Noto Sans SC（拉丁字形齐全，共用一套图集）
+    ///   中文：毛笔糖圆体 MaoKenTangYuan（装饰性手写字形），生僻字缺字时兜底 Noto Sans SC
+    ///   英文：Noto Sans SC（拉丁字形齐全）
     ///   日文：Noto Sans JP（SC 的假名字形不合日文排印规范，必须独立字体），
-    ///        并把 SC 设为 TMP fallback，日文文本里偶发的简体汉字也不缺字
+    ///        生僻字缺字时同样兜底 Noto Sans SC（不用中文的毛笔体，避免风格突兀且缺字覆盖不如 Noto 全）
     ///
     /// 每种语言的解析顺序（三级兜底，保证任何情况下都能显示）：
     ///   1. 预烘焙动态 TMP 字体资产（Assets/Resources/VNFonts/&lt;名字&gt;-Dynamic.asset，
     ///      由 Tools → VN Effects → Create TMP Font Asset 生成，多图集动态填充）
-    ///   2. 运行时从随包 OTF（Resources/VNFonts/&lt;名字&gt;-Regular）动态创建 TMP 字体资产
+    ///   2. 运行时从随包字体文件（Resources/VNFonts/&lt;名字&gt;-Regular）动态创建 TMP 字体资产
     ///   3. 运行时从操作系统字体（雅黑 / Yu Gothic 等）动态创建
-    /// 日文三级全失败时最终回退中文字体（汉字/假名可读，字形略不标准）。
+    /// 三级全失败时回退到该语言登记的 fallback 档案（见 Profile.fallback）。
     ///
     /// 动态图集：需要的字形按需光栅化进图集（多图集自动扩展），生僻字零缺字；
     /// 用 Prewarm() 把剧本全文预热进图集可避免台词首次渲染时的逐字光栅化卡顿。
@@ -31,8 +32,12 @@ namespace VNEffects
     {
         /// <summary>中文预烘焙 TMP 字体资产的 Resources 路径（编辑器场景生成器也引用它）</summary>
         public const string BakedAssetPath = "VNFonts/NotoSansSC-Dynamic";
-        /// <summary>中文随包源字体（OTF）的 Resources 路径</summary>
-        public const string SourceFontPath = "VNFonts/NotoSansSC-Regular";
+        /// <summary>中文随包源字体（MaoKenTangYuan）的 Resources 路径</summary>
+        public const string SourceFontPath = "VNFonts/MaoKenTangYuan-Regular";
+        /// <summary>英文 / 兜底通用 CJK 预烘焙 TMP 字体资产（Noto Sans SC）的 Resources 路径</summary>
+        public const string BakedAssetPathGeneral = "VNFonts/NotoSansSC-General-Dynamic";
+        /// <summary>英文 / 兜底通用 CJK 随包源字体（Noto Sans SC）的 Resources 路径</summary>
+        public const string SourceFontPathGeneral = "VNFonts/NotoSansSC-Regular";
         /// <summary>日文预烘焙 TMP 字体资产的 Resources 路径</summary>
         public const string BakedAssetPathJa = "VNFonts/NotoSansJP-Dynamic";
         /// <summary>日文随包源字体（OTF）的 Resources 路径</summary>
@@ -49,23 +54,36 @@ namespace VNEffects
             "abcdefghijklmnopqrstuvwxyz{|}~" +
             "，。、；：？！…—·「」『』（）《》【】“”‘’▼▲◀▶★☆♪％×";
 
-        /// <summary>一种语言的字体来源描述（zh/en 共用 SC 档案，ja 用 JP 档案）</summary>
+        /// <summary>一种语言的字体来源描述</summary>
         class Profile
         {
             public string bakedPath;
             public string sourcePath;
             public string[] osCandidates;
+            /// <summary>解析失败时兜底改用的档案；解析成功时也会把它挂进 TMP fallback 表补缺字</summary>
+            public Profile fallback;
         }
 
-        static readonly Profile ScProfile = new Profile
+        static readonly string[] ScOsCandidates =
+        {
+            "Microsoft YaHei", "微软雅黑", "PingFang SC", "Hiragino Sans GB",
+            "Noto Sans CJK SC", "Source Han Sans SC", "SimHei", "SimSun",
+        };
+
+        /// <summary>英文 UI 用，同时也是中文毛笔体 / 日文字体的缺字兜底（拉丁 + CJK 字形齐全）</summary>
+        static readonly Profile GeneralCjkProfile = new Profile
+        {
+            bakedPath = BakedAssetPathGeneral,
+            sourcePath = SourceFontPathGeneral,
+            osCandidates = ScOsCandidates,
+        };
+
+        static readonly Profile ZhProfile = new Profile
         {
             bakedPath = BakedAssetPath,
             sourcePath = SourceFontPath,
-            osCandidates = new[]
-            {
-                "Microsoft YaHei", "微软雅黑", "PingFang SC", "Hiragino Sans GB",
-                "Noto Sans CJK SC", "Source Han Sans SC", "SimHei", "SimSun",
-            },
+            osCandidates = ScOsCandidates,
+            fallback = GeneralCjkProfile,
         };
 
         static readonly Profile JaProfile = new Profile
@@ -77,9 +95,10 @@ namespace VNEffects
                 "Yu Gothic UI", "Yu Gothic", "Meiryo", "MS Gothic",
                 "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Source Han Sans",
             },
+            fallback = GeneralCjkProfile,
         };
 
-        /// <summary>档案 → 已解析字体（zh/en 命中同一份缓存）</summary>
+        /// <summary>档案 → 已解析字体</summary>
         static readonly Dictionary<Profile, TMP_FontAsset> _cache =
             new Dictionary<Profile, TMP_FontAsset>();
 
@@ -89,33 +108,44 @@ namespace VNEffects
         /// <summary>指定语言的 TMP 字体资产</summary>
         public static TMP_FontAsset AssetFor(VNLanguage language)
         {
-            var profile = language == VNLanguage.Japanese ? JaProfile : ScProfile;
+            Profile profile;
+            switch (language)
+            {
+                case VNLanguage.Chinese: profile = ZhProfile; break;
+                case VNLanguage.Japanese: profile = JaProfile; break;
+                default: profile = GeneralCjkProfile; break;
+            }
+            return Resolve(profile);
+        }
+
+        static TMP_FontAsset Resolve(Profile profile)
+        {
             if (_cache.TryGetValue(profile, out var cached) && cached != null) return cached;
 
             var asset = LoadBaked(profile) ?? CreateFromBundledFont(profile) ?? CreateFromOsFont(profile);
             if (asset == null)
             {
-                if (profile == JaProfile)
+                if (profile.fallback != null)
                 {
-                    Debug.LogWarning("[VNFont] 日文字体三级来源均不可用，回退中文字体（假名字形略不标准）");
-                    asset = AssetFor(VNLanguage.Chinese);
+                    Debug.LogWarning("[VNFont] " + profile.sourcePath + " 字体来源均不可用，回退 " + profile.fallback.sourcePath);
+                    asset = Resolve(profile.fallback);
                 }
                 else
                 {
-                    Debug.LogError("[VNFont] 所有中文字体来源均不可用，回退 TMP 默认字体（无中文字形）");
+                    Debug.LogError("[VNFont] 所有字体来源均不可用，回退 TMP 默认字体（可能无中文字形）");
                     asset = TMP_Settings.defaultFontAsset;
                 }
                 _cache[profile] = asset;
                 return asset;
             }
 
-            // 日文字体挂中文 fallback：日文文本里偶发的简体专用汉字不缺字
-            if (profile == JaProfile)
+            // 挂上缺字兜底：生僻字在主字体里找不到时，TMP 自动去 fallback 表里找
+            if (profile.fallback != null)
             {
-                var sc = AssetFor(VNLanguage.Chinese);
-                if (sc != null && sc != asset && asset.fallbackFontAssetTable != null &&
-                    !asset.fallbackFontAssetTable.Contains(sc))
-                    asset.fallbackFontAssetTable.Add(sc);
+                var fb = Resolve(profile.fallback);
+                if (fb != null && fb != asset && asset.fallbackFontAssetTable != null &&
+                    !asset.fallbackFontAssetTable.Contains(fb))
+                    asset.fallbackFontAssetTable.Add(fb);
             }
 
             _cache[profile] = asset;
