@@ -200,6 +200,10 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   绑定后镜头窗口可「跟随选中」自动切行、支持实时或手动回写；存储仍是 `camLines` 字符串。
   镜头窗口画布的**底图三级回退**（手动指定 → 绑定行推算出的背景/CG → 场景当前那张），
   并按推算站位画**真实立绘**（可开关）——数据源是行左侧「舞台一览」同一套 `TryGetRowStage`。
+  画布两种模式：`整图`（全景+取景框，可拖点）/ `镜头视角`（直接显示镜头里的画面，
+  拖进度条=运镜动画，只读）——两者共用一套绘制，差别只是 `ViewPoint` 那一层坐标变换。
+  `场景预览` 会把绑定行的背景/立绘**摆进场景**让 Game 视图也对（带 URP 后处理），
+  临时立绘一律 `HideFlags.DontSave`（绝不写进场景文件、域重载自动销毁），关掉全部还原。
   **路径点行禁用 `CharacterPopup` / `SpritePopup`**——那套是异步回调、会把值写进 `VNRow.values`，
   和 camLines 是两条路径，必须用同步的 `PopupString` / `EditorGUI.Popup`。详见 WhatAiDo 九十八章。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；

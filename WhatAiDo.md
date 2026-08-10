@@ -5282,3 +5282,73 @@ Unity 在控件有键盘焦点时不会用传入值刷新编辑中的文本，�
     底图 sprite 正确解析成「学校の廊下（夕方）」，不再是占位图；
   - rows[63]（第 66 行）→ `bg=教室_黄昏` + 在场 `星野结衣2@center`，且立绘非空。
 - 底图下拉、立绘开关、超出画布的裁切是 IMGUI 交互，需要在编辑器里手动点验。
+
+---
+
+## 一〇〇、镜头视角画布 + 场景舞台预览（2026-08-11，分支 `agent/camseq-inline-editor`）
+
+### 需求 / 背景
+
+九十九章让编排画布画对了背景与立绘，但 **Game 视图还是那张占位图**——
+「场景预览」只接管了 ZoomRoot 的位移缩放，**没把场景里的舞台摆成那一行该有的样子**，
+所以想在真实窗口里看演出效果依然做不到。
+
+两个方向一起补：
+
+- **A（场景舞台预览）**：开「场景预览」时连背景/立绘一起摆进场景 → Game 视图带 URP 后处理的真实画面；
+- **B（镜头视角画布）**：画布直接显示「镜头里看到的画面」，拖进度条 / ▶ 就是运镜动画，
+  完全在窗口内、零场景副作用。
+
+### 文件改动清单
+
+`Editor/VNCamseqEditorWindow.cs`（本章只动这一个文件）
+
+- **A**：`ApplyStageToScene` / `RestoreStage` / `ClearPreviewCharacters`，
+  挂在「场景预览」开关上（开 = 摆舞台 + 接管 ZoomRoot，关 = 全部还原）。
+  跟随绑定行切换时 `Update` 里比对 `_stagedRow` 自动重摆。
+- **B**：`_cameraView` 开关 + `ViewPoint(view, p)` 变换，
+  背景与立绘统一按「当前时刻的运镜状态」变换后再画；
+  镜头视角下不画取景框/路径线、并禁用画布拖拽（只看不改）。
+- 工具栏第二行新增 `整图 / 镜头视角` 与升级后的 `场景预览` 两个按钮。
+
+### 技术决策与取舍
+
+**1. 镜头视角是一个坐标变换，不是另一套绘制**
+
+运行时 ZoomRoot 的 `localScale = zoom`、`anchoredPosition = base + offset`，
+所以画布上一点 `p` 显示在 `p × zoom + offset`。
+把这个变换抽成 `ViewPoint`，背景（中心 0,0、半尺寸 960×540）与立绘走同一条路径——
+整图模式就是 `zoom=1, offset=0` 的恒等变换。**两种模式共用一套绘制代码**，
+不会出现「整图对了镜头视角不对」的分裂。
+
+**2. 临时立绘只挂最小组件 + `HideFlags.DontSave`**
+
+运行时 `CreateCharacter` 会挂 `VNImageEffectController` / blink / mouth / marks 一大堆，
+它们的 `Awake` 在编辑期会乱来。预览版只要 `RectTransform + CanvasRenderer + Image`，
+位置尺寸按 `SlotPosition + positionOffset` / `characterHeight × sizeScale` 算，视觉一致就够。
+
+`HideFlags.DontSave` 是防泄漏的关键保险：**绝不会写进场景文件**，
+而且域重载时会被 Unity 自动销毁——所以 `OnEnable` 里发现 `_scenePreviewing` 还开着，
+就按记录的状态重新摆一遍。
+
+**3. 顺手修了一个既有 bug：场景预览的还原信息活不过域重载**
+
+`_zoomRoot` / `_origPos` / `_origScale` 原本都是普通字段，
+脚本一重编译就全清空——`StopScenePreview` 时 `_zoomRoot` 已经是 null，
+**ZoomRoot 会永久停在预览位置还原不回去**（进出 Play 有 `playModeStateChanged` 兜着，
+纯重编译没有）。本章把它们连同新增的背景还原信息一起加了 `[SerializeField]`。
+
+**4. 镜头视角下禁用拖拽**
+
+画布坐标被运镜变换过了，拖点/拖角的命中判定要跟着换一套。
+与其维护两套交互，不如镜头视角只读——要改点位就切回整图，或直接用下面的路径点列表。
+
+### 验证方法
+
+- 编译零错误。
+- **摆舞台 + 还原**（对 `第1章.vn.txt` rows[63]，那行有立绘在场）：
+  背景 `background`（占位图）→ `学校の廊下（夕方）`；
+  `characterLayer` 子物体 0 → 1，造出的 `[camseq预览] 星野结衣2`
+  `pos=(0,-60)`、`size=(1286.15, 880)`、`hideFlags=DontSave`；
+  还原后背景与子物体数**完全回到原值，零残留**。
+- 镜头视角的变换、超出画布的裁切、拖拽禁用是 IMGUI 交互，需要在编辑器里手动点验。

@@ -6,6 +6,7 @@ using DG.Tweening.Core.Easing;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace VNEffects.EditorTools
 {
@@ -102,10 +103,21 @@ namespace VNEffects.EditorTools
         enum DragMode { None, Center, Corner }
         DragMode _dragMode;
 
-        bool _scenePreviewing;
-        RectTransform _zoomRoot;
-        Vector2 _origPos;
-        Vector3 _origScale;
+        // 场景预览的还原信息全部 [SerializeField]：不然脚本一重编译（域重载）
+        // 就丢了原始位置/原背景，ZoomRoot 与背景会永久停在预览态还原不回去。
+        [SerializeField] bool _scenePreviewing;
+        [SerializeField] RectTransform _zoomRoot;
+        [SerializeField] Vector2 _origPos;
+        [SerializeField] Vector3 _origScale;
+
+        // 舞台预览（把绑定行的背景/立绘摆进场景，让 Game 视图也对）
+        [SerializeField] Sprite _origBgSprite;
+        [SerializeField] bool _bgTouched;
+        [SerializeField] int _stagedRow = -1;      // 已经摆过舞台的那一行
+        // 临时立绘：HideFlags.DontSave，绝不写进场景文件，域重载时自动销毁
+        readonly List<GameObject> _previewChars = new List<GameObject>();
+
+        [SerializeField] bool _cameraView;         // 画布：整图 / 镜头视角
 
         VNCamseqPresetLibrary _library;
         string _presetName = "";
@@ -338,6 +350,14 @@ namespace VNEffects.EditorTools
             _lastUpdateTime = EditorApplication.timeSinceStartup;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             _library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
+
+            // 域重载会把 DontSave 的临时立绘销毁，但列表本身没序列化——
+            // 重编译时场景预览还开着的话，这里按记录的状态把舞台重新摆一遍。
+            if (_scenePreviewing)
+            {
+                _stagedRow = -1;
+                ApplyStageToScene();
+            }
         }
 
         void OnDisable()
@@ -366,7 +386,12 @@ namespace VNEffects.EditorTools
                 }
                 Repaint();
             }
-            if (_scenePreviewing) ApplySceneState();
+            if (_scenePreviewing)
+            {
+                // 绑定跟到别的行了 → 舞台要跟着换
+                if (HasLink && _stagedRow != _linkedRow) ApplyStageToScene();
+                ApplySceneState();
+            }
         }
 
         // ==================================================================
@@ -512,7 +537,17 @@ namespace VNEffects.EditorTools
             // 第二行：场景预览 / 捕获 / 预设库
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                bool newPreview = GUILayout.Toggle(_scenePreviewing, "场景预览",
+                bool cameraView = GUILayout.Toggle(_cameraView,
+                    new GUIContent(_cameraView ? "镜头视角" : "整图",
+                        "整图 = 全景 + 取景框（可拖点编辑）\n" +
+                        "镜头视角 = 画布直接显示镜头里看到的画面，拖进度条 / ▶ 就是运镜动画（只看不改）"),
+                    EditorStyles.toolbarButton, GUILayout.Width(60f));
+                if (cameraView != _cameraView) _cameraView = cameraView;
+
+                bool newPreview = GUILayout.Toggle(_scenePreviewing,
+                    new GUIContent("场景预览",
+                        "把绑定行的背景/立绘摆进场景并接管 ZoomRoot，" +
+                        "让 Game 视图显示带后处理的真实画面；关掉全部还原"),
                     EditorStyles.toolbarButton, GUILayout.Width(70f));
                 if (newPreview != _scenePreviewing)
                 {
@@ -604,12 +639,31 @@ namespace VNEffects.EditorTools
         {
             // 底：背景缩略图或深色底
             EditorGUI.DrawRect(rect, new Color(0.08f, 0.08f, 0.12f));
+
+            // 镜头视角模式：整个画面按当前时刻的运镜变换后再画，
+            // 画布 = 玩家真正看到的那一帧（拖进度条/▶ 就是运镜动画）
+            var view = _cameraView
+                ? PreviewAtTime(_scrub).state
+                : new CamState { offset = Vector2.zero, zoom = 1f };
+
+            // 内容会超出画布（放大后背景/立绘都溢出），统一裁进画布内
+            GUI.BeginGroup(rect);
+            var local = new Rect(0f, 0f, rect.width, rect.height);
             var bgSprite = CanvasBackdrop();
             if (bgSprite != null)
-                DrawSpriteFill(rect, bgSprite);
+                DrawSpriteAt(local, ViewPoint(view, Vector2.zero), CanvasHalf * view.zoom, bgSprite);
+            DrawStageCharacters(local, view);
+            GUI.EndGroup();
+
             DrawRectOutline(rect, new Color(1f, 1f, 1f, 0.35f), 1f);
 
-            DrawStageCharacters(rect);
+            // 镜头视角下画面本身就是取景结果，再叠取景框/路径线只会挡视线
+            if (_cameraView)
+            {
+                GUI.Label(new Rect(rect.x + 6f, rect.y + 4f, 200f, 18f),
+                    "镜头视角（拖进度条看运镜）", EditorStyles.whiteMiniLabel);
+                return;
+            }
 
             // 各路径点取景框 + 路径线
             Vector2? prevCenter = null;
@@ -656,7 +710,10 @@ namespace VNEffects.EditorTools
         /// 取景框套没套住脸能直接看出来。关掉开关 / 没绑定 / 没立绘可用时，
         /// 退回原来那三个灰色站位矩形。
         /// </summary>
-        void DrawStageCharacters(Rect rect)
+        /// <summary>画布坐标 → 运镜变换后的坐标（与运行时 ZoomRoot 的缩放+平移同构）</summary>
+        static Vector2 ViewPoint(CamState view, Vector2 p) => p * view.zoom + view.offset;
+
+        void DrawStageCharacters(Rect rect, CamState view)
         {
             var info = RowStage;
             var stage = Object.FindFirstObjectByType<VNStage>();
@@ -664,9 +721,6 @@ namespace VNEffects.EditorTools
 
             if (_showPortraits && info != null && info.characters.Count > 0)
             {
-                // 立绘会超出画布（脚在画面外），裁进画布内再画
-                GUI.BeginGroup(rect);
-                var local = new Rect(0f, 0f, rect.width, rect.height);
                 foreach (var c in info.characters)
                 {
                     if (c.sprite == null) continue;
@@ -686,18 +740,17 @@ namespace VNEffects.EditorTools
                     var center = new Vector2(SlotX[Mathf.Clamp(c.slot, 0, 2)], -60f) + offset;
                     float aspect = c.sprite.rect.width / Mathf.Max(1f, c.sprite.rect.height);
                     var half = new Vector2(height * aspect * 0.5f, height * 0.5f);
-                    DrawSpriteAt(local, center, half, c.sprite);
+                    DrawSpriteAt(rect, ViewPoint(view, center), half * view.zoom, c.sprite);
                     drew = true;
                 }
-                GUI.EndGroup();
             }
 
             if (drew) return;
             for (int s = 0; s < 3; s++)
             {
-                var p = CanvasToGui(rect, new Vector2(SlotX[s], -60f));
-                float hw = 880f * 0.28f * rect.width / 1920f;
-                float hh = 880f * 0.5f * rect.height / 1080f;
+                var p = CanvasToGui(rect, ViewPoint(view, new Vector2(SlotX[s], -60f)));
+                float hw = 880f * 0.28f * view.zoom * rect.width / 1920f;
+                float hh = 880f * 0.5f * view.zoom * rect.height / 1080f;
                 EditorGUI.DrawRect(new Rect(p.x - hw * 0.5f, p.y - hh, hw, hh * 2f),
                     new Color(1f, 1f, 1f, 0.05f));
             }
@@ -708,12 +761,12 @@ namespace VNEffects.EditorTools
         {
             var tl = CanvasToGui(canvasRect, new Vector2(center.x - half.x, center.y + half.y));
             var br = CanvasToGui(canvasRect, new Vector2(center.x + half.x, center.y - half.y));
-            DrawSpriteRaw(Rect.MinMaxRect(tl.x, tl.y, br.x, br.y), sprite, true);
+            var dst = Rect.MinMaxRect(tl.x, tl.y, br.x, br.y);
+            // 放大后完全移出画布的（镜头推到别处）直接跳过，省掉无意义的绘制
+            if (dst.xMax < canvasRect.x || dst.x > canvasRect.xMax ||
+                dst.yMax < canvasRect.y || dst.y > canvasRect.yMax) return;
+            DrawSpriteRaw(dst, sprite, true);
         }
-
-        /// <summary>整张铺满（背景用，按 16:9 画布直接拉伸/裁切）</summary>
-        static void DrawSpriteFill(Rect rect, Sprite sprite) =>
-            DrawSpriteRaw(rect, sprite, false);
 
         static void DrawSpriteRaw(Rect dst, Sprite sprite, bool alphaBlend)
         {
@@ -837,11 +890,13 @@ namespace VNEffects.EditorTools
             _origPos = _zoomRoot.anchoredPosition;
             _origScale = _zoomRoot.localScale;
             _scenePreviewing = true;
+            ApplyStageToScene();
             ApplySceneState();
         }
 
         void StopScenePreview()
         {
+            RestoreStage();
             if (!_scenePreviewing) return;
             _scenePreviewing = false;
             if (_zoomRoot != null)
@@ -850,6 +905,91 @@ namespace VNEffects.EditorTools
                 _zoomRoot.localScale = _origScale;
                 EditorApplication.QueuePlayerLoopUpdate();
             }
+        }
+
+        // ==================================================================
+        // 舞台预览：把绑定行的背景 / 立绘摆进场景，让 Game 视图也是那一行的画面
+        // ==================================================================
+
+        /// <summary>
+        /// 按绑定行的推算结果摆舞台。背景只换 sprite（原值记下来可还原）；
+        /// 立绘造临时 GameObject——**只挂最小的 RectTransform + Image**，
+        /// 不带运行时那一堆 fx / blink / mouth 组件（它们的 Awake 在编辑期会乱来）。
+        /// 全部标 HideFlags.DontSave：绝不写进场景文件，域重载也会被自动销毁。
+        /// </summary>
+        void ApplyStageToScene()
+        {
+            var stage = Object.FindFirstObjectByType<VNStage>();
+            var info = RowStage;
+            if (stage == null || info == null) return;
+            _stagedRow = _linkedRow;
+
+            if (info.backdrop != null && stage.backgroundImage != null)
+            {
+                if (!_bgTouched)
+                {
+                    _origBgSprite = stage.backgroundImage.sprite;
+                    _bgTouched = true;
+                }
+                stage.backgroundImage.sprite = info.backdrop;
+            }
+
+            ClearPreviewCharacters();
+            if (stage.characterLayer == null) return;
+            foreach (var c in info.characters)
+            {
+                if (c.sprite == null) continue;
+
+                float height = 880f;
+                Vector2 offset = Vector2.zero;
+                var def = stage.characters.Find(d => d != null && d.id == c.id);
+                if (def != null)
+                {
+                    height = stage.characterHeight * Mathf.Max(0.05f, def.sizeScale);
+                    offset = def.positionOffset;
+                }
+
+                var go = new GameObject($"[camseq预览] {c.id}",
+                    typeof(RectTransform), typeof(CanvasRenderer), typeof(Image))
+                { hideFlags = HideFlags.DontSave };
+                var rect = (RectTransform)go.transform;
+                rect.SetParent(stage.characterLayer, false);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition =
+                    new Vector2(SlotX[Mathf.Clamp(c.slot, 0, 2)], -60f) + offset;
+
+                float aspect = c.sprite.rect.width / Mathf.Max(1f, c.sprite.rect.height);
+                rect.sizeDelta = new Vector2(height * aspect, height);
+
+                var img = go.GetComponent<Image>();
+                img.sprite = c.sprite;
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+                _previewChars.Add(go);
+            }
+            EditorApplication.QueuePlayerLoopUpdate();
+        }
+
+        void RestoreStage()
+        {
+            ClearPreviewCharacters();
+            _stagedRow = -1;
+            if (!_bgTouched) return;
+
+            var stage = Object.FindFirstObjectByType<VNStage>();
+            if (stage != null && stage.backgroundImage != null)
+                stage.backgroundImage.sprite = _origBgSprite;
+            _bgTouched = false;
+            _origBgSprite = null;
+            EditorApplication.QueuePlayerLoopUpdate();
+        }
+
+        void ClearPreviewCharacters()
+        {
+            foreach (var go in _previewChars)
+                if (go != null) DestroyImmediate(go);
+            _previewChars.Clear();
         }
 
         void ApplySceneState()
