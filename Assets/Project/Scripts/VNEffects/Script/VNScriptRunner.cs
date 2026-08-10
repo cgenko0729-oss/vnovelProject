@@ -79,12 +79,19 @@ namespace VNEffects
         int _currentSayIndex; // 正在显示的台词命令索引（存档恢复点）
         string _lastSayText = "";
 
+        // 编辑器调试：命令级暂停/单步（不冻结画面动画，只卡在两条命令之间）
+        bool _debugPaused;
+        bool _debugStepRequested;
+
         public bool IsRunning => _running;
         public bool IsAuto => _auto;
         public bool IsSkipping => _skip;
         public bool IsInitialized { get; private set; }
         public int CurrentLine =>
             _running && _index > 0 && _index <= _commands.Count ? _commands[_index - 1].line : 0;
+
+        /// <summary>正在播放的剧本文件名（跨文件 jump / chapter 会更新它）</summary>
+        public string CurrentScriptName => script != null ? script.name : null;
 
         [Header("内容总配置（留空 = 自动读 Resources/VNGameConfig）")]
         public VNGameConfig config;
@@ -187,6 +194,7 @@ namespace VNEffects
 
         public void Play(string source)
         {
+            SetDebugPaused(false); // 正常开局不继承编辑器留下的调试暂停
             Prepare(source);
             ResumeAt(0);
         }
@@ -197,6 +205,36 @@ namespace VNEffects
         /// </summary>
         public int PlayFromSourceLine(string source, int sourceLine) =>
             PlayFromSourceLine(source, sourceLine, false);
+
+        /// <summary>
+        /// 编辑器热重载：把当前调试的剧本资产告诉 Runner。
+        /// 只换 script 引用（翻译查表、chapter/跨文件 jump 的"当前文件"都按它算），
+        /// 不重新加载命令——命令由紧随其后的 PlayFromSourceLine 用未保存文本装载。
+        /// </summary>
+        public void SetDebugScript(TextAsset asset)
+        {
+            if (asset != null) script = asset;
+        }
+
+        // ------------------------------------------------------------------
+        // 编辑器调试：命令级暂停 / 单步
+        // ------------------------------------------------------------------
+
+        /// <summary>命令级暂停中（卡在两条命令之间，进行中的补间/打字机不受影响）</summary>
+        public bool IsDebugPaused => _debugPaused;
+
+        public void SetDebugPaused(bool paused)
+        {
+            _debugPaused = paused;
+            if (!paused) _debugStepRequested = false;
+        }
+
+        /// <summary>放行一条命令后重新暂停（未暂停时先进入暂停态）</summary>
+        public void RequestDebugStep()
+        {
+            _debugPaused = true;
+            _debugStepRequested = true;
+        }
 
         public int PlayFromSourceLine(string source, int sourceLine, bool rebuildState)
         {
@@ -1786,6 +1824,13 @@ namespace VNEffects
             _running = true;
             while (_index < _commands.Count)
             {
+                // 编辑器调试暂停：卡在两条命令之间；单步 = 放行一条后自动卡回来
+                while (_debugPaused)
+                {
+                    if (_debugStepRequested) { _debugStepRequested = false; break; }
+                    yield return null;
+                }
+
                 var cmd = ResolveParameters(_commands[_index++]);
                 IEnumerator co = null;
                 try

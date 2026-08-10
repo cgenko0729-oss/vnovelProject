@@ -1,6 +1,6 @@
 ---
 name: vn-editor-extend
-description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规则：Schema 登记、say 专用字段、SourceLineForRow 行号换算、Sprite textureRect、EditorPrefs 不标脏、播放 Bridge 时序。Extend the visual scenario editor (VNScenarioEditorWindow, schema, thumbnails).
+description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规则：Schema 登记、say 专用字段、SourceLineForRow 行号换算、Sprite textureRect、EditorPrefs 不标脏、窗口状态跨域重载存活、播放 Bridge 与热重载时序。Extend the visual scenario editor (VNScenarioEditorWindow, schema, thumbnails, hot reload).
 ---
 
 # 剧本可视化编辑器扩展
@@ -14,16 +14,39 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
 - **say 的角色/表情是专用字段** `VNRow.speaker / expression`，**不是** `VNRow.values`；
   图片选择回调必须经专用访问器读写。`show` 才用普通 `character / expr` 参数。两条路径禁止混用。
 - **UI 行号 ≠ 物理行号**：换算一律走 `SourceLineForRow`——choice 选项行和 camseq waypoint
-  都额外占物理行；空行/注释从下一条有效命令启动。
+  都额外占物理行；空行/注释从下一条有效命令启动。反向换算（物理行 → UI 行）走
+  `RowForSourceLine`，两个函数的跨行规则必须保持一致，改一个就得改另一个。
+- **窗口状态默认活不过域重载**：进/出 Play Mode、脚本重编译都会重建窗口，
+  普通字段一律清空。任何"关掉/重编译也不该丢"的状态都要
+  ①加 `[SerializeField]` ②在 `OnBeforeSerialize` 里写入 ③在 `OnEnable`
+  （`RestoreAfterDomainReload`）里还原——**只加字段没用**。
+  `_doc` 本体走 `_docText` 文本中转；`DateTime` 之类不可序列化的存 ticks。
+  `OnBeforeSerialize` 里只能做纯 C# 运算，`OnAfterDeserialize` 里不能碰 Unity API。
 - **Sprite 缩略图必须按 `textureRect` 画 UV**——图集里的 sprite 不能整张 texture 当缩略图。
 - 纯外观偏好（如分类颜色）存 **EditorPrefs**，**不能因此把剧本文档标脏**。
 - 枚举（transition/emote）显示中英对照，但写进剧本的值保持英文。
 
-## 「从选中行播放」Bridge 时序
-- Bridge 用 `SessionState` 传 `_doc.GenerateText()`、目标行、rebuild 标志后进 Play；
-  未保存文本也能调试；**请求消费后必须清除**。
-- Bridge 必须等 `VNScriptRunner.IsInitialized`，否则 Runner 的 Start/playOnStart
+## 播放 / 热重载时序
+- **播放路径只有一个入口** `PlayFromSourceLine(int sourceLine)`：
+  Issues 校验 → `AutoSaveBeforePlay()` → 按是否在 Play Mode 分流。
+  新加的播放按钮/菜单项都接它，别另起炉灶。
+- **Play Mode 中走热重播**（`HotReplay`）：直接
+  `runner.PlayFromSourceLine(内存文本, 行, rebuildState)`，
+  不退出 Play Mode、不触发域重载。前面先 `runner.SetDebugScript(资产)`，
+  否则翻译查表和 `chapter` / 跨文件 `jump` 会按旧的当前文件算。
+- **编辑期走冷启动 Bridge**：`SessionState` 传 `_doc.GenerateText()`、目标行、
+  rebuild 标志、资产路径后进 Play；未保存文本也能调试；**请求消费后必须清除**。
+  Bridge 必须等 `VNScriptRunner.IsInitialized`，否则 Runner 的 Start/playOnStart
   会在调试启动后再覆盖一次播放位置。
+- **自动保存有两个例外**：未命名文档（无路径）不弹保存框，直接播内存文本；
+  `_externalChanged` 时不写盘，避免静默覆盖别处的改动。
+- **跟随高亮用 `OnInspectorUpdate` 轮询**（10Hz）读 `runner.CurrentLine`，
+  不给运行时加事件——省掉域重载前后订阅/退订的生命周期坑。
+  只在 `runner.CurrentScriptName` 与打开的文件同名时才高亮，跨文件跳转后行号不通用。
+- **暂停是命令级的**（闸门在 Runner `Run()` 主循环顶部），
+  已经跑起来的 DOTween 补间和打字机不会冻结；别想着用 `Time.timeScale = 0` 代替。
+- **`ShortcutManager` 不接受 `Return`/`Enter` 当绑定键**（会被忽略并刷警告）；
+  Enter 系快捷键只能在 IMGUI 里自己收，且要排在 `HandleInsertKeys` 之前。
 - 运行时入口：`VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`；
   重建逻辑本身见 [vn-save-compat] 与 [vn-debug]。
 
@@ -33,5 +56,6 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
   改了来源记得 `Refresh Sources` 重建缓存逻辑仍然成立。
 
 ## 权威参考
-- CLAUDE.md「剧本可视化编辑器」节；WhatAiDo.md 三十一/三十二（主体）、六十~六十二（试听/舞台一览/多选）
+- CLAUDE.md「剧本可视化编辑器」节；WhatAiDo.md 三十一/三十二（主体）、
+  六十~六十二（试听/舞台一览/多选）、九十六（热重载调试与域重载存活）
 - ProjectCodeGuide.md 九（编辑器工具）

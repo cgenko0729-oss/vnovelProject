@@ -187,7 +187,14 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 文本是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`，保存时重新生成文本，注释/空行保留。
 - 支持「▶ 从选中行播放」（默认重建前置状态）调试；入口
   `VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`。
+- **热重载调试**：Play Mode 中播放按钮不禁用，直接用内存文本原地重跑，
+  不退出 Play Mode / 不触发域重载；播放前静默自动保存；当前行高亮跟随（10Hz 轮询
+  `runner.CurrentLine`）；工具栏播放控制条（暂停/单步/重播本行/上一条，命令级暂停
+  不冻结画面动画）。窗口状态跨域重载存活走 `ISerializationCallbackReceiver`，
+  **加新窗口状态必须同时改 `OnBeforeSerialize` 和 `OnEnable`**。详见 WhatAiDo 九十六章。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；
   文本框编辑中的第一下 Enter 只结束编辑。插命令行仍走列表底部 `+` 下拉。
+  调试键位 `F5` 播放选中行 / `F6` 重播上次那行 / `F8` 暂停 / `F10` 单步 / `Ctrl+S` 保存
+  （走 ShortcutManager，可在 Edit → Shortcuts 改），另有 `Ctrl+Enter` / `Ctrl+Shift+Enter`。
 - **改编辑器前必读技能 vn-editor-extend**（say 专用字段、行号换算、Bridge 时序等硬规则都在里面）；
   调试能力边界见技能 vn-debug。完整记录见 WhatAiDo.md 三十一/三十二章。

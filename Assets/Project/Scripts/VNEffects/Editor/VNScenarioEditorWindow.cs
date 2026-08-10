@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
+using UnityEditor.ShortcutManagement;
 using UnityEditorInternal;
 using UnityEngine;
 
@@ -14,27 +15,49 @@ namespace VNEffects.EditorTools
     ///   - choice 块内嵌编辑；camseq 参数下拉 + 路径点行原样保留（下一批接镜头编辑器）
     ///   - 校验面板：id/label/语法检查，点击定位到行
     ///   - 文本预览页签、外部修改检测、Ctrl+Z/Y 撤销（约 1 秒粒度合并）
+    ///   - 热重载调试：Play Mode 中直接重播选中行（不退出 Play Mode）、当前行高亮跟随、
+    ///     命令级暂停/单步；播放前静默自动保存
     /// 菜单：Tools → VN Effects → Scenario Editor
+    ///
+    /// 【域重载存活】窗口进 Play Mode 会被 Unity 序列化后重建（domain reload），
+    /// 普通字段一律清空。文档正文/路径/脏标记/撤销栈全部走 [SerializeField]，
+    /// 由 ISerializationCallbackReceiver 在重载前把 _doc 拍成文本、OnEnable 里再解析回来。
+    /// 新增任何"关掉窗口也不该丢"的状态时，记得一并加进 OnBeforeSerialize / OnEnable。
     /// </summary>
-    public class VNScenarioEditorWindow : EditorWindow
+    public class VNScenarioEditorWindow : EditorWindow, ISerializationCallbackReceiver
     {
         enum Tab { Edit, Text, Issues }
 
         const float LineH2 = 21f;   // 一个子行的高度（含间距）
 
         VNScenarioDoc _doc = new VNScenarioDoc();
-        string _path = "";
+
+        // ↓ 域重载存活组（Unity 会替我们保存/恢复；_doc 本体走 _docText 中转）
+        [SerializeField] string _docText = "";
+        [SerializeField] string _path = "";
+        [SerializeField] long _fileTimeTicks;
+        [SerializeField] bool _dirty;
+        [SerializeField] bool _externalChanged;
+        [SerializeField] Tab _tab;
+        [SerializeField] bool _showCategoryColors;
+        [SerializeField] bool _rebuildStateBeforePlay = true;
+        [SerializeField] int _restoredListIndex = -1;
+        [SerializeField] List<string> _undoStackSerialized = new List<string>();
+        [SerializeField] List<string> _redoStackSerialized = new List<string>();
+        [SerializeField] Vector2 _scroll;
+        [SerializeField] int _lastPlayedLine = -1;   // Ctrl+Shift+Enter「重播上次那一行」
+
         System.DateTime _fileTime;
-        bool _dirty;
-        bool _externalChanged;
-        Tab _tab;
-        bool _showCategoryColors;
-        bool _rebuildStateBeforePlay = true;
         bool _stagePreview = true;
+        bool _followPlayback = true;
 
         ReorderableList _list;
-        Vector2 _scroll;
         float _pendingScrollY = -1f;
+
+        // 播放跟随：Runner 报告的物理行 → UI 行号（-1 = 没在播 / 播的不是本文件）
+        VNScriptRunner _runnerCache;
+        int _playingLine = -1;
+        int _playingRow = -1;
 
         // Enter / Shift+Enter 快捷插入台词行：KeyDown 期间不能改列表长度
         // （IMGUI 布局已在 Layout 事件里定好），所以只记位置，留到下一个 Layout 再插
@@ -63,6 +86,7 @@ namespace VNEffects.EditorTools
 
         // 舞台一览：逐行推算"这行时台上有谁、背景是什么"（按文件顺序，jump/choice 近似）
         const string StagePreviewPref = "VNEffects.ScenarioEditor.StagePreview";
+        const string FollowPlaybackPref = "VNEffects.ScenarioEditor.FollowPlayback";
         const float StageCellW = 70f;
         readonly List<RowStageState> _stageStates = new List<RowStageState>();
         int _stageStatesVersion = -1;
@@ -190,9 +214,48 @@ namespace VNEffects.EditorTools
         {
             LoadCategoryColors();
             _stagePreview = EditorPrefs.GetBool(StagePreviewPref, true);
+            _followPlayback = EditorPrefs.GetBool(FollowPlaybackPref, true);
+            RestoreAfterDomainReload();
             BuildList();
+            if (_restoredListIndex >= 0 && _restoredListIndex < _doc.rows.Count)
+            {
+                _list.index = _restoredListIndex;
+                _list.Select(_restoredListIndex, true);
+            }
             RefreshSources();
         }
+
+        /// <summary>
+        /// 域重载（进/出 Play Mode、脚本重编译）后把文档从序列化文本里还原回来。
+        /// 没有存活文本时保持全新空文档，等同首次打开窗口。
+        /// </summary>
+        void RestoreAfterDomainReload()
+        {
+            _fileTime = _fileTimeTicks > 0
+                ? new System.DateTime(_fileTimeTicks, System.DateTimeKind.Utc)
+                : default;
+            if (!string.IsNullOrEmpty(_docText))
+                _doc = VNScenarioDoc.Parse(_docText);
+
+            _undoStack.Clear();
+            if (_undoStackSerialized != null) _undoStack.AddRange(_undoStackSerialized);
+            _redoStack.Clear();
+            if (_redoStackSerialized != null) _redoStack.AddRange(_redoStackSerialized);
+        }
+
+        /// <summary>域重载前的最后一刻：把 _doc 与两个撤销栈拍进可序列化字段</summary>
+        public void OnBeforeSerialize()
+        {
+            // 注意：这里跑在序列化线程语境下，只能做纯 C# 运算，不要碰 Unity API
+            if (_doc != null) _docText = _doc.GenerateText();
+            _fileTimeTicks = _fileTime.Ticks;
+            _restoredListIndex = _list != null ? _list.index : -1;
+            _undoStackSerialized = new List<string>(_undoStack);
+            _redoStackSerialized = new List<string>(_redoStack);
+        }
+
+        /// <summary>反序列化时不能碰 Unity API，实际还原挪到 OnEnable</summary>
+        public void OnAfterDeserialize() { }
 
         void OnFocus()
         {
@@ -203,6 +266,26 @@ namespace VNEffects.EditorTools
         void OnDisable()
         {
             StopAudioPreview();
+        }
+
+        /// <summary>10Hz 轮询 Runner 的当前行，驱动播放跟随高亮（不用给运行时加事件）</summary>
+        void OnInspectorUpdate()
+        {
+            int line = -1;
+            if (EditorApplication.isPlaying)
+            {
+                VNScriptRunner runner = ResolveRunner();
+                // 播的必须是本窗口打开的这个文件，否则行号对不上，宁可不高亮
+                if (runner != null && runner.IsRunning && IsRunnerOnOpenFile(runner))
+                    line = runner.CurrentLine;
+            }
+
+            if (line == _playingLine) return;
+            _playingLine = line;
+            _playingRow = line > 0 ? RowForSourceLine(line) : -1;
+            if (_followPlayback && _playingRow >= 0 && _tab == Tab.Edit)
+                ScrollRowIntoView(_playingRow);
+            Repaint();
         }
 
         void BuildList()
@@ -534,6 +617,68 @@ namespace VNEffects.EditorTools
             }
         }
 
+        // ------------------------------------------------------------------
+        // 快捷键（走 ShortcutManager：窗口作用域，用户可在 Edit → Shortcuts 里改键位）
+        // ------------------------------------------------------------------
+
+        [Shortcut("VN/Scenario Editor/Save", typeof(VNScenarioEditorWindow),
+            KeyCode.S, ShortcutModifiers.Action)]
+        static void ShortcutSave(ShortcutArguments args)
+        {
+            if (args.context is VNScenarioEditorWindow w) w.SaveFile(false);
+        }
+
+        // 注意：ShortcutManager 不接受 Return/Enter 当绑定键（会被忽略并刷警告），
+        // 所以主键位用 F5/F6，Ctrl+Enter 那套在 HandleShortcutKeys 里走 IMGUI 自己收。
+        [Shortcut("VN/Scenario Editor/Play From Selected Row", typeof(VNScenarioEditorWindow),
+            KeyCode.F5)]
+        static void ShortcutPlaySelected(ShortcutArguments args)
+        {
+            if (args.context is VNScenarioEditorWindow w) w.PlayFromSelectedRow();
+        }
+
+        [Shortcut("VN/Scenario Editor/Replay Last Line", typeof(VNScenarioEditorWindow),
+            KeyCode.F6)]
+        static void ShortcutReplayLast(ShortcutArguments args)
+        {
+            if (args.context is VNScenarioEditorWindow w) w.ReplayLastLine();
+        }
+
+        /// <summary>ShortcutManager 收不了的 Ctrl+Enter / Ctrl+Shift+Enter，在 IMGUI 里补</summary>
+        void HandleShortcutKeys()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown) return;
+            if (e.keyCode != KeyCode.Return && e.keyCode != KeyCode.KeypadEnter) return;
+            if (!(e.control || e.command) || e.alt) return;
+
+            if (e.shift) ReplayLastLine();
+            else PlayFromSelectedRow();
+            e.Use();
+        }
+
+        [Shortcut("VN/Scenario Editor/Toggle Debug Pause", typeof(VNScenarioEditorWindow),
+            KeyCode.F8)]
+        static void ShortcutTogglePause(ShortcutArguments args)
+        {
+            if (!(args.context is VNScenarioEditorWindow w)) return;
+            VNScriptRunner runner = w.ResolveRunner();
+            if (runner == null) return;
+            runner.SetDebugPaused(!runner.IsDebugPaused);
+            w.Repaint();
+        }
+
+        [Shortcut("VN/Scenario Editor/Debug Step", typeof(VNScenarioEditorWindow),
+            KeyCode.F10)]
+        static void ShortcutStep(ShortcutArguments args)
+        {
+            if (!(args.context is VNScenarioEditorWindow w)) return;
+            VNScriptRunner runner = w.ResolveRunner();
+            if (runner == null) return;
+            runner.RequestDebugStep();
+            w.Repaint();
+        }
+
         /// <summary>Enter = 在选区下方插一条台词行，Shift+Enter = 插在上方（文本框内不抢键）</summary>
         void HandleInsertKeys()
         {
@@ -599,9 +744,13 @@ namespace VNEffects.EditorTools
             {
                 _frameSnapshot = _doc.GenerateText();
                 _frameSnapshotVersion = _version;
+                _docText = _frameSnapshot;  // 域重载存活的兜底同步
+                // 行数变了，跟随高亮的 UI 行号要跟着重算
+                if (_playingLine > 0) _playingRow = RowForSourceLine(_playingLine);
             }
 
             HandleUndoKeys();
+            HandleShortcutKeys();  // 必须在 HandleInsertKeys 之前：都盯着 Enter
             HandleInsertKeys();
             ValidateIfNeeded();
             DrawToolbar();
@@ -841,12 +990,19 @@ namespace VNEffects.EditorTools
                         }
                     }
                 }
+                // Play Mode 中不禁用：走热重播，原地生效不退出 Play Mode。
+                // 只有正在切换 Play Mode 的那一小段时间按钮才灰掉。
+                bool switchingPlaymode =
+                    EditorApplication.isPlayingOrWillChangePlaymode &&
+                    !EditorApplication.isPlaying;
                 using (new EditorGUI.DisabledScope(
-                    _list.index < 0 || _list.index >= _doc.rows.Count ||
-                    EditorApplication.isPlayingOrWillChangePlaymode))
+                    _list.index < 0 || _list.index >= _doc.rows.Count || switchingPlaymode))
                 {
-                    if (GUILayout.Button(new GUIContent("▶ 从选中行播放",
-                            "进入 Play Mode，并从当前行或下一条有效命令开始播放"),
+                    if (GUILayout.Button(new GUIContent(
+                            EditorApplication.isPlaying ? "▶ 播放选中行（热）" : "▶ 从选中行播放",
+                            EditorApplication.isPlaying
+                                ? "热重播：直接用当前（未保存也算）文本从选中行重跑，不退出 Play Mode。Ctrl+Enter"
+                                : "先自动保存，再进入 Play Mode 并从当前行或下一条有效命令开始播放。Ctrl+Enter"),
                             GUILayout.Width(126f)))
                         PlayFromSelectedRow();
                 }
@@ -854,7 +1010,19 @@ namespace VNEffects.EditorTools
                 _rebuildStateBeforePlay = GUILayout.Toggle(_rebuildStateBeforePlay,
                     new GUIContent("重建前置状态", "播放前静默恢复目标行之前的舞台状态"),
                     GUILayout.Width(96f));
+                bool follow = GUILayout.Toggle(_followPlayback,
+                    new GUIContent("跟随播放",
+                        "Play Mode 中高亮正在执行的那一行，并在它滚出可视区时自动滚过去"),
+                    GUILayout.Width(72f));
+                if (follow != _followPlayback)
+                {
+                    _followPlayback = follow;
+                    EditorPrefs.SetBool(FollowPlaybackPref, follow);
+                }
                 GUI.changed = previousChanged;
+
+                DrawPlaybackControls();
+
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"{_doc.rows.Count} rows", EditorStyles.miniLabel);
             }
@@ -871,6 +1039,10 @@ namespace VNEffects.EditorTools
             EditorGUILayout.EndScrollView();
 
             EditorGUILayout.HelpBox(
+                "热重载调试：F5 / Ctrl+Enter = 从选中行播放（Play Mode 中是原地热重播，不退出播放；" +
+                "编辑期则自动保存后进 Play Mode），F6 / Ctrl+Shift+Enter = 重播上次那一行，" +
+                "Ctrl+S = 保存，F8 = 暂停/继续，F10 = 单步一条命令。" +
+                "F5/F6/F8/F10/Ctrl+S 可在 Edit → Shortcuts → VN/Scenario Editor 里改键位。\n" +
                 "Enter = 在选中行下方插入台词行（自动聚焦，可直接打字），Shift+Enter = 插在上方；" +
                 "在文本框里打字时第一下 Enter 只是结束编辑，再按一次才插入。\n" +
                 "Shift+click = select range, Ctrl+click = toggle select; " +
@@ -882,8 +1054,94 @@ namespace VNEffects.EditorTools
                 MessageType.Info);
         }
 
+        /// <summary>
+        /// 播放控制条（只在 Play Mode 有意义，编辑期整组灰掉）。
+        /// 暂停是「命令级」的：卡在两条命令之间，已经跑起来的补间/打字机不会冻结——
+        /// 想要真·定格画面请用 Unity 自带的暂停按钮。
+        /// </summary>
+        void DrawPlaybackControls()
+        {
+            VNScriptRunner runner = ResolveRunner();
+            bool live = EditorApplication.isPlaying && runner != null;
+
+            GUILayout.Space(6f);
+            using (new EditorGUI.DisabledScope(!live))
+            {
+                bool paused = live && runner.IsDebugPaused;
+                if (GUILayout.Button(new GUIContent(paused ? "▶" : "❚❚",
+                        paused ? "继续（F8）" : "暂停在下一条命令之前（F8）"),
+                        GUILayout.Width(30f)))
+                    runner.SetDebugPaused(!paused);
+
+                if (GUILayout.Button(new GUIContent("⏭",
+                        "单步：放行一条命令后重新暂停（F10）"), GUILayout.Width(28f)))
+                    runner.RequestDebugStep();
+
+                using (new EditorGUI.DisabledScope(
+                    !live || (_playingLine <= 0 && _lastPlayedLine <= 0)))
+                {
+                    if (GUILayout.Button(new GUIContent("⟳",
+                            "重播当前这一行（Ctrl+Shift+Enter 是重播上次播放的那一行）"),
+                            GUILayout.Width(28f)))
+                        ReplayPlayingLine();
+                    if (GUILayout.Button(new GUIContent("⏮",
+                            "退回上一条命令并从它开始播"), GUILayout.Width(28f)))
+                        PlayPreviousCommand();
+                }
+
+                if (live && _playingLine > 0)
+                    GUILayout.Label($"L{_playingLine}" + (paused ? " 已暂停" : ""),
+                        EditorStyles.miniLabel, GUILayout.Width(74f));
+            }
+        }
+
         void PlayFromSelectedRow()
         {
+            if (_list.index < 0 || _list.index >= _doc.rows.Count) return;
+            PlayFromSourceLine(SourceLineForRow(_list.index));
+        }
+
+        /// <summary>「重播上次那一行」：没播过就退回选中行</summary>
+        void ReplayLastLine()
+        {
+            if (_lastPlayedLine > 0) PlayFromSourceLine(_lastPlayedLine);
+            else PlayFromSelectedRow();
+        }
+
+        /// <summary>正在播的那一行重来一遍（跟随高亮指到哪就重播哪）</summary>
+        void ReplayPlayingLine()
+        {
+            PlayFromSourceLine(_playingLine > 0 ? _playingLine : _lastPlayedLine);
+        }
+
+        /// <summary>回退到当前行之前的那一条命令并从它开始播</summary>
+        void PlayPreviousCommand()
+        {
+            int from = _playingLine > 0 ? _playingLine : _lastPlayedLine;
+            if (from <= 0) return;
+            var commands = VNScriptParser.Parse(_doc.GenerateText());
+            int previous = -1;
+            foreach (var command in commands)
+            {
+                if (command.line >= from) break;
+                previous = command.line;
+            }
+            if (previous < 0)
+            {
+                ShowNotification(new GUIContent("已经是第一条命令"));
+                return;
+            }
+            PlayFromSourceLine(previous);
+        }
+
+        /// <summary>
+        /// 统一播放入口：校验 → 静默自动保存 → Play Mode 中热重播 / 否则冷启动 Bridge。
+        /// Play Mode 中走热路径时完全不触发域重载，改一行到看到效果约等于一次 Repaint。
+        /// </summary>
+        void PlayFromSourceLine(int sourceLine)
+        {
+            if (sourceLine <= 0) return;
+
             foreach (var issue in _issues)
             {
                 if (!issue.isError) continue;
@@ -893,7 +1151,6 @@ namespace VNEffects.EditorTools
                 return;
             }
 
-            int sourceLine = SourceLineForRow(_list.index);
             string source = _doc.GenerateText();
             var commands = VNScriptParser.Parse(source);
             bool found = false;
@@ -910,7 +1167,77 @@ namespace VNEffects.EditorTools
                 return;
             }
 
-            VNPlayFromLineBridge.Request(source, sourceLine, _rebuildStateBeforePlay);
+            AutoSaveBeforePlay();
+            _lastPlayedLine = sourceLine;
+
+            if (EditorApplication.isPlaying)
+            {
+                HotReplay(source, sourceLine);
+                return;
+            }
+            VNPlayFromLineBridge.Request(source, sourceLine, _rebuildStateBeforePlay,
+                ProjectRelativePath());
+        }
+
+        /// <summary>
+        /// 播放前静默把改动写盘，省得「进 Play Mode 前忘了存」。
+        /// 未命名（没有路径）不弹保存框，直接拿内存文本播；
+        /// 磁盘已被别处改过（_externalChanged）也不写，避免静默覆盖掉别人的改动。
+        /// </summary>
+        void AutoSaveBeforePlay()
+        {
+            if (!_dirty || string.IsNullOrEmpty(_path) || _externalChanged) return;
+            SaveFile(false);
+        }
+
+        /// <summary>Play Mode 中原地重播：不退出 Play Mode，不触发域重载</summary>
+        void HotReplay(string source, int sourceLine)
+        {
+            VNScriptRunner runner = ResolveRunner();
+            if (runner == null || !runner.IsInitialized)
+            {
+                Debug.LogError("[VNScript] 热重播失败：当前场景里找不到已初始化的 VNScriptRunner");
+                ShowNotification(new GUIContent("场景里没有 VNScriptRunner"));
+                return;
+            }
+            // 让 Runner 知道现在调试的是哪个剧本：翻译查表与 chapter/跨文件 jump 都按它算
+            runner.SetDebugScript(OpenFileAsset());
+            runner.PlayFromSourceLine(source, sourceLine, _rebuildStateBeforePlay);
+            Repaint();
+        }
+
+        VNScriptRunner ResolveRunner()
+        {
+            if (!EditorApplication.isPlaying) return _runnerCache = null;
+            if (_runnerCache == null)
+                _runnerCache = Object.FindFirstObjectByType<VNScriptRunner>();
+            return _runnerCache;
+        }
+
+        /// <summary>Runner 正在播的文件 == 本窗口打开的文件？（跨文件 jump 后行号就不通用了）</summary>
+        bool IsRunnerOnOpenFile(VNScriptRunner runner)
+        {
+            if (string.IsNullOrEmpty(_path)) return true; // 未命名文档：只能相信是它
+            string running = runner.CurrentScriptName;
+            if (string.IsNullOrEmpty(running)) return true;
+            return VNStoryAddress.NormalizeFile(running) ==
+                   VNStoryAddress.NormalizeFile(Path.GetFileName(_path));
+        }
+
+        /// <summary>当前文件的 "Assets/..." 相对路径（不在工程内时返回 null）</summary>
+        string ProjectRelativePath()
+        {
+            if (string.IsNullOrEmpty(_path)) return null;
+            string assets = Application.dataPath.Replace('\\', '/');
+            string norm = _path.Replace('\\', '/');
+            return norm.StartsWith(assets) ? "Assets" + norm.Substring(assets.Length) : null;
+        }
+
+        TextAsset OpenFileAsset()
+        {
+            string relative = ProjectRelativePath();
+            return string.IsNullOrEmpty(relative)
+                ? null : AssetDatabase.LoadAssetAtPath<TextAsset>(relative);
         }
 
         int SourceLineForRow(int rowIndex)
@@ -924,6 +1251,25 @@ namespace VNEffects.EditorTools
                 if (row.camLines != null) line += row.camLines.Count;
             }
             return line;
+        }
+
+        /// <summary>
+        /// SourceLineForRow 的逆运算：物理行 → UI 行号（播放跟随高亮用）。
+        /// choice 的选项行 / camseq 的路径点行都算进它们所属的那一行。
+        /// </summary>
+        int RowForSourceLine(int sourceLine)
+        {
+            int line = 1;
+            for (int i = 0; i < _doc.rows.Count; i++)
+            {
+                VNRow row = _doc.rows[i];
+                int span = 1;
+                if (row.options != null) span += row.options.Count;
+                if (row.camLines != null) span += row.camLines.Count;
+                if (sourceLine < line + span) return i;
+                line += span;
+            }
+            return -1;
         }
 
         float RowHeight(VNRow r)
@@ -941,6 +1287,15 @@ namespace VNEffects.EditorTools
         {
             if (index < 0 || index >= _doc.rows.Count) return;
             var r = _doc.rows[index];
+
+            // 播放跟随：正在执行的这一行铺一层淡蓝底 + 左侧竖条
+            if (index == _playingRow)
+            {
+                EditorGUI.DrawRect(new Rect(rect.x, rect.y - 1f, rect.width, rect.height + 2f),
+                    new Color(0.30f, 0.62f, 1f, 0.16f));
+                EditorGUI.DrawRect(new Rect(rect.x - 3f, rect.y - 1f, 3f, rect.height + 2f),
+                    new Color(0.35f, 0.70f, 1f, 0.95f));
+            }
 
             // 校验状态圆点
             if (_rowHasError.TryGetValue(index, out bool isErr))
@@ -2210,6 +2565,7 @@ namespace VNEffects.EditorTools
         const string SourceKey = "VNEffects.PlayFromLine.Source";
         const string LineKey = "VNEffects.PlayFromLine.Line";
         const string RebuildKey = "VNEffects.PlayFromLine.Rebuild";
+        const string AssetKey = "VNEffects.PlayFromLine.Asset";
         static int _remainingAttempts;
 
         static VNPlayFromLineBridge()
@@ -2218,12 +2574,14 @@ namespace VNEffects.EditorTools
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
 
-        public static void Request(string source, int sourceLine, bool rebuildState)
+        public static void Request(string source, int sourceLine, bool rebuildState,
+            string assetPath)
         {
             SessionState.SetBool(PendingKey, true);
             SessionState.SetString(SourceKey, source);
             SessionState.SetInt(LineKey, Mathf.Max(1, sourceLine));
             SessionState.SetBool(RebuildKey, rebuildState);
+            SessionState.SetString(AssetKey, assetPath ?? "");
             EditorApplication.isPlaying = true;
         }
 
@@ -2263,8 +2621,12 @@ namespace VNEffects.EditorTools
             string source = SessionState.GetString(SourceKey, "");
             int line = SessionState.GetInt(LineKey, 1);
             bool rebuildState = SessionState.GetBool(RebuildKey, true);
+            string assetPath = SessionState.GetString(AssetKey, "");
             ClearRequest();
             EditorApplication.update -= TryStartRunner;
+            // 先告诉 Runner 调试的是哪个剧本，翻译查表与跨文件跳转才对得上
+            if (!string.IsNullOrEmpty(assetPath))
+                runner.SetDebugScript(AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath));
             runner.PlayFromSourceLine(source, line, rebuildState);
         }
 
@@ -2274,6 +2636,7 @@ namespace VNEffects.EditorTools
             SessionState.EraseString(SourceKey);
             SessionState.EraseInt(LineKey);
             SessionState.EraseBool(RebuildKey);
+            SessionState.EraseString(AssetKey);
         }
     }
 }

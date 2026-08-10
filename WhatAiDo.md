@@ -4911,3 +4911,118 @@ Noto Sans SC 字体档案（`ScProfile`），日文缺字时也是兜底到这�
 - 进剧本场景走一段中文台词，字形应变成毛笔体；切到英文/日文语言应保持
   Noto Sans SC / Noto Sans JP 不受影响。
 - 用一个生僻字（比如剧本里没预热过的字）验证中文缺字时能兜底显示而不是方框。
+
+## 九十六、剧本编辑器热重载调试（2026-08-10，分支 `agent/scenario-hot-reload`）
+
+### 起因
+
+用户的迭代循环是「改一行 → 看效果」，但当时的编辑器把这个循环拖成了几十秒：
+
+1. **进 Play Mode 后编辑内容全没了。** 这是本章要修的头号 bug，
+   而且它跟"忘了保存"无关——`VNScenarioEditorWindow` 的 `_doc` / `_path` /
+   撤销栈全是普通字段，没有 `[SerializeField]`。进 Play Mode 触发域重载
+   （domain reload），Unity 只保留标了 `[SerializeField]` 的窗口字段，
+   整个文档被重置成空白 untitled。**就算存了盘，退出 Play Mode 后窗口也是空的。**
+2. **每次调试都得完整进出一趟 Play Mode。** 播放按钮在 Play Mode 中是禁用的
+   （`EditorApplication.isPlayingOrWillChangePlaymode` 的 DisabledScope），
+   想再看一次就得退出、改、再进——每次一次域重载 + 场景初始化。
+3. 忘了保存就点播放，播放本身没问题（`PlayFromSelectedRow` 用的是
+   `_doc.GenerateText()` 内存文本），但域重载一来改动就随窗口一起蒸发。
+
+### 做了什么
+
+**一、窗口跨域重载存活（必须做，不是可选项）**
+
+`VNScenarioEditorWindow` 实现 `ISerializationCallbackReceiver`：
+
+- 新增存活组字段：`_docText`（文档正文的序列化中转）、`_path`、`_fileTimeTicks`
+  （`DateTime` 不可序列化，存 ticks）、`_dirty`、`_externalChanged`、`_tab`、
+  `_showCategoryColors`、`_rebuildStateBeforePlay`、`_restoredListIndex`、
+  `_undoStackSerialized` / `_redoStackSerialized`、`_scroll`、`_lastPlayedLine`。
+- `OnBeforeSerialize()` 把 `_doc` 拍成文本、撤销栈拷进可序列化 List、
+  记下 ReorderableList 的选中行。**这里只能做纯 C# 运算，不能碰 Unity API。**
+- `OnAfterDeserialize()` 留空，实际还原挪到 `OnEnable` 的
+  `RestoreAfterDomainReload()`（Unity API 在反序列化时机不可用）。
+- 兜底：OnGUI 帧首快照重算时顺手同步 `_docText = _frameSnapshot`。
+
+> **加新状态时的规矩**：以后往这个窗口加任何"关掉/重编译也不该丢"的状态，
+> 必须同时改 `OnBeforeSerialize` 和 `OnEnable` 两处，只加字段没用。
+
+**二、Play Mode 中原地热重播（核心）**
+
+播放路径统一收敛到 `PlayFromSourceLine(int sourceLine)`：校验 → 自动保存 →
+分流。Play Mode 中走 `HotReplay()`，直接
+`runner.PlayFromSourceLine(内存文本, 行, rebuildState)`——
+**不退出 Play Mode、不触发域重载、不重新初始化场景**，改一行到看到效果
+约等于一次 Repaint。编辑期仍走原来的 `VNPlayFromLineBridge` 冷启动。
+
+播放按钮在 Play Mode 中不再禁用（只有正在切换 Play Mode 的那一瞬灰掉），
+文案切换成「▶ 播放选中行（热）」。
+
+**三、播放前静默自动保存**
+
+`AutoSaveBeforePlay()`：脏了就直接写盘。两个例外——未命名文档（没有路径）
+不弹保存框，直接拿内存文本播；`_externalChanged`（磁盘被别处改过）时不写，
+避免静默覆盖掉别人的改动。
+
+**四、当前行高亮跟随**
+
+`OnInspectorUpdate()` 以 10Hz 轮询 `runner.CurrentLine`（不给运行时加事件，
+避免域重载时的订阅生命周期问题），换算成 UI 行号后画淡蓝底 + 左侧竖条，
+滚出可视区时自动滚过去。工具栏「跟随播放」开关控制（EditorPrefs）。
+
+- 新增 `RowForSourceLine()`，是 `SourceLineForRow()` 的逆运算；
+  choice 选项行 / camseq 路径点行都算进它们所属的那一行。
+- 文档行数变了要重算 `_playingRow`，挂在 OnGUI 帧首快照那里。
+- **只在 Runner 正播本窗口打开的文件时才高亮**（比对
+  `runner.CurrentScriptName`），跨文件 jump 之后行号不通用，宁可不亮。
+
+**五、播放控制条**（工具栏，只在 Play Mode 有效）
+
+`❚❚/▶` 暂停继续、`⏭` 单步、`⟳` 重播当前行、`⏮` 退回上一条命令，
+右侧显示 `L<行号>` 与暂停状态。
+
+**六、快捷键**
+
+走 `ShortcutManager`（窗口作用域，用户可在 Edit → Shortcuts →
+VN/Scenario Editor 里自己改键位）：`F5` 从选中行播放、`F6` 重播上次那一行、
+`F8` 暂停/继续、`F10` 单步、`Ctrl+S` 保存。
+另外 `Ctrl+Enter` / `Ctrl+Shift+Enter` 走 IMGUI 自己收
+（`HandleShortcutKeys`，必须排在 `HandleInsertKeys` 之前，两者都盯着 Enter）。
+
+### 运行时改动（VNScriptRunner）
+
+- `SetDebugScript(TextAsset)`：告诉 Runner 现在调试的是哪个剧本。
+  只换 `script` 引用不重载命令——翻译查表、`chapter` / 跨文件 `jump`
+  的"当前文件"都按它算。Bridge 冷启动路径也补了这一步（新增 `AssetKey`
+  经 SessionState 传资产路径）。
+- `CurrentScriptName` 属性。
+- 命令级暂停/单步：`IsDebugPaused` / `SetDebugPaused()` / `RequestDebugStep()`，
+  闸门在 `Run()` 主循环顶部。`Play(string)` 开局时清暂停标记，
+  免得编辑器留下的暂停态把正常开局卡死。
+
+### 技术决策与取舍
+
+- **暂停是「命令级」的，不是画面定格**：卡在两条命令之间，已经跑起来的
+  DOTween 补间和打字机不受影响。真要定格画面请用 Unity 自带的暂停按钮。
+  没做 `Time.timeScale = 0` ——会连打字机和 DOTween 一起搞坏，代价太大。
+- **跟随高亮用轮询而不是运行时事件**：10Hz 的 `OnInspectorUpdate` 足够跟手，
+  而且省掉了域重载前后订阅/退订的生命周期坑，运行时零改动。
+- **`ShortcutManager` 不接受 `Return`/`Enter` 当绑定键**——会被忽略并刷
+  `Ignoring shortcut attribute with invalid binding` 警告。所以主键位用 F 系，
+  Ctrl+Enter 那套只能在 IMGUI 里自己收。
+- **用户选择了静默自动保存**（而不是弹窗询问 / 完全不存）：
+  文件永远和看到的一致，Git diff 也干净；试验性的乱改有撤销栈兜底。
+- **没做**：外部文件改动自动重播、定时备份+崩溃恢复、`hasUnsavedChanges`
+  关窗提示、行右键菜单、播放时自动切换到剧本场景——用户逐项确认不要，
+  场景处理维持现状（找不到 Runner 就在 Console 报错）。
+
+### 验证方法
+
+- Unity 编译零错误；ShortcutManager 的两条 invalid binding 警告已消除。
+- Play Mode 实测（`script-execute` 探针）：对同一个 Runner 连续调用两次
+  `PlayFromSourceLine`，都正确从第 16 行起播且 `CurrentLine=16`，无异常——
+  热重播可反复执行。
+- 暂停实测：`SetDebugPaused(true)` 后隔 20 秒复查，`CurrentLine` 停在 16
+  纹丝不动而 `IsRunning=True`，确认闸门卡在命令之间而非整体停摆。
+- 窗口存活与 UI 交互（高亮、控制条、快捷键手感）需要在编辑器里手动点验。
