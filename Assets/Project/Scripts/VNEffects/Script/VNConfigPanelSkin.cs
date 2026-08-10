@@ -43,6 +43,10 @@ namespace VNEffects
         public Button fullscreenButton;
         public TMP_Text fullscreenLabel;
 
+        [Header("操作（可留空：缺了只是面板里没这一项，开关本身照常默认生效）")]
+        public Button wheelBacklogButton;
+        public TMP_Text wheelBacklogLabel;
+
         public override void CollectValidationErrors(List<string> errors)
         {
             Require(panelRoot, "面板根", errors);

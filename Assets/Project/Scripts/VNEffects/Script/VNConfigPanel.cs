@@ -15,16 +15,28 @@ namespace VNEffects
         const string VoiceKey = "VN.Config.VoiceVolume";
         const string TextSpeedKey = "VN.Config.TextSpeed";
         const string FullscreenKey = "VN.Config.Fullscreen";
+        const string WheelBacklogKey = "VN.Config.WheelBacklog";
 
         VNScriptRunner _runner;
         VNStage _stage;
         GameObject _canvasGo;
         GameObject _panel;
         TMP_Text _fullscreenLabel;
+        TMP_Text _wheelBacklogLabel;
         bool _open;
         bool _settingsApplied;
 
         public bool IsOpen => _open;
+
+        /// <summary>
+        /// 滚轮上滑是否打开回想。默认开（Galgame 惯例），关掉后只剩 H 键。
+        /// 静态是因为 VNScriptRunner 每帧要读它，而设置面板未必存在于所有场景。
+        /// </summary>
+        public static bool WheelOpensBacklog
+        {
+            get => PlayerPrefs.GetInt(WheelBacklogKey, 1) != 0;
+            set => PlayerPrefs.SetInt(WheelBacklogKey, value ? 1 : 0);
+        }
 
         public void Initialize(VNScriptRunner runner, VNStage stage)
         {
@@ -145,6 +157,13 @@ namespace VNEffects
             BindLanguageButton(skin.japaneseButton, skin.japaneseLabel, VNLanguage.Japanese, skin.selectedLanguageColor);
             BindButton(skin.fullscreenButton, ToggleFullscreen);
             UpdateFullscreenLabel();
+
+            // 槽位可留空：老的皮肤 prefab 没有这个按钮，缺了就只是设置面板里没这一项，
+            // 开关本身照常生效（默认开），不影响面板其它部分。
+            _wheelBacklogLabel = skin.wheelBacklogLabel;
+            if (skin.wheelBacklogButton != null)
+                BindButton(skin.wheelBacklogButton, ToggleWheelBacklog);
+            UpdateWheelBacklogLabel();
         }
 
         static void BindSlider(Slider slider, TMP_Text valueText, float min, float max, float value,
@@ -185,7 +204,25 @@ namespace VNEffects
             button.onClick.AddListener(action);
         }
 
-        void RefreshValues() => UpdateFullscreenLabel();
+        void RefreshValues()
+        {
+            UpdateFullscreenLabel();
+            UpdateWheelBacklogLabel();
+        }
+
+        void ToggleWheelBacklog()
+        {
+            WheelOpensBacklog = !WheelOpensBacklog;
+            UpdateWheelBacklogLabel();
+        }
+
+        void UpdateWheelBacklogLabel()
+        {
+            if (_wheelBacklogLabel == null) return;
+            _wheelBacklogLabel.text = VNLocale.T(WheelOpensBacklog
+                ? "config.wheelBacklogOn"
+                : "config.wheelBacklogOff");
+        }
 
         void ToggleFullscreen()
         {

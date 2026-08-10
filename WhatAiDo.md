@@ -5026,3 +5026,65 @@ VN/Scenario Editor 里自己改键位）：`F5` 从选中行播放、`F6` 重播
 - 暂停实测：`SetDebugPaused(true)` 后隔 20 秒复查，`CurrentLine` 停在 16
   纹丝不动而 `IsRunning=True`，确认闸门卡在命令之间而非整体停摆。
 - 窗口存活与 UI 交互（高亮、控制条、快捷键手感）需要在编辑器里手动点验。
+
+## 九十七、编辑器隐藏注释/空行 + 滚轮开回想可关（2026-08-10，分支 `agent/scenario-hot-reload`）
+
+### 起因
+
+- 第1章.vn.txt 有 206 行，开头一大段是教学注释，编辑器里每条注释都占满
+  一行 21px，想看剧情得先滚过去一屏。
+- 滚轮上滑打开回想是 `VNScriptRunner.cs` 里硬编码的，有人嫌误触但关不掉。
+
+### 一、编辑器：隐注释/空行
+
+工具栏加一个「隐注释/空行」开关（EditorPrefs 记忆，默认关）。
+
+**实现走"高度归零"而不是"过滤列表"**：`_list` 直接绑定 `_doc.rows`，
+只让 `RowHeight()` 对隐藏行返回 0、`DrawRow()` 直接 return。
+这样 `_doc.rows` 的索引完全不变，`SourceLineForRow` / `RowForSourceLine` /
+多选 / 拖动排序 / 删除 / 舞台一览 / 校验圆点全部零改动，
+也不存在过滤视图那种"拖到隐藏行之间算什么"的语义黑洞。
+
+**只隐空行与 `#` 注释，不隐全部 Raw 行。** `VNRowKind.Raw` 还兜着两种
+语法残留：前面没有 choice 的孤儿 `*` 选项行、前面没有 camseq 的孤儿 `>`
+路径点行（`VNScenarioDoc.cs:113/119/125` 三个入口）。那两种一旦藏起来就
+再也找不回来——Issues 面板定位过去也是一片空白——所以必须留着显形。
+判定在 `IsHiddenRow()`。
+
+开关打开的瞬间若选中行正好被藏了，`MoveSelectionOffHiddenRow()` 会把选中
+挪到最近的可见行，免得 Duplicate / [-] / 播放作用在看不见的行上。
+
+### 二、运行时：滚轮打开回想可关
+
+- `VNConfigPanel.WheelOpensBacklog` 静态属性（PlayerPrefs `VN.Config.WheelBacklog`，
+  默认开）。**静态**是因为 `VNScriptRunner` 每帧要读它，而设置面板未必存在于所有场景。
+- `VNScriptRunner` 的滚轮分支加判断；关掉后 H 键照常。
+- 设置面板加一项，照抄全屏那一项的「按钮 + 文案翻面」模式。
+- 三语词条 `config.wheelBacklogOn` / `config.wheelBacklogOff`。
+
+**皮肤槽位是可留空的**：`VNConfigPanelSkin.wheelBacklogButton / wheelBacklogLabel`
+没有进 `CollectValidationErrors` 的 `Require`，`BindCustomSkin` 里也做了 null 检查。
+老皮肤 prefab 缺这两个槽位时，只是设置面板里没这一项，开关本身照常默认生效。
+
+### 改到了实际在用的那个 prefab
+
+**注意：`VNSystemUiSkinSet_Default.asset` 的 `configPanelPrefab` 指向的是
+`ConfigPanel_New.prefab`，不是 `ConfigPanel_Default.prefab`。**
+所以只更新导出器（`VNSystemUiSkinExporter.BuildConfig`）没用——它只重建 `_Default`。
+本章两个 prefab 都处理了：
+
+- 导出器：窗口 740 → 810，`WheelBacklog` 按钮插在 -654，Hint 从 -668 挪到 -738。
+  以后重跑 Export Default Prefabs 会带上这一行。
+- `ConfigPanel_New.prefab`：**直接增量改**（复制 Fullscreen 按钮 → 改名
+  WheelBacklog → 挪到 -654 → 窗口加高 → Hint 下移 → 回填两个槽位），
+  没有重导，用户在这个 prefab 上的其它自定义原样保留。
+
+### 验证方法
+
+- 编译零错误。
+- Play Mode 实测：`WheelOpensBacklog` 默认 True、可读写翻转；
+  三语 `config.wheelBacklogOn/Off` 都解析出译文而不是回落成 key。
+- 皮肤实测：`panel.Open()` 真正走一遍 Build + BindCustomSkin 后，
+  两个槽位都非空，label = 「滚轮打开回想　开」；
+  `onClick.Invoke()` 两次，PlayerPrefs 与文案同步翻面（关 → 开）。
+- 编辑器的隐藏开关是 IMGUI 交互，需要在编辑器里手动点验。

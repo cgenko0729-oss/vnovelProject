@@ -63,6 +63,8 @@ config.textSpeedValue = {0:0} 字/秒
 config.language = 言語 / Language
 config.displayFullscreen = 画面モード　フルスクリーン
 config.displayWindowed = 画面モード　ウィンドウ
+config.wheelBacklogOn = ホイールで履歴　オン
+config.wheelBacklogOff = ホイールで履歴　オフ
 config.hint = 設定は自動保存されます　·　Esc か外側クリックで閉じる
 
 # —— 実行時トースト ——

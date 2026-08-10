@@ -50,6 +50,7 @@ namespace VNEffects.EditorTools
         System.DateTime _fileTime;
         bool _stagePreview = true;
         bool _followPlayback = true;
+        bool _hideRawRows;
 
         ReorderableList _list;
         float _pendingScrollY = -1f;
@@ -87,6 +88,7 @@ namespace VNEffects.EditorTools
         // 舞台一览：逐行推算"这行时台上有谁、背景是什么"（按文件顺序，jump/choice 近似）
         const string StagePreviewPref = "VNEffects.ScenarioEditor.StagePreview";
         const string FollowPlaybackPref = "VNEffects.ScenarioEditor.FollowPlayback";
+        const string HideRawPref = "VNEffects.ScenarioEditor.HideRawRows";
         const float StageCellW = 70f;
         readonly List<RowStageState> _stageStates = new List<RowStageState>();
         int _stageStatesVersion = -1;
@@ -215,6 +217,7 @@ namespace VNEffects.EditorTools
             LoadCategoryColors();
             _stagePreview = EditorPrefs.GetBool(StagePreviewPref, true);
             _followPlayback = EditorPrefs.GetBool(FollowPlaybackPref, true);
+            _hideRawRows = EditorPrefs.GetBool(HideRawPref, false);
             RestoreAfterDomainReload();
             BuildList();
             if (_restoredListIndex >= 0 && _restoredListIndex < _doc.rows.Count)
@@ -832,6 +835,17 @@ namespace VNEffects.EditorTools
                     _stagePreview = stagePreview;
                     EditorPrefs.SetBool(StagePreviewPref, stagePreview);
                 }
+                bool hideRaw = GUILayout.Toggle(_hideRawRows,
+                    new GUIContent("隐注释/空行",
+                        "把空行与 # 注释折成零高度，只剩台词和命令。\n" +
+                        "行号与所有编辑操作不受影响；想改注释就关掉它，或去 Text 页签改。"),
+                    EditorStyles.toolbarButton, GUILayout.Width(78f));
+                if (hideRaw != _hideRawRows)
+                {
+                    _hideRawRows = hideRaw;
+                    EditorPrefs.SetBool(HideRawPref, hideRaw);
+                    if (hideRaw) MoveSelectionOffHiddenRow();
+                }
                 GUI.changed = previousChanged;
 
                 GUILayout.Space(8f);
@@ -866,6 +880,35 @@ namespace VNEffects.EditorTools
                 DrawTabButton(Tab.Edit, "Edit");
                 DrawTabButton(Tab.Text, "Text");
                 DrawTabButton(Tab.Issues, $"Issues ({errors}E/{warns}W)");
+            }
+        }
+
+        /// <summary>
+        /// 刚开启隐藏时选中行正好被藏了：往下挪到第一个可见行。
+        /// 否则 Duplicate / [-] / 播放会作用在一个看不见的行上。
+        /// </summary>
+        void MoveSelectionOffHiddenRow()
+        {
+            int index = _list.index;
+            if (index < 0 || index >= _doc.rows.Count) return;
+            if (!IsHiddenRow(_doc.rows[index])) return;
+
+            for (int i = index; i < _doc.rows.Count; i++)
+            {
+                if (IsHiddenRow(_doc.rows[i])) continue;
+                _list.ClearSelection();
+                _list.index = i;
+                _list.Select(i, true);
+                return;
+            }
+            // 后面全是隐藏行，往前找
+            for (int i = index - 1; i >= 0; i--)
+            {
+                if (IsHiddenRow(_doc.rows[i])) continue;
+                _list.ClearSelection();
+                _list.index = i;
+                _list.Select(i, true);
+                return;
             }
         }
 
@@ -1274,10 +1317,26 @@ namespace VNEffects.EditorTools
 
         float RowHeight(VNRow r)
         {
+            if (IsHiddenRow(r)) return 0f;
             int lines = 1;
             if (r.options != null) lines += r.options.Count;
             if (r.camLines != null) lines += r.camLines.Count;
             return lines * LineH2 + 6f;
+        }
+
+        /// <summary>
+        /// 「隐注释/空行」开着时这一行是否折成零高度。
+        ///
+        /// 只认空行与 `#` 注释——VNRowKind.Raw 还兜着两种语法残留：
+        /// 前面没有 choice 的孤儿 `*` 选项行、前面没有 camseq 的孤儿 `>` 路径点行。
+        /// 那两种一旦藏起来就再也找不回来了（Issues 面板定位过去也是一片空白），
+        /// 所以必须留在列表里显形。
+        /// </summary>
+        bool IsHiddenRow(VNRow r)
+        {
+            if (!_hideRawRows || r.kind != VNRowKind.Raw) return false;
+            string text = r.raw == null ? "" : r.raw.TrimStart();
+            return text.Length == 0 || text.StartsWith("#");
         }
 
         Rect SubLine(Rect rect, int line) => new Rect(
@@ -1287,6 +1346,7 @@ namespace VNEffects.EditorTools
         {
             if (index < 0 || index >= _doc.rows.Count) return;
             var r = _doc.rows[index];
+            if (IsHiddenRow(r)) return;   // 零高度，什么都别画
 
             // 播放跟随：正在执行的这一行铺一层淡蓝底 + 左侧竖条
             if (index == _playingRow)

@@ -1724,8 +1724,11 @@ namespace VNEffects
             // 存读档（F5/F9/Q/L）照常可用——气泡停顿处就是合法存档点。
             if (!snsOpen)
             {
+                // 滚轮上滑开回想是可关的（设置面板「滚轮打开回想」）——有人嫌误触；
+                // 关掉后 H 键照常。
                 if (kb.hKey.wasPressedThisFrame ||
-                    (mouse != null && mouse.scroll.ReadValue().y > 0.1f))
+                    (VNConfigPanel.WheelOpensBacklog &&
+                     mouse != null && mouse.scroll.ReadValue().y > 0.1f))
                 {
                     _backlog?.Open();
                     return;

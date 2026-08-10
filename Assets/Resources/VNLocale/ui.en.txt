@@ -63,6 +63,8 @@ config.textSpeedValue = {0:0} chars/s
 config.language = Language
 config.displayFullscreen = Display Mode　Fullscreen
 config.displayWindowed = Display Mode　Windowed
+config.wheelBacklogOn = Wheel Opens Backlog　On
+config.wheelBacklogOff = Wheel Opens Backlog　Off
 config.hint = Settings save automatically　·　Esc or click outside to close
 
 # —— Runtime toasts ——

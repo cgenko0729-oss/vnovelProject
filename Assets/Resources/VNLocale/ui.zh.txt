@@ -64,6 +64,8 @@ config.textSpeedValue = {0:0} 字/秒
 config.language = 语言 / Language
 config.displayFullscreen = 显示模式　全屏
 config.displayWindowed = 显示模式　窗口
+config.wheelBacklogOn = 滚轮打开回想　开
+config.wheelBacklogOff = 滚轮打开回想　关
 config.hint = 设置会自动保存　·　Esc 或点击外部关闭
 
 # —— 运行时提示 ——

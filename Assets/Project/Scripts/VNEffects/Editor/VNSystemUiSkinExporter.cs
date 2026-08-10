@@ -177,7 +177,7 @@ namespace VNEffects
             skin.panelRoot = root;
             skin.backgroundCloseButton = FullButton(root.transform, "Dim", new Color(0, 0, .02f, .82f));
             var window = Image(root.transform, "Window", Panel);
-            SetCenter(window.rectTransform, new Vector2(780, 740));
+            SetCenter(window.rectTransform, new Vector2(780, 810));  // +70 = 多出「滚轮打开回想」一行
             skin.titleText = Text(window.transform, "Title", 38, TextAlignmentOptions.Left,
                 new Vector2(58, -34), new Vector2(560, 56));
             (skin.closeButton, _) = FixedButton(window.transform, "Close", new Vector2(700, -34), new Vector2(48, 48), "×");
@@ -191,8 +191,9 @@ namespace VNEffects
             (skin.englishButton, skin.englishLabel) = FixedButton(window.transform, "English", new Vector2(408, -474), new Vector2(140, 50));
             (skin.japaneseButton, skin.japaneseLabel) = FixedButton(window.transform, "Japanese", new Vector2(556, -474), new Vector2(140, 50));
             (skin.fullscreenButton, skin.fullscreenLabel) = FixedButton(window.transform, "Fullscreen", new Vector2(82, -584), new Vector2(616, 58));
+            (skin.wheelBacklogButton, skin.wheelBacklogLabel) = FixedButton(window.transform, "WheelBacklog", new Vector2(82, -654), new Vector2(616, 58));
             skin.hintText = Text(window.transform, "Hint", 19, TextAlignmentOptions.Center,
-                new Vector2(80, -668), new Vector2(620, 34));
+                new Vector2(80, -738), new Vector2(620, 34));
             return Save(root);
         }
 

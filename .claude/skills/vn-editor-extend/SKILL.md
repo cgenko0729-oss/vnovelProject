@@ -16,6 +16,13 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
 - **UI 行号 ≠ 物理行号**：换算一律走 `SourceLineForRow`——choice 选项行和 camseq waypoint
   都额外占物理行；空行/注释从下一条有效命令启动。反向换算（物理行 → UI 行）走
   `RowForSourceLine`，两个函数的跨行规则必须保持一致，改一个就得改另一个。
+- **`VNRowKind.Raw` 不等于「注释或空行」**：它还兜着前面没有 choice 的孤儿 `*`
+  选项行、前面没有 camseq 的孤儿 `>` 路径点行。任何「批量处理 Raw 行」的功能
+  （隐藏、折叠、清理）都必须先用 `IsHiddenRow` 那套判定筛出真正的空行与 `#` 注释，
+  否则那两种语法残留会人间蒸发。
+- **隐藏行走「高度归零」不走「过滤列表」**：`_list` 绑的是 `_doc.rows` 本体，
+  让 `RowHeight` 返回 0 就够了，索引保持不变，行号换算/多选/拖动/删除全部零改动。
+  换成过滤视图就要处理"拖到隐藏行之间算什么"，不值得。
 - **窗口状态默认活不过域重载**：进/出 Play Mode、脚本重编译都会重建窗口，
   普通字段一律清空。任何"关掉/重编译也不该丢"的状态都要
   ①加 `[SerializeField]` ②在 `OnBeforeSerialize` 里写入 ③在 `OnEnable`

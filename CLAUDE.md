@@ -192,6 +192,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   `runner.CurrentLine`）；工具栏播放控制条（暂停/单步/重播本行/上一条，命令级暂停
   不冻结画面动画）。窗口状态跨域重载存活走 `ISerializationCallbackReceiver`，
   **加新窗口状态必须同时改 `OnBeforeSerialize` 和 `OnEnable`**。详见 WhatAiDo 九十六章。
+- 工具栏「隐注释/空行」：把空行与 `#` 注释折成零高度（`RowHeight` 返回 0，索引不变，
+  所有编辑操作零影响）。**只隐空行与 `#`**——孤儿 `*` / `>` 行也是 Raw，藏了就找不回来。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；
   文本框编辑中的第一下 Enter 只结束编辑。插命令行仍走列表底部 `+` 下拉。
   调试键位 `F5` 播放选中行 / `F6` 重播上次那行 / `F8` 暂停 / `F10` 单步 / `Ctrl+S` 保存
