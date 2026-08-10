@@ -1368,3 +1368,44 @@
 
 
 and also please update HowToUse.md file to reflect the newest system and usage and update(fix any old and wrong text). and  merge all the change in current project to main , so main have the newest state,
+
+
+分析：能否在剧本里自定义命令（如 hideHUD）
+
+结论：完全可行，而且这正是这套 DSL 的设计初衷
+
+.vn.txt → VNScriptParser → VNScriptRunner 这套架构本身就是"关键字 → 函数调用"的映射表，加一条新命令就是往两个地方各加一行 case，架构上没有任何障碍。我看了现有代码里已经有很多类似的先例，比如 ui、letterbox、portrait 这几条命令，套路完全一样：
+
+- VNScriptParser.cs:85 的 Keywords 集合里登记关键字（比如 letterbox、portrait），解析器看到这个词就走"命令解析"分支而不是当成台词。
+- VNScriptRunner.cs:1686 附近的 ExecuteCommand（大 switch）里加一个 case，直接调用你想要的函数——比如现有的 case "ui" 就是直接调一句 stage.SetUiSkin(...)，case "portrait" 直接调 stage.SetPortraitEnabled(...)。
+
+所以 hideHUD 想调 VNScriptRunner.SetInterfaceHidden 或 VNStatsHud.SetHudVisible，本质上和现成的 portrait on/off、letterbox on/off 是同一类命令，做法是抄它们的模式。
+
+两种命名思路，推荐后者
+
+1. 专用简写命令：直接加关键字 hideHUD/showHUD，各自不带参数。
+  - 优点：剧本里写起来最短。
+  - 缺点：破坏了项目现有的命名一致性——环顾现有命令，凡是"开关类"状态都是 命令 on|off 的形式（letterbox on/off、portrait on/off、fx <名> on/off/burst），没有"一个动作一个专属关键字"的先例，加进去会让命令表风格不统一，以后每加一个开关都要新造一个关键字。
+  - 我个人不建议这条路，除非你就是想要极短的调试用命令。
+2. 归入现有开关模式：新增一个命令比如 interface hide|show（或者复用 ui 的语义，比如 ui interface hide），参数走 on/off 或 hide/show。
+  - 优点：和 letterbox/portrait 保持同一套语法直觉，写剧本的人不用记新规则；将来如果 HUD 相关的开关变多（比如同时还想隐藏日历 HUD、快捷条），可以在同一个命令下加 kwargs 而不是继续开新关键字。
+  - 这是更符合项目现状的做法。
+VNScriptRunner.cs:1302-1309），所以剧本命令应该调 runner.SetInterfaceHidden(...) 这一个入口，而不是绕开它直接调 VNStatsHud.SetHudVisible——否则对话框和日历 HUD 的可见性会跟 HUD 状态脱节。
+
+落地要走的全链路（对应技能 vn-new-command 的 9 步，逐条落到这个例子上）
+
+1. VNScriptParser.Keywords 加关键字。
+2. VNScriptRunner 的 ExecuteCommand switch 里加 case，因为这是瞬发操作（不需要等动画播完），跟 portrait/letterbox 一样直接 return null，不用写协程。
+3. 状态重建：RebuildStateBefore()（约 VNScriptRunner.cs:337 那段 snapshot 重放逻辑）要不要加对应 case——取决于这是不是"持续性舞台状态"。这里要判断一下：_uiHidden 现在只是运行时字段，目前的用途（快捷条 H 键、截图前隐藏 UI）是临时性的，不是像 letterbox/皮肤那样需要在存档里持久化、或者编辑器"从选中行播放"时需要重建的状态。所以大概率这一步和第4步（存档兼容）可以跳过——除非你想让"进游戏就默认隐藏 HUD"这种剧情演出效果在读档后依然生效，那就要走 vn-save-compat 清单，把 _uiHidden 计入 VNSaveData 并在快照恢复时同步。
+4. VNScenarioSchema 登记参数模式，让可视化编辑器能自动生成这条命令的编辑 UI（下拉选 on/off 之类）。
+5. VNScenarioEditorWindow.CommandTranslations 给它配中文名，方便编辑器里显示。
+6. 因为参数只是 on/off 这种固定枚举，不涉及素材 id/角色 id，Lint 校验器这步基本可以跳过或只加一个"参数必须是 on/off"的简单检查。
+7. 文档：HowToUse.md 命令详解 + 文末速查卡加一条。
+8. 编译验证后按 vn-doc-update 补 WhatAiDo.md。
+
+小结
+
+- 技术上零障碍，架构本来就是为了让你不断加这种"关键字 → 调 C# 函数"的命令。
+- 建议不要单开 hideHUD/showHUD 两个关键字，改成一个 on/off 风格的命令（比如 interface hide|show），和项目里 letterbox/portrait 的现有语法保持一致。
+- 调用点建议统一走 VNScriptRunner.SetInterfaceHidden，因为它已经把对话框、属性 HUD、日历 HUD 三处可见性绑在一起了，不要绕开它单独调 VNStatsHud.SetHudVisible。
+- 是否需要存档兼容，取决于你想让这个隐藏状态是"临时演出效果"还是"读档后依然保持"的持久状态，这个需要你确认一下产品意图，我才能告诉你第 3/4 步能不能跳过。

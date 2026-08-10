@@ -139,6 +139,9 @@ namespace VNEffects
         [Header("站位偏移（像素）：脚底留白偏高→y 负值下压；构图偏左右→x 修正")]
         public Vector2 positionOffset = Vector2.zero;
 
+        [Header("立绘 Z 轴旋转偏移（度）：用于修正素材本身的倾斜；正值逆时针旋转")]
+        public float rotationZOffset = 0f;
+
         [Header("对话框头像")]
         [Header("这个角色说话时是否在对话框显示头像（另有剧本全局开关 portrait on/off）")]
         public bool showPortrait = true;

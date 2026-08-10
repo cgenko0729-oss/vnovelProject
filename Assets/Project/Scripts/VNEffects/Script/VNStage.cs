@@ -295,6 +295,7 @@ namespace VNEffects
             }
 
             var c = Get(id) ?? CreateCharacter(def);
+            c.fx.SetBaseRotationZ(def.rotationZOffset);
             if (!string.IsNullOrEmpty(at))
             {
                 // 标准站位 + 该角色的标定偏移（吸收素材构图差异）
@@ -530,6 +531,7 @@ namespace VNEffects
                 rect = rect,
                 fx = go.AddComponent<VNImageEffectController>(),
             };
+            c.fx.SetBaseRotationZ(def.rotationZOffset);
             go.AddComponent<VNGlowBackdrop>();
             c.animator = go.AddComponent<VNEntranceAnimator>();
             c.emotes = go.AddComponent<VNCharacterEmotes>();
@@ -864,6 +866,7 @@ namespace VNEffects
             }
 
             var c = Get(id) ?? CreateCharacter(def);
+            c.fx.SetBaseRotationZ(def.rotationZOffset);
             // 存档里的 x 已含偏移，y 用标定偏移重建
             var pos = new Vector2(x, -60f + def.positionOffset.y);
             c.rect.anchoredPosition = pos;

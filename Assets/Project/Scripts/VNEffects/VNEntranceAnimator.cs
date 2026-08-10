@@ -122,7 +122,7 @@ namespace VNEffects
             _fx.SetFlash(0f);
             _fx.Rect.anchoredPosition = _basePos;
             _fx.Rect.localScale = _baseScale;
-            _fx.Rect.localRotation = Quaternion.identity; // WalkIn 的轻摆被打断时不留歪头
+            _fx.Rect.localRotation = Quaternion.Euler(_fx.RotationEuler()); // 清掉动作倾斜，保留素材校准角
             _backdrop?.Hide();
         }
 
@@ -283,7 +283,7 @@ namespace VNEffects
             var resolved = Resolve(side, true);
             float dir = resolved == VNSide.Right ? 1f : -1f;
             _fx.Rect.anchoredPosition = _basePos + new Vector2(dir * 300f, 0f);
-            _fx.Rect.localRotation = Quaternion.Euler(0f, 0f, -1.3f * dir);
+            _fx.Rect.localRotation = Quaternion.Euler(_fx.RotationEuler(-1.3f * dir));
 
             float total = 1.1f * k;
             const int steps = 4;                 // 4 步走到位
@@ -296,14 +296,14 @@ namespace VNEffects
             // 步伐起伏 / 左右轻摆 / 踩地压缩：同一步长，Yoyo 回到原值
             seq.Join(_fx.Rect.DOAnchorPosY(_basePos.y + 8f, half)
                              .SetEase(Ease.InOutSine).SetLoops(steps * 2, LoopType.Yoyo));
-            seq.Join(_fx.Rect.DOLocalRotate(new Vector3(0f, 0f, 1.3f * dir), half * 2f)
+            seq.Join(_fx.Rect.DOLocalRotate(_fx.RotationEuler(1.3f * dir), half * 2f)
                              .SetEase(Ease.InOutSine).SetLoops(steps, LoopType.Yoyo));
             seq.Join(_fx.Rect.DOScaleY(_baseScale.y * 0.988f, half)
                              .SetEase(Ease.InOutSine).SetLoops(steps * 2, LoopType.Yoyo));
             seq.OnComplete(() =>
             {
                 // Yoyo 的循环次数是偶数，理论上自然回到原值；这里兜底防抖动残留
-                _fx.Rect.localRotation = Quaternion.identity;
+                _fx.Rect.localRotation = Quaternion.Euler(_fx.RotationEuler());
                 _fx.Rect.localScale = _baseScale;
                 _fx.Rect.anchoredPosition = _basePos;
             });
@@ -462,7 +462,7 @@ namespace VNEffects
             _current = DOTween.Sequence()
                 .Append(_fx.Rect.DOAnchorPos(_basePos + new Vector2(dir * 1250f, 0f), total)
                                 .SetEase(Ease.InQuad))
-                .Join(_fx.Rect.DOLocalRotate(new Vector3(0f, 0f, -6f * dir), total * 0.35f)
+                .Join(_fx.Rect.DOLocalRotate(_fx.RotationEuler(-6f * dir), total * 0.35f)
                                 .SetEase(Ease.OutQuad))
                 .Join(_group.DOFade(0f, total).SetEase(Ease.InQuad))
                 .SetLink(gameObject);

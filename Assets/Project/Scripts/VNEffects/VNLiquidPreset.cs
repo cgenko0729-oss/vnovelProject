@@ -153,8 +153,10 @@ namespace VNEffects
                 glowRatio = 0.5f,
                 gravityScale = 1f,
                 drag = 0.02f,
-                lifeMin = 0.65f, lifeMax = 1.15f,
-                sizeMin = 0.038f, sizeMax = 0.075f,
+                lifeMin = 0.65f,
+                lifeMax = 1.15f,
+                sizeMin = 0.038f,
+                sizeMax = 0.075f,
                 stretch = 3.6f,
                 speedScale = 1f,
                 burstCount = 58,
@@ -164,7 +166,39 @@ namespace VNEffects
                 drySeconds = 7f,
                 dropScale = 1f,
                 trailAlpha = 0.5f,
-                clingMin = 0.25f, clingMax = 1.1f,
+                clingMin = 0.25f,
+                clingMax = 1.1f,
+
+                //milk splash 
+                // 奶白色、较不透明
+                //          tint = new Color(1f, 0.96f, 0.84f),
+                //bodyAlpha = 0.90f,
+                //glowTint = new Color(1f, 0.94f, 0.80f),
+                //glowBoost = 0.35f,
+                //glowRatio = 0.08f,
+
+                // 浓稠：下落慢、空气阻力大、存留久
+                //gravityScale = 0.68f,
+                //drag = 0.28f,
+                //lifeMin = 1.1f,
+                //lifeMax = 1.8f,
+
+                // 液滴较大、较短粗、喷射较慢
+                //sizeMin = 0.060f,
+                //sizeMax = 0.120f,
+                //stretch = 1.45f,
+                //speedScale = 0.70f,
+                //burstCount = 700,
+                //splinterCount = 70,
+
+                // 镜头上的奶滴：较大、流得慢、较晚干
+                //screenChance = 0.40f,
+                //dripSpeed = 45f,
+                //drySeconds = 24f,
+                //dropScale = 1.35f,
+                //trailAlpha = 0.72f,
+                //clingMin = 1f,
+                //clingMax = 3f,
             };
 
             // 血：黏、重、落得慢、拖尾短、几乎不干。dripSpeed 只有清水的三分之一，

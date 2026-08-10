@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f9f244636a43e7d4cbbd0f389155e761, type: 3}
-  m_Name: "\u661F\u91CE\u7ED3\u8863"
+  m_Name: "\u661F\u91CE\u7ED3\u8863 2"
   m_EditorClassIdentifier: 
-  id: "\u661F\u91CE\u7ED3\u8863"
+  id: "\u661F\u91CE\u7ED3\u88632"
   displayName: "\u661F\u91CE\u7ED3\u8863"
   displayNameEn: 
   displayNameJa: 
   nameColor: {r: 0.45, g: 0.3, b: 0.75, a: 0.9}
   expressions:
   - name: "\u9ED8\u8BA4"
-    sprite: {fileID: 21300000, guid: 61f33628e16c67149b6ea95bb29409b7, type: 3}
+    sprite: {fileID: 21300000, guid: e86374fe681a09b48a58d9e40edf3a2d, type: 3}
   - name: "\u5FAE\u7B11"
     sprite: {fileID: 21300000, guid: 90436bdfb80ce304eb379df16e5979b2, type: 3}
   - name: "\u5BB3\u7F9E"
@@ -35,7 +35,7 @@ MonoBehaviour:
   enableBlink: 1
   blinkMode: 1
   blinkSprite: {fileID: 21300000, guid: 8f7e0401a82d505429ebbf54e5d801a3, type: 3}
-  blinkOverlaySprite: {fileID: 21300000, guid: 1dc771feafdc945429f3a03597049ecb, type: 3}
+  blinkOverlaySprite: {fileID: 21300000, guid: 1ce1ced46817775459f8cdb85abc19b3, type: 3}
   blinkIntervalMin: 2.5
   blinkIntervalMax: 5
   blinkDuration: 0.225
@@ -48,10 +48,11 @@ MonoBehaviour:
   markScale: 1
   markSprites: []
   sizeScale: 1.18
-  positionOffset: {x: 0, y: -56.633972}
+  positionOffset: {x: 21.149721, y: -61.921524}
+  rotationZOffset: -38.3
   showPortrait: 1
   portraits:
   - name: p01
     sprite: {fileID: 21300000, guid: ae0d6a713feafd94890767c45685bb1b, type: 3}
   portraitScale: 4.96
-  portraitOffset: {x: 0, y: -16.8}
+  portraitOffset: {x: -3.213985, y: 8.911858}

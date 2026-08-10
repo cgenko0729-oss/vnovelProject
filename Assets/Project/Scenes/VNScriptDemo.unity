@@ -10346,6 +10346,9 @@ MonoBehaviour:
   choicePanel: {fileID: 76956192}
   vnAudio: {fileID: 1111248293}
   eventRegistry: {fileID: 664587819}
+  sns: {fileID: 0}
+  liquidSplash: {fileID: 1553815223}
+  wetScreen: {fileID: 1717207306}
   expressionCrossfade: 0.25
   characterHeight: 880
   autoMemoryLetterbox: 1
@@ -15490,12 +15493,12 @@ MonoBehaviour:
     strength: 8
     basePos: {x: 0, y: 0}
   - rect: {fileID: 451194176}
-    strength: 13
+    strength: 21
     basePos: {x: 0, y: 0}
   - rect: {fileID: 1692429737}
-    strength: 19
+    strength: 49
     basePos: {x: 0, y: 0}
-  damping: 5
+  damping: 7
 --- !u!4 &482874035
 Transform:
   m_ObjectHideFlags: 0
@@ -15651,6 +15654,8 @@ MonoBehaviour:
     template: {fileID: 1758906615}
   - id: battle
     template: {fileID: 273684235}
+  - id: quiz
+    template: {fileID: 842440488}
 --- !u!4 &664587820
 Transform:
   m_ObjectHideFlags: 0
@@ -15670,6 +15675,7 @@ Transform:
   - {fileID: 684890041}
   - {fileID: 1758906614}
   - {fileID: 273684236}
+  - {fileID: 842440489}
   m_Father: {fileID: 386602334}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &684890040
@@ -15831,6 +15837,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1603896289}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &842440487
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 842440489}
+  - component: {fileID: 842440488}
+  m_Layer: 0
+  m_Name: QuizTemplate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &842440488
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 842440487}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbfe7b7b63cd7794485e48bded269005, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNQuizModule
+  quizzes:
+  - {fileID: 11400000, guid: 6771f02b60c0ce148b69582a7d9a30d0, type: 2}
+--- !u!224 &842440489
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 842440487}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 664587820}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &901910931
 GameObject:
   m_ObjectHideFlags: 0
@@ -15958,6 +16014,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNWeatherController
   additiveMaterial: {fileID: 2100000, guid: 880be6a2cff73e241af0203e872ab0f7, type: 2}
+  particleAlphaMaterial: {fileID: 0}
   moodTargets: []
   applyMoodGrading: 1
 --- !u!4 &1063208258
@@ -16594,6 +16651,7 @@ RectTransform:
   - {fileID: 1116642982}
   - {fileID: 1362564055}
   - {fileID: 1670013180}
+  - {fileID: 1717207307}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -16787,6 +16845,55 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1553815222
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1553815224}
+  - component: {fileID: 1553815223}
+  m_Layer: 0
+  m_Name: LiquidSplash
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1553815223
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1553815222}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 089b8bcf99c9c96428e6080877646dab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNLiquidSplash
+  sortingOrder: 28
+  wetScreen: {fileID: 1717207306}
+  alphaSourceMaterial: {fileID: 2100000, guid: 9e859f66a230f314a8beb8e4f2af54fb, type: 2}
+  additiveSourceMaterial: {fileID: 2100000, guid: e4130246093919a4ea06515f399d3c3f, type: 2}
+  clickMode: 0
+--- !u!4 &1553815224
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1553815222}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1554851200
 GameObject:
   m_ObjectHideFlags: 0
@@ -16816,6 +16923,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6438cc3e9181a2341a60914b0e449ed2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNSakuraBurst
+  particleAlphaMaterial: {fileID: 0}
   additiveMaterial: {fileID: 2100000, guid: 880be6a2cff73e241af0203e872ab0f7, type: 2}
   heartbeat: {fileID: 1181495025}
   petalColor: {r: 1, g: 0.68, b: 0.8, a: 1}
@@ -17024,7 +17132,7 @@ MonoBehaviour:
     | C \u5C5E\u6027\u9762\u677F | I \u7269\u54C1\u680F | G CG\u9274\u8D4F"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: fdf08363d8a023d4d929f785c67e4c59, type: 2}
-  m_sharedMaterial: {fileID: -6854057523667862738, guid: fdf08363d8a023d4d929f785c67e4c59, type: 2}
+  m_sharedMaterial: {fileID: -99551427029467159, guid: fdf08363d8a023d4d929f785c67e4c59, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -22061,6 +22169,58 @@ MonoBehaviour:
     condition: "\u597D\u611F\u5EA6>=2"
     icon: {fileID: 0}
   markVisited: 1
+--- !u!1 &1717207305
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1717207307}
+  - component: {fileID: 1717207306}
+  m_Layer: 0
+  m_Name: WetScreen
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1717207306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1717207305}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9d30f7f31cccc043b9118bd7fe68dde, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNWetScreen
+  sortingOrder: 30
+  coverSortingOrder: 50
+  coverDialogue: 0
+  sourceMaterial: {fileID: 2100000, guid: e4130246093919a4ea06515f399d3c3f, type: 2}
+--- !u!224 &1717207307
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1717207305}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1427739357}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1758906613
 GameObject:
   m_ObjectHideFlags: 0
@@ -27391,7 +27551,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNScriptRunner
   stage: {fileID: 360770714}
-  script: {fileID: 4900000, guid: 1bc8d1c2e986cb1419062b4774a88452, type: 3}
+  script: {fileID: 4900000, guid: e3965cfe539c0784e8787b8d7aa91edd, type: 3}
   chapters:
   - {fileID: 4900000, guid: 7bc19c23bb1425c4d8024c27edcc65d4, type: 3}
   - {fileID: 4900000, guid: 3dc677cd351b51d40aecfaeeede5f343, type: 3}
@@ -27407,6 +27567,7 @@ MonoBehaviour:
   - {fileID: 4900000, guid: c8ec8fcd50f14ccfa72975821eac17aa, type: 3}
   - {fileID: 4900000, guid: 2c494596a0914599ae545b1ab21cc6d8, type: 3}
   - {fileID: 4900000, guid: 4c615a3f83a148229de313c73b4d376b, type: 3}
+  - {fileID: 4900000, guid: e3965cfe539c0784e8787b8d7aa91edd, type: 3}
   playOnStart: 1
   autoDelay: 1.4
   skipTimeScale: 4
@@ -27672,3 +27833,4 @@ SceneRoots:
   - {fileID: 36108149}
   - {fileID: 1511128753}
   - {fileID: 386602334}
+  - {fileID: 1553815224}

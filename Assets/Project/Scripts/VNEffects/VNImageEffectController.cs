@@ -50,6 +50,7 @@ namespace VNEffects
         bool _hasFloatBase;
         float _lastFloatAmplitude = 8f;
         float _lastFloatPeriod = 4f;
+        float _baseRotationZ;
 
         /// <summary>当前是否在悬浮飘动（情绪动作库用来暂停/恢复）</summary>
         public bool IsFloating => _floatTween != null;
@@ -71,6 +72,18 @@ namespace VNEffects
                 if (_rect == null) _rect = (RectTransform)transform;
                 return _rect;
             }
+        }
+
+        /// <summary>角色素材校准后的基础 Z 轴角度（动画倾斜会叠加在此角度上）。</summary>
+        public float BaseRotationZ => _baseRotationZ;
+
+        public Vector3 RotationEuler(float offset = 0f) =>
+            new Vector3(0f, 0f, _baseRotationZ + offset);
+
+        public void SetBaseRotationZ(float degrees)
+        {
+            _baseRotationZ = degrees;
+            Rect.localRotation = Quaternion.Euler(RotationEuler());
         }
 
         void Awake()
@@ -428,12 +441,12 @@ namespace VNEffects
             if (tiltDegrees > 0.01f)
             {
                 // 先缓慢摆到一侧，再在两侧之间往复 —— 起步不跳变
-                _tiltTween = t.DOLocalRotate(new Vector3(0f, 0f, tiltDegrees), tiltPeriod * 0.5f)
+                _tiltTween = t.DOLocalRotate(RotationEuler(tiltDegrees), tiltPeriod * 0.5f)
                               .SetEase(Ease.InOutSine)
                               .SetLink(gameObject)
                               .OnComplete(() =>
                               {
-                                  _tiltTween = t.DOLocalRotate(new Vector3(0f, 0f, -tiltDegrees), tiltPeriod)
+                                  _tiltTween = t.DOLocalRotate(RotationEuler(-tiltDegrees), tiltPeriod)
                                                 .SetEase(Ease.InOutSine)
                                                 .SetLoops(-1, LoopType.Yoyo)
                                                 .SetLink(gameObject);
@@ -450,7 +463,7 @@ namespace VNEffects
             if (_hasOrigScale)
             {
                 Rect.localScale = CurrentBaseScale;
-                Rect.localRotation = Quaternion.identity;
+                Rect.localRotation = Quaternion.Euler(RotationEuler());
             }
         }
 

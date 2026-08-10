@@ -21,7 +21,7 @@
 # ============================================================
 
 # ---------- 开幕：先黑边 + 转场，建立"电影开场"的仪式感 ----------
-letterbox on time:1.2
+letterbox off time:1.2
 bg 教室 transition:Eyelid
 bg 教室_黄昏 transition:WhiteFlash
 mood Neutral
@@ -43,11 +43,17 @@ se se1
 # 顺序讲究：先 camera 急推（异步 @，不挡下面的 show），再 show，
 # 于是"镜头猛地推过去"和"人出现"是同时发生的。
 camera snapzoom 1.12 @
-show 星野结衣 at:center expr:默认 with:DissolveGlow
+show 星野结衣 at:center expr:默认 with:StepIn
+hide 星野结衣 with:RunOut
+show 星野结衣 at:center expr:默认 with:WalkIn
+hide 星野结衣 with:Sink
+show 星野结衣2 at:center with:Crossfade
+mark 星野结衣 exclaim @ # 漫符：惊！弹一下就消失
+
 se se1
 fx speedlines burst
 
-: （……）
+: （……）hahaha
 : （染成浅金色的头发，耳朵上一排耳钉，制服裙子短得像在挑衅校规。）
 : （班上的辣妹——星野结衣。）
 : （和我，是完全不同世界的生物。）
@@ -59,9 +65,10 @@ camseq start:fade end:fade @
 > 星野结衣:waist 1.6 1.4
 > middle 1.0 1.0
 
+
 星野结衣 默认: 唔——哪个是我的座位来着……
 wait 0.5
-
+mark 星野结衣 sweat @ # 冒冷汗（一次性）
 # 她走到我旁边：move 是"滑步换位"，配 @ 可边走边说
 move 星野结衣 left 0.9 @
 星野结衣 默认: 啊，找到了。窗边诶，赚到。
@@ -194,5 +201,13 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+
+
+
+
+
+
+
 
 

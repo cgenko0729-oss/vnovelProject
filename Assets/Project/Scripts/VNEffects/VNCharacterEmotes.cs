@@ -63,7 +63,7 @@ namespace VNEffects
 
             // 基准缩放从控制器取（包含说话者高亮的倍率），不自己缓存
             _rect.localScale = _fx.CurrentBaseScale;
-            _rect.localRotation = Quaternion.identity;
+            _rect.localRotation = Quaternion.Euler(_fx.RotationEuler());
             if (!_dejected) _rect.anchoredPosition = _basePos;
         }
 
@@ -162,11 +162,11 @@ namespace VNEffects
         {
             Begin();
             var seq = DOTween.Sequence()
-                .Append(_rect.DOLocalRotate(new Vector3(0f, 0f, 2.6f), 0.1f).SetEase(Ease.OutQuad))
-                .Append(_rect.DOLocalRotate(new Vector3(0f, 0f, -2.6f), 0.16f).SetEase(Ease.InOutSine))
-                .Append(_rect.DOLocalRotate(new Vector3(0f, 0f, 2f), 0.15f).SetEase(Ease.InOutSine))
-                .Append(_rect.DOLocalRotate(new Vector3(0f, 0f, -1.4f), 0.14f).SetEase(Ease.InOutSine))
-                .Append(_rect.DOLocalRotate(Vector3.zero, 0.12f).SetEase(Ease.OutQuad));
+                .Append(_rect.DOLocalRotate(_fx.RotationEuler(2.6f), 0.1f).SetEase(Ease.OutQuad))
+                .Append(_rect.DOLocalRotate(_fx.RotationEuler(-2.6f), 0.16f).SetEase(Ease.InOutSine))
+                .Append(_rect.DOLocalRotate(_fx.RotationEuler(2f), 0.15f).SetEase(Ease.InOutSine))
+                .Append(_rect.DOLocalRotate(_fx.RotationEuler(-1.4f), 0.14f).SetEase(Ease.InOutSine))
+                .Append(_rect.DOLocalRotate(_fx.RotationEuler(), 0.12f).SetEase(Ease.OutQuad));
             return End(seq);
         }
 

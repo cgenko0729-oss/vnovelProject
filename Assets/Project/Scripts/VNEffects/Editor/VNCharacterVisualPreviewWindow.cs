@@ -9,6 +9,7 @@ namespace VNEffects.EditorTools
     {
         public float sizeScale = 1f;
         public Vector2 positionOffset;
+        public float rotationZOffset;
         public bool enableBlink;
         public VNBlinkMode blinkMode = VNBlinkMode.FullSprite;
         public Sprite blinkSprite;
@@ -29,6 +30,7 @@ namespace VNEffects.EditorTools
         {
             sizeScale = character.sizeScale;
             positionOffset = character.positionOffset;
+            rotationZOffset = character.rotationZOffset;
             enableBlink = character.enableBlink;
             blinkMode = character.blinkMode;
             blinkSprite = character.blinkSprite;
@@ -276,14 +278,20 @@ namespace VNEffects.EditorTools
                 GUI.BeginClip(rect);
                 var localRect = new Rect(spriteRect.x - rect.x, spriteRect.y - rect.y,
                     spriteRect.width, spriteRect.height);
+                Matrix4x4 oldMatrix = GUI.matrix;
+                GUIUtility.RotateAroundPivot(-_draft.rotationZOffset, localRect.center);
                 DrawSprite(sprite, localRect, Color.white);
                 Sprite blinkOverlay = BlinkOverlayPreviewSprite();
                 if (blinkOverlay != null) DrawSprite(blinkOverlay, localRect, Color.white);
                 Sprite mouth = MouthPreviewSprite();
                 if (mouth != null) DrawSprite(mouth, localRect, Color.white);
+                GUI.matrix = oldMatrix;
                 GUI.EndClip();
 
+                oldMatrix = GUI.matrix;
+                GUIUtility.RotateAroundPivot(-_draft.rotationZOffset, spriteRect.center);
                 DrawRectOutline(spriteRect, new Color(0.35f, 0.85f, 1f, 0.8f), 1f);
+                GUI.matrix = oldMatrix;
             }
             else
             {
@@ -305,7 +313,8 @@ namespace VNEffects.EditorTools
 
             GUI.Label(new Rect(rect.x + 8f, rect.y + 6f, rect.width - 16f, 20f),
                 $"{SlotNames[_slotIndex]}  |  高度 {_baseCharacterHeight * _draft.sizeScale:0}px  |  " +
-                $"偏移 ({_draft.positionOffset.x:0}, {_draft.positionOffset.y:0})",
+                $"偏移 ({_draft.positionOffset.x:0}, {_draft.positionOffset.y:0})  |  " +
+                $"旋转 {_draft.rotationZOffset:0.##}°",
                 EditorStyles.miniLabel);
         }
 
@@ -380,12 +389,16 @@ namespace VNEffects.EditorTools
                         _draft.sizeScale, 0.3f, 2.5f);
                     Vector2 offset = EditorGUILayout.Vector2Field(
                         "positionOffset", _draft.positionOffset);
+                    float rotation = EditorGUILayout.FloatField(
+                        "rotationZOffset", _draft.rotationZOffset);
                     if (!Mathf.Approximately(size, _draft.sizeScale) ||
-                        offset != _draft.positionOffset)
+                        offset != _draft.positionOffset ||
+                        !Mathf.Approximately(rotation, _draft.rotationZOffset))
                     {
                         RecordDraft("调整角色立绘校准草稿");
                         _draft.sizeScale = size;
                         _draft.positionOffset = offset;
+                        _draft.rotationZOffset = rotation;
                         ChangedDraft();
                     }
 
@@ -511,6 +524,7 @@ namespace VNEffects.EditorTools
                             RecordDraft("重置角色立绘校准草稿");
                             _draft.sizeScale = 1f;
                             _draft.positionOffset = Vector2.zero;
+                            _draft.rotationZOffset = 0f;
                             ChangedDraft();
                         }
                         if (GUILayout.Button("选中当前立绘") && ExpressionSprite() != null)
@@ -595,6 +609,7 @@ namespace VNEffects.EditorTools
             Undo.RecordObject(_character, "确认角色视觉校准");
             _character.sizeScale = _draft.sizeScale;
             _character.positionOffset = _draft.positionOffset;
+            _character.rotationZOffset = _draft.rotationZOffset;
             _character.enableBlink = _draft.enableBlink;
             _character.blinkMode = _draft.blinkMode;
             _character.blinkSprite = _draft.blinkSprite;
@@ -831,6 +846,7 @@ namespace VNEffects.EditorTools
         bool HasPendingChanges => _character != null && _draft != null &&
             (!Mathf.Approximately(_draft.sizeScale, _character.sizeScale) ||
              _draft.positionOffset != _character.positionOffset ||
+             !Mathf.Approximately(_draft.rotationZOffset, _character.rotationZOffset) ||
              _draft.enableBlink != _character.enableBlink ||
              _draft.blinkMode != _character.blinkMode ||
              _draft.blinkSprite != _character.blinkSprite ||
