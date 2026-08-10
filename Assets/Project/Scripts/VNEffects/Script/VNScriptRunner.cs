@@ -1293,6 +1293,7 @@ namespace VNEffects
                         duration = point.duration,
                         ease = Replace(point.ease),
                         fade = point.fade,
+                        hold = point.hold,
                         line = point.line,
                     });
             }
@@ -2645,6 +2646,7 @@ namespace VNEffects
                     ease = easeVal,
                     easeSet = easeSet,
                     fade = def.fade,
+                    hold = def.hold,
                 });
             }
 

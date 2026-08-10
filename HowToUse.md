@@ -335,6 +335,18 @@ camera reset
 >      **Game 视图**显示带 Bloom/调色等后处理的真实画面。关掉时全部还原
 >      （临时立绘标了 DontSave，绝不会存进场景文件）。
 >
+>    **构图辅助线**：工具栏 `辅助线 ▾` 逐项勾选三分线 / 中心十字 / 安全区(90%) /
+>    对话框遮挡区，开关记在 EditorPrefs（关窗重开还在）。整图模式下辅助线画在
+>    **选中路径点的取景框**里、跟着框缩放平移；镜头视角模式下铺满整个画布。
+>    对话框遮挡区按场景里真实对话框的尺寸换算——**特写时脸会不会被对话框挡住，
+>    看这一条就够了**（对话框不随镜头缩放，所以它永远压在一屏的底部那条）。
+>
+>    **撤销**：`Ctrl+Z` / `Ctrl+Y`（`Ctrl+Shift+Z` 也行），路径点增删、改值、拖拽排序、
+>    套预设/模板、清空全都能撤。只作用于这个窗口，**不动 Unity 的全局撤销**
+>    （在 Scene 视图按 Ctrl+Z 不会莫名其妙改到路径点）；拖滑条、连续输入会自动
+>    合并成一步；换绑定行会重开一段历史。工具栏也有 `↶ ↷` 按钮，键位可在
+>    Edit → Shortcuts 里改。
+>
 >    要连 mood 调色、天气粒子、特效全部真实，还是用剧本编辑器的
 >    `F5 从选中行播放` + `重建前置状态` 进 Play Mode 实跑——那是 100% 真实的演出。
 >
@@ -348,6 +360,10 @@ camseq                          # 多段路径块：整条路径连续流畅（�
 > topright 1.8 0                # 路径点：目标点 [zoom] [时长]；时长 0 = 瞬切起手
 > bottom 1.8 2.5                # 2.5 秒匀速移到画面下方（zoom 保持 1.8）
 > middle 1.0 1.5                # 1.5 秒回原点并 zoom out
+
+camseq                          # hold：到点后停一会儿再走下一段
+> 亚里沙:head 1.9 1.2 hold:1    # 1.2 秒推到脸上，停 1 秒（这一秒镜头纹丝不动）
+> middle 1 0.8                  # 再 0.8 秒拉回全景
 
 camto 亚里沙:head 1.6 0.8       # 单段直达：目标点 [zoom] [秒] [ease:名]
 camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里"）
@@ -365,6 +381,10 @@ camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里
 
 - **缓动**：单段默认 InOutSine；多段路径首段 InSine 缓起、中间 Linear 匀速、末段 OutSine 缓停
   ——整条像一次连续运镜。每个路径点可用 `ease:OutBack` 等覆盖（DOTween 全部 Ease 名可用）
+- **停留**：`hold:秒` = 到达该点后停在原地的秒数（**到点之后**，不是到点之前）。
+  想「推到脸上停一秒再拉回」写 `hold:1` 就够了，不用再补一个同点位、时长 0 的路径点。
+  hold 计入 camseq 总时长（异步 `@` 时不阻塞台词），Skip 快进对它同样生效；
+  `xfade:` 叠化点也能带 hold（叠化完成后再停）
 - **防露边**：高倍 zoom 对准边角时自动钳制偏移，不会把画布边缘露出来
 - 路径点在**执行时**才解析角色位置（角色刚 move 过也能对准）
 - camseq 整块可加 `@` 异步（台词与运镜同时进行）
@@ -1461,7 +1481,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
 | | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
 | | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
-| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位 [zoom] [秒] [ease:名] [xfade:秒]`（多余数字、ease 名拼错等）→ 剧本编辑器只能把它当纯文本保留 |
+| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒]`（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
 | **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
 
 ### 两条设计取舍
@@ -1532,7 +1552,7 @@ mark <角色> <符号|clear> [keep|off] [pos:x,y] [size:] [dur:]  立绘漫符
 move <角色> <位置> [秒]                          滑步换位
 wait <秒>                                        停顿
 camera <pushin|snapzoom|pan|dolly|reset> [...]   预设运镜
-camseq + > 目标点 [zoom] [秒] [ease:名]          多段镜头路径
+camseq + > 目标点 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒]  多段镜头路径（hold = 到点后停留）
 camto <目标点> [zoom] [秒] / camcut <目标点> [zoom]  单段直达/瞬切
 shake <light|medium|heavy>                       震动
 weather <id> [density:] [wind:] [speed:] [size:]  天气

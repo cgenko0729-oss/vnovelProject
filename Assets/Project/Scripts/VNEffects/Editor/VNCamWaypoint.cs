@@ -34,7 +34,7 @@ namespace VNEffects.EditorTools
     /// 校验全都不用动；任何解析不了的写法也能原样留在文件里（UI 退回纯文本行显示）。
     ///
     /// 语法与运行时 <c>VNScriptParser.ParseCamWaypoint</c> 同构：
-    /// <c>&gt; 目标点 [zoom] [时长] [ease:名] [xfade:秒]</c>，改那边这里必须跟着改。
+    /// <c>&gt; 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]</c>，改那边这里必须跟着改。
     /// </summary>
     public class VNCamWaypoint
     {
@@ -53,6 +53,7 @@ namespace VNEffects.EditorTools
         public float duration = DefaultDuration;
         public string ease = "";
         public float fade;
+        public float hold;      // >0 = 到达本点后停留的秒数
 
         // 原文没写 zoom / 时长时置位：只要值还是默认就继续省略，避免打开编辑器就把
         // 手写的 "> middle" 撑成 "> middle 1 0.8" 这种无意义的 diff
@@ -136,6 +137,12 @@ namespace VNEffects.EditorTools
                     if (result.fade > 0f) return false;                     // 重复
                     result.fade = f;
                 }
+                else if (tok.StartsWith("hold:"))
+                {
+                    if (!TryFloat(tok.Substring(5), out float h) || h <= 0f) return false;
+                    if (result.hold > 0f) return false;                     // 重复
+                    result.hold = h;
+                }
                 else if (TryFloat(tok, out float v))
                 {
                     if (numIndex == 0) { result.zoom = v; result.omitZoom = false; }
@@ -168,6 +175,7 @@ namespace VNEffects.EditorTools
             if (writeDuration) sb.Append(' ').Append(Num(duration));
             if (!string.IsNullOrEmpty(ease)) sb.Append(" ease:").Append(ease);
             if (fade > 0.0001f) sb.Append(" xfade:").Append(Num(fade));
+            if (hold > 0.0001f) sb.Append(" hold:").Append(Num(hold));
             return sb.ToString();
         }
 

@@ -128,6 +128,7 @@ namespace VNEffects
             public Ease ease;       // 本段缓动（easeSet 为 true 时生效）
             public bool easeSet;
             public float fade;      // >0 = 交叉淡化到本点（秒），代替平移/瞬切
+            public float hold;      // >0 = 到达本点后停留的秒数（停在原地再走下一段）
         }
 
         /// <summary>
@@ -217,17 +218,22 @@ namespace VNEffects
                         target.localScale = Vector3.one * zoom;
                         target.anchoredPosition = pos;
                     });
-                    continue;
+                }
+                else
+                {
+                    Ease ease = wp.easeSet ? wp.ease
+                        : moveCount <= 1 ? Ease.InOutSine
+                        : i == firstMove ? Ease.InSine
+                        : i == lastMove ? Ease.OutSine
+                        : Ease.Linear;
+
+                    seq.Append(target.DOScale(zoom, wp.duration).SetEase(ease));
+                    seq.Join(target.DOAnchorPos(pos, wp.duration).SetEase(ease));
                 }
 
-                Ease ease = wp.easeSet ? wp.ease
-                    : moveCount <= 1 ? Ease.InOutSine
-                    : i == firstMove ? Ease.InSine
-                    : i == lastMove ? Ease.OutSine
-                    : Ease.Linear;
-
-                seq.Append(target.DOScale(zoom, wp.duration).SetEase(ease));
-                seq.Join(target.DOAnchorPos(pos, wp.duration).SetEase(ease));
+                // hold：到点后停在原地。编进同一条 Sequence，Skip 的 DOTween.timeScale
+                // 加速对它同样生效（用 WaitForSeconds 就会在快进时变成唯一的卡点）
+                if (wp.hold > 0.001f) seq.AppendInterval(wp.hold);
             }
             return seq;
         }
@@ -250,6 +256,7 @@ namespace VNEffects
             if (startFade > 0.001f && points.Count > 0)
             {
                 yield return CrossfadeTo(points[0].point, points[0].zoom, startFade);
+                yield return HoldCo(points[0].hold);
                 i = 1;
             }
 
@@ -258,6 +265,7 @@ namespace VNEffects
                 if (points[i].fade > 0.001f)
                 {
                     yield return CrossfadeTo(points[i].point, points[i].zoom, points[i].fade);
+                    yield return HoldCo(points[i].hold);
                     i++;
                     continue;
                 }
@@ -284,6 +292,18 @@ namespace VNEffects
                     if (t != null) yield return t.WaitForCompletion();
                 }
             }
+        }
+
+        /// <summary>
+        /// 叠化段之后的 hold（普通补间段的 hold 直接编进 Sequence，见 BuildSegment）。
+        /// 同样走 DOTween 而不是 WaitForSeconds，Skip 加速才对所有段一致生效。
+        /// </summary>
+        IEnumerator HoldCo(float seconds)
+        {
+            if (seconds <= 0.001f) yield break;
+            var t = DOTween.Sequence().AppendInterval(seconds)
+                .SetTarget(this).SetLink(gameObject);
+            yield return t.WaitForCompletion();
         }
 
         /// <summary>截屏当前画面 → 瞬切到目标镜头 → 截图淡出</summary>

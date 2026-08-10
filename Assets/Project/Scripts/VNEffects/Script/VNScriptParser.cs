@@ -26,6 +26,7 @@ namespace VNEffects
         public float duration = 0.8f;
         public string ease;     // 可选缓动名
         public float fade;      // >0 = 交叉淡化到本点（xfade:秒），代替平移/瞬切
+        public float hold;      // >0 = 到达本点后停留的秒数（hold:秒）
         public int line;
     }
 
@@ -175,7 +176,7 @@ namespace VNEffects
             return result;
         }
 
-        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名] [xfade:秒]</summary>
+        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]</summary>
         static void ParseCamWaypoint(VNScriptCommand camseqCmd, string raw, int line)
         {
             var tokens = raw.Substring(1).Trim()
@@ -200,6 +201,14 @@ namespace VNEffects
                         wp.fade = f;
                     else
                         Debug.LogWarning($"[VNScript] 第 {line} 行：xfade 时长「{tokens[t]}」应为正数");
+                }
+                else if (tokens[t].StartsWith("hold:"))
+                {
+                    // 到达本点后停留的秒数（停在原地，不是到达前等待）
+                    if (float.TryParse(tokens[t].Substring(5), out float h) && h > 0f)
+                        wp.hold = h;
+                    else
+                        Debug.LogWarning($"[VNScript] 第 {line} 行：hold 时长「{tokens[t]}」应为正数");
                 }
                 else if (float.TryParse(tokens[t], out float v))
                 {

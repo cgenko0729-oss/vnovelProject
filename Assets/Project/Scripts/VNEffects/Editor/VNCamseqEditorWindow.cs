@@ -4,6 +4,7 @@ using System.Text;
 using DG.Tweening;
 using DG.Tweening.Core.Easing;
 using UnityEditor;
+using UnityEditor.ShortcutManagement;
 using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +36,7 @@ namespace VNEffects.EditorTools
             public float duration = 0.8f;
             public int easeIndex = 0;     // 0 = (默认)
             public float fade;            // >0 = 交叉叠化到本点（xfade:秒），代替平移/瞬切
+            public float hold;            // >0 = 到达本点后停留的秒数（hold:秒）
         }
 
         /// <summary>camseq 开场衔接方式（对应 start: 选项）</summary>
@@ -118,6 +120,35 @@ namespace VNEffects.EditorTools
         readonly List<GameObject> _previewChars = new List<GameObject>();
 
         [SerializeField] bool _cameraView;         // 画布：整图 / 镜头视角
+
+        // ---- 构图辅助线 ----
+        [System.Flags]
+        enum Guides
+        {
+            None = 0,
+            Thirds = 1,        // 三分线
+            Center = 2,        // 中心十字
+            SafeArea = 4,      // 安全区（90%）
+            DialogueBox = 8,   // 对话框遮挡区
+            All = Thirds | Center | SafeArea | DialogueBox,
+        }
+
+        const string GuidesPrefKey = "VNCamseq.Guides";
+        const Guides DefaultGuides = Guides.Thirds | Guides.DialogueBox;
+        // 纯外观偏好 → EditorPrefs，不序列化进窗口（OnEnable 里读回来）
+        Guides _guides = DefaultGuides;
+
+        // ---- 撤销 / 重做（窗口内独立栈，**不进 Unity 全局 Undo**）----
+        // 快照 = GenerateText()：路径点 + 开场/收尾叠化全在这一串文本里，
+        // 恢复 = 反过来解析。全部 [SerializeField]，重编译后还能继续撤销。
+        // 走全局 Undo 的话，在 Scene 视图按 Ctrl+Z 会莫名其妙撤到这里的改动。
+        [SerializeField] List<string> _undoStack = new List<string>();
+        [SerializeField] List<string> _redoStack = new List<string>();
+        [SerializeField] string _undoBaseline = "";
+        string _undoPending;          // 上一拍看到的文本（判断"还在连续改"）
+        double _undoPendingTime;
+        const int UndoDepth = 64;
+        const double UndoIdleSeconds = 0.35;   // 静默这么久才切一步 → 拖滑条合并成一次
 
         VNCamseqPresetLibrary _library;
         string _presetName = "";
@@ -221,7 +252,112 @@ namespace VNEffects.EditorTools
             ParseText(silent: true);
             _lastAppliedText = GenerateText();
             _scrub = 0f;
+            ResetUndo();   // 换了一行 = 换了一段历史
             Repaint();
+        }
+
+        // ==================================================================
+        // 撤销 / 重做
+        // ==================================================================
+
+        bool CanUndo => _undoStack.Count > 0 || GenerateText() != _undoBaseline;
+        bool CanRedo => _redoStack.Count > 0;
+
+        /// <summary>
+        /// 每拍看一眼内容变没变。变了要等「鼠标松开 + 静默一小会儿」才落一步，
+        /// 拖滑条那 200 帧、连着敲的几个字符就自然合并成一次撤销。
+        /// </summary>
+        void TrackUndo()
+        {
+            string current = GenerateText();
+            if (current == _undoBaseline) { _undoPending = null; return; }
+
+            // 还在改（值一直在变）/ 鼠标还按着（拖点、拖滑条）→ 不切分
+            if (_undoPending != current || GUIUtility.hotControl != 0 ||
+                _dragMode != DragMode.None)
+            {
+                _undoPending = current;
+                _undoPendingTime = EditorApplication.timeSinceStartup;
+                return;
+            }
+            if (EditorApplication.timeSinceStartup - _undoPendingTime < UndoIdleSeconds) return;
+            CommitUndo();
+        }
+
+        /// <summary>把还没落栈的改动立刻切成一步（清空/套预设这种大动作前先调，免得跟上一次微调粘一起）</summary>
+        void CommitUndo()
+        {
+            string current = GenerateText();
+            if (current == _undoBaseline) return;
+            _undoStack.Add(_undoBaseline);
+            if (_undoStack.Count > UndoDepth) _undoStack.RemoveAt(0);
+            _redoStack.Clear();
+            _undoBaseline = current;
+            _undoPending = null;
+        }
+
+        /// <summary>换绑定行 / 从剧本重载后重开一段历史：绝不让 Ctrl+Z 撤回上一行的内容</summary>
+        void ResetUndo()
+        {
+            _undoStack.Clear();
+            _redoStack.Clear();
+            _undoBaseline = GenerateText();
+            _undoPending = null;
+        }
+
+        void PerformUndo()
+        {
+            CommitUndo();                       // 手上没落栈的改动也算一步
+            if (_undoStack.Count == 0) return;
+            int last = _undoStack.Count - 1;
+            string snapshot = _undoStack[last];
+            _undoStack.RemoveAt(last);
+            _redoStack.Add(GenerateText());
+            RestoreSnapshot(snapshot);
+        }
+
+        void PerformRedo()
+        {
+            if (_redoStack.Count == 0) return;
+            int last = _redoStack.Count - 1;
+            string snapshot = _redoStack[last];
+            _redoStack.RemoveAt(last);
+            _undoStack.Add(GenerateText());
+            RestoreSnapshot(snapshot);
+        }
+
+        void RestoreSnapshot(string text)
+        {
+            ParseTextFrom(text, silent: true);
+            _undoBaseline = GenerateText();
+            _undoPending = null;
+            // 焦点还留在数字框里的话，框里显示的仍是撤销前那串字符 → 强制丢焦点重画
+            GUIUtility.keyboardControl = 0;
+            if (_list != null) _list.index = Mathf.Min(_list.index, _points.Count - 1);
+            Repaint();
+        }
+
+        // 快捷键走 ShortcutManager（窗口作用域）：本窗口有焦点时优先于全局 Undo，
+        // 键位可在 Edit → Shortcuts 里改。撤销范围只有这个窗口，与场景编辑互不干扰。
+        [Shortcut("VN/Camseq Editor/Undo", typeof(VNCamseqEditorWindow),
+            KeyCode.Z, ShortcutModifiers.Action)]
+        static void ShortcutUndo(ShortcutArguments args)
+        {
+            if (args.context is VNCamseqEditorWindow w) w.PerformUndo();
+        }
+
+        [Shortcut("VN/Camseq Editor/Redo", typeof(VNCamseqEditorWindow),
+            KeyCode.Y, ShortcutModifiers.Action)]
+        static void ShortcutRedo(ShortcutArguments args)
+        {
+            if (args.context is VNCamseqEditorWindow w) w.PerformRedo();
+        }
+
+        [Shortcut("VN/Camseq Editor/Redo (Alt)", typeof(VNCamseqEditorWindow),
+            KeyCode.Z, ShortcutModifiers.Action | ShortcutModifiers.Shift)]
+        static void ShortcutRedoAlt(ShortcutArguments args)
+        {
+            if (args.context is VNCamseqEditorWindow w) w.PerformRedo();
         }
 
         /// <summary>把当前编排写回剧本行</summary>
@@ -342,7 +478,8 @@ namespace VNEffects.EditorTools
         {
             _list = new ReorderableList(_points, typeof(Waypoint), true, true, true, true)
             {
-                drawHeaderCallback = r => GUI.Label(r, "路径点（拖手柄排序 | 时长 0 = 瞬切 | xfade>0 = 叠化到该点）"),
+                drawHeaderCallback = r => GUI.Label(r,
+                    "路径点（拖手柄排序 | 时长 0 = 瞬切 | xfade>0 = 叠化到该点 | hold = 到点后停留）"),
                 elementHeightCallback = _ => EditorGUIUtility.singleLineHeight * 2f + 10f,
                 drawElementCallback = DrawElement,
                 onAddCallback = l => _points.Add(new Waypoint()),
@@ -350,6 +487,11 @@ namespace VNEffects.EditorTools
             _lastUpdateTime = EditorApplication.timeSinceStartup;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             _library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
+
+            // 纯外观偏好 → EditorPrefs（关窗重开、换项目窗口都还在）
+            _guides = (Guides)EditorPrefs.GetInt(GuidesPrefKey, (int)DefaultGuides);
+            // 域重载后 _undoBaseline 是序列化带回来的，别覆盖掉；只有全新窗口才初始化
+            if (string.IsNullOrEmpty(_undoBaseline)) _undoBaseline = GenerateText();
 
             // 域重载会把 DontSave 的临时立绘销毁，但列表本身没序列化——
             // 重编译时场景预览还开着的话，这里按记录的状态把舞台重新摆一遍。
@@ -374,6 +516,7 @@ namespace VNEffects.EditorTools
 
         void Update()
         {
+            TrackUndo();
             if (_playing)
             {
                 double now = EditorApplication.timeSinceStartup;
@@ -475,7 +618,11 @@ namespace VNEffects.EditorTools
             GUILayout.Space(6f);
             GUILayout.Label("解析已有 camseq 文本（粘贴后点「解析载入」）：", EditorStyles.boldLabel);
             _pasteText = EditorGUILayout.TextArea(_pasteText, GUILayout.MinHeight(60f));
-            if (GUILayout.Button("解析载入")) ParseText();
+            if (GUILayout.Button("解析载入"))
+            {
+                CommitUndo();
+                ParseText();
+            }
 
             EditorGUILayout.HelpBox(
                 "画布：点空白 = 给选中点设坐标；点取景中心 = 选中；拖动 = 移动；" +
@@ -492,7 +639,13 @@ namespace VNEffects.EditorTools
                 "缓动默认：单段 InOutSine；多段首 InSine / 中 Linear / 末 OutSine，" +
                 "叠化段会把连续补间分成独立组（与运行时一致）。\n" +
                 "绑定条：从剧本编辑器 camseq 行的「编排」按钮进来后，这里的改动可以直接回写那一行；" +
-                "「跟随选中」时在剧本里点另一个 camseq 行会自动切过来。",
+                "「跟随选中」时在剧本里点另一个 camseq 行会自动切过来。\n" +
+                "hold：到达该点后停留的秒数（0 = 不停）。要「推到脸上停一秒再拉回」写 hold 就够了，" +
+                "不用再补一个同点位、时长 0 的路径点。\n" +
+                "辅助线：整图模式画在选中路径点的取景框里，镜头视角模式铺满画布。" +
+                "对话框遮挡区按场景里真实对话框的尺寸换算——特写时脸有没有被挡住看这条。\n" +
+                "撤销：Ctrl+Z / Ctrl+Y（Ctrl+Shift+Z 也行），只作用于本窗口，不动 Unity 全局撤销；" +
+                "拖滑条、连续输入会合并成一步；换绑定行会重开一段历史。",
                 MessageType.Info);
 
             EditorGUILayout.EndScrollView();
@@ -524,12 +677,24 @@ namespace VNEffects.EditorTools
                 {
                     if (EditorUtility.DisplayDialog("清空", "确定清空全部路径点？", "清空", "取消"))
                     {
+                        CommitUndo();
                         _points.Clear();
                         _startMode = StartMode.None;
                         _endFade = false;
                         _startFade = _endFadeDur = 0.6f;
                     }
                 }
+
+                GUILayout.Space(8f);
+                using (new EditorGUI.DisabledScope(!CanUndo))
+                    if (GUILayout.Button(new GUIContent("↶", "撤销（Ctrl+Z，只作用于本窗口）"),
+                            EditorStyles.toolbarButton, GUILayout.Width(26f)))
+                        PerformUndo();
+                using (new EditorGUI.DisabledScope(!CanRedo))
+                    if (GUILayout.Button(new GUIContent("↷", "重做（Ctrl+Y / Ctrl+Shift+Z）"),
+                            EditorStyles.toolbarButton, GUILayout.Width(26f)))
+                        PerformRedo();
+
                 GUILayout.FlexibleSpace();
                 GUILayout.Label($"{_points.Count} 个路径点", EditorStyles.miniLabel);
             }
@@ -543,6 +708,18 @@ namespace VNEffects.EditorTools
                         "镜头视角 = 画布直接显示镜头里看到的画面，拖进度条 / ▶ 就是运镜动画（只看不改）"),
                     EditorStyles.toolbarButton, GUILayout.Width(60f));
                 if (cameraView != _cameraView) _cameraView = cameraView;
+
+                var guidesRect = GUILayoutUtility.GetRect(
+                    new GUIContent("辅助线 ▾"), EditorStyles.toolbarButton, GUILayout.Width(64f));
+                var prevBg = GUI.backgroundColor;
+                if (_guides != Guides.None) GUI.backgroundColor = new Color(0.45f, 0.85f, 1f);
+                if (GUI.Button(guidesRect,
+                        new GUIContent("辅助线 ▾",
+                            "构图辅助线：三分线 / 中心十字 / 安全区 / 对话框遮挡区。\n" +
+                            "整图模式画在选中路径点的取景框里，镜头视角模式铺满整个画布"),
+                        EditorStyles.toolbarButton))
+                    ShowGuidesMenu(guidesRect);
+                GUI.backgroundColor = prevBg;
 
                 bool newPreview = GUILayout.Toggle(_scenePreviewing,
                     new GUIContent("场景预览",
@@ -618,17 +795,28 @@ namespace VNEffects.EditorTools
                     break;
             }
 
-            // 第二行：zoom / 时长 / 缓动 / 叠化
+            // 第二行：zoom / 时长 / 缓动 / 叠化 / 停留
             x = r2.x + 26f;
             GUI.Label(new Rect(x, r2.y, 42f, line), "zoom"); x += 44f;
-            w.zoom = EditorGUI.Slider(new Rect(x, r2.y, 130f, line), w.zoom, 0.5f, 3f); x += 136f;
-            GUI.Label(new Rect(x, r2.y, 22f, line), "秒"); x += 24f;
+
+            // 右边几个数字框宽度固定，zoom 滑条吃掉剩下的宽度（窗口拉窄时先压滑条）
+            const float tail = 6f + 22f + 48f + 32f + 86f + 38f + 44f + 34f + 40f;
+            float sliderW = Mathf.Max(60f, r2.xMax - x - tail);
+            w.zoom = EditorGUI.Slider(new Rect(x, r2.y, sliderW, line), w.zoom, 0.5f, 3f);
+            x += sliderW + 6f;
+
+            GUI.Label(new Rect(x, r2.y, 22f, line),
+                new GUIContent("秒", "移动到本点的时长；0 = 瞬切")); x += 22f;
             w.duration = EditorGUI.FloatField(new Rect(x, r2.y, 42f, line), w.duration); x += 48f;
-            GUI.Label(new Rect(x, r2.y, 32f, line), "ease"); x += 34f;
+            GUI.Label(new Rect(x, r2.y, 32f, line), "ease"); x += 32f;
             w.easeIndex = EditorGUI.Popup(new Rect(x, r2.y, 82f, line), w.easeIndex, EaseNames); x += 86f;
-            GUI.Label(new Rect(x, r2.y, 38f, line), "xfade"); x += 40f;
-            w.fade = Mathf.Max(0f, EditorGUI.FloatField(
-                new Rect(x, r2.y, Mathf.Max(36f, r2.xMax - x), line), w.fade));
+            GUI.Label(new Rect(x, r2.y, 38f, line),
+                new GUIContent("xfade", "叠化到本点的秒数（>0 时代替平移/瞬切）")); x += 38f;
+            w.fade = Mathf.Max(0f, EditorGUI.FloatField(new Rect(x, r2.y, 40f, line), w.fade));
+            x += 44f;
+            GUI.Label(new Rect(x, r2.y, 34f, line),
+                new GUIContent("hold", "到达本点后停留的秒数（0 = 不停，直接走下一段）")); x += 34f;
+            w.hold = Mathf.Max(0f, EditorGUI.FloatField(new Rect(x, r2.y, 40f, line), w.hold));
         }
 
         // ==================================================================
@@ -660,6 +848,8 @@ namespace VNEffects.EditorTools
             // 镜头视角下画面本身就是取景结果，再叠取景框/路径线只会挡视线
             if (_cameraView)
             {
+                // 画布 = 玩家看到的那一屏，辅助线直接铺满
+                DrawCompositionGuides(rect, rect);
                 GUI.Label(new Rect(rect.x + 6f, rect.y + 4f, 200f, 18f),
                     "镜头视角（拖进度条看运镜）", EditorStyles.whiteMiniLabel);
                 return;
@@ -700,6 +890,17 @@ namespace VNEffects.EditorTools
                     DrawCanvasFrame(rect, gc, CanvasHalf / ps.fadeFrom.zoom,
                         new Color(1f, 0.6f, 0.2f, Mathf.Clamp01(ps.ghostAlpha)), 2f);
                 }
+            }
+
+            // 构图辅助线画在「选中路径点的取景框」里——那一框才是玩家看到的一屏；
+            // 没选中点就跟着预览框走
+            if (_guides != Guides.None && _points.Count > 0)
+            {
+                var gs = _list.index >= 0 && _list.index < _points.Count
+                    ? TargetState(_points[_list.index])
+                    : PreviewAtTime(_scrub).state;
+                DrawCompositionGuides(
+                    FrameGuiRect(rect, -gs.offset / gs.zoom, CanvasHalf / gs.zoom), rect);
             }
 
             HandleCanvasInput(rect);
@@ -1108,6 +1309,7 @@ namespace VNEffects.EditorTools
                 string text = VNCamseqTemplates.Resolve(entry.text, character);
                 menu.AddItem(new GUIContent(entry.name), false, () =>
                 {
+                    CommitUndo();      // 整段替换，撤销时要能一步回到套用前
                     _pasteText = text;
                     ParseText();
                 });
@@ -1118,6 +1320,7 @@ namespace VNEffects.EditorTools
         void LoadPreset()
         {
             if (_library == null || _presetIndex < 0 || _presetIndex >= _library.presets.Count) return;
+            CommitUndo();          // 整段替换，撤销时要能一步回到载入前
             _pasteText = _library.presets[_presetIndex].camseqText;
             ParseText();
             _presetName = _library.presets[_presetIndex].name;
@@ -1153,10 +1356,14 @@ namespace VNEffects.EditorTools
         }
 
         void DrawCanvasFrame(Rect rect, Vector2 center, Vector2 half, Color color, float thickness)
+            => DrawRectOutline(FrameGuiRect(rect, center, half), color, thickness);
+
+        /// <summary>取景框（画布坐标的中心 + 半尺寸）在 GUI 里占的矩形</summary>
+        static Rect FrameGuiRect(Rect canvasRect, Vector2 center, Vector2 half)
         {
-            var tl = CanvasToGui(rect, new Vector2(center.x - half.x, center.y + half.y));
-            var br = CanvasToGui(rect, new Vector2(center.x + half.x, center.y - half.y));
-            DrawRectOutline(Rect.MinMaxRect(tl.x, tl.y, br.x, br.y), color, thickness);
+            var tl = CanvasToGui(canvasRect, new Vector2(center.x - half.x, center.y + half.y));
+            var br = CanvasToGui(canvasRect, new Vector2(center.x + half.x, center.y - half.y));
+            return Rect.MinMaxRect(tl.x, tl.y, br.x, br.y);
         }
 
         static void DrawRectOutline(Rect r, Color c, float t)
@@ -1176,6 +1383,145 @@ namespace VNEffects.EditorTools
                 EditorGUI.DrawRect(new Rect(p.x - 1f, p.y - 1f, 2f, 2f), color);
             }
         }
+
+        // ==================================================================
+        // 构图辅助线
+        // ==================================================================
+
+        void ShowGuidesMenu(Rect rect)
+        {
+            var menu = new GenericMenu();
+            void Toggle(string label, Guides bit) =>
+                menu.AddItem(new GUIContent(label), (_guides & bit) != 0,
+                    () => SetGuides(_guides ^ bit));
+
+            Toggle("三分线", Guides.Thirds);
+            Toggle("中心十字", Guides.Center);
+            Toggle("安全区(90%)", Guides.SafeArea);
+            Toggle("对话框遮挡区", Guides.DialogueBox);
+            menu.AddSeparator("");
+            menu.AddItem(new GUIContent("全开"), false, () => SetGuides(Guides.All));
+            menu.AddItem(new GUIContent("全关"), false, () => SetGuides(Guides.None));
+            menu.DropDown(rect);
+        }
+
+        void SetGuides(Guides value)
+        {
+            _guides = value;
+            EditorPrefs.SetInt(GuidesPrefKey, (int)value);
+            Repaint();
+        }
+
+        /// <summary>
+        /// 在「一屏画面」上画构图辅助线。
+        /// <paramref name="frame"/> = 那一屏在 GUI 里的矩形：整图模式下是选中路径点的
+        /// 取景框（辅助线跟着框缩放平移），镜头视角模式下就是整个画布。
+        /// <paramref name="clip"/> = 画布矩形，超出的部分裁掉（zoom&lt;1 时取景框比画布还大）。
+        ///
+        /// 【为什么对话框遮挡区按比例画在 frame 里】对话框是 Canvas 下 ZoomRoot 的**兄弟**，
+        /// 不随镜头缩放平移 —— 它在玩家眼里永远压着屏幕底部那一条。所以它要按"占一屏的
+        /// 比例"落在取景框内，而不是画布上的某个固定位置。
+        /// </summary>
+        void DrawCompositionGuides(Rect frame, Rect clip)
+        {
+            if (_guides == Guides.None || frame.width < 4f || frame.height < 4f) return;
+
+            if ((_guides & Guides.Thirds) != 0)
+            {
+                var c = new Color(1f, 1f, 1f, 0.3f);
+                for (int i = 1; i <= 2; i++)
+                {
+                    float t = i / 3f;
+                    VLine(frame.x + frame.width * t, frame.yMin, frame.yMax, c, clip);
+                    HLine(frame.y + frame.height * t, frame.xMin, frame.xMax, c, clip);
+                }
+            }
+
+            if ((_guides & Guides.Center) != 0)
+            {
+                var c = new Color(0.45f, 1f, 0.7f, 0.45f);
+                VLine(frame.center.x, frame.yMin, frame.yMax, c, clip);
+                HLine(frame.center.y, frame.xMin, frame.xMax, c, clip);
+            }
+
+            if ((_guides & Guides.SafeArea) != 0)
+            {
+                float w = frame.width * 0.9f, h = frame.height * 0.9f;
+                var safe = new Rect(frame.center.x - w * 0.5f, frame.center.y - h * 0.5f, w, h);
+                DrawRectOutlineClipped(safe, new Color(0.4f, 1f, 0.55f, 0.5f), 1f, clip);
+            }
+
+            if ((_guides & Guides.DialogueBox) != 0)
+            {
+                var band = DialogueBandFractions();
+                var r = Rect.MinMaxRect(
+                    frame.x + band.xMin * frame.width, frame.y + band.yMin * frame.height,
+                    frame.x + band.xMax * frame.width, frame.y + band.yMax * frame.height);
+                DrawRectClipped(r, new Color(1f, 0.35f, 0.35f, 0.15f), clip);
+                DrawRectOutlineClipped(r, new Color(1f, 0.45f, 0.45f, 0.55f), 1f, clip);
+            }
+        }
+
+        /// <summary>
+        /// 对话框在一屏里占的比例（x 自左、y 自上，0~1）。
+        /// 优先量场景里真实的对话框（换了皮肤/改了尺寸都跟得上）；
+        /// 量不到就退回演示场景生成器的默认布局（1920×1080 下 x 5%~95%、
+        /// 底边上方 28px 起、高 230px）。
+        /// </summary>
+        static Rect DialogueBandFractions()
+        {
+            var stage = Object.FindFirstObjectByType<VNStage>();
+            var box = stage != null && stage.dialogue != null
+                ? stage.dialogue : Object.FindFirstObjectByType<VNDialogueBox>();
+            var rt = box != null ? box.transform as RectTransform : null;
+            var canvas = rt != null ? rt.GetComponentInParent<Canvas>() : null;
+            var root = canvas != null ? canvas.rootCanvas.transform as RectTransform : null;
+
+            if (rt != null && root != null)
+            {
+                var corners = new Vector3[4];
+                rt.GetWorldCorners(corners);            // 0=左下 1=左上 2=右上 3=右下
+                var a = root.InverseTransformPoint(corners[0]);
+                var b = root.InverseTransformPoint(corners[2]);
+                var cr = root.rect;
+                if (cr.width > 1f && cr.height > 1f)
+                {
+                    float x0 = Mathf.InverseLerp(cr.xMin, cr.xMax, Mathf.Min(a.x, b.x));
+                    float x1 = Mathf.InverseLerp(cr.xMin, cr.xMax, Mathf.Max(a.x, b.x));
+                    // GUI 的 y 自上而下，画布的 y 自下而上 → 上下对调
+                    float y0 = 1f - Mathf.InverseLerp(cr.yMin, cr.yMax, Mathf.Max(a.y, b.y));
+                    float y1 = 1f - Mathf.InverseLerp(cr.yMin, cr.yMax, Mathf.Min(a.y, b.y));
+                    if (x1 > x0 && y1 > y0)
+                        return Rect.MinMaxRect(Mathf.Clamp01(x0), Mathf.Clamp01(y0),
+                                               Mathf.Clamp01(x1), Mathf.Clamp01(y1));
+                }
+            }
+
+            const float h = 230f / 1080f, bottom = 28f / 1080f;
+            return Rect.MinMaxRect(0.05f, 1f - bottom - h, 0.95f, 1f - bottom);
+        }
+
+        static void DrawRectClipped(Rect r, Color c, Rect clip)
+        {
+            var i = Rect.MinMaxRect(
+                Mathf.Max(r.xMin, clip.xMin), Mathf.Max(r.yMin, clip.yMin),
+                Mathf.Min(r.xMax, clip.xMax), Mathf.Min(r.yMax, clip.yMax));
+            if (i.width > 0f && i.height > 0f) EditorGUI.DrawRect(i, c);
+        }
+
+        static void DrawRectOutlineClipped(Rect r, Color c, float t, Rect clip)
+        {
+            DrawRectClipped(new Rect(r.x, r.y, r.width, t), c, clip);
+            DrawRectClipped(new Rect(r.x, r.yMax - t, r.width, t), c, clip);
+            DrawRectClipped(new Rect(r.x, r.y, t, r.height), c, clip);
+            DrawRectClipped(new Rect(r.xMax - t, r.y, t, r.height), c, clip);
+        }
+
+        static void VLine(float x, float y0, float y1, Color c, Rect clip) =>
+            DrawRectClipped(new Rect(x, y0, 1f, y1 - y0), c, clip);
+
+        static void HLine(float y, float x0, float x1, Color c, Rect clip) =>
+            DrawRectClipped(new Rect(x0, y, x1 - x0, 1f), c, clip);
 
         // ==================================================================
         // 预览插值（与运行时同一套公式）
@@ -1227,7 +1573,8 @@ namespace VNEffects.EditorTools
             public CamState target;
             public float duration;
             public bool isFade;
-            public Ease ease;   // 补间段缓动（isFade 时无意义）
+            public bool isHold; // hold 段：停在 target 不动（不参与默认缓动的首/末判定）
+            public Ease ease;   // 补间段缓动（isFade / isHold 时无意义）
         }
 
         /// <summary>
@@ -1251,6 +1598,7 @@ namespace VNEffects.EditorTools
                     isFade = true,
                 });
                 pointOf.Add(0);
+                AddHoldSegment(segs, pointOf, 0);
                 start = 1;
             }
             for (int i = start; i < _points.Count; i++)
@@ -1263,6 +1611,7 @@ namespace VNEffects.EditorTools
                     segs.Add(new Segment
                         { target = TargetState(w), duration = Mathf.Max(0f, w.duration) });
                 pointOf.Add(i);
+                AddHoldSegment(segs, pointOf, i);
             }
             if (_endFade)
             {
@@ -1286,7 +1635,9 @@ namespace VNEffects.EditorTools
                 int firstMove = -1, lastMove = -1, moveCount = 0;
                 for (int k = g; k < gEnd; k++)
                 {
-                    if (segs[k].duration > 0.001f)
+                    // hold 段只是停顿，不算"移动段"——否则默认缓动的首/末会算错，
+                    // 与运行时 BuildSegment（只看 duration 字段）对不上
+                    if (!segs[k].isHold && segs[k].duration > 0.001f)
                     {
                         if (firstMove < 0) firstMove = k;
                         lastMove = k;
@@ -1296,6 +1647,7 @@ namespace VNEffects.EditorTools
                 for (int k = g; k < gEnd; k++)
                 {
                     var s = segs[k];
+                    if (s.isHold) continue;
                     int pi = pointOf[k];
                     if (pi >= 0 && _points[pi].easeIndex > 0 &&
                         System.Enum.TryParse(EaseNames[_points[pi].easeIndex], true, out Ease custom))
@@ -1310,6 +1662,16 @@ namespace VNEffects.EditorTools
                 g = gEnd;
             }
             return segs;
+        }
+
+        /// <summary>该点带 hold 就补一段「停在原地」的时间轴段（运行时是 Sequence 里的 Interval）</summary>
+        void AddHoldSegment(List<Segment> segs, List<int> pointOf, int index)
+        {
+            var w = _points[index];
+            if (w.hold <= 0.001f) return;
+            segs.Add(new Segment
+                { target = TargetState(w), duration = w.hold, isHold = true });
+            pointOf.Add(index);
         }
 
         float TotalDuration()
@@ -1349,6 +1711,11 @@ namespace VNEffects.EditorTools
                     prev = s.target;
                     ps.state = prev;
                     continue;
+                }
+                if (s.isHold)
+                {
+                    ps.state = s.target;   // 停在原地
+                    return ps;
                 }
                 if (s.isFade)
                 {
@@ -1420,15 +1787,20 @@ namespace VNEffects.EditorTools
                 if (w.easeIndex > 0) sb.Append(" ease:").Append(EaseNames[w.easeIndex]);
                 if (w.fade > 0.001f)
                     sb.Append(" xfade:").Append(w.fade.ToString("0.##", CultureInfo.InvariantCulture));
+                if (w.hold > 0.001f)
+                    sb.Append(" hold:").Append(w.hold.ToString("0.##", CultureInfo.InvariantCulture));
                 sb.Append('\n');
             }
             return sb.ToString();
         }
 
         /// <summary>silent = 绑定载入时用，不弹通知也不因空序列而放弃（允许清成 0 个点）</summary>
-        void ParseText(bool silent = false)
+        void ParseText(bool silent = false) => ParseTextFrom(_pasteText, silent);
+
+        /// <summary>撤销恢复走这个重载：不碰下方那个粘贴框的内容</summary>
+        void ParseTextFrom(string text, bool silent)
         {
-            var commands = VNScriptParser.Parse(_pasteText);
+            var commands = VNScriptParser.Parse(text);
             VNScriptCommand camseq = null;
             foreach (var c in commands)
                 if (c.keyword == "camseq" && c.camPoints != null &&
@@ -1454,7 +1826,11 @@ namespace VNEffects.EditorTools
             _points.Clear();
             foreach (var def in camseq.camPoints)
             {
-                var w = new Waypoint { zoom = def.zoom, duration = def.duration, fade = def.fade };
+                var w = new Waypoint
+                {
+                    zoom = def.zoom, duration = def.duration,
+                    fade = def.fade, hold = def.hold,
+                };
 
                 int anchor = System.Array.IndexOf(AnchorTokens, def.point.ToLower());
                 if (def.point.ToLower() == "center" || def.point.ToLower() == "origin"

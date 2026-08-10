@@ -5352,3 +5352,123 @@ Unity 在控件有键盘焦点时不会用传入值刷新编辑中的文本，�
   `pos=(0,-60)`、`size=(1286.15, 880)`、`hideFlags=DontSave`；
   还原后背景与子物体数**完全回到原值，零残留**。
 - 镜头视角的变换、超出画布的裁切、拖拽禁用是 IMGUI 交互，需要在编辑器里手动点验。
+
+## 一〇一、camseq 停留参数 hold + 构图辅助线 + 编排窗口撤销（2026-08-11，分支 `agent/camseq-hold-guides-undo`）
+
+### 需求 / 背景
+
+镜头系统头脑风暴后先落地三件「小而痛」的：
+
+1. **`hold:` 停留** —— 路径点原本只有 `duration`（到达本点的时长），`duration=0` 是**瞬切**
+   不是**停留**。想做「推到脸上停一秒再拉回」只能在外面加 `wait`（但那会打断异步 `@`
+   的连贯性）或者补一个同点位、时长 0 的废点位。缺的是最基础的「到点停一会儿」语义。
+2. **构图辅助线** —— 编排画布只有取景框，判断不了构图。最要命的是**对话框遮挡区**：
+   对话框是 Canvas 下 ZoomRoot 的**兄弟**、不随镜头缩放，特写时角色的脸经常正好落在
+   对话框后面，只能进 Play Mode 才发现，返工成本高。
+3. **撤销** —— 编排窗口一直没有撤销。误删一个路径点、拖拽排序拖错、手滑套了个预设
+   覆盖掉半天的调参，全都只能「从剧本重载」整段丢掉重来。
+
+### 文件改动清单
+
+**运行时（hold 全链路）**
+
+- `Script/VNScriptParser.cs`：`VNCamWaypointDef` 加 `hold` 字段；`ParseCamWaypoint`
+  认 `hold:秒` token（非正数告警并忽略）。
+- `VNCamera.cs`：`Waypoint` 加 `hold`；`BuildSegment` 在补间段/瞬切段之后
+  `AppendInterval(hold)`；新增 `HoldCo(seconds)` 供 `PlayPathCo` 的叠化段用；
+  `PlayPathCo` 在 `startFade` 与每个 `xfade` 点的 `CrossfadeTo` 之后接 hold。
+- `Script/VNScriptRunner.cs`：`CamseqCo` 把 `def.hold` 带进 `VNCamera.Waypoint`；
+  call 参数替换的 `camPoints` 深拷贝也补上 `hold`（漏了它，带参子程序里的 hold 会丢）。
+
+**编辑器（hold 的两套 UI）**
+
+- `Editor/VNCamWaypoint.cs`：`hold` 字段 + `TryParse` 认 `hold:`（非正数/重复一律返回
+  false 退回纯文本）+ `Format` 在 `xfade` 之后输出。
+- `Editor/VNScenarioEditorWindow.cs`：路径点行加 `hold` 数字框（tailW 加宽 76px）；
+  黄色纯文本行的悬停语法提示补上 `[hold:秒]`。
+- `Editor/VNCamseqEditorWindow.cs`：`Waypoint.hold` + 列表第二行加 hold 框
+  （顺手把 zoom 滑条改成弹性宽度：窗口拉窄时先压滑条，右边几个数字框宽度不变）；
+  `GenerateText` / `ParseTextFrom` 双向；时间轴 `Segment` 加 `isHold`。
+
+**编辑器（构图辅助线）**
+
+- `Editor/VNCamseqEditorWindow.cs`：`Guides` 位标志枚举（三分线/中心十字/安全区/
+  对话框遮挡区）+ 工具栏 `辅助线 ▾` 下拉逐项勾选（开了任意一项按钮高亮）+
+  `DrawCompositionGuides(frame, clip)` + `DialogueBandFractions()` 实测对话框 +
+  一组带裁切的绘制辅助 `DrawRectClipped / DrawRectOutlineClipped / VLine / HLine`；
+  `DrawCanvasFrame` 抽出 `FrameGuiRect`（辅助线与取景框共用同一套坐标换算）。
+
+**编辑器（撤销 / 重做）**
+
+- `Editor/VNCamseqEditorWindow.cs`：`_undoStack / _redoStack / _undoBaseline`
+  + `TrackUndo / CommitUndo / ResetUndo / PerformUndo / PerformRedo / RestoreSnapshot`
+  + 三个 `[Shortcut]`（Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z，窗口作用域）+ 工具栏 `↶ ↷`。
+  `ParseText` 拆出 `ParseTextFrom(text, silent)` 重载给撤销恢复用。
+
+**文档**：HowToUse.md camseq 章（hold 语法与规则、编排窗口的辅助线/撤销说明、
+Lint 表、命令速查卡）、CLAUDE.md 编辑器节。
+
+### 技术决策与取舍
+
+**hold 语义定为「到达本点之后停留」**（不是到达之前等待）。理由：写剧本时想的永远是
+「推到脸上，停一下，再拉回」，停顿属于**刚到的那个点**。放在「之前」的话最后一个点
+没法停，语义还不对称。
+
+**hold 走 DOTween 的 `AppendInterval`，不用 `WaitForSeconds`。** Skip 快进是靠
+`DOTween.timeScale = skipTimeScale` 实现的（`VNScriptRunner.SetSkip`），
+用 `WaitForSeconds` 的话 hold 会变成整条运镜里唯一不加速的卡点。叠化段没法编进
+Sequence（它是截屏协程），所以单独造了个只有 Interval 的 Sequence 来等，
+`SetTarget(this)` 保持和其他镜头补间一致的清理语义。
+
+**hold 不参与默认缓动的首/末判定。** 运行时 `BuildSegment` 只看 `duration` 字段，
+hold 是另一个字段，天然不受影响；但**编辑器预览是按「段」展开的**，hold 会变成一个
+`duration>0` 的独立段，如果不排除掉，`firstMove/lastMove/moveCount` 就会算错，
+预览的缓动分配和运行时对不上。所以 `Segment.isHold` 在计数和赋值两个循环里都要跳过。
+—— 这是「预览与运行时同构」这条约定最容易被破坏的地方，加新的段类型都要想一遍。
+
+**辅助线画在取景框内，不是画布上。** 关键认知：**对话框不随镜头缩放**（它是 ZoomRoot
+的兄弟），所以在玩家眼里它永远压着屏幕底部那一条。辅助线要表达的是「玩家看到的那一屏
+的构图」，因此整图模式下必须画在**选中路径点的取景框**里、按比例落位；镜头视角模式下
+画布本身就是那一屏，直接铺满。画在画布固定位置是错的（推近时取景框只占画布一小块，
+遮挡区完全对不上）。zoom<1 时取景框比画布大，所有绘制统一走 `clip` 裁切。
+
+**对话框遮挡区实测优先。** 从 `VNStage.dialogue` 拿 RectTransform，`GetWorldCorners`
+换到 rootCanvas 局部坐标再按 `root.rect` 归一化成比例 —— 换了对话框皮肤、改了尺寸都跟得上。
+量不到才退回生成器的默认布局（x 5%~95%、底边上方 28px 起、高 230px）。
+实测结果 `x:0.05~0.95 y:0.761~0.974`，与默认布局吻合。
+
+**撤销用窗口内独立栈，不挂 Unity 全局 Undo。** `Undo.RecordObject(this)` 也能用
+（EditorWindow 是 ScriptableObject），但全局撤销栈是共享的：在 Scene 视图按 Ctrl+Z
+可能撤到镜头路径点，顺序还会和场景编辑交错，很难预期。独立栈的代价是不进
+Edit → Undo 菜单，换来的是「Ctrl+Z 只管这个窗口」这条清晰边界。
+快捷键仍走 `ShortcutManager`（窗口作用域优先于全局 Undo，且可在 Edit → Shortcuts 改键）。
+
+**快照用 `GenerateText()` 字符串，不是深拷贝对象图。** 路径点 + 开场/收尾叠化设置
+全在这一串文本里，恢复就是反过来解析，天然与「文本是唯一真相」一致；顺带白拿了
+序列化能力（`List<string>` 直接 `[SerializeField]`，重编译后还能继续撤销）。
+
+**撤销粒度靠「静默 0.35 秒 + 鼠标已松开」自动切分**（`TrackUndo` 在 `Update` 里跑）：
+拖 zoom 滑条那 200 帧、连着敲的几个字符自然合并成一步。清空 / 载入预设 / 套模板 /
+解析载入这类**整段替换**在动手前先 `CommitUndo()` 强制切一步，免得跟上一次微调粘一起。
+`PerformUndo` 开头也调 `CommitUndo()`——还没落栈的改动同样要能一步撤回。
+`RestoreSnapshot` 里 `GUIUtility.keyboardControl = 0`：不丢焦点的话，数字框里显示的
+仍是撤销前那串字符。换绑定行 / 从剧本重载走 `ResetUndo()` 重开一段历史，
+绝不让 Ctrl+Z 撤回**上一行**的内容。
+
+### 验证方法
+
+`assets-refresh` 编译零错误，随后用 `script-execute` 跑了三组断言（结果见 Console）：
+
+- **运行时链路**：`camseq` + 两个带 hold 的路径点 → `hold0=1.2 hold1=0.4`；
+  `VNCamWaypoint.TryParse` 往返一致（`> 教室:head 1.9 0.8 ease:OutSine xfade:0.5 hold:1.2`
+  解析后 `Format()` 与原文逐字相同）；老写法 `> middle` 不会被撑成 `> middle 1 0.8`；
+  `hold:0` / `hold:abc` / 重复 `hold:` 一律 `TryParse=false`（退回纯文本，不被吞掉）。
+- **预览时间轴**：`> left 1.3 0.5` / `> right 1.3 1 hold:2` / `> middle 1 0.8`
+  总时长 = 4.3s（正确计入 hold）；hold 区间内 t=1.6s 与 t=3.4s 的镜头状态
+  `offset=(-366,0) zoom=1.3` **完全相同**（确认停住不动）；不带 hold 的老序列时长
+  仍是 1.3s（没有被新逻辑改变）。
+- **撤销栈**：初始栈 0 → 改动 + CommitUndo 后栈 1 → 撤销回到 A、redo 栈 1 →
+  重做回到 B 且 `hold:1.5` 一并回来 → 未落栈的改动直接 `PerformUndo` 也能撤回。
+  `DialogueBandFractions()` 实测返回 `x:0.05~0.95 y:0.761~0.974`。
+- 辅助线的实际观感、Ctrl+Z 的键位是否被全局 Undo 抢走（窗口作用域应当优先），
+  是 IMGUI / ShortcutManager 交互，需要在编辑器里手动点验。

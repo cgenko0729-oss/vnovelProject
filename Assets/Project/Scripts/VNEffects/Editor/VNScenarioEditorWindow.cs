@@ -1547,7 +1547,7 @@ namespace VNEffects.EditorTools
                 string nv = EditorGUI.TextField(body, r.camLines[i], style);
                 if (nv != r.camLines[i]) r.camLines[i] = nv;
                 GUI.Label(body, new GUIContent("", "这一行认不出来，暂按纯文本保留。\n" +
-                    "语法：> 目标点 [zoom] [时长] [ease:名] [xfade:秒]\n" +
+                    "语法：> 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]\n" +
                     "改成合法写法后会自动变回字段化控件。"));
             }
 
@@ -1580,8 +1580,9 @@ namespace VNEffects.EditorTools
                 kind = newKind;
             }
 
-            // 尾部固定宽度：zoom / 秒 / ease / xfade
-            const float tailW = 34f + 48f + 4f + 20f + 42f + 4f + 76f + 4f + 34f + 40f;
+            // 尾部固定宽度：zoom / 秒 / ease / xfade / hold
+            const float tailW = 34f + 48f + 4f + 20f + 42f + 4f + 76f + 4f + 34f + 40f
+                                + 4f + 32f + 40f;
             float targetW = Mathf.Max(90f, rect.xMax - x - tailW - 4f);
             DrawCamPointTarget(new Rect(x, rect.y, targetW, rect.height), r, i, wp, kind);
             x = rect.xMax - tailW;
@@ -1610,6 +1611,14 @@ namespace VNEffects.EditorTools
             x += 34f;
             wp.fade = Mathf.Max(0f,
                 EditorGUI.FloatField(new Rect(x, rect.y, 40f, rect.height), wp.fade));
+            x += 44f;
+
+            GUI.Label(new Rect(x, rect.y, 32f, rect.height),
+                new GUIContent("hold", "到达本点后停留的秒数（0 = 不停，直接走下一段）"),
+                EditorStyles.miniLabel);
+            x += 32f;
+            wp.hold = Mathf.Max(0f,
+                EditorGUI.FloatField(new Rect(x, rect.y, 40f, rect.height), wp.hold));
 
             return EditorGUI.EndChangeCheck();
         }

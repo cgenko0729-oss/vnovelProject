@@ -195,7 +195,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   **加新窗口状态必须同时改 `OnBeforeSerialize` 和 `OnEnable`**。详见 WhatAiDo 九十六章。
 - 工具栏「隐注释/空行」：把空行与 `#` 注释折成零高度（`RowHeight` 返回 0，索引不变，
   所有编辑操作零影响）。**只隐空行与 `#`**——孤儿 `*` / `>` 行也是 Raw，藏了就找不回来。
-- **camseq 路径点行是字段化的**（类型/目标/zoom/秒/ease/xfade），解析不了的**退回纯文本并标黄**；
+- **camseq 路径点行是字段化的**（类型/目标/zoom/秒/ease/xfade/hold），解析不了的**退回纯文本并标黄**；
   header 行右侧三个按钮：`编排`（打开镜头编排窗口并**双向绑定**这一行）/ `预设▾`（内置模板·我的预设·存为预设）/ `+ wp`。
   绑定后镜头窗口可「跟随选中」自动切行、支持实时或手动回写；存储仍是 `camLines` 字符串。
   镜头窗口画布的**底图三级回退**（手动指定 → 绑定行推算出的背景/CG → 场景当前那张），
@@ -206,6 +206,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   临时立绘一律 `HideFlags.DontSave`（绝不写进场景文件、域重载自动销毁），关掉全部还原。
   **路径点行禁用 `CharacterPopup` / `SpritePopup`**——那套是异步回调、会把值写进 `VNRow.values`，
   和 camLines 是两条路径，必须用同步的 `PopupString` / `EditorGUI.Popup`。详见 WhatAiDo 九十八章。
+  `辅助线 ▾` 逐项勾选三分线/中心十字/安全区/对话框遮挡区（存 EditorPrefs）：
+  **整图模式画在选中路径点的取景框内**（对话框不随镜头缩放，遮挡区只能按占一屏的比例落位），
+  镜头视角模式铺满画布；遮挡区尺寸实测 `VNStage.dialogue`，量不到才退回默认布局。
+  撤销是**窗口内独立栈**（快照 = `GenerateText()` 文本），Ctrl+Z/Ctrl+Y 走 ShortcutManager
+  窗口作用域，**不挂 Unity 全局 Undo**；换绑定行清空历史。详见 WhatAiDo 一〇一章。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；
   文本框编辑中的第一下 Enter 只结束编辑。插命令行仍走列表底部 `+` 下拉。
   调试键位 `F5` 播放选中行 / `F6` 重播上次那行 / `F8` 暂停 / `F10` 单步 / `Ctrl+S` 保存
