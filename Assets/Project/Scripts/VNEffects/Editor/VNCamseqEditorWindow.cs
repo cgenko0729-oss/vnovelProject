@@ -89,6 +89,15 @@ namespace VNEffects.EditorTools
         [SerializeField] bool _liveApply = true; // 实时回写（关掉则手动点「应用回剧本」）
         [SerializeField] string _lastAppliedText = "";  // 最后一次与剧本一致的文本
 
+        // ---- 画布底图 / 立绘 ----
+        [SerializeField] string _bgOverrideId = "";   // 空 = 跟随绑定行推算出的背景
+        [SerializeField] bool _showPortraits = true;  // 关掉退回三个灰色站位矩形
+
+        // 绑定行的舞台快照缓存（行号或文档版本变了才重查）
+        VNRowStageInfo _rowStage;
+        int _rowStageRow = -1;
+        int _rowStageVersion = -1;
+
         // ---- 第二批：场景预览 / 画布拖拽 / 预设库 ----
         enum DragMode { None, Center, Corner }
         DragMode _dragMode;
@@ -268,6 +277,52 @@ namespace VNEffects.EditorTools
                     _linkLocked = false;
                 }
                 GUILayout.FlexibleSpace();
+                DrawCanvasSourceControls();
+            }
+        }
+
+        /// <summary>底图来源下拉 + 立绘开关（没绑定剧本时也要能用，所以画在共用段）</summary>
+        void DrawCanvasSourceControls()
+        {
+            var ids = SceneBackgroundIds();
+            var display = new string[ids.Length + 1];
+            display[0] = _rowStage != null && _rowStage.backdrop != null
+                ? $"底图: 跟随剧本（{_rowStage.cgId ?? _rowStage.bgId}）" : "底图: 跟随剧本";
+            for (int i = 0; i < ids.Length; i++) display[i + 1] = "底图: " + ids[i];
+
+            int index = string.IsNullOrEmpty(_bgOverrideId)
+                ? 0 : System.Array.IndexOf(ids, _bgOverrideId) + 1;
+            if (index < 0) index = 0;
+            int picked = EditorGUILayout.Popup(index, display,
+                EditorStyles.toolbarPopup, GUILayout.Width(190f));
+            if (picked != index)
+                _bgOverrideId = picked <= 0 ? "" : ids[picked - 1];
+
+            _showPortraits = GUILayout.Toggle(_showPortraits,
+                new GUIContent("立绘", "按剧本推算出的站位画真实立绘；关掉退回灰色站位矩形"),
+                EditorStyles.toolbarButton, GUILayout.Width(40f));
+        }
+
+        /// <summary>绑定行的舞台快照（背景 / CG / 在场角色），没绑定返回 null</summary>
+        VNRowStageInfo RowStage
+        {
+            get
+            {
+                if (!HasLink)
+                {
+                    _rowStage = null;
+                    _rowStageRow = -1;
+                    return null;
+                }
+                int version = _linkedEditor.DocVersion;
+                if (_rowStage == null || _rowStageRow != _linkedRow ||
+                    _rowStageVersion != version)
+                {
+                    _linkedEditor.TryGetRowStage(_linkedRow, out _rowStage);
+                    _rowStageRow = _linkedRow;
+                    _rowStageVersion = version;
+                }
+                return _rowStage;
             }
         }
 
@@ -549,20 +604,12 @@ namespace VNEffects.EditorTools
         {
             // 底：背景缩略图或深色底
             EditorGUI.DrawRect(rect, new Color(0.08f, 0.08f, 0.12f));
-            var bgSprite = SceneBackgroundSprite();
+            var bgSprite = CanvasBackdrop();
             if (bgSprite != null)
-                GUI.DrawTexture(rect, bgSprite.texture, ScaleMode.ScaleAndCrop);
+                DrawSpriteFill(rect, bgSprite);
             DrawRectOutline(rect, new Color(1f, 1f, 1f, 0.35f), 1f);
 
-            // 站位参考剪影（left/center/right）
-            for (int s = 0; s < 3; s++)
-            {
-                var p = CanvasToGui(rect, new Vector2(SlotX[s], -60f));
-                float hw = 880f * 0.28f * rect.width / 1920f;
-                float hh = 880f * 0.5f * rect.height / 1080f;
-                EditorGUI.DrawRect(new Rect(p.x - hw * 0.5f, p.y - hh, hw, hh * 2f),
-                    new Color(1f, 1f, 1f, 0.05f));
-            }
+            DrawStageCharacters(rect);
 
             // 各路径点取景框 + 路径线
             Vector2? prevCenter = null;
@@ -602,6 +649,82 @@ namespace VNEffects.EditorTools
             }
 
             HandleCanvasInput(rect);
+        }
+
+        /// <summary>
+        /// 在场立绘：按剧本推算出的站位 + VNStage 的真实高度画，
+        /// 取景框套没套住脸能直接看出来。关掉开关 / 没绑定 / 没立绘可用时，
+        /// 退回原来那三个灰色站位矩形。
+        /// </summary>
+        void DrawStageCharacters(Rect rect)
+        {
+            var info = RowStage;
+            var stage = Object.FindFirstObjectByType<VNStage>();
+            bool drew = false;
+
+            if (_showPortraits && info != null && info.characters.Count > 0)
+            {
+                // 立绘会超出画布（脚在画面外），裁进画布内再画
+                GUI.BeginGroup(rect);
+                var local = new Rect(0f, 0f, rect.width, rect.height);
+                foreach (var c in info.characters)
+                {
+                    if (c.sprite == null) continue;
+
+                    float height = 880f;
+                    Vector2 offset = Vector2.zero;
+                    if (stage != null)
+                    {
+                        var def = stage.characters.Find(d => d != null && d.id == c.id);
+                        if (def != null)
+                        {
+                            height = stage.characterHeight * Mathf.Max(0.05f, def.sizeScale);
+                            offset = def.positionOffset;
+                        }
+                    }
+                    // 立绘 RectTransform 的锚点位置就是中心（与 VNStage.SlotPosition 一致）
+                    var center = new Vector2(SlotX[Mathf.Clamp(c.slot, 0, 2)], -60f) + offset;
+                    float aspect = c.sprite.rect.width / Mathf.Max(1f, c.sprite.rect.height);
+                    var half = new Vector2(height * aspect * 0.5f, height * 0.5f);
+                    DrawSpriteAt(local, center, half, c.sprite);
+                    drew = true;
+                }
+                GUI.EndGroup();
+            }
+
+            if (drew) return;
+            for (int s = 0; s < 3; s++)
+            {
+                var p = CanvasToGui(rect, new Vector2(SlotX[s], -60f));
+                float hw = 880f * 0.28f * rect.width / 1920f;
+                float hh = 880f * 0.5f * rect.height / 1080f;
+                EditorGUI.DrawRect(new Rect(p.x - hw * 0.5f, p.y - hh, hw, hh * 2f),
+                    new Color(1f, 1f, 1f, 0.05f));
+            }
+        }
+
+        /// <summary>按画布坐标把 sprite 画到指定矩形（图集 sprite 走 textureRect 取 UV）</summary>
+        static void DrawSpriteAt(Rect canvasRect, Vector2 center, Vector2 half, Sprite sprite)
+        {
+            var tl = CanvasToGui(canvasRect, new Vector2(center.x - half.x, center.y + half.y));
+            var br = CanvasToGui(canvasRect, new Vector2(center.x + half.x, center.y - half.y));
+            DrawSpriteRaw(Rect.MinMaxRect(tl.x, tl.y, br.x, br.y), sprite, true);
+        }
+
+        /// <summary>整张铺满（背景用，按 16:9 画布直接拉伸/裁切）</summary>
+        static void DrawSpriteFill(Rect rect, Sprite sprite) =>
+            DrawSpriteRaw(rect, sprite, false);
+
+        static void DrawSpriteRaw(Rect dst, Sprite sprite, bool alphaBlend)
+        {
+            var texture = sprite.texture;
+            if (texture == null) return;
+            // 图集里的 sprite 不能整张 texture 当图用，必须按 textureRect 取 UV
+            var source = sprite.textureRect;
+            var uv = new Rect(
+                source.x / texture.width, source.y / texture.height,
+                source.width / texture.width, source.height / texture.height);
+            GUI.DrawTextureWithTexCoords(dst, texture, uv, alphaBlend);
         }
 
         void HandleCanvasInput(Rect rect)
@@ -1251,12 +1374,36 @@ namespace VNEffects.EditorTools
             return ids.ToArray();
         }
 
-        Sprite SceneBackgroundSprite()
+        /// <summary>
+        /// 画布底图，三级回退：
+        ///   ① 工具栏手动指定的背景（分支里推算不准时的兜底）
+        ///   ② 绑定行推算出的背景 / CG（默认，切行自动跟着换）
+        ///   ③ 场景里 VNStage 当前挂着的那张（没绑定剧本时的老行为）
+        /// </summary>
+        Sprite CanvasBackdrop()
         {
             var stage = Object.FindFirstObjectByType<VNStage>();
+
+            if (!string.IsNullOrEmpty(_bgOverrideId) && stage != null)
+                foreach (var b in stage.backgrounds)
+                    if (b != null && b.id == _bgOverrideId) return b.sprite;
+
+            var info = RowStage;
+            if (info != null && info.backdrop != null) return info.backdrop;
+
             if (stage != null && stage.backgroundImage != null && stage.backgroundImage.sprite != null)
                 return stage.backgroundImage.sprite;
             return null;
+        }
+
+        string[] SceneBackgroundIds()
+        {
+            var stage = Object.FindFirstObjectByType<VNStage>();
+            if (stage == null) return new string[0];
+            var ids = new List<string>();
+            foreach (var b in stage.backgrounds)
+                if (b != null && !string.IsNullOrEmpty(b.id)) ids.Add(b.id);
+            return ids.ToArray();
         }
     }
 

@@ -198,6 +198,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - **camseq 路径点行是字段化的**（类型/目标/zoom/秒/ease/xfade），解析不了的**退回纯文本并标黄**；
   header 行右侧三个按钮：`编排`（打开镜头编排窗口并**双向绑定**这一行）/ `预设▾`（内置模板·我的预设·存为预设）/ `+ wp`。
   绑定后镜头窗口可「跟随选中」自动切行、支持实时或手动回写；存储仍是 `camLines` 字符串。
+  镜头窗口画布的**底图三级回退**（手动指定 → 绑定行推算出的背景/CG → 场景当前那张），
+  并按推算站位画**真实立绘**（可开关）——数据源是行左侧「舞台一览」同一套 `TryGetRowStage`。
   **路径点行禁用 `CharacterPopup` / `SpritePopup`**——那套是异步回调、会把值写进 `VNRow.values`，
   和 camLines 是两条路径，必须用同步的 `PopupString` / `EditorGUI.Popup`。详见 WhatAiDo 九十八章。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；

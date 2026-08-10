@@ -1774,6 +1774,44 @@ namespace VNEffects.EditorTools
             return IsCamseqRow(index) ? index : -1;
         }
 
+        /// <summary>
+        /// 某一行的舞台推算快照（镜头编排窗口拿它画底图和立绘）。
+        /// 数据源就是行左侧「舞台一览」那格用的同一套逐行推算，
+        /// 所以两边看到的背景/在场角色永远一致。
+        /// 注意它是**按文件顺序的近似**：jump / choice 分支不展开，
+        /// camseq 落在分支里时可能推不准——镜头窗口那边留了手动覆盖的口子。
+        /// </summary>
+        public bool TryGetRowStage(int index, out VNRowStageInfo info)
+        {
+            info = null;
+            if (index < 0 || index >= _doc.rows.Count) return false;
+            RebuildStageStatesIfNeeded();
+            if (index >= _stageStates.Count) return false;
+
+            var state = _stageStates[index];
+            info = new VNRowStageInfo
+            {
+                bgId = state.bg,
+                cgId = state.cg,
+                backdrop = state.cg != null
+                    ? SpriteFor(_cgPreviews, state.cg)
+                    : state.bg != null ? SpriteFor(_backgroundPreviews, state.bg) : null,
+            };
+            // CG 盖着且没 keepChars 时立绘本来就看不见，别画上去误导取景
+            if (state.cg == null || state.cgKeepChars)
+                foreach (var c in state.chars)
+                {
+                    var preview = _characterPreviews.Find(p => p.id == c.id);
+                    info.characters.Add(new VNRowStageChar
+                    {
+                        id = c.id,
+                        slot = c.slot,
+                        sprite = preview != null ? preview.DefaultSprite : null,
+                    });
+                }
+            return true;
+        }
+
         /// <summary>读出某一行的完整 camseq 文本</summary>
         public bool TryGetCamseqText(int index, out string text)
         {

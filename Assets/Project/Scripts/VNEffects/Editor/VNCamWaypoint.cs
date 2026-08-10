@@ -1,11 +1,29 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using UnityEngine;
 
 namespace VNEffects.EditorTools
 {
     /// <summary>camseq 路径点的目标点类型（由 point token 反推，不额外存）</summary>
     public enum VNCamPointKind { Anchor, Character, Coords }
+
+    /// <summary>某一行的舞台推算快照（剧本编辑器算，镜头编排窗口画）</summary>
+    public class VNRowStageInfo
+    {
+        public string bgId;
+        public string cgId;
+        public Sprite backdrop;   // CG 优先，否则背景
+        public readonly List<VNRowStageChar> characters = new List<VNRowStageChar>();
+    }
+
+    /// <summary>快照里的一个在场角色</summary>
+    public struct VNRowStageChar
+    {
+        public string id;
+        public int slot;      // 0=left 1=center 2=right
+        public Sprite sprite; // 默认表情立绘
+    }
 
     /// <summary>
     /// camseq 的一个 "&gt; ..." 路径点行的结构化视图。

@@ -5212,3 +5212,73 @@ Unity 在控件有键盘焦点时不会用传入值刷新编辑中的文本，�
   header 从有到无（清空 start/end）也能正确写回。
 - **Lint 新警告无误报**：现有全部剧本跑 `Validate`，零 waypoint 相关告警。
 - 绑定条的跟随/锁定/实时回写是 IMGUI 交互，需要在编辑器里手动点验。
+
+---
+
+## 九十九、镜头编排画布：底图跟随剧本行 + 真实立绘（2026-08-11，分支 `agent/camseq-inline-editor`）
+
+### 需求 / 背景
+
+九十八章把镜头编排窗口和剧本行绑上之后，暴露了画布本身的问题：
+**底图画的是场景里 `VNStage.backgroundImage` 当前挂着的那张**（编辑期就是个占位图），
+跟剧本里那一行该显示的背景毫无关系——想给「教室_黄昏」编排运镜，
+画布上却是一张紫色波浪占位图，等于闭着眼睛拖取景框。
+
+顺带一个更大的问题：画布上那三个半透明灰矩形只是**假的站位参考**。
+可镜头编排的高频需求恰恰是「对准角色的头/胸」，看不见人在哪、多高，全靠猜。
+
+### 关键发现：推算逻辑早就有了
+
+剧本编辑器的「舞台一览」（每行左侧那个缩略图格子）本来就在
+**逐行推算「执行到这一行时背景是什么、台上有谁站哪」**（`RowStageState`）。
+既然窗口现在知道自己绑在第几行，直接问它要就行——零新逻辑，
+而且两边看到的东西永远一致。
+
+### 文件改动清单
+
+- `Editor/VNCamWaypoint.cs`：新增 `VNRowStageInfo` / `VNRowStageChar` 传输类
+  （背景/CG sprite + 在场角色的 id·站位·立绘）。
+- `Editor/VNScenarioEditorWindow.cs`：新增公开 `TryGetRowStage(index, out info)`，
+  内部复用 `RebuildStageStatesIfNeeded` + `_backgroundPreviews` / `_cgPreviews` /
+  `_characterPreviews`。CG 盖着且没 `keepChars` 时不吐立绘（本来就看不见）。
+- `Editor/VNCamseqEditorWindow.cs`：
+  - `SceneBackgroundSprite` → `CanvasBackdrop`，三级回退：
+    **手动指定的背景 → 绑定行推算出的背景/CG → 场景当前那张**（老行为兜底）。
+  - 绑定条右侧新增 `底图: 跟随剧本（教室_黄昏）▾` 下拉与 `立绘` 开关，
+    没绑定剧本时也画得出来（放在 `HasLink` 早退之外的共用段）。
+  - `DrawStageCharacters`：按推算站位 + `VNStage.characterHeight × def.sizeScale`
+    + `def.positionOffset` 画真实立绘，宽度按 sprite 宽高比算。
+    关掉开关 / 没绑定 / 没立绘可用时退回原来的灰矩形。
+  - 舞台快照按「行号 + `DocVersion`」缓存，不每帧重算。
+
+### 技术决策与取舍
+
+**1. 底图为什么要留手动覆盖**
+
+逐行推算是**按文件顺序的近似**，`jump` / `choice` 分支不展开
+（和「重建前置状态」调试是同一套近似）。camseq 落在分支里时可能推不准，
+所以工具栏留了个背景下拉当兜底；空值 = 跟随，不是「无背景」。
+
+**2. 立绘必须裁进画布**
+
+立绘按真实尺寸画会超出画布（脚在画面外），`GUI.DrawTextureWithTexCoords`
+不会自动裁。包一层 `GUI.BeginGroup(rect)` 把坐标系挪到画布左上角再画；
+只裁立绘那一段，取景框/路径线还是 1px 线，超出一点无所谓。
+交互（`HandleCanvasInput`）在 `EndGroup` 之后，不受影响。
+
+**3. 图集 sprite 走 textureRect**
+
+背景和立绘统一走新的 `DrawSpriteRaw`，按 `sprite.textureRect` 换算 UV——
+图集里的 sprite 不能整张 texture 当图用（这条是 vn-editor-extend 的铁律，
+原来的背景绘制 `GUI.DrawTexture(rect, sprite.texture, ...)` 其实就踩着，顺手修了）。
+立绘走 alphaBlend，背景不走。
+
+### 验证方法
+
+- 编译零错误。
+- 拿 `第1章.vn.txt` 逐个 camseq 行跑 `TryGetRowStage`（另建隐藏窗口实例，
+  不碰用户已打开的那个）：
+  - rows[26]（源码第 27 行，正是出问题那行）→ `bg=教室_黄昏`，
+    底图 sprite 正确解析成「学校の廊下（夕方）」，不再是占位图；
+  - rows[63]（第 66 行）→ `bg=教室_黄昏` + 在场 `星野结衣2@center`，且立绘非空。
+- 底图下拉、立绘开关、超出画布的裁切是 IMGUI 交互，需要在编辑器里手动点验。
