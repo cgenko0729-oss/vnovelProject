@@ -13,6 +13,11 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
 - **文本是唯一真相**：`.vn.txt ↔ VNScenarioDoc.rows`，保存时重新生成文本，注释/空行必须保留。
 - **say 的角色/表情是专用字段** `VNRow.speaker / expression`，**不是** `VNRow.values`；
   图片选择回调必须经专用访问器读写。`show` 才用普通 `character / expr` 参数。两条路径禁止混用。
+- **`SpritePopup` / `CharacterPopup` / `ExpressionPopup` 是异步写值的**：选中走
+  `PopupWindow` 回调 → `SetPopupValue` → 写进 `VNRow.values[key]`，**返回值当帧不变**。
+  所以它们只能用在「值本来就存在 `values`（或 say 专用字段）」的参数格上。
+  值存在别处的（camseq 路径点存在 `camLines` 文本里）必须用同步控件——
+  `PopupString` / `EditorGUI.Popup`，否则选了不生效还顺手往文档里塞个野参数。
 - **UI 行号 ≠ 物理行号**：换算一律走 `SourceLineForRow`——choice 选项行和 camseq waypoint
   都额外占物理行；空行/注释从下一条有效命令启动。反向换算（物理行 → UI 行）走
   `RowForSourceLine`，两个函数的跨行规则必须保持一致，改一个就得改另一个。

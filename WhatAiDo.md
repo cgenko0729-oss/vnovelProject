@@ -5088,3 +5088,127 @@ VN/Scenario Editor 里自己改键位）：`F5` 从选中行播放、`F6` 重播
   两个槽位都非空，label = 「滚轮打开回想　开」；
   `onClick.Invoke()` 两次，PlayerPrefs 与文案同步翻面（关 → 开）。
 - 编辑器的隐藏开关是 IMGUI 交互，需要在编辑器里手动点验。
+
+---
+
+## 九十八、camseq 结构化路径点 + 镜头编排窗口双向绑定（2026-08-11，分支 `agent/camseq-inline-editor`）
+
+### 需求 / 背景
+
+剧本编辑器里加一条 `camseq` 之后，编辑体验是断的：
+
+- 路径点行 `> middle 1 1` 是**纯文本 TextField**，没下拉、没校验、没提示，全靠手打语法；
+- 真正好用的可视化工具（Tools → VN Effects → Camera Sequence Editor，
+  有迷你画布拖点、拖角改 zoom、时间轴预览、场景实时预览、预设库）
+  跟剧本**完全没有连线**，中间隔着一个剪贴板：
+  复制整段 → 切窗口 → 粘贴 → 解析载入 → 调 → 生成文本 → 回来删旧的粘新的。
+
+本章把这两头接上，并给路径点行长出正经控件。
+
+### 文件改动清单
+
+**新增**
+
+- `Editor/VNCamWaypoint.cs`
+  - `VNCamWaypoint`：一行 `> ...` 的结构化视图 + 严格 `TryParse` / `Format`。
+    语法与运行时 `VNScriptParser.ParseCamWaypoint` 同构。
+  - `VNCamseqText`：一整段 camseq 文本（header + 路径点行）的 `TrySplit` / `Join`，
+    不经 `VNScriptParser`（那边解析失败会往 Console 打 warning，编辑期不该有噪音）。
+  - `VNCamseqTemplates`：11 条内置运镜模板（推近特写 / 缓慢拉远 / 推近后回位 /
+    左右横摇 / 环视全景 / 三连甩镜 / 告白推镜 / 惊讶弹镜 / 叠化转特写 /
+    叠化开场特写 / 转场瞬切起手）。`{char}` 占位在套用时替换成当前第一个角色 id。
+- `Editor/VNTextPromptWindow.cs`：极简单行输入弹窗（Unity 没有内置的
+  「带输入框的 DisplayDialog」），「把本行存为预设」用它要名字。
+
+**修改**
+
+- `Editor/VNScenarioEditorWindow.cs`
+  - 路径点行改成字段化控件：类型（锚点/角色/坐标）+ 目标 + zoom + 秒 + ease + xfade + 删除；
+    解析不了的行**退回纯文本框并标黄**，鼠标悬停说明语法。
+  - camseq header 行右侧新增三个按钮：`编排`（打开并绑定镜头编排窗口）、
+    `预设▾`（内置模板 / 我的预设 / 把本行存为预设）、原有的 `+ wp`。
+  - 新增公开 API 供镜头窗口调用：`IsCamseqRow` / `SelectedCamseqRow` /
+    `TryGetCamseqText` / `ApplyCamseqText` / `ScenarioDisplayName` / `DocVersion`，
+    `FocusRow` 从 private 提为 public（原来 Issues 面板在用，逻辑一模一样，不另起炉灶）。
+- `Editor/VNCamseqEditorWindow.cs`
+  - 新增绑定条：`◆ 文件名 第 N 行`（点它把剧本滚到那一行）、
+    `跟随选中 / 已锁定`、`实时回写`、`应用回剧本`、`从剧本重载`。
+  - `_points` / `_startMode` / `_startFade` / `_endFade` / `_endFadeDur` / `_scrub`
+    与全部绑定状态改成 `[SerializeField]`，跨域重载存活。
+  - 路径点列表下方加「内置模板 ▾」。预设保存统一走新的静态 `SavePreset`。
+- `Editor/VNScenarioDoc.cs`：Lint 增加一条 Warning——路径点行结构化失败时点名，
+  免得写错了还以为编辑器坏了。
+
+### 技术决策与取舍
+
+**1. 存储不变：`VNRow.camLines` 仍是唯一真相（字符串列表）**
+
+一开始考虑把路径点升级成结构化的 `List<VNCamWaypointRow>`，但那样
+`VNScenarioDoc` 的解析/生成、`SourceLineForRow` / `RowForSourceLine` 行号换算、
+校验、`Clone` 全都要跟着动，回归面太大。
+
+最后选了「每帧现解析、改完立刻格式化写回」：`camLines` 一个字都不用改，
+上述所有逻辑零改动，而且**任何解析不了的写法都原样留在文件里**。
+成本是每帧解析几个 token——IMGUI 本来就每帧重画，可以忽略。
+
+FloatField 的中间态（用户打 `1.`）不会被 round-trip 打断：
+Unity 在控件有键盘焦点时不会用传入值刷新编辑中的文本，只要解析回来的值一致就没事。
+
+**2. 严格解析 + 退回纯文本，而不是强制结构化**
+
+`TryParse` 认不出任何一个 token 就整行失败（多余的数字、非法 ease 名、
+`[middle]`、`point:` 这种带冒号的残缺写法）。宁可少一个结构化控件，
+也不能吞掉用户写的内容。`ease:outsine` 这种大小写不规范的会被规范化成 `OutSine`。
+
+配套：`omitZoom` / `omitDuration` 标记——原文没写 zoom/时长的（`> middle`），
+只要值还是默认就继续省略，避免打开编辑器就把手写行撑成 `> middle 1 0.8` 的无意义 diff。
+时长是「第二个数字」，要写它就必须先把 zoom 写出来占位。
+
+**3. 路径点行禁用 `CharacterPopup` / `SpritePopup`**
+
+这是个真陷阱：`SpritePopup` 的选中是**异步回调**（`PopupWindow` + `SetPopupValue`），
+会把值写进 `VNRow.values[key]`——而路径点存在 `camLines` 文本里，
+两条路径一混，选了角色不生效还顺手往文档里塞了个野参数。
+所以角色 id 改用同步的 `PopupString`（`custom…` 还能手打场景里没有的 id），
+锚点 / 部位 / ease 用纯 `EditorGUI.Popup`。代价是没有角色缩略图，路径点行本来也窄。
+
+**4. 绑定关系存在镜头窗口的 `[SerializeField]` 里**
+
+`VNRow` 是纯 C# 对象，域重载后 `_doc` 重新 Parse，引用就悬空了。
+所以绑定存的是「`VNScenarioEditorWindow` 引用（EditorWindow 是 ScriptableObject，
+引用能跨域重载存活）+ 行索引 int」，读写全走上面那几个公开 API。
+剧本编辑器画「编排」按钮要每帧问「这行在编排吗」，逐行 `FindObjectsOfTypeAll` 太费，
+另用一对静态字段缓存（域重载后清空，下一次 `SyncLink` 立刻补回来）。
+
+**5. 三道防丢稿的闸**
+
+- 从菜单打开镜头窗口、手上已经摆了点的：自动跟随会**自动上锁**，
+  绝不让它覆盖现成的稿；点剧本行的「编排」或「从剧本重载」才真正接管。
+- 手动回写模式下一旦有未应用的改动就自动上锁 + 绑定条标「（未应用）」，
+  不弹模态框（IMGUI 里弹框重入很脏），应用或重载后自动解锁恢复跟随。
+- 点别的行的「编排」时，若当前行手动模式下还脏，弹一次「应用后切换 / 丢弃改动」。
+
+**6. 实时回写的撤销节流**
+
+实时模式每帧都可能回写，直接 `MarkStructural()` 会把撤销栈刷爆。
+`ApplyCamseqText` 走新的 `PushUndoThrottled()`——和 `OnGUI` 末尾那套一样的
+1 秒粒度合并，行为一致。另外「内容没变就早退」，稳态下不会反复触发。
+
+### 验证方法
+
+- 编译零错误（`assets-refresh` 强制重编，只剩既有的 `FindFirstObjectByType` 弃用警告）。
+- **现有剧本全量往返**：扫 `Assets/Scenarios/*.vn.txt` 的全部 13 行路径点，
+  13 行全部可结构化、0 行退回纯文本；3 行有格式差异且都是
+  `> middle 1.0 1.0` → `> middle 1 1` 的数字规范化（语义相同，且只在实际编辑该行时才写回）。
+- **边界写法**：`> middle` / `> middle 1` / `> 小雪:head 1.8 0.8 ease:OutSine xfade:0.5` /
+  `> -300,120 2 0` 往返无损；`> ` / `>` / `> middle 1 2 3` / `> middle ease:Bogus` /
+  `> [middle] 1 1` 正确退回纯文本；`ease:outsine` 规范化成 `OutSine`。
+- **内置模板**：11 条全部能 `TrySplit` + 每个路径点都能 `TryParse` 且往返无损；
+  无角色可用时 `{char}` 与部位后缀一起退化成 `middle`，不留 `middle:head` 废点位。
+- **写回不破坏文件**：拿 `第1章.vn.txt` 做「Parse → 套用模板 → GenerateText」，
+  解析-生成行数 203/203 一致；真实内容改动只在 camseq 块内（后面的行只是整体位移）；
+  行尾的 `@` 异步标记保留；生成文本经 `VNScriptParser` 解析出
+  `start=fade startfade=0.7` + 2 个路径点，首点 `小雪:head` zoom=1.8 dur=0 全对；
+  header 从有到无（清空 start/end）也能正确写回。
+- **Lint 新警告无误报**：现有全部剧本跑 `Validate`，零 waypoint 相关告警。
+- 绑定条的跟随/锁定/实时回写是 IMGUI 交互，需要在编辑器里手动点验。

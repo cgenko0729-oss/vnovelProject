@@ -698,11 +698,19 @@ namespace VNEffects.EditorTools
                         else
                         {
                             foreach (var l in r.camLines)
+                            {
                                 foreach (var tok in l.Substring(1).Split(new[] { ' ', '\t' },
                                     System.StringSplitOptions.RemoveEmptyEntries))
                                     if (tok == ":" || tok.EndsWith(":") || tok.StartsWith("["))
                                         Err(i, $"waypoint token \"{tok}\": " +
                                                "colon must have no surrounding spaces/brackets");
+                                // 编辑器只能把结构化得了的路径点画成控件，其余退回纯文本；
+                                // 这里提前点名，免得写错了还以为编辑器坏了
+                                if (!VNCamWaypoint.TryParse(l, out _))
+                                    Warn(i, $"waypoint \"{l.Trim()}\" is not recognized " +
+                                            "(> point [zoom] [sec] [ease:Name] [xfade:sec]); " +
+                                            "the scenario editor will keep it as raw text");
+                            }
                             if (r.Get("start") == "cut" && !FirstWaypointIsCut(r))
                                 Warn(i, "start:cut expects the first waypoint duration to be 0");
                         }

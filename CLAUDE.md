@@ -126,6 +126,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNBattleModule | 回合制小战斗（event battle，结果 胜利/失败/逃跑；patkstat/phpstat/pdefstat 从 flag 读属性=养成联动，结束写 flag 战斗剩余HP 供车轮战） |
 | VNLiquidInstaller (Editor) | 把液体喷溅**增量装进当前场景**（Tools → VN Effects → Install Liquid Splash To Scene）：Canvas 下补 WetScreen + 场外补 LiquidSplash + 两层互连并回填 VNStage，不重建场景、可重复执行。老场景不跑它的话 `liquid` 命令会静默无效果 |
 | VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → Install Quiz Module To Scene）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
+| VNCamWaypoint / VNCamseqText / VNCamseqTemplates (Editor) | camseq 路径点行的结构化视图（严格 TryParse/Format，语法与运行时 ParseCamWaypoint 同构）/ 一整段 camseq 文本的 TrySplit·Join / 11 条内置运镜模板（`{char}` 占位按当前角色替换）。**存储仍是 VNRow.camLines 字符串**，本层只做每帧现解析、改完写回的中转 |
 | VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
@@ -194,6 +195,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   **加新窗口状态必须同时改 `OnBeforeSerialize` 和 `OnEnable`**。详见 WhatAiDo 九十六章。
 - 工具栏「隐注释/空行」：把空行与 `#` 注释折成零高度（`RowHeight` 返回 0，索引不变，
   所有编辑操作零影响）。**只隐空行与 `#`**——孤儿 `*` / `>` 行也是 Raw，藏了就找不回来。
+- **camseq 路径点行是字段化的**（类型/目标/zoom/秒/ease/xfade），解析不了的**退回纯文本并标黄**；
+  header 行右侧三个按钮：`编排`（打开镜头编排窗口并**双向绑定**这一行）/ `预设▾`（内置模板·我的预设·存为预设）/ `+ wp`。
+  绑定后镜头窗口可「跟随选中」自动切行、支持实时或手动回写；存储仍是 `camLines` 字符串。
+  **路径点行禁用 `CharacterPopup` / `SpritePopup`**——那套是异步回调、会把值写进 `VNRow.values`，
+  和 camLines 是两条路径，必须用同步的 `PopupString` / `EditorGUI.Popup`。详见 WhatAiDo 九十八章。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；
   文本框编辑中的第一下 Enter 只结束编辑。插命令行仍走列表底部 `+` 下拉。
   调试键位 `F5` 播放选中行 / `F6` 重播上次那行 / `F8` 暂停 / `F10` 单步 / `Ctrl+S` 保存

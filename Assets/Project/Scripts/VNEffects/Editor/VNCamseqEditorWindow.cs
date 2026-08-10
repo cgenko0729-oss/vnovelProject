@@ -65,18 +65,29 @@ namespace VNEffects.EditorTools
         static readonly Vector2 CanvasHalf = new Vector2(960f, 540f);
         static readonly Vector2 Overscan = new Vector2(60f, 60f);
 
-        readonly List<Waypoint> _points = new List<Waypoint>();
-        StartMode _startMode;
-        float _startFade = 0.6f;
-        bool _endFade;
-        float _endFadeDur = 0.6f;
+        // ↓ 域重载存活组：进出 Play Mode / 重编译都会重建窗口，普通字段一律清空。
+        //   正在调的这段运镜和它跟剧本的绑定关系绝不能丢，所以全部 [SerializeField]。
+        [SerializeField] List<Waypoint> _points = new List<Waypoint>();
+        [SerializeField] StartMode _startMode;
+        [SerializeField] float _startFade = 0.6f;
+        [SerializeField] bool _endFade;
+        [SerializeField] float _endFadeDur = 0.6f;
+        [SerializeField] float _scrub;          // 0~总时长 的预览时间
+
         ReorderableList _list;
-        float _scrub;          // 0~总时长 的预览时间
         bool _playing;
         double _lastUpdateTime;
         string _pasteText = "";
         string _generatedText = "";
         Vector2 _scroll;
+
+        // ---- 与剧本编辑器的双向绑定 ----
+        // EditorWindow 是 ScriptableObject，引用能跨域重载存活；行号只是个 int。
+        [SerializeField] VNScenarioEditorWindow _linkedEditor;
+        [SerializeField] int _linkedRow = -1;
+        [SerializeField] bool _linkLocked;      // 锁头：不跟随剧本的选中行
+        [SerializeField] bool _liveApply = true; // 实时回写（关掉则手动点「应用回剧本」）
+        [SerializeField] string _lastAppliedText = "";  // 最后一次与剧本一致的文本
 
         // ---- 第二批：场景预览 / 画布拖拽 / 预设库 ----
         enum DragMode { None, Center, Corner }
@@ -91,13 +102,173 @@ namespace VNEffects.EditorTools
         string _presetName = "";
         int _presetIndex;
 
-        const string LibraryPath = "Assets/VNEffects/CamseqPresets.asset";
+        public const string LibraryPath = "Assets/VNEffects/CamseqPresets.asset";
 
         [MenuItem("Tools/VN Effects/Camera Sequence Editor")]
         static void Open()
         {
             var win = GetWindow<VNCamseqEditorWindow>("镜头编排");
             win.minSize = new Vector2(560f, 720f);
+        }
+
+        // ==================================================================
+        // 与剧本编辑器的双向绑定
+        // ==================================================================
+
+        // 剧本编辑器每帧都要问「这行在编排吗」，逐行 FindObjectsOfTypeAll 太费；
+        // 绑定关系本来就唯一，缓存成静态的。域重载后清空，下一次 SyncLink 立刻补回来。
+        static VNScenarioEditorWindow s_linkEditor;
+        static int s_linkRow = -1;
+
+        /// <summary>剧本编辑器某行的「编排」按钮：打开窗口并绑定到那一行</summary>
+        public static void OpenLinked(VNScenarioEditorWindow editor, int rowIndex)
+        {
+            var win = GetWindow<VNCamseqEditorWindow>("镜头编排");
+            win.minSize = new Vector2(560f, 720f);
+
+            // 手动回写模式下手上还有没应用的稿，切走就没了——先问一句
+            if (win.HasLink && win._linkedRow != rowIndex && !win._liveApply && win.LinkDirty)
+            {
+                if (EditorUtility.DisplayDialog("还有未应用的改动",
+                        $"第 {win._linkedRow + 1} 行的编排还没写回剧本。要先应用再切过去吗？",
+                        "应用后切换", "丢弃改动"))
+                    win.ApplyToLink();
+            }
+
+            win.BindTo(editor, rowIndex, forceLoad: true);
+            win.Focus();
+        }
+
+        /// <summary>剧本编辑器画「编排」按钮时问：这一行是不是正被编排？</summary>
+        public static bool IsLinkedTo(VNScenarioEditorWindow editor, int rowIndex) =>
+            s_linkEditor == editor && s_linkRow == rowIndex && rowIndex >= 0;
+
+        void BindTo(VNScenarioEditorWindow editor, int rowIndex, bool forceLoad)
+        {
+            bool changed = _linkedEditor != editor || _linkedRow != rowIndex;
+            _linkedEditor = editor;
+            _linkedRow = rowIndex;
+            s_linkEditor = editor;
+            s_linkRow = rowIndex;
+            if (changed || forceLoad) LoadFromLink();
+        }
+
+        bool HasLink => _linkedEditor != null && _linkedRow >= 0 &&
+                        _linkedEditor.IsCamseqRow(_linkedRow);
+
+        /// <summary>当前编排内容与剧本那一行不一致（手动回写模式下的脏标记）</summary>
+        bool LinkDirty => HasLink && GenerateText() != _lastAppliedText;
+
+        /// <summary>
+        /// 每帧对齐绑定关系：没绑过就找一个打开着的剧本编辑器；未锁定时跟随它的选中行。
+        /// 手动回写模式下一旦有未应用的改动就自动上锁——宁可停在原地，也不能悄悄切走丢稿。
+        /// </summary>
+        void SyncLink()
+        {
+            if (_linkedEditor == null)
+            {
+                var windows = Resources.FindObjectsOfTypeAll<VNScenarioEditorWindow>();
+                if (windows.Length == 0) return;
+                _linkedEditor = windows[0];
+                _linkedRow = -1;
+                // 从菜单打开、手上已经摆了点的：自动上锁，绝不让自动跟随覆盖掉现成的稿。
+                // 用户点剧本行的「编排」或这里的「从剧本重载」才会真正接管。
+                if (_points.Count > 0) _linkLocked = true;
+            }
+
+            if (!_liveApply && LinkDirty) _linkLocked = true;
+            if (_linkLocked)
+            {
+                // 锁着也要让剧本编辑器的按钮高亮保持正确
+                s_linkEditor = _linkedEditor;
+                s_linkRow = _linkedRow;
+                return;
+            }
+
+            int selected = _linkedEditor.SelectedCamseqRow();
+            if (selected >= 0 && selected != _linkedRow) BindTo(_linkedEditor, selected, false);
+            s_linkEditor = _linkedEditor;
+            s_linkRow = _linkedRow;
+        }
+
+        /// <summary>从绑定的剧本行读回内容（覆盖当前编排）</summary>
+        void LoadFromLink()
+        {
+            if (!HasLink) return;
+            if (!_linkedEditor.TryGetCamseqText(_linkedRow, out string text)) return;
+            _pasteText = text;
+            ParseText(silent: true);
+            _lastAppliedText = GenerateText();
+            _scrub = 0f;
+            Repaint();
+        }
+
+        /// <summary>把当前编排写回剧本行</summary>
+        void ApplyToLink()
+        {
+            if (!HasLink) return;
+            string text = GenerateText();
+            if (text == _lastAppliedText) return;
+            if (_linkedEditor.ApplyCamseqText(_linkedRow, text))
+            {
+                _lastAppliedText = text;
+                _linkLocked = false;   // 应用完就重新跟随
+            }
+        }
+
+        void DrawLinkBar()
+        {
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            {
+                if (!HasLink)
+                {
+                    GUILayout.Label(_linkedEditor == null
+                        ? "未连接剧本编辑器（打开 Scenario Editor 后点 camseq 行的「编排」）"
+                        : "剧本里选中的不是 camseq 行", EditorStyles.miniLabel);
+                    GUILayout.FlexibleSpace();
+                    return;
+                }
+
+                bool dirty = LinkDirty;
+                if (GUILayout.Button(
+                        new GUIContent($"◆ {_linkedEditor.ScenarioDisplayName} 第 {_linkedRow + 1} 行"
+                                       + (dirty ? "（未应用）" : ""),
+                            "点一下把剧本编辑器里的这一行滚到眼前"),
+                        dirty ? EditorStyles.boldLabel : EditorStyles.label,
+                        GUILayout.Width(220f)))
+                    _linkedEditor.FocusRow(_linkedRow);
+
+                _linkLocked = GUILayout.Toggle(_linkLocked,
+                    new GUIContent(_linkLocked ? "已锁定" : "跟随选中",
+                        "锁定后不再跟着剧本里的选中行切换；手动回写模式下有未应用改动会自动上锁"),
+                    EditorStyles.toolbarButton, GUILayout.Width(64f));
+
+                bool live = GUILayout.Toggle(_liveApply,
+                    new GUIContent("实时回写", "改一下就立刻写回剧本；关掉则要手动点「应用回剧本」"),
+                    EditorStyles.toolbarButton, GUILayout.Width(64f));
+                if (live != _liveApply)
+                {
+                    _liveApply = live;
+                    if (live) ApplyToLink();
+                }
+
+                using (new EditorGUI.DisabledScope(!dirty))
+                {
+                    var prev = GUI.backgroundColor;
+                    if (dirty) GUI.backgroundColor = new Color(1f, 0.8f, 0.3f);
+                    if (GUILayout.Button("应用回剧本", EditorStyles.toolbarButton,
+                            GUILayout.Width(80f)))
+                        ApplyToLink();
+                    GUI.backgroundColor = prev;
+                }
+                if (GUILayout.Button(new GUIContent("从剧本重载", "丢弃这里的改动，按剧本行重新载入"),
+                        EditorStyles.toolbarButton, GUILayout.Width(80f)))
+                {
+                    LoadFromLink();
+                    _linkLocked = false;
+                }
+                GUILayout.FlexibleSpace();
+            }
         }
 
         void OnEnable()
@@ -149,9 +320,11 @@ namespace VNEffects.EditorTools
 
         void OnGUI()
         {
+            SyncLink();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
             DrawToolbar();
+            DrawLinkBar();
             GUILayout.Space(4f);
 
             // 迷你画布（16:9）
@@ -208,6 +381,10 @@ namespace VNEffects.EditorTools
                     _points.Insert(0, new Waypoint { type = PointType.Anchor, anchorIndex = 2, zoom = 1.8f, duration = 0f });
                 if (GUILayout.Button("+ 回原点收尾"))
                     _points.Add(new Waypoint { type = PointType.Anchor, anchorIndex = 4, zoom = 1f, duration = 1f });
+                var templateRect = GUILayoutUtility.GetRect(
+                    new GUIContent("内置模板 ▾"), GUI.skin.button);
+                if (GUI.Button(templateRect, "内置模板 ▾"))
+                    ShowTemplateMenu(templateRect);
             }
 
             GUILayout.Space(6f);
@@ -233,10 +410,15 @@ namespace VNEffects.EditorTools
                 "（可先手动摆好 ZoomRoot 再捕获）。\n" +
                 "编辑态下「角色部位」按假定站位显示，Play 中按真实位置。" +
                 "缓动默认：单段 InOutSine；多段首 InSine / 中 Linear / 末 OutSine，" +
-                "叠化段会把连续补间分成独立组（与运行时一致）。",
+                "叠化段会把连续补间分成独立组（与运行时一致）。\n" +
+                "绑定条：从剧本编辑器 camseq 行的「编排」按钮进来后，这里的改动可以直接回写那一行；" +
+                "「跟随选中」时在剧本里点另一个 camseq 行会自动切过来。",
                 MessageType.Info);
 
             EditorGUILayout.EndScrollView();
+
+            // 实时回写：放在最后，确保这一帧的所有编辑都已落到 _points 上
+            if (_liveApply && HasLink) ApplyToLink();
         }
 
         void DrawToolbar()
@@ -594,14 +776,35 @@ namespace VNEffects.EditorTools
         VNCamseqPresetLibrary EnsureLibrary()
         {
             if (_library != null) return _library;
-            _library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
-            if (_library == null)
-            {
-                _library = CreateInstance<VNCamseqPresetLibrary>();
-                AssetDatabase.CreateAsset(_library, LibraryPath);
-                AssetDatabase.SaveAssets();
-            }
+            _library = LoadOrCreateLibrary();
             return _library;
+        }
+
+        static VNCamseqPresetLibrary LoadOrCreateLibrary()
+        {
+            var library = AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(LibraryPath);
+            if (library != null) return library;
+
+            string folder = System.IO.Path.GetDirectoryName(LibraryPath).Replace('\\', '/');
+            if (!AssetDatabase.IsValidFolder(folder))
+                AssetDatabase.CreateFolder("Assets", "VNEffects");
+            library = CreateInstance<VNCamseqPresetLibrary>();
+            AssetDatabase.CreateAsset(library, LibraryPath);
+            AssetDatabase.SaveAssets();
+            return library;
+        }
+
+        /// <summary>存一条预设（剧本编辑器的「把本行存为预设」也走这里，同名覆盖）</summary>
+        public static void SavePreset(string name, string camseqText)
+        {
+            if (string.IsNullOrEmpty(name)) return;
+            var library = LoadOrCreateLibrary();
+            var existing = library.presets.Find(p => p != null && p.name == name);
+            if (existing != null) existing.camseqText = camseqText;
+            else library.presets.Add(new VNCamseqPresetLibrary.Preset
+                { name = name, camseqText = camseqText });
+            EditorUtility.SetDirty(library);
+            AssetDatabase.SaveAssets();
         }
 
         string[] PresetNames()
@@ -625,16 +828,28 @@ namespace VNEffects.EditorTools
             string name = string.IsNullOrEmpty(_presetName.Trim())
                 ? $"预设{System.DateTime.Now:HHmmss}" : _presetName.Trim();
 
-            var lib = EnsureLibrary();
-            var existing = lib.presets.Find(p => p.name == name);
-            if (existing != null) existing.camseqText = GenerateText(); // 同名覆盖
-            else lib.presets.Add(new VNCamseqPresetLibrary.Preset
-                { name = name, camseqText = GenerateText() });
-
-            EditorUtility.SetDirty(lib);
-            AssetDatabase.SaveAssets();
-            _presetIndex = lib.presets.FindIndex(p => p.name == name);
+            SavePreset(name, GenerateText());
+            _library = EnsureLibrary();
+            _presetIndex = _library.presets.FindIndex(p => p.name == name);
             ShowNotification(new GUIContent($"已保存预设「{name}」"));
+        }
+
+        /// <summary>内置运镜模板菜单：套用 = 整段替换当前编排（角色占位按场景里的第一个角色填）</summary>
+        void ShowTemplateMenu(Rect rect)
+        {
+            var ids = SceneCharacterIds();
+            string character = ids.Length > 0 ? ids[0] : null;
+            var menu = new GenericMenu();
+            foreach (var entry in VNCamseqTemplates.All)
+            {
+                string text = VNCamseqTemplates.Resolve(entry.text, character);
+                menu.AddItem(new GUIContent(entry.name), false, () =>
+                {
+                    _pasteText = text;
+                    ParseText();
+                });
+            }
+            menu.DropDown(rect);
         }
 
         void LoadPreset()
@@ -947,19 +1162,21 @@ namespace VNEffects.EditorTools
             return sb.ToString();
         }
 
-        void ParseText()
+        /// <summary>silent = 绑定载入时用，不弹通知也不因空序列而放弃（允许清成 0 个点）</summary>
+        void ParseText(bool silent = false)
         {
             var commands = VNScriptParser.Parse(_pasteText);
             VNScriptCommand camseq = null;
             foreach (var c in commands)
-                if (c.keyword == "camseq" && c.camPoints != null && c.camPoints.Count > 0)
+                if (c.keyword == "camseq" && c.camPoints != null &&
+                    (silent || c.camPoints.Count > 0))
                 {
                     camseq = c;
                     break;
                 }
             if (camseq == null)
             {
-                ShowNotification(new GUIContent("没有找到含路径点的 camseq 块"));
+                if (!silent) ShowNotification(new GUIContent("没有找到含路径点的 camseq 块"));
                 return;
             }
 
@@ -1017,7 +1234,7 @@ namespace VNEffects.EditorTools
                 _points.Add(w);
             }
             _scrub = 0f;
-            ShowNotification(new GUIContent($"已载入 {_points.Count} 个路径点"));
+            if (!silent) ShowNotification(new GUIContent($"已载入 {_points.Count} 个路径点"));
         }
 
         // ==================================================================

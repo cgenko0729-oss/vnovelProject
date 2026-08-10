@@ -991,7 +991,8 @@ namespace VNEffects.EditorTools
             SelectLabelRow(label);
         }
 
-        void FocusRow(int index)
+        /// <summary>把某一行切到编辑页、选中并滚进视野（Issues 面板 / 镜头编排窗口共用）</summary>
+        public void FocusRow(int index)
         {
             _tab = Tab.Edit;
             _list.index = index;
@@ -1377,7 +1378,7 @@ namespace VNEffects.EditorTools
             {
                 case VNRowKind.Raw: DrawRawRow(line0, r); break;
                 case VNRowKind.Say: DrawSayRow(line0, r, index); break;
-                case VNRowKind.Command: DrawCommandRow(rect, line0, r); break;
+                case VNRowKind.Command: DrawCommandRow(rect, line0, r, index); break;
             }
         }
 
@@ -1427,7 +1428,7 @@ namespace VNEffects.EditorTools
                 r.isAsync, "@", EditorStyles.miniButton);
         }
 
-        void DrawCommandRow(Rect fullRect, Rect line0, VNRow r)
+        void DrawCommandRow(Rect fullRect, Rect line0, VNRow r, int index)
         {
             float x = line0.x;
 
@@ -1440,7 +1441,11 @@ namespace VNEffects.EditorTools
 
             var def = VNScenarioSchema.Find(r.keyword);
             float asyncW = 26f;
-            float avail = line0.xMax - x - asyncW - 4f;
+            // 行尾按钮区：choice 的 "+ option" / camseq 的 "🎬 预设▾ + wp"
+            float tailW = 0f;
+            if (r.options != null) tailW = 78f;
+            else if (r.camLines != null) tailW = CamseqHeaderButtonsWidth;
+            float avail = line0.xMax - x - asyncW - tailW - 4f;
 
             if (def != null && def.parameters.Length > 0)
                 DrawParams(new Rect(x, line0.y, avail, line0.height), r, def);
@@ -1466,33 +1471,347 @@ namespace VNEffects.EditorTools
                 }
             }
 
-            // ---- camseq 路径点行（原样文本） ----
+            // ---- camseq 路径点行 ----
             if (r.camLines != null)
             {
                 for (int i = 0; i < r.camLines.Count; i++)
+                    if (DrawCamWaypointRow(SubLine(fullRect, 1 + i), r, i)) break;
+                DrawCamseqHeaderButtons(line0, asyncW, r, index);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // camseq：路径点行 + header 上的镜头编排 / 预设入口
+        // ------------------------------------------------------------------
+
+        // 「编排」40 + 「预设▾」52 + 「+ wp」50 + 间距（emoji 在 IMGUI 默认字体里是方块，用汉字）
+        const float CamseqHeaderButtonsWidth = 40f + 4f + 52f + 4f + 50f + 4f;
+
+        void DrawCamseqHeaderButtons(Rect line0, float asyncW, VNRow r, int index)
+        {
+            float x = line0.xMax - asyncW - CamseqHeaderButtonsWidth + 4f;
+
+            bool linked = VNCamseqEditorWindow.IsLinkedTo(this, index);
+            var prevBg = GUI.backgroundColor;
+            if (linked) GUI.backgroundColor = new Color(1f, 0.85f, 0.35f);
+            if (GUI.Button(new Rect(x, line0.y, 40f, line0.height),
+                    new GUIContent("编排", linked
+                        ? "镜头编排窗口正在编辑这一行（再点一次把窗口调到前面）"
+                        : "在镜头编排窗口里可视化编辑这段运镜（画布拖点、时间轴预览，改动回写本行）"),
+                    EditorStyles.miniButton))
+                VNCamseqEditorWindow.OpenLinked(this, index);
+            GUI.backgroundColor = prevBg;
+            x += 44f;
+
+            var presetRect = new Rect(x, line0.y, 52f, line0.height);
+            if (GUI.Button(presetRect,
+                    new GUIContent("预设▾", "套用内置运镜模板或已保存的预设（会覆盖本行的全部路径点）"),
+                    EditorStyles.miniButton))
+                ShowCamseqPresetMenu(presetRect, r, index);
+            x += 56f;
+
+            if (GUI.Button(new Rect(x, line0.y, 50f, line0.height),
+                    new GUIContent("+ wp", "追加一个路径点"), EditorStyles.miniButton))
+            {
+                MarkStructural();
+                r.camLines.Add(new VNCamWaypoint
                 {
-                    var lr = SubLine(fullRect, 1 + i);
-                    var delRect = new Rect(lr.xMax - 20f, lr.y, 20f, lr.height);
-                    string nv = EditorGUI.TextField(
-                        new Rect(lr.x + 12f, lr.y, lr.width - 34f, lr.height), r.camLines[i]);
-                    if (nv != r.camLines[i]) r.camLines[i] = nv;
-                    GUI.Label(new Rect(lr.x, lr.y, 12f, lr.height), "›", EditorStyles.miniLabel);
-                    if (GUI.Button(delRect, "x", EditorStyles.miniButton))
-                    {
-                        MarkStructural();
-                        r.camLines.RemoveAt(i);
-                        Bump();
-                        break;
-                    }
+                    point = "middle", zoom = 1.4f, duration = 0.8f,
+                }.Format());
+                Bump();
+            }
+        }
+
+        /// <summary>
+        /// 画一行路径点。能解析的走字段化控件，解析不了的退回纯文本框并标黄
+        /// （旧剧本的手写行、未来新语法都不会被吞掉）。返回 true = 本行被删掉，
+        /// 调用方要立刻停止遍历。
+        /// </summary>
+        bool DrawCamWaypointRow(Rect rect, VNRow r, int i)
+        {
+            GUI.Label(new Rect(rect.x, rect.y, 12f, rect.height), "›", EditorStyles.miniLabel);
+            var delRect = new Rect(rect.xMax - 20f, rect.y, 20f, rect.height);
+            var body = new Rect(rect.x + 12f, rect.y, rect.xMax - 24f - rect.x - 12f, rect.height);
+
+            if (VNCamWaypoint.TryParse(r.camLines[i], out var wp))
+            {
+                if (DrawCamWaypointFields(body, r, i, wp))
+                    r.camLines[i] = wp.Format();
+            }
+            else
+            {
+                // 解析不了：原样文本 + 黄底提醒，鼠标悬停说明为什么
+                var style = new GUIStyle(EditorStyles.textField);
+                style.normal.textColor = new Color(0.95f, 0.8f, 0.25f);
+                EditorGUI.DrawRect(body, new Color(0.85f, 0.65f, 0.1f, 0.12f));
+                string nv = EditorGUI.TextField(body, r.camLines[i], style);
+                if (nv != r.camLines[i]) r.camLines[i] = nv;
+                GUI.Label(body, new GUIContent("", "这一行认不出来，暂按纯文本保留。\n" +
+                    "语法：> 目标点 [zoom] [时长] [ease:名] [xfade:秒]\n" +
+                    "改成合法写法后会自动变回字段化控件。"));
+            }
+
+            if (GUI.Button(delRect, "x", EditorStyles.miniButton))
+            {
+                MarkStructural();
+                r.camLines.RemoveAt(i);
+                Bump();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>字段化的一行；返回 true = 有改动，调用方负责写回文本</summary>
+        bool DrawCamWaypointFields(Rect rect, VNRow r, int i, VNCamWaypoint wp)
+        {
+            EditorGUI.BeginChangeCheck();
+            float x = rect.x;
+
+            // 点位类型（由 point token 反推；切换时给一个合理的初值）
+            var kind = wp.Kind;
+            var newKind = (VNCamPointKind)EditorGUI.Popup(
+                new Rect(x, rect.y, 56f, rect.height), (int)kind, CamPointKindNames);
+            x += 60f;
+            if (newKind != kind)
+            {
+                wp.point = newKind == VNCamPointKind.Anchor ? "middle"
+                    : newKind == VNCamPointKind.Coords ? "0,0"
+                    : (_ctx.characterIds.Length > 0 ? _ctx.characterIds[0] : "");
+                kind = newKind;
+            }
+
+            // 尾部固定宽度：zoom / 秒 / ease / xfade
+            const float tailW = 34f + 48f + 4f + 20f + 42f + 4f + 76f + 4f + 34f + 40f;
+            float targetW = Mathf.Max(90f, rect.xMax - x - tailW - 4f);
+            DrawCamPointTarget(new Rect(x, rect.y, targetW, rect.height), r, i, wp, kind);
+            x = rect.xMax - tailW;
+
+            GUI.Label(new Rect(x, rect.y, 34f, rect.height),
+                new GUIContent("zoom", "取景倍率：1 = 全图，越大越推近"), EditorStyles.miniLabel);
+            x += 34f;
+            wp.zoom = EditorGUI.FloatField(new Rect(x, rect.y, 48f, rect.height), wp.zoom);
+            x += 52f;
+
+            GUI.Label(new Rect(x, rect.y, 20f, rect.height),
+                new GUIContent("秒", "移动到本点的时长；0 = 瞬切"), EditorStyles.miniLabel);
+            x += 20f;
+            wp.duration = EditorGUI.FloatField(new Rect(x, rect.y, 42f, rect.height), wp.duration);
+            x += 46f;
+
+            // 缓动/锚点/部位一律用同步 Popup：SpritePopup 那套是异步回调，
+            // 会把选中值写进 VNRow.values（路径点存的是 camLines 文本，两条路径不能混）
+            wp.ease = OptionalPopup(new Rect(x, rect.y, 76f, rect.height),
+                wp.ease, VNScenarioSchema.EaseNames, "(默认缓动)");
+            x += 80f;
+
+            GUI.Label(new Rect(x, rect.y, 34f, rect.height),
+                new GUIContent("xfade", "叠化到本点的秒数（>0 时代替平移/瞬切）"),
+                EditorStyles.miniLabel);
+            x += 34f;
+            wp.fade = Mathf.Max(0f,
+                EditorGUI.FloatField(new Rect(x, rect.y, 40f, rect.height), wp.fade));
+
+            return EditorGUI.EndChangeCheck();
+        }
+
+        void DrawCamPointTarget(Rect rect, VNRow r, int i, VNCamWaypoint wp, VNCamPointKind kind)
+        {
+            switch (kind)
+            {
+                case VNCamPointKind.Anchor:
+                {
+                    int at = Mathf.Max(0,
+                        System.Array.IndexOf(VNCamWaypoint.Anchors, wp.point.ToLower()));
+                    at = EditorGUI.Popup(rect, at, CamAnchorDisplayNames);
+                    wp.point = VNCamWaypoint.Anchors[at];
+                    break;
                 }
-                var addRect = new Rect(line0.xMax - asyncW - 54f, line0.y, 50f, line0.height);
-                if (GUI.Button(addRect, "+ wp", EditorStyles.miniButton))
+
+                case VNCamPointKind.Character:
                 {
-                    MarkStructural();
-                    r.camLines.Add("> middle 1 1");
-                    Bump();
+                    VNCamWaypoint.SplitCharacter(wp.point, out string id, out string part);
+                    float half = Mathf.Max(60f, rect.width * 0.58f);
+                    // 角色 id 走 PopupString：它是同步返回的，custom… 还能手打场景里没有的 id
+                    string newId = PopupString(new Rect(rect.x, rect.y, half, rect.height),
+                        id, _ctx.characterIds, "(选角色)", (r, $"wp{i}.char"));
+                    string newPart = OptionalPopup(
+                        new Rect(rect.x + half + 4f, rect.y, rect.width - half - 4f, rect.height),
+                        part, VNCamWaypoint.CharacterParts, "(整体)");
+                    wp.point = VNCamWaypoint.JoinCharacter(newId, newPart);
+                    break;
+                }
+
+                case VNCamPointKind.Coords:
+                {
+                    VNCamWaypoint.SplitCoords(wp.point, out float px, out float py);
+                    float half = (rect.width - 22f) * 0.5f;
+                    GUI.Label(new Rect(rect.x, rect.y, 10f, rect.height), "x",
+                        EditorStyles.miniLabel);
+                    px = EditorGUI.FloatField(
+                        new Rect(rect.x + 10f, rect.y, half, rect.height), px);
+                    GUI.Label(new Rect(rect.x + half + 14f, rect.y, 10f, rect.height), "y",
+                        EditorStyles.miniLabel);
+                    py = EditorGUI.FloatField(
+                        new Rect(rect.x + half + 24f, rect.y, half - 2f, rect.height), py);
+                    wp.point = VNCamWaypoint.JoinCoords(px, py);
+                    break;
                 }
             }
+        }
+
+        /// <summary>「(留空) + 候选」的同步下拉；返回 "" 表示选了留空项</summary>
+        static string OptionalPopup(Rect rect, string value, string[] options, string emptyLabel)
+        {
+            var display = new string[options.Length + 1];
+            display[0] = emptyLabel;
+            for (int i = 0; i < options.Length; i++) display[i + 1] = options[i];
+
+            int index = string.IsNullOrEmpty(value)
+                ? 0 : System.Array.IndexOf(options, value) + 1;
+            if (index < 0) index = 0;   // 认不出的值当留空显示（TryParse 已挡掉大部分）
+            int picked = EditorGUI.Popup(rect, index, display);
+            return picked <= 0 ? "" : options[picked - 1];
+        }
+
+        static readonly string[] CamPointKindNames = { "锚点", "角色", "坐标" };
+
+        static readonly string[] CamAnchorDisplayNames =
+        {
+            "topleft（左上）", "top（上）", "topright（右上）",
+            "left（左）", "middle（中）", "right（右）",
+            "bottomleft（左下）", "bottom（下）", "bottomright（右下）",
+        };
+
+        void ShowCamseqPresetMenu(Rect rect, VNRow r, int index)
+        {
+            var menu = new GenericMenu();
+            string character = _ctx.characterIds.Length > 0 ? _ctx.characterIds[0] : null;
+
+            foreach (var entry in VNCamseqTemplates.All)
+            {
+                string text = VNCamseqTemplates.Resolve(entry.text, character);
+                menu.AddItem(new GUIContent($"内置模板/{entry.name}"), false,
+                    () => ApplyCamseqTextToRow(index, text, "套用模板"));
+            }
+
+            var library = LoadCamseqPresetLibrary();
+            if (library != null && library.presets.Count > 0)
+            {
+                menu.AddSeparator("");
+                foreach (var preset in library.presets)
+                {
+                    if (preset == null || string.IsNullOrEmpty(preset.name)) continue;
+                    string text = preset.camseqText;
+                    menu.AddItem(new GUIContent($"我的预设/{preset.name}"), false,
+                        () => ApplyCamseqTextToRow(index, text, "套用预设"));
+                }
+            }
+
+            menu.AddSeparator("");
+            menu.AddItem(new GUIContent("把本行存为预设…"), false, () => SaveRowAsCamseqPreset(r));
+            menu.DropDown(rect);
+        }
+
+        static VNCamseqPresetLibrary LoadCamseqPresetLibrary() =>
+            AssetDatabase.LoadAssetAtPath<VNCamseqPresetLibrary>(
+                VNCamseqEditorWindow.LibraryPath);
+
+        void SaveRowAsCamseqPreset(VNRow r)
+        {
+            if (r.camLines == null || r.camLines.Count == 0)
+            {
+                ShowNotification(new GUIContent("这一行还没有路径点"));
+                return;
+            }
+            string name = VNTextPromptWindow.Prompt("存为镜头预设", "预设名称", "");
+            if (string.IsNullOrEmpty(name)) return;
+            VNCamseqEditorWindow.SavePreset(name, CamseqTextOfRow(r));
+            ShowNotification(new GUIContent($"已保存预设「{name}」"));
+        }
+
+        /// <summary>把一行 camseq（含 header 参数）拍成完整的 camseq 文本</summary>
+        static string CamseqTextOfRow(VNRow r)
+        {
+            var header = new Dictionary<string, string>();
+            foreach (var key in VNCamseqText.HeaderKeys)
+            {
+                string v = r.Get(key);
+                if (!string.IsNullOrEmpty(v)) header[key] = v;
+            }
+            return VNCamseqText.Join(header, r.camLines ?? new List<string>());
+        }
+
+        /// <summary>套用一段 camseq 文本到指定行（预设/模板/镜头窗口回写共用）</summary>
+        void ApplyCamseqTextToRow(int index, string camseqText, string what)
+        {
+            if (!ApplyCamseqText(index, camseqText))
+            {
+                ShowNotification(new GUIContent($"{what}失败：目标行不是 camseq"));
+                return;
+            }
+            ShowNotification(new GUIContent(what + "完成"));
+        }
+
+        // ---- 供镜头编排窗口调用的公开接口 ----
+
+        /// <summary>当前打开文件的显示名（镜头窗口的绑定条用）</summary>
+        public string ScenarioDisplayName =>
+            string.IsNullOrEmpty(_path) ? "(未命名)" : Path.GetFileName(_path);
+
+        /// <summary>文档改动计数：镜头窗口靠它发现「剧本那边被改了」</summary>
+        public int DocVersion => _version;
+
+        public bool IsCamseqRow(int index) =>
+            index >= 0 && index < _doc.rows.Count &&
+            _doc.rows[index].kind == VNRowKind.Command &&
+            _doc.rows[index].keyword == "camseq" &&
+            _doc.rows[index].camLines != null;
+
+        /// <summary>当前选中行是 camseq 时返回它的行号，否则 -1（自动跟随用）</summary>
+        public int SelectedCamseqRow()
+        {
+            int index = _list != null ? _list.index : -1;
+            return IsCamseqRow(index) ? index : -1;
+        }
+
+        /// <summary>读出某一行的完整 camseq 文本</summary>
+        public bool TryGetCamseqText(int index, out string text)
+        {
+            text = null;
+            if (!IsCamseqRow(index)) return false;
+            text = CamseqTextOfRow(_doc.rows[index]);
+            return true;
+        }
+
+        /// <summary>
+        /// 把一段 camseq 文本写回指定行（header 参数 + 路径点行整体替换）。
+        /// 撤销走和手动编辑一样的 1 秒节流，免得镜头窗口实时回写时刷爆撤销栈。
+        /// </summary>
+        public bool ApplyCamseqText(int index, string camseqText)
+        {
+            if (!IsCamseqRow(index)) return false;
+            if (!VNCamseqText.TrySplit(camseqText, out var header, out var lines)) return false;
+
+            var r = _doc.rows[index];
+            if (CamseqTextOfRow(r) == VNCamseqText.Join(header, lines)) return true; // 无变化
+
+            PushUndoThrottled();
+            foreach (var key in VNCamseqText.HeaderKeys)
+                r.Set(key, header.TryGetValue(key, out string v) ? v : "");
+            r.camLines.Clear();
+            r.camLines.AddRange(lines);
+            Bump();
+            Repaint();
+            return true;
+        }
+
+        /// <summary>外部改动的撤销入口：与 OnGUI 末尾同一套 1 秒节流</summary>
+        void PushUndoThrottled()
+        {
+            double now = EditorApplication.timeSinceStartup;
+            if (now - _lastUndoPush <= 1.0) return;
+            PushUndo(_doc.GenerateText());
+            _lastUndoPush = now;
         }
 
         void ShowRowTypeMenu(Rect rect, VNRow row)
@@ -2479,7 +2798,10 @@ namespace VNEffects.EditorTools
             var r = new VNRow { kind = VNRowKind.Command };
             SetKeyword(r, keyword);
             if (r.camLines != null && r.camLines.Count == 0)
-                r.camLines.Add("> middle 1 1");
+                r.camLines.Add(new VNCamWaypoint
+                {
+                    point = "middle", zoom = 1.4f, duration = 0.8f,
+                }.Format());
             return r;
         }
 
