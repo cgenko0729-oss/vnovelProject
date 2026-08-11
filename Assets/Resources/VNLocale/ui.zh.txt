@@ -221,3 +221,5 @@ badminton.startFree = 自由练习——不计胜负，ESC 随时结束
 badminton.confirmQuit = 现在退出将判定为落败。\n确定要认输吗？
 badminton.quitYes = 认输（Y）
 badminton.quitNo = 继续打（N）
+badminton.goal = 先到 {0} 分 · 需净胜 2 分
+badminton.goalFree = 自由练习 · 不计胜负 · ESC 结束

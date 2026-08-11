@@ -1,2 +1,21 @@
 fileFormatVersion: 2
 guid: 498229597acbbc1458b09bd142fed245
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - opponentBody: {instanceID: 0}
+  - playerBody: {fileID: 21300000, guid: 4a425d2a1b83182419f73a12b77f100b, type: 3}
+  - racket: {instanceID: 0}
+  - arm: {instanceID: 0}
+  - backdrop: {instanceID: 0}
+  - serveSe: {instanceID: 0}
+  - hitSe: {instanceID: 0}
+  - perfectSe: {instanceID: 0}
+  - smashSe: {instanceID: 0}
+  - landSe: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -42,6 +42,9 @@ namespace VNEffects
         public Sprite racketSprite;
         public Sprite armSprite;
 
+        [Header("兜底羽毛球本体图（留空 = 程序化光球+羽裙；有图时按图片比例显示，图片约定羽裙朝上/球头朝下）")]
+        public Sprite ballSprite;
+
         [Header("兜底远景底图（留空 = 程序化渐变天空）")]
         public Sprite backdrop;
 
@@ -149,6 +152,7 @@ namespace VNEffects
             _sfx.Build(gameObject, _def, ctx.stage != null ? ctx.stage.vnAudio : null);
 
             _court.SetHint(VNLocale.T(_freeMode ? "badminton.hintFree" : "badminton.hint"));
+            _court.SetGoal(_freeMode, _target);
 
             _scoreMe = _scoreOp = 0;
             _court.SetScore(0, 0, false);
@@ -156,6 +160,9 @@ namespace VNEffects
             _phaseTimer = 1.2f;
             _court.ShowTips(VNLocale.T(_freeMode ? "badminton.startFree"
                                                  : "badminton.start", _target));
+
+            // 先同步一次，否则第一帧渲染时球还在原点（低帧率下会看到它在左下角闪一下）
+            SyncVisuals();
         }
 
         /// <summary>
@@ -286,11 +293,24 @@ namespace VNEffects
             VNBadmintonUi.AnchorBottomCenter(_ballShadow);
             _ballShadow.sizeDelta = new Vector2(56f, 20f);
 
-            // 球体：软光晕打底 + 实心球头。纯 Sparkle 贴图在亮底上几乎看不见，
+            // 球体：有图用图（羽裙朝上/球头朝下的约定见 ballSprite 注释），
+            // 没图时软光晕打底 + 实心球头兜底——纯 Sparkle 贴图在亮底上几乎看不见，
             // 而「看得见球」是这个玩法的生命线。
+            Sprite ball = _def != null && _def.ballSprite != null ? _def.ballSprite : ballSprite;
             _ballRect = VNBadmintonUi.CreateImage("Ball", _court.ActorLayer,
-                VNProceduralTextures.RadialGlowSprite, new Color(1f, 1f, 1f, 0.55f));
+                ball != null ? ball : VNProceduralTextures.RadialGlowSprite,
+                ball != null ? Color.white : new Color(1f, 1f, 1f, 0.55f));
             VNBadmintonUi.AnchorBottomCenter(_ballRect);
+
+            if (ball != null)
+            {
+                _ballRect.GetComponent<Image>().preserveAspect = true;
+                const float h = 56f;
+                float aspect = ball.rect.width / Mathf.Max(1f, ball.rect.height);
+                _ballRect.sizeDelta = new Vector2(h * aspect, h);
+                return;
+            }
+
             _ballRect.sizeDelta = new Vector2(52f, 52f);
 
             // 羽毛裙（拉长的半透明尾）
@@ -357,10 +377,11 @@ namespace VNEffects
             if (_def != null) ApplyTuning();
 #endif
 
-            ReadInput();
-
-            // 确认框开着时冻结整局（球不动、输入只走确认框）
+            // 确认框开着时冻结整局：**必须在 ReadInput 之前拦**，
+            // 否则 ReadInput 尾部还会照常触发挥拍/起跳，「冻结」名不副实
             if (_confirmOpen) { TickConfirm(); return; }
+
+            ReadInput();
 
             if (_pressQuit && _phase != Phase.Over)
             {

@@ -220,3 +220,5 @@ badminton.startFree = 自由練習——勝敗なし、ESC でいつでも終了
 badminton.confirmQuit = ここで抜けると敗北扱いになります。\n棄権しますか？
 badminton.quitYes = 棄権（Y）
 badminton.quitNo = 続ける（N）
+badminton.goal = 先に {0} 点 · 2 点差が必要
+badminton.goalFree = 自由練習 · 勝敗なし · ESC で終了

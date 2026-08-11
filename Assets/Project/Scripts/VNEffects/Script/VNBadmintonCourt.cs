@@ -51,7 +51,7 @@ namespace VNEffects
         public RectTransform ActorLayer { get; private set; }
 
         RectTransform _scoreBoard, _tipsBox;
-        TextMeshProUGUI _scoreText, _leftName, _rightName, _tipsText, _hintText;
+        TextMeshProUGUI _scoreText, _leftName, _rightName, _tipsText, _hintText, _goalText;
         Sequence _tipsSeq;
         GameObject _linkTarget;
 
@@ -277,27 +277,37 @@ namespace VNEffects
             _scoreBoard.GetComponent<Image>().type = Image.Type.Sliced;
             VNBadmintonUi.AnchorBottomCenter(_scoreBoard);
             _scoreBoard.anchoredPosition = new Vector2(0f, ScoreBoardY);
-            _scoreBoard.sizeDelta = new Vector2(720f, 120f);
+            _scoreBoard.sizeDelta = new Vector2(720f, 148f);
 
+            // 名字与比分同一行（0.62），副标题独占下面一行（0.16），两行不能挤在一起
             _leftName = VNBadmintonUi.CreateText("LeftName", _scoreBoard, 34,
                 new Color(0.62f, 0.80f, 1f, 1f), "");
             var ln = VNBadmintonUi.Rect(_leftName);
-            ln.anchorMin = ln.anchorMax = new Vector2(0.2f, 0.5f);
+            ln.anchorMin = ln.anchorMax = new Vector2(0.2f, 0.62f);
             ln.anchoredPosition = Vector2.zero;
             ln.sizeDelta = new Vector2(260f, 60f);
 
             _rightName = VNBadmintonUi.CreateText("RightName", _scoreBoard, 34,
                 new Color(1f, 0.68f, 0.70f, 1f), "");
             var rn = VNBadmintonUi.Rect(_rightName);
-            rn.anchorMin = rn.anchorMax = new Vector2(0.8f, 0.5f);
+            rn.anchorMin = rn.anchorMax = new Vector2(0.8f, 0.62f);
             rn.anchoredPosition = Vector2.zero;
             rn.sizeDelta = new Vector2(260f, 60f);
 
             _scoreText = VNBadmintonUi.CreateText("Score", _scoreBoard, 62, ScoreColor, "0 - 0");
             var sc = VNBadmintonUi.Rect(_scoreText);
-            sc.anchorMin = sc.anchorMax = new Vector2(0.5f, 0.5f);
+            sc.anchorMin = sc.anchorMax = new Vector2(0.5f, 0.62f);
             sc.anchoredPosition = Vector2.zero;
             sc.sizeDelta = new Vector2(260f, 90f);
+
+            // 赛制副标题：**必须常驻**。开场横幅一闪而过，没有这行的话
+            // 「自由练习不会结束」与「正式赛坏了不判胜负」在玩家眼里长得一模一样。
+            _goalText = VNBadmintonUi.CreateText("Goal", _scoreBoard, 24,
+                new Color(1f, 1f, 1f, 0.62f), "");
+            var gr = VNBadmintonUi.Rect(_goalText);
+            gr.anchorMin = gr.anchorMax = new Vector2(0.5f, 0.16f);
+            gr.anchoredPosition = Vector2.zero;
+            gr.sizeDelta = new Vector2(700f, 34f);
 
             // 提示横幅（得分 / 出界 / 赛点）
             _tipsBox = VNBadmintonUi.CreateImage("Tips", hud,
@@ -329,6 +339,15 @@ namespace VNEffects
         public void SetHint(string text)
         {
             if (_hintText != null) _hintText.text = text;
+        }
+
+        /// <summary>记分板副标题：这一局要打到几分，还是根本没有终局</summary>
+        public void SetGoal(bool freeMode, int target)
+        {
+            if (_goalText == null) return;
+            _goalText.text = freeMode
+                ? VNLocale.T("badminton.goalFree")
+                : VNLocale.T("badminton.goal", target);
         }
 
         public void SetNames(string left, string right)

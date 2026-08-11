@@ -157,12 +157,13 @@ namespace VNEffects
 
         void BuildShadow()
         {
+            // 软光晕的边缘衰减很快，0.32 的黑在绿色球场上几乎看不见——落地感全靠它，加深到 0.5
             _shadow = VNBadmintonUi.CreateImage("Shadow", Root,
-                VNProceduralTextures.RadialGlowSprite, new Color(0f, 0f, 0f, 0.32f));
+                VNProceduralTextures.RadialGlowSprite, new Color(0f, 0f, 0f, 0.5f));
             _shadow.anchorMin = _shadow.anchorMax = new Vector2(0.5f, 0f);
             _shadow.pivot = new Vector2(0.5f, 0.5f);
-            _shadow.anchoredPosition = new Vector2(0f, 6f);
-            _shadow.sizeDelta = new Vector2(190f, 54f);
+            _shadow.anchoredPosition = new Vector2(0f, 8f);
+            _shadow.sizeDelta = new Vector2(170f, 48f);
             _shadowImage = _shadow.GetComponent<Image>();
         }
 
@@ -482,10 +483,10 @@ namespace VNEffects
         {
             if (_shadowImage == null) return;
             float k = Mathf.Clamp01(1f - airHeight / 320f);
-            _shadow.sizeDelta = new Vector2(190f * Mathf.Lerp(0.55f, 1f, k),
-                                            54f * Mathf.Lerp(0.55f, 1f, k));
+            _shadow.sizeDelta = new Vector2(170f * Mathf.Lerp(0.55f, 1f, k),
+                                            48f * Mathf.Lerp(0.55f, 1f, k));
             var c = _shadowImage.color;
-            _shadowImage.color = new Color(c.r, c.g, c.b, Mathf.Lerp(0.14f, 0.32f, k));
+            _shadowImage.color = new Color(c.r, c.g, c.b, Mathf.Lerp(0.22f, 0.5f, k));
         }
 
         static float Ease01(float t) => 1f - (1f - t) * (1f - t);

@@ -220,3 +220,5 @@ badminton.startFree = Free practice — no score to reach, ESC to stop
 badminton.confirmQuit = Quitting now counts as a loss.\nForfeit the match?
 badminton.quitYes = Forfeit (Y)
 badminton.quitNo = Keep playing (N)
+badminton.goal = First to {0} · must lead by 2
+badminton.goalFree = Free practice · no winner · ESC to end

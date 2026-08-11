@@ -95,6 +95,8 @@ namespace VNEffects
         [Header("──────── 场景 ────────")]
         [Header("远景底图（留空 = 程序化渐变天空）")]
         public Sprite backdrop;
+        [Header("羽毛球本体图（留空 = 用下面模块兜底图，再留空 = 程序化光球+羽裙）")]
+        public Sprite ballSprite;
 
         [Header("──────── 赛制与手感 ────────")]
         [Header("目标分数（净胜 2 分制不变；剧本 target: 可覆盖）")]
