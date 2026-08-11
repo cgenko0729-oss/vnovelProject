@@ -387,6 +387,46 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   （`BuildUi` 直接 `(RectTransform)transform`）——这正是不该手工接的原因。
   支持 Undo、重复执行安全；新增事件模块时照抄这个文件即可。
 
+### VNBadminton*.cs —— 示例模块⑤：羽毛球对战（一〇二章）
+
+从参考项目 `Student Age new` 的 `BadmintonMiniGameView`（1263 行反编译源码）复刻。
+那份来源**只有代码没有美术**，所以是照逻辑重写，不是搬运。
+
+**五个文件的分层（这是这个模块最值得抄的地方）**
+
+| 文件 | 层 | 允许依赖 |
+|---|---|---|
+| `VNBadmintonBallistics.cs` | 纯数学 | 只有 `UnityEngine` 的 `Mathf/Vector2`。**无 MonoBehaviour、无 UI**，可单测 |
+| `VNBadmintonUi.cs` | UI 原语 | uGUI。含 `VNBadmintonQuad`（uGUI 画不出梯形） |
+| `VNBadmintonCourt.cs` | 场景与 HUD | UI 原语。不是 MonoBehaviour，由模块 new 出来持有 |
+| `VNBadmintonActor.cs` | 角色表现 | UI 原语。**换真动画只改这一个文件** |
+| `VNBadmintonModule.cs` | 玩法 | 以上全部 + `VNFlags` / `VNBadmintonDef` |
+
+- **弹道是解析式抛物线**：`BuildArc` 用「起点 + 落点 + 球网处过网高度」三点定
+  `y=ax²+bx+c`，每帧 `x += speed·dt`。球路一解出来，落点 / 顶点 / 对手该跑到哪里
+  就能全部反解——AI 不需要预测、轨迹虚点不需要模拟。**改玩法前先理解这一点**。
+- **不用 Physics2D**（与参考实现的关键偏离）。改纯数学距离判定，
+  **代价是 `StepBall` 必须子步进**：单步位移上限 12px、上限 16 步。
+  扣杀球 1350+ px/s，30fps 单帧位移 45px 而拍面半径只有 105px，
+  不切小步低帧率时球会**直接穿过球拍**。改速度上限时必须同步复核这个比例。
+- **判定几何与动画分开**：`RacketPointFor(kind)` 返回固定几何，不随挥拍动画角度走。
+  判定要可预测、帧率无关；动画只负责「看起来打到了」。**别把它们接起来**。
+- **★ 坐标换算的隐藏项**：参考实现 2560×1440 → 本专案 1920×1080 全部 ×0.75，
+  但 `flySpeed` 还要**再乘 √0.75 = 0.866**（`tuning.flySpeedScale`）。
+  坐标缩放 k 后 `a→a/k`，速度只会变 √k 倍，而飞行时间不变需要 k 倍。
+  少这一下球快 15%，数值全对但手感就是不对。详见《羽毛球小游戏实施计划.md》第四节。
+- 难度 / 对手 / 台词 / 立绘 / 音效全在 `VNBadmintonDef`；解析三级
+  （剧本 `id:` → 剧本 `vs:` 同名资产 → 库里只有一条时直接用）。
+- 养成联动照 `VNBattleModule.patkstat` 范式：`powerstat/speedstat/jumpstat` 指定读哪个
+  flag，`ApplyTuning()` 在 `CopyFrom(def.tuning)` **之后**叠加加成——
+  顺序反了会被编辑器每帧重读冲掉。
+- 音效 `VNBadmintonSfx` 全部 `AudioClip.Create` 合成（指数包络 × (正弦 + 低通白噪)），
+  Def 填了真音效逐条覆盖，音量跟随 `VNAudio.seVolume`。
+- `debugAutoPlayer` 开关：让玩家也交给 AI 自动对拉，验证回合逻辑用。
+- `Editor/VNBadmintonInstaller.cs` 与 `VNQuizInstaller` 同款增量装机。
+- **坑**：`Graphic` 子类必须自己再写一遍 `[RequireComponent(typeof(CanvasRenderer))]`，
+  基类那条不会被 `AddComponent` 走继承链读到——不写的症状是「一切状态正常但就是不画」。
+
 ### VNSnsView.cs / VNSnsMessage.cs —— SNS 手机聊天（九十章）
 
 - **不是事件模块**，是对话的另一种呈现层：`sns open` 之后 `SayCo` 分流到 `SnsSayCo`，

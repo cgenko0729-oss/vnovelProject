@@ -70,6 +70,8 @@ namespace VNEffects.EditorTools
                 ["result"] = new HashSet<string> { "fail", "normal", "good", "great" },
                 ["battle"] = new HashSet<string> { "胜利", "失败", "逃跑" },
                 ["quiz"] = new HashSet<string> { "全对", "及格", "失败" },
+                // badminton 的「结束」只在 mode:free 下出现，正式赛只有胜利/失败
+                ["badminton"] = new HashSet<string> { "胜利", "失败", "结束" },
                 // map 的结果名 = 地点名，取自场景模板，运行时补
             };
 
@@ -100,6 +102,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> eventModules = new HashSet<string>();
             public HashSet<string> mapLocations = new HashSet<string>();
             public HashSet<string> quizIds = new HashSet<string>();
+            public HashSet<string> badmintonIds = new HashSet<string>();
             public HashSet<string> weatherIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
@@ -274,6 +277,15 @@ namespace VNEffects.EditorTools
                 var def = AssetDatabase.LoadAssetAtPath<VNQuizDef>(
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (def != null && !string.IsNullOrEmpty(def.quizId)) reg.quizIds.Add(def.quizId);
+            }
+
+            // 羽球对手 id：同理扫资产，新建对手后不必重建场景就能被校验到
+            foreach (var guid in AssetDatabase.FindAssets("t:VNBadmintonDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNBadmintonDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def != null && !string.IsNullOrEmpty(def.badmintonId))
+                    reg.badmintonIds.Add(def.badmintonId);
             }
 
             // 自定义飘落天气资产（内置叶型别名与 VNWeather 枚举另行判定，不进这个集合）
@@ -734,6 +746,19 @@ namespace VNEffects.EditorTools
                             "题库是 VN/Quiz Definition 资产（Assets/VNEffects/Quizzes），" +
                             $"quizId 要和剧本写的一致。当前已有：" +
                             $"{string.Join(" / ", reg.quizIds.OrderBy(s => s))}");
+                }
+
+                // badminton 的对手 id 拼错 = 静默退回兜底难度，一局白打
+                if (module == "badminton")
+                {
+                    string defId = c.Kw("id");
+                    if (!string.IsNullOrEmpty(defId) && !Dynamic(defId) &&
+                        reg.badmintonIds.Count > 0 && !reg.badmintonIds.Contains(defId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-badminton", f, c.line,
+                            $"没有 id 为「{defId}」的羽球对手资产",
+                            "对手是 VN/Badminton Definition 资产（Assets/VNEffects/Badminton），" +
+                            "badmintonId 要和剧本写的一致；拼错只会静默退回兜底难度。" +
+                            $"当前已有：{string.Join(" / ", reg.badmintonIds.OrderBy(s => s))}");
                 }
 
                 if (c.options == null || c.options.Count == 0) continue;

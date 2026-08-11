@@ -66,7 +66,15 @@ namespace VNEffects
         VNBadmintonCourt _court;
         VNBadmintonActor _me, _op;
         VNBadmintonDef _def;
+        VNBadmintonSfx _sfx;
         Sprite _opponentBody;   // 三级回退的结果，OnLaunch 里定下来
+
+        /// <summary>自由练习模式：无胜负、无上限、随时可退（结果名「结束」）</summary>
+        bool _freeMode;
+        /// <summary>养成属性换算出的能力加成，每次重刷 tuning 后要重新叠上去</summary>
+        float _bonusPower, _bonusSpeed, _bonusJump;
+        bool _confirmOpen;
+        RectTransform _confirmPanel;
 
         // 比分与赛制
         int _scoreMe, _scoreOp, _target;
@@ -112,7 +120,10 @@ namespace VNEffects
         protected override void OnLaunch(VNEventContext ctx)
         {
             ResolveDef(ctx);
+            ComputeStatBonus(ctx);
+            ApplyTuning();
 
+            _freeMode = ctx.Kw("mode", "match") == "free";
             _target = Mathf.Max(1, ctx.KwI("target",
                 _def != null ? _def.targetScore : targetScore));
             _flagPrefix = ctx.Kw("flag", _flagPrefix);
@@ -134,11 +145,49 @@ namespace VNEffects
             BuildBall();
             ResetPositions();
 
+            _sfx = new VNBadmintonSfx();
+            _sfx.Build(gameObject, _def, ctx.stage != null ? ctx.stage.vnAudio : null);
+
+            _court.SetHint(VNLocale.T(_freeMode ? "badminton.hintFree" : "badminton.hint"));
+
             _scoreMe = _scoreOp = 0;
             _court.SetScore(0, 0, false);
             _phase = Phase.Intro;
             _phaseTimer = 1.2f;
-            _court.ShowTips(VNLocale.T("badminton.start", _target));
+            _court.ShowTips(VNLocale.T(_freeMode ? "badminton.startFree"
+                                                 : "badminton.start", _target));
+        }
+
+        /// <summary>
+        /// 养成联动：能力 = Def 基础值 + 属性点数 × 每点增量（照 VNBattleModule 的 patkstat 范式）。
+        /// 属性名由剧本给，模块不认识任何具体属性——桥全在 flags 上。
+        /// </summary>
+        void ComputeStatBonus(VNEventContext ctx)
+        {
+            int cap = _def != null ? _def.statCap : 20;
+            float perPower = _def != null ? _def.powerPerStat : 0.04f;
+            float perSpeed = _def != null ? _def.speedPerStat : 0.12f;
+            float perJump = _def != null ? _def.jumpPerStat : 0.05f;
+
+            _bonusPower = StatOf(ctx, "powerstat", cap) * perPower;
+            _bonusSpeed = StatOf(ctx, "speedstat", cap) * perSpeed;
+            _bonusJump = StatOf(ctx, "jumpstat", cap) * perJump;
+        }
+
+        static int StatOf(VNEventContext ctx, string key, int cap)
+        {
+            string statName = ctx.Kw(key);
+            if (string.IsNullOrEmpty(statName)) return 0;
+            return Mathf.Clamp(VNFlags.Get(statName), 0, Mathf.Max(0, cap));
+        }
+
+        /// <summary>Def 参数 → tuning，再叠上养成加成。Editor 实时调参每帧都会重走一遍。</summary>
+        void ApplyTuning()
+        {
+            if (_def != null) tuning.CopyFrom(_def.tuning);
+            tuning.playerPower += _bonusPower;
+            tuning.playerMoveSpeed += _bonusSpeed;
+            tuning.playerJumpHeight += _bonusJump;
         }
 
         /// <summary>
@@ -155,14 +204,9 @@ namespace VNEffects
             _def = FindDef(id) ?? FindDef(vs);
             if (_def == null && defs.Count == 1 && string.IsNullOrEmpty(id)) _def = defs[0];
 
-            if (_def == null)
-            {
-                if (!string.IsNullOrEmpty(id))
-                    Debug.LogWarning($"[VNEvent] 第 {ctx.line} 行：没有 id 为「{id}」的 " +
-                                     "VNBadmintonDef，本局用模板上的兜底参数");
-                return;
-            }
-            tuning.CopyFrom(_def.tuning);
+            if (_def == null && !string.IsNullOrEmpty(id))
+                Debug.LogWarning($"[VNEvent] 第 {ctx.line} 行：没有 id 为「{id}」的 " +
+                                 "VNBadmintonDef，本局用模板上的兜底参数");
         }
 
         VNBadmintonDef FindDef(string id)
@@ -310,15 +354,19 @@ namespace VNEffects
 #if UNITY_EDITOR
             // 决策 10 没做 Editor 调参窗口的补偿：Play 着直接拖 Def 资产的 Inspector
             // 就能实时看到手感变化，不用反复进出 Play Mode。运行时构建整段编译掉。
-            if (_def != null) tuning.CopyFrom(_def.tuning);
+            if (_def != null) ApplyTuning();
 #endif
 
             ReadInput();
 
+            // 确认框开着时冻结整局（球不动、输入只走确认框）
+            if (_confirmOpen) { TickConfirm(); return; }
+
             if (_pressQuit && _phase != Phase.Over)
             {
-                // TODO(P4)：这里要弹「退出将判负」确认框，确认后才结算。
-                Finish(false);
+                // 自由练习没有胜负，直接收工；正式赛要弹确认——退出即判负
+                if (_freeMode) FinishFree();
+                else OpenConfirm();
                 return;
             }
 
@@ -373,6 +421,86 @@ namespace VNEffects
                     ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
         }
 
+        // ------------------------------------------------------------------
+        // 认输确认框（决策 9：退出即判负，结算只有一条路径）
+        // ------------------------------------------------------------------
+
+        void OpenConfirm()
+        {
+            if (_confirmOpen) return;
+            _confirmOpen = true;
+
+            var root = (RectTransform)transform;
+            _confirmPanel = VNBadmintonUi.CreateImage("QuitConfirm", root, null,
+                new Color(0f, 0f, 0f, 0.55f));
+            VNBadmintonUi.Stretch(_confirmPanel);
+            _confirmPanel.GetComponent<Image>().raycastTarget = true;   // 挡住底下的点击
+
+            var box = VNBadmintonUi.CreateImage("Box", _confirmPanel,
+                VNProceduralTextures.RoundedRectSprite,
+                new Color(0.08f, 0.09f, 0.14f, 0.96f));
+            box.GetComponent<Image>().type = Image.Type.Sliced;
+            box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
+            box.sizeDelta = new Vector2(620f, 240f);
+
+            var msg = VNBadmintonUi.CreateText("Msg", box, 36, Color.white,
+                VNLocale.T("badminton.confirmQuit"));
+            var mr2 = VNBadmintonUi.Rect(msg);
+            mr2.anchorMin = mr2.anchorMax = new Vector2(0.5f, 0.68f);
+            mr2.sizeDelta = new Vector2(580f, 100f);
+            msg.textWrappingMode = TMPro.TextWrappingModes.Normal;
+
+            MakeConfirmButton(box, -140f, VNLocale.T("badminton.quitYes"),
+                new Color(0.85f, 0.35f, 0.38f, 1f), () => CloseConfirm(true));
+            MakeConfirmButton(box, 140f, VNLocale.T("badminton.quitNo"),
+                new Color(0.30f, 0.45f, 0.70f, 1f), () => CloseConfirm(false));
+
+            box.localScale = Vector3.one * 0.8f;
+            box.DOScale(1f, 0.2f).SetEase(Ease.OutBack).SetUpdate(true).SetLink(gameObject);
+        }
+
+        void MakeConfirmButton(RectTransform parent, float x, string label,
+            Color color, UnityEngine.Events.UnityAction onClick)
+        {
+            var rect = VNBadmintonUi.CreateImage("Btn", parent,
+                VNProceduralTextures.RoundedRectSprite, color);
+            var img = rect.GetComponent<Image>();
+            img.type = Image.Type.Sliced;
+            img.raycastTarget = true;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.26f);
+            rect.anchoredPosition = new Vector2(x, 0f);
+            rect.sizeDelta = new Vector2(220f, 72f);
+
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = img;
+            button.onClick.AddListener(onClick);
+
+            var text = VNBadmintonUi.CreateText("Label", rect, 32, Color.white, label);
+            var tr = VNBadmintonUi.Rect(text);
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+            tr.offsetMin = tr.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>确认框开着时只读键盘，其余一律冻结</summary>
+        void TickConfirm()
+        {
+            var k = Keyboard.current;
+            if (k == null) return;
+            if (k.yKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame) CloseConfirm(true);
+            else if (k.nKey.wasPressedThisFrame || k.escapeKey.wasPressedThisFrame) CloseConfirm(false);
+        }
+
+        void CloseConfirm(bool quit)
+        {
+            _confirmOpen = false;
+            if (_confirmPanel != null)
+            {
+                Destroy(_confirmPanel.gameObject);
+                _confirmPanel = null;
+            }
+            if (quit) Finish(false);   // 认输 = 失败，与打输走同一条结算路径
+        }
+
         void EnterServe()
         {
             ResetPositions();
@@ -406,6 +534,7 @@ namespace VNEffects
 
             _ballDir = outDir;
             server.PlaySwing(VNBadmintonSwing.High);
+            _sfx.Play(VNBadmintonSfx.Kind.Serve);
             Talk(byPlayer, TalkKind.Serve);
             BuildTrack();
             PlanReceive();
@@ -491,6 +620,10 @@ namespace VNEffects
 
             actor.PlaySwing(airborne ? VNBadmintonSwing.Smash
                 : _ball.y < tuning.lowSwingY ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+
+            _sfx.Play(airborne ? VNBadmintonSfx.Kind.Smash
+                    : perfect ? VNBadmintonSfx.Kind.Perfect
+                              : VNBadmintonSfx.Kind.Hit);
 
             if (perfect)
             {
@@ -713,6 +846,7 @@ namespace VNEffects
 
         void AwardPoint(bool toPlayer, string reasonKey)
         {
+            _sfx.Play(VNBadmintonSfx.Kind.Land);
             if (toPlayer) _scoreMe++; else _scoreOp++;
             _serverSide = toPlayer ? -1 : 1;   // 拿分方发球
             _bestRally = Mathf.Max(_bestRally, _rallyCount);
@@ -732,8 +866,9 @@ namespace VNEffects
             string msg = VNLocale.T(toPlayer ? "badminton.pointMe" : "badminton.pointOp");
             if (!string.IsNullOrEmpty(reasonKey)) msg = VNLocale.T(reasonKey) + msg;
 
-            bool meWin = _scoreMe >= _target && _scoreMe - _scoreOp >= 2;
-            bool opWin = _scoreOp >= _target && _scoreOp - _scoreMe >= 2;
+            // 自由练习没有终局，只记分不判胜负
+            bool meWin = !_freeMode && _scoreMe >= _target && _scoreMe - _scoreOp >= 2;
+            bool opWin = !_freeMode && _scoreOp >= _target && _scoreOp - _scoreMe >= 2;
 
             if (meWin || opWin)
             {
@@ -743,7 +878,7 @@ namespace VNEffects
             }
 
             // 赛点提醒并进同一条横幅——ShowTips 是单条通道，连喊两次会把前一条掐掉
-            if (Mathf.Max(_scoreMe, _scoreOp) >= _target - 1 &&
+            if (!_freeMode && Mathf.Max(_scoreMe, _scoreOp) >= _target - 1 &&
                 Mathf.Abs(_scoreMe - _scoreOp) >= 1)
                 msg += "  " + VNLocale.T("badminton.matchPoint");
 
@@ -756,15 +891,26 @@ namespace VNEffects
         {
             _phase = Phase.Over;
             _playerWon = win;
+            WriteFlags();
+            _court.ShowTips(VNLocale.T(win ? "badminton.win" : "badminton.lose"),
+                () => Done(win ? "胜利" : "失败"));
+        }
 
-            // 与剧情通信只走 flags（事件模块状态不进存档）
+        /// <summary>自由练习收工：无胜负，结果名固定「结束」</summary>
+        void FinishFree()
+        {
+            _phase = Phase.Over;
+            WriteFlags();
+            Done("结束");
+        }
+
+        /// <summary>与剧情通信只走 flags（事件模块状态不进存档）</summary>
+        void WriteFlags()
+        {
             VNFlags.Set($"{_flagPrefix}_我方得分", _scoreMe);
             VNFlags.Set($"{_flagPrefix}_对方得分", _scoreOp);
             VNFlags.Set($"{_flagPrefix}_精准数", _perfectCount);
             VNFlags.Set($"{_flagPrefix}_最长回合", Mathf.Max(_bestRally, _rallyCount));
-
-            _court.ShowTips(VNLocale.T(win ? "badminton.win" : "badminton.lose"),
-                () => Done(win ? "胜利" : "失败"));
         }
 
         // ------------------------------------------------------------------

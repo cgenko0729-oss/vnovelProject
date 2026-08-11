@@ -51,7 +51,7 @@ namespace VNEffects
         public RectTransform ActorLayer { get; private set; }
 
         RectTransform _scoreBoard, _tipsBox;
-        TextMeshProUGUI _scoreText, _leftName, _rightName, _tipsText;
+        TextMeshProUGUI _scoreText, _leftName, _rightName, _tipsText, _hintText;
         Sequence _tipsSeq;
         GameObject _linkTarget;
 
@@ -315,14 +315,20 @@ namespace VNEffects
             tt.sizeDelta = new Vector2(680f, 60f);
 
             // 右下角操作提示（与参考截图同位置）
-            var hint = VNBadmintonUi.CreateText("Hint", hud, 26,
+            _hintText = VNBadmintonUi.CreateText("Hint", hud, 26,
                 new Color(1f, 1f, 1f, 0.72f), VNLocale.T("badminton.hint"),
                 TextAlignmentOptions.Right);
-            var hr = VNBadmintonUi.Rect(hint);
+            var hr = VNBadmintonUi.Rect(_hintText);
             VNBadmintonUi.AnchorBottomCenter(hr);
             hr.pivot = new Vector2(1f, 0f);
             hr.anchoredPosition = new Vector2(930f, 18f);
             hr.sizeDelta = new Vector2(760f, 40f);
+        }
+
+        /// <summary>右下角操作提示（正式赛 / 自由练习两套文案）</summary>
+        public void SetHint(string text)
+        {
+            if (_hintText != null) _hintText.text = text;
         }
 
         public void SetNames(string left, string right)

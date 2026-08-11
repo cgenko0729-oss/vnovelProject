@@ -877,6 +877,7 @@ event qte time:3 target:12 title:鼓起勇气连打！
 | `result` | `event result grade:great title:剑术训练` | GOOD!/COMPLETE! 结算大弹窗（见下） |
 | `battle` | `event battle enemy:史莱姆 ehp:22` | 回合制小战斗，结果 `胜利` / `失败` / `逃跑` |
 | `quiz` | `event quiz id:社团常识 count:3 time:15` | 限时问答（见下） |
+| `badminton` | `event badminton vs:小雪 id:校队 target:5` | 羽毛球对战，结果 `胜利` / `失败` / `结束`（见下） |
 
 新玩法（战斗/钓鱼/番长镇日程……）就是照 VNQteModule 的样子再写一个模块类，
 接口/铁律见 `ProjectCodeGuide.md`。
@@ -931,6 +932,78 @@ if 答题正确数>=3 jump 学霸称号
 ——只往当前场景的 VNEventRegistry 里补一个禁用的 QuizTemplate 并登记题库，
 **不重建场景**（`Create Script Demo Scene` 会从零重造，手工整理的层级会丢）。
 装完记得 Ctrl+S 存场景。重复执行安全：已经装过就只刷新题库列表。
+
+### 羽毛球对战：badminton 🏸
+
+```
+event badminton vs:小雪 id:校队 target:5 powerstat:体育 speedstat:体育 jumpstat:体育
+* 胜利 -> 赢了
+* 失败 -> 输了
+```
+
+侧视 2D 羽球对战。**A/D**（或 ←/→）移动、**J** 发球兼击球、**K** 起跳扣杀、
+**ESC** 认输（会弹确认框，**退出即判负**）；鼠标左键 = 击球、右键 = 扣杀，但**移动只能键盘**。
+
+赛制 **先到目标分且净胜 2 分**。球飞的是一条解析求出的抛物线，
+球前方会有一串**轨迹虚点预告**落点——预告显示多长由难度决定，这是最大的难度杠杆。
+
+**手感要点**（照抄参考实现，值得写进教程）：按 J 只是**挥拍**，
+真正判定在球进入拍面那一刻。球在身前 90px 内击中 = **精准**（必定界内，冒金字）；
+更远只有一定概率界内。所以打不准不会立刻失误，而是**概率性出界**——
+不挫败，且「站位准」有明确正反馈。来球够高时玩家侧会亮出一个圈，那是**扣杀机会**。
+
+| 参数 | 说明 |
+|---|---|
+| `vs:` | 对手角色 id（`VNCharacterDef.id`），用于名字与立绘回退 |
+| `id:` | 对手 / 难度资产 id；省略时退回用 `vs:` 找同名资产 |
+| `target:` | 目标分数（默认取资产的；净胜 2 分制不变） |
+| `first:` | `me` / `opponent` / `random`（默认）谁先发球 |
+| `mode:` | `match` 正式赛（默认）/ `free` 自由练习——无胜负、ESC 随时收工 |
+| `powerstat:` | 扣杀力度读哪个属性 flag（不填 = 只用资产基础值） |
+| `speedstat:` | 移动速度读哪个属性 flag |
+| `jumpstat:` | 跳跃高度读哪个属性 flag |
+| `flag:` | 战绩 flag 前缀覆盖（默认 `羽球`） |
+| `title:` | 记分板标题覆盖 |
+
+**结果**：`胜利` / `失败`（打输**或 ESC 认输**走同一条）/ `结束`（仅 `mode:free`）。
+
+同时写入四个 flag，可用来做细分支：
+
+```
+if 羽球_对方得分 == 0 jump 零封
+if 羽球_对方得分 - 羽球_我方得分 <= 1 jump 惜败
+if 羽球_精准数 >= 3 jump 打得漂亮
+```
+
+| flag | 内容 |
+|---|---|
+| `<前缀>_我方得分` / `<前缀>_对方得分` | 最终比分 |
+| `<前缀>_精准数` | 本局打出「精准」的次数 |
+| `<前缀>_最长回合` | 最长一回合的来回次数 |
+
+**对手配置在 VNBadmintonDef 资产**（`Assets/VNEffects/Badminton/`，右键
+**Create → VN → Badminton Definition**）：
+
+| 字段 | 含义 |
+|---|---|
+| badmintonId | 剧本 `id:` 引用的 id（可中文，永远不翻译） |
+| 对手名 / 立绘 / 回退角色 id | 立绘三级回退：羽球专用图 → 该角色默认立绘 → 剪影占位 |
+| 六项难度 | 扣杀倾向 / 接球率 / **轨迹预告比例** / 界内率 / 移速 / 力度 |
+| 养成联动 | 属性每 1 点带来的力度・移速・跳跃增量 + 属性读数上限 |
+| 六类台词 | 发球 / 击球 / 扣杀 / 夸对手 / 得分 / 失分，各自一组随机取一条（三语） |
+| 音效 ×5 | 留空 = 用代码合成的（发球/击球/精准/扣杀/落地） |
+
+内置三档：**新手**（轨迹全程给、AI 爱漏球）/ **校队**（轨迹给一半）/
+**王牌**（轨迹只给 22%、AI 又快又爱扣杀，7 分制）。
+
+**调手感的办法**：Play Mode 里直接拖 Def 资产的 Inspector，**改了立刻生效**
+（编辑器下每帧重读，不用退出 Play Mode）。
+
+**第一次用要先装模块**：**Tools → VN Effects → Install Badminton Module To Scene**
+——只往当前场景的 VNEventRegistry 补一个禁用的 BadmintonTemplate 并登记对手库，
+**不重建场景**。装完记得 Ctrl+S。重复执行安全。
+
+完整示例见 `Assets/Scenarios/BadmintonDemo.vn.txt`。
 
 ### 商店与物品栏 🛒
 
@@ -1476,6 +1549,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `bad-event-outcome` | event 结果名不在该模块的返回值里（拼错会**静默**走顺序继续） |
 | | `unknown-event-module` | 模块 id 没注册进 VNEventRegistry |
 | | `unknown-quiz` | `event quiz` 的 `id:` 没有对应的 VNQuizDef 题库资产（整段问答会被静默跳过） |
+| | `unknown-badminton` | `event badminton` 的 `id:` 没有对应的 VNBadmintonDef 对手资产（会静默退回兜底难度） |
 | | `sns-not-closed` | 最后一次 `sns open` 之后没有 `sns close`（手机会一直盖在画面上） |
 | | `sns-timeout-no-late` | `sns reply` 写了 `timeout:` 却没写 `late:` → 运行时退回成不限时 |
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
@@ -1589,6 +1663,7 @@ event <模块> [key:value…] + * 结果 [flag:op] [-> 标签]      小游戏事
 event plan slots:7 pool:… / event plan op:next   周日程排程 / 逐格派发
 event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
+event badminton vs:<角色> [id:] [target:] [first:] [mode:free] [powerstat:]  羽毛球对战
                                                  结果 全对/及格/失败
 quest <start|stage|done|fail> <id> [阶段]        任务
 

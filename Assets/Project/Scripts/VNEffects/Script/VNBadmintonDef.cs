@@ -103,6 +103,21 @@ namespace VNEffects
         [Header("全部手感与难度参数（换算依据见《羽毛球小游戏实施计划.md》第四节）")]
         public VNBadmintonTuning tuning = new VNBadmintonTuning();
 
+        [Header("──────── 养成联动 ────────")]
+        [Header("属性每 1 点带来的能力增量\n剧本用 powerstat: / speedstat: / jumpstat: 指定读哪个 flag")]
+        public float powerPerStat = 0.04f;
+        public float speedPerStat = 0.12f;
+        public float jumpPerStat = 0.05f;
+        [Header("属性读数上限（防止属性练爆后把玩家变成超人）")]
+        public int statCap = 20;
+
+        [Header("──────── 音效（留空 = 用代码合成的）────────")]
+        public AudioClip serveSe;
+        public AudioClip hitSe;
+        public AudioClip perfectSe;
+        public AudioClip smashSe;
+        public AudioClip landSe;
+
         [Header("──────── 台词 ────────")]
         [Header("台词触发概率（0 = 全程不说话）")]
         [Range(0f, 1f)] public float talkRate = 0.5f;

@@ -26,6 +26,7 @@ namespace VNEffects.EditorTools
         const string ShopsDir = "Assets/VNEffects/Shops";
         const string PlansDir = "Assets/VNEffects/Plans";
         internal const string QuizzesDir = "Assets/VNEffects/Quizzes";
+        internal const string BadmintonDir = "Assets/VNEffects/Badminton";
         const string ScenePath = "Assets/Scenes/VNEffectsDemo.unity";
         const string ScriptScenePath = "Assets/Scenes/VNScriptDemo.unity";
         const string ProfilePath = "Assets/VNEffects/VNEffectsVolumeProfile.asset";
@@ -621,6 +622,17 @@ namespace VNEffects.EditorTools
             EnsureQuizDef();
             quizModule.quizzes.AddRange(FindAllAssets<VNQuizDef>());
             registry.modules.Add(new VNEventRegistry.Entry { id = "quiz", template = quizModule });
+
+            // 羽毛球对战模块（event badminton id:校队 target:5；结果 胜利/失败/结束）
+            EnsureFolder(BadmintonDir);
+            var badmintonGo = new GameObject("BadmintonTemplate", typeof(RectTransform));
+            badmintonGo.transform.SetParent(registry.transform, false);
+            badmintonGo.SetActive(false);
+            var badmintonModule = badmintonGo.AddComponent<VNBadmintonModule>();
+            badmintonModule.defs.AddRange(FindAllAssets<VNBadmintonDef>());
+            registry.modules.Add(new VNEventRegistry.Entry
+                { id = "badminton", template = badmintonModule });
+
             stage.eventRegistry = registry;
 
             // ---------- 任务系统（示例任务定义 + 日志组件） ----------

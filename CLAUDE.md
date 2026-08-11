@@ -127,6 +127,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNLiquidInstaller (Editor) | 把液体喷溅**增量装进当前场景**（Tools → VN Effects → Install Liquid Splash To Scene）：Canvas 下补 WetScreen + 场外补 LiquidSplash + 两层互连并回填 VNStage，不重建场景、可重复执行。老场景不跑它的话 `liquid` 命令会静默无效果 |
 | VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → Install Quiz Module To Scene）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
 | VNCamWaypoint / VNCamseqText / VNCamseqTemplates (Editor) | camseq 路径点行的结构化视图（严格 TryParse/Format，语法与运行时 ParseCamWaypoint 同构）/ 一整段 camseq 文本的 TrySplit·Join / 11 条内置运镜模板（`{char}` 占位按当前角色替换）。**存储仍是 VNRow.camLines 字符串**，本层只做每帧现解析、改完写回的中转 |
+| VNBadmintonModule / VNBadmintonDef | 羽毛球对战事件模块（`event badminton vs: id: target: first: mode: powerstat:/speedstat:/jumpstat: flag:`，结果 胜利/失败/结束）/ 对手+难度+台词+立绘+音效定义资产（登记进 VNGameConfig）；战绩写 flag `<前缀>_我方得分/_对方得分/_精准数/_最长回合`；装机走 Tools → VN Effects → **Install Badminton Module To Scene** |
+| VNBadmintonBallistics / VNBadmintonCourt / VNBadmintonActor / VNBadmintonSfx / VNBadmintonUi | 羽球的四层拆分：**纯静态弹道数学**（三点定抛物线/落点抽样/精准判定，无 MonoBehaviour 依赖可单测）/ 程序化球场与 HUD / 角色表现层（六态假动画，**换真动画只改这一个文件**）/ 五个代码合成音效 / 共用 UI 辅助 + 画梯形的 `VNBadmintonQuad` |
 | VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
@@ -165,6 +167,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 音频 | 三通道库+基准音量；`bgm/se/voice` 支持 `vol:`，公式=基准×vol×通道 | 四十 |
 | 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result/quiz | 四十一~四十四、七十、八十一 |
 | 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
+| 羽毛球对战 | `event badminton vs:角色 id:对手资产 target: first:me\|opponent\|random mode:match\|free`；A/D 移动 + J 击球 + K 扣杀 + ESC 认输（弹确认，退出即判负）；弹道 = 三点定抛物线，**不用 Physics2D**（改纯数学判定，代价是必须子步进）；难度靠 VNBadmintonDef 六参数，轨迹预告 `trackDisplayRate` 是最大杠杆 | 一〇二 |
 | SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
 | 液体喷溅 | `liquid splash\|spray\|click\|wet\|dry\|cover [on\|off] [x:] [y:] [type:] [power:] [dir:] [spread:] [rate:] [screen:] [amount:]`，type = water/blood/ink/slime（+中文别名）；x/y 是屏幕比例 0~1；**dir 留空=朝镜头扑面而来（默认，正交相机下走伪透视：放射+加速+放大），填了才侧喷**；screen 是溅上镜头的概率倍率；click 模式下左键归喷水、Enter/空格仍推进 | 九十四 |
 | 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → **Weather Preview** | 九十二 |

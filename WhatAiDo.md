@@ -5472,3 +5472,171 @@ Edit → Undo 菜单，换来的是「Ctrl+Z 只管这个窗口」这条清晰�
   `DialogueBandFractions()` 实测返回 `x:0.05~0.95 y:0.761~0.974`。
 - 辅助线的实际观感、Ctrl+Z 的键位是否被全局 Undo 抢走（窗口作用域应当优先），
   是 IMGUI / ShortcutManager 交互，需要在编辑器里手动点验。
+
+---
+
+## 一〇二、羽毛球对战小游戏（2026-08-11，分支 `agent/badminton-minigame`）
+
+### 需求 / 背景
+
+用户要求把参考项目 `Student Age new`（学生时代）里的羽毛球小游戏做进本专案。
+
+**先说前提：那份参考目录只有反编译源码，没有任何美术、预制体、DragonBones 骨骼数据**
+（326 个 `.cs`，非代码文件只有 `.vs/` 与 `obj/` 的编译缓存）。所以这不是「搬运」，
+是**照着逻辑重写**——与 `卡牌游戏并入视觉小说专案.md` 那次工程合并性质完全不同。
+
+好消息是配方完整：`BadmintonMiniGameView.cs`（1263 行）把弹道数学、AI 决策、
+精准判定、赛制全部写死在一个文件里，逐行读完即可复刻。
+
+决策经三轮问答定案 11 项，完整记录在 **`羽毛球小游戏实施计划.md`**（本章不重复）。
+要点：程序化假动画 / 完整还原玩法 / 全部四项系统联动 / 程序化球场 /
+A・D + J + K 键位（鼠标只负责击球）/ ESC 认输 / 不做 Editor 调参窗口。
+
+### 参考实现的核心配方
+
+- **弹道是解析式抛物线，不是物理模拟**。`CalcTrack` 用「起点 + 落点 + 球网处过网高度」
+  三点定二次曲线 `y = ax²+bx+c`，之后每帧 `x += flySpeed·dt`、`y` 直接代公式。
+  一旦球路定下来，落点、最高点、对手该跑到哪里**全部可以立刻解析求出**——
+  AI 不需要预测、轨迹虚点不需要模拟。整个玩法的可控性都建立在这上面。
+- `flySpeed = √(|g·200 / 2a|)`，曲率越平飞越快、高吊球慢。
+- **轨迹虚点 = 难度旋钮**：`trackDisplayRate` 控制预告显示多长的一截。
+- **击球判定不是「按键即击球」**：按键只触发挥拍动画，真正判定在球与拍碰撞那一刻；
+  `CalcAccurate(球x − 人x)` 决定界内概率——打不准不是立刻失误，而是**概率性出界**。
+- 赛制 5 分制 + 净胜 2 分；结算一律写在 `CloseView()` 一条路径
+  （`ReferenceProjectLearnings.md` §43b 记录的铁律，这次落地）。
+
+### 文件改动清单
+
+**新增运行时**（`Assets/Project/Scripts/VNEffects/Script/`）
+
+- `VNBadmintonBallistics.cs` —— 手感参数类 `VNBadmintonTuning` + 球路结构 `VNBadmintonArc`
+  + 纯静态数学：三点定抛物线、飞行速度、落点抽样、精准判定、接球点反解。
+  **无 MonoBehaviour / 无 UI 依赖**，可单测。
+- `VNBadmintonUi.cs` —— 三个文件共用的程序化 UI 辅助 + `VNBadmintonQuad`
+  （uGUI 画不出梯形，球场透视地面靠它）。
+- `VNBadmintonCourt.cs` —— 程序化球场与 HUD（天空/广告横幅/沙地/透视球场/场地线/
+  球网/记分板/得分横幅/操作提示）。不是 MonoBehaviour，由模块构造并持有。
+- `VNBadmintonActor.cs` —— 角色表现层。六态程序化假动画、球拍绕肩画弧、扣杀残影、
+  脚影与落地冲击、台词气泡。
+- `VNBadmintonDef.cs` —— 对手 + 难度 + 台词 + 立绘 + 赛制 + 音效槽位 ScriptableObject。
+  合并了参考实现的 `BadmintonLevelCfg` 与 `LoveBadmintonCfg` 两张表。
+- `VNBadmintonSfx.cs` —— 五个音效的代码合成（`AudioClip.Create`），Def 填了就覆盖。
+- `VNBadmintonModule.cs` —— `VNEventModule` 子类，五态状态机 + 主循环 + 计分 + 结算。
+
+**新增编辑器**
+
+- `Editor/VNBadmintonInstaller.cs` —— `Tools → VN Effects → Install Badminton Module
+  To Scene`，增量装机（照 `VNQuizInstaller` 范式），不重建场景、可重复执行。
+
+**新增资产与内容**
+
+- `Assets/VNEffects/Badminton/{新手,校队,王牌}.asset`
+- `Assets/Scenarios/BadmintonDemo.vn.txt`
+
+**改动**
+
+- `VNGameConfig.cs` —— 加 `badmintons` 列表。
+- `Editor/VNEffectsDemoSetup.cs` —— 加 `BadmintonDir` 常量 + 生成场景时建
+  `BadmintonTemplate` 并登记 id `badminton`。
+- `Editor/VNGameConfigTools.cs` —— 从场景导入 / 扫资产两条路径都补上羽球对手库。
+- `Editor/VNScenarioLinter.cs` —— 结果名白名单加 `badminton`；新增 `unknown-badminton`
+  检查（扫 `t:VNBadmintonDef` 资产，与 `unknown-quiz` 同款）。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— 新增 `badminton.*` 共 17 个 key。
+- **未提交** `Resources/VNGameConfig.asset` 的登记改动——里面混着用户未提交的
+  `CG_test` 条目，按分支规矩不顺手带上；装机器会重建。
+
+### 与参考实现的三处刻意偏离
+
+1. **不使用 Physics2D**。参考实现靠 `Rigidbody2D` + `Collider2D` 做击球判定与落地翻滚，
+   会把 Tag / Layer / 物理配置污染到全局。改成纯数学距离判定后确定性可重放、零全局配置。
+   **代价是必须自己做子步进**：扣杀球 1350+ px/s，30fps 单帧位移 45px，
+   而拍面命中半径只有 105px——不切小步的话低帧率时球会直接穿过球拍
+   （参考实现靠连续碰撞检测规避了这点）。现在按最大单步 12px 切，上限 16 步。
+2. **AI 起拍/起跳改用「还有多久到位」判定**，取代参考实现的距离阈值，帧率无关；
+   提前量直接问表现层要 `ActiveWindowStart(kind)`，动画时长改了自动跟上。
+3. **判定几何与动画分开**。`RacketPointFor()` 返回固定几何（站位 + 拍型对应的固定高度），
+   不随挥拍动画的实际角度走。判定必须可预测、帧率无关，动画只负责让这一拍
+   「看起来打到了」——参考实现用碰撞盒时两者是耦合的，那正是它需要连续碰撞检测的原因。
+
+### ★ 坐标换算：0.75 倍 + 额外的 √k 修正
+
+参考实现设计分辨率约 2560×1440（由 `minY 260` / `moveArea (200,1000)` / 截图逐像素反推），
+本专案 1920×1080，所有长度量 ×0.75。完整对照表在实施计划第四节。
+
+**但 flySpeed 还要再乘一次 √k = 0.866**：坐标缩放 k 后 `a → a/k`，
+于是 `flySpeed → √k·flySpeed`，而保持**飞行时间不变**需要的是 `k·flySpeed`。
+少了这一下，球相对屏幕会快约 15%、回合明显变短、来不及跑位——
+数值全部照抄、看起来也能跑，但手感就是不对，而且极难归因。
+这个系数在 Def 里暴露为 `flySpeedScale`。
+
+同理跳跃的「米 → 像素」乘数从 ×100 改成 ×75，移动速度共用同一个 `pixelsPerUnit`。
+
+### 系统联动
+
+- **属性影响强度**：`powerstat: / speedstat: / jumpstat:` 指定读哪个 flag，
+  能力 = Def 基础值 + `Clamp(属性值, 0, statCap)` × 每点增量（增量配在 Def）。
+  照 `VNBattleModule.patkstat` 范式——模块不认识任何具体属性名，桥全在 flags 上。
+- **战绩回写 flag**：`<前缀>_我方得分 / _对方得分 / _精准数 / _最长回合`，
+  前缀默认「羽球」，剧本 `flag:` 可改。剧本可据此做「零封」「虽败犹荣」「打得漂亮」细分支。
+- **多对手难度**：Def 解析三级 —— 剧本 `id:` → 剧本 `vs:`（同名资产）→ 库里只有一条时直接用。
+- **立绘三级回退**：Def 的羽球专用图 → Def / `vs:` 指定角色的 `VNCharacterDef` 默认立绘
+  → 模板兜底图 → 剪影占位。
+
+### 三档难度
+
+| | 扣杀倾向 | 接球率 | 轨迹预告 | 界内率 | 移速 | 力度 | 目标分 |
+|---|---|---|---|---|---|---|---|
+| 新手 | 0.05 | 0.62 | 1.00 | 0.85 | 5.0 | 0.45 | 5 |
+| 校队 | 0.25 | 0.88 | 0.55 | 0.72 | 8.0 | 0.75 | 5 |
+| 王牌 | 0.45 | 0.96 | 0.22 | 0.60 | 10.5 | 1.00 | 7 |
+
+轨迹预告是最大的难度杠杆：王牌只让玩家看到 22% 的球路。
+
+### 没做 Editor 调参窗口的补偿
+
+用户明确不要调参预览窗口（决策 10）。补偿：**Editor 下每帧重读 Def 的手感参数**，
+Play 着直接拖 Def 资产的 Inspector 就能实时看到变化，不用反复进出 Play Mode。
+用 `JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(other), this)` 就地覆盖
+（加字段时不会漏改），`#if UNITY_EDITOR` 包住，运行时构建整段编译掉。
+养成加成在 `ApplyTuning()` 里于 `CopyFrom` 之后重新叠加，不会被每帧重读冲掉。
+
+### 音效
+
+五个音效全部代码合成，配方 = 指数衰减包络 ×（衰减正弦 + 低通白噪）。
+正弦决定音高（球拍绷弦的"当"），白噪决定质感（击打的"啪"），配比 `noise` 就是
+「这一拍有多闷」。发球轻 / 击球中 / 精准亮 / 扣杀闷而重 / 落地最闷。
+音量跟随 `VNAudio.seVolume`，Def 里填了真音效就逐条覆盖。
+
+### 验证
+
+- 弹道解算：发球 `(-300,375) → (300,195)` 解出 `a=-0.00323`、顶点 `(-46,583)`、
+  速度 477px/s，飞行 1.26s——数值合理。
+- 自动对拉（`debugAutoPlayer` 开关，让玩家也交给 AI）：打到 2-2、双方均能得分，
+  发球→飞行→接球→精准判定→落点→计分全链路通。
+- Def 生效：记分板显示「校队主力」、`opponentHitRate=0.88`（资产值而非默认 0.9）。
+- 挥拍与起跳姿态、两侧台词气泡渲染正确。
+
+### 坑（都踩过了，记下来免得再犯）
+
+1. **`Graphic` 子类必须自己再写一遍 `[RequireComponent(typeof(CanvasRenderer))]`**。
+   基类上那条不会被 `AddComponent` 走继承链读到。症状极具迷惑性：组件 active、
+   enabled、material、canvas、顶点数据**全部正常**，就是不画。
+   稳妥做法是创建时显式 `AddComponent<CanvasRenderer>()`。
+2. 构建顺序有依赖：`ResetPositions()` 会碰 `_hitMarker`，必须排在 `BuildBall()` 之后。
+3. `ShowTips` 是**单条通道**，连喊两次会把前一条掐掉（赛点提醒要并进同一条文案）。
+4. 球体不能只用 `SparkleSprite`——在亮底球场上几乎看不见。现在是「软光晕 + 实心球头
+   + 羽毛裙」三层。网面也别用实心半透明矩形，会变成一块压住球场的灰盒子。
+5. 台词气泡宽度必须按 `GetPreferredValues` 算，固定宽度会被长句撑破。
+6. **`screenshot-game-view` 会返回旧帧**——编辑器窗口不在前台时 Game View 不重绘。
+   我因此追了三次「明明建好了却看不见」的幽灵。**验证渲染一律用 `screenshot-camera`**
+   （直接渲到 RenderTexture，必定新帧）。
+7. **编辑器在后台时 Play Mode 只跑 ~0.5 FPS**（`Time.unscaledDeltaTime` 高达 2.16s）。
+   模块自己钳制了 `dt ≤ 0.05` 所以玩法不会乱，但 **DOTween 没有这个钳制**——
+   一帧就把整段 1.7s 的气泡序列跑完了，截图当然什么都截不到。
+8. **装机器结尾的 `EditorUtility.DisplayDialog` 会卡住 MCP**：模态框阻塞主线程，
+   自动化调用会超时直到有人手点 OK。用脚本跑安装器时要有心理准备。
+
+### 待办
+
+- 用户提供侧身运动立绘后替换占位剪影（规格见实施计划第八节，逻辑零改动）。
+- `VNGameConfig.asset` 的对手库登记需要用户自行提交（或跑一次装机器）。
