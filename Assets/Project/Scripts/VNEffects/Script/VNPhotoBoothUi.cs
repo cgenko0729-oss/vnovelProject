@@ -123,36 +123,41 @@ namespace VNEffects
     /// 这样切表情重摆立绘时，玩家挪好的位置不会被冲掉。
     /// </summary>
     public class VNPhotoPortraitDragger : MonoBehaviour,
-        IPointerDownHandler, IDragHandler
+        IPointerDownHandler, IDragHandler, IPointerEnterHandler, IPointerExitHandler
     {
         public RectTransform me, her;
         public Vector2 meOffset, herOffset;
+        /// <summary>玩家滚轮缩出来的倍率（叠在取景倍率上）。素材大小不统一时这就是解药</summary>
+        public float meScale = 1f, herScale = 1f;
         /// <summary>相对基准站位的最大偏移（别让人物被拖出开窗外）</summary>
         public Vector2 bounds = new Vector2(220f, 160f);
         public System.Action onChanged;
 
+        const float MinScale = 0.45f;
+        const float MaxScale = 2.6f;
+
         RectTransform _rect;
+        Canvas _canvas;
         bool _dragMe;
+        bool _hover;
         Vector2 _last;
 
-        void Awake() => _rect = (RectTransform)transform;
+        void Awake()
+        {
+            _rect = (RectTransform)transform;
+            _canvas = GetComponentInParent<Canvas>();
+        }
 
         public void OnPointerDown(PointerEventData e)
         {
-            if (!ToLocal(e, out var local)) return;
+            if (!ToLocal(e.position, e.pressEventCamera, out var local)) return;
             _last = local;
-
-            float dMe = me != null && me.gameObject.activeSelf && me.GetComponent<Image>().enabled
-                ? Mathf.Abs(local.x - me.anchoredPosition.x) : float.MaxValue;
-            float dHer = her != null && her.gameObject.activeSelf &&
-                         her.GetComponent<Image>().enabled
-                ? Mathf.Abs(local.x - her.anchoredPosition.x) : float.MaxValue;
-            _dragMe = dMe <= dHer;
+            _dragMe = NearerIsMe(local.x);
         }
 
         public void OnDrag(PointerEventData e)
         {
-            if (!ToLocal(e, out var local)) return;
+            if (!ToLocal(e.position, e.pressEventCamera, out var local)) return;
             Vector2 delta = local - _last;
             _last = local;
 
@@ -161,18 +166,60 @@ namespace VNEffects
             onChanged?.Invoke();
         }
 
-        public void ResetOffsets()
+        public void OnPointerEnter(PointerEventData e) => _hover = true;
+        public void OnPointerExit(PointerEventData e) => _hover = false;
+
+        void Update()
         {
-            meOffset = herOffset = Vector2.zero;
+            // 滚轮缩放指针底下那个人。贴纸挡住时 uGUI 会先给贴纸发 PointerEnter、
+            // 给这块板发 PointerExit，所以不会出现「一滚同时缩人物和贴纸」
+            if (!_hover) return;
+            var mouse = Mouse.current;
+            if (mouse == null) return;
+
+            float wheel = mouse.scroll.ReadValue().y;
+            if (Mathf.Abs(wheel) < 0.01f) return;
+
+            Camera cam = _canvas != null && _canvas.rootCanvas.renderMode
+                != RenderMode.ScreenSpaceOverlay ? _canvas.rootCanvas.worldCamera : null;
+            if (!ToLocal(mouse.position.ReadValue(), cam, out var local)) return;
+
+            float step = Mathf.Sign(wheel) * 0.08f;
+            if (NearerIsMe(local.x))
+                meScale = Mathf.Clamp(meScale + step, MinScale, MaxScale);
+            else
+                herScale = Mathf.Clamp(herScale + step, MinScale, MaxScale);
             onChanged?.Invoke();
         }
 
-        bool ToLocal(PointerEventData e, out Vector2 local)
+        public void ResetAdjustments()
+        {
+            meOffset = herOffset = Vector2.zero;
+            meScale = herScale = 1f;
+            onChanged?.Invoke();
+        }
+
+        /// <summary>本地 x 离谁的当前站位更近</summary>
+        bool NearerIsMe(float x)
+        {
+            float dMe = Visible(me) ? Mathf.Abs(x - me.anchoredPosition.x) : float.MaxValue;
+            float dHer = Visible(her) ? Mathf.Abs(x - her.anchoredPosition.x) : float.MaxValue;
+            return dMe <= dHer;
+        }
+
+        static bool Visible(RectTransform rect)
+        {
+            if (rect == null || !rect.gameObject.activeInHierarchy) return false;
+            var image = rect.GetComponent<Image>();
+            return image != null && image.enabled && image.sprite != null;
+        }
+
+        bool ToLocal(Vector2 screenPoint, Camera cam, out Vector2 local)
         {
             local = Vector2.zero;
             if (_rect == null) _rect = (RectTransform)transform;
             return RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                _rect, e.position, e.pressEventCamera, out local);
+                _rect, screenPoint, cam, out local);
         }
 
         Vector2 Clamp(Vector2 v) => new Vector2(

@@ -774,10 +774,15 @@ namespace VNEffects
             Vector2 meDrag = _dragger != null ? _dragger.meOffset : Vector2.zero;
             Vector2 herDrag = _dragger != null ? _dragger.herOffset : Vector2.zero;
 
+            // 玩家滚轮缩出来的倍率叠在取景倍率上——素材尺寸不统一时靠它救场
+            float meScale = _dragger != null ? _dragger.meScale : 1f;
+            float herScale = _dragger != null ? _dragger.herScale : 1f;
+
             VNPhotoBoothUi.ApplyPortrait(_meImage, _meDef, _meExpr, slotWidth,
-                FitFor(_meDef), AnchorFor(_meDef), new Vector2(-half, 0f) + meDrag, mirrorMe);
+                FitFor(_meDef) * meScale, AnchorFor(_meDef),
+                new Vector2(-half, 0f) + meDrag, mirrorMe);
             VNPhotoBoothUi.ApplyPortrait(_herImage, _herDef, _herExpr, slotWidth,
-                FitFor(_herDef), AnchorFor(_herDef),
+                FitFor(_herDef) * herScale, AnchorFor(_herDef),
                 new Vector2(solo ? 0f : half, 0f) + herDrag, false);
         }
 
