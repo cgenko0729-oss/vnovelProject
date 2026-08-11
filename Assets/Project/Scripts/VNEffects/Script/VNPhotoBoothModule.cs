@@ -50,6 +50,9 @@ namespace VNEffects
         [Header("贴纸库（右下角贴纸列表 + 主题评分表按 stickerId 引用）")]
         public List<VNPhotoStickerDef> stickers = new List<VNPhotoStickerDef>();
 
+        [Header("背景库（画在两个人身后，被开窗裁切；event photo bg: 按 backdropId 查找）")]
+        public List<VNPhotoBackdropDef> backdrops = new List<VNPhotoBackdropDef>();
+
         [Header("主题库（event photo theme: 按 themeId 查找）")]
         public List<VNPhotoThemeDef> themes = new List<VNPhotoThemeDef>();
 
@@ -120,6 +123,7 @@ namespace VNEffects
         string _meExpr, _herExpr;
         VNPhotoThemeDef _theme;
         VNPhotoFrameDef _frame;
+        VNPhotoBackdropDef _backdrop;
         bool _freeMode;
 
         float _timeLimit, _timeLeft;
@@ -133,13 +137,14 @@ namespace VNEffects
 
         // UI
         RectTransform _machine, _viewFinder, _window, _stickerLayer, _timerFill;
-        Image _frameBack, _windowImage, _windowRing, _frameFront;
+        Image _frameBack, _windowImage, _windowRing, _frameFront, _backdropImage;
         Image _meImage, _herImage;
         TextMeshProUGUI _watermark, _timerText, _hintText;
         GameObject _leftPanel, _rightPanel, _bottomBar, _confirmLayer;
-        RectTransform _frameContent, _stickerContent;
+        RectTransform _frameContent, _backdropContent, _stickerContent;
         Button _shutterButton;
         readonly List<Image> _frameCells = new List<Image>();
+        readonly List<Image> _backdropCells = new List<Image>();
         readonly List<Image> _meCells = new List<Image>();
         readonly List<Image> _herCells = new List<Image>();
 
@@ -173,9 +178,10 @@ namespace VNEffects
             if (!ParseArgs(ctx)) return;
 
             BuildUi();
-            ApplyFrame(_frame);
+            ApplyFrame(_frame);          // 内部会连带铺一次背景
             RefreshPortraits();
             RefreshFrameCells();
+            RefreshBackdropCells();
             RefreshExpressionCells();
 
             _phase = Phase.Dressing;
@@ -188,6 +194,7 @@ namespace VNEffects
             VNGameConfig.ApplyList(cfg.photoFrames, ref frames);
             VNGameConfig.ApplyList(cfg.photoStickers, ref stickers);
             VNGameConfig.ApplyList(cfg.photoThemes, ref themes);
+            VNGameConfig.ApplyList(cfg.photoBackdrops, ref backdrops);
             if (!string.IsNullOrEmpty(cfg.photoMeCharacterId))
                 defaultMeCharacterId = cfg.photoMeCharacterId;
         }
@@ -231,6 +238,7 @@ namespace VNEffects
             if (_theme == null) _freeMode = true;
 
             _frame = FindFrame(ctx.Kw("frame"));
+            _backdrop = FindBackdrop(ctx.Kw("bg"));
 
             _timeLimit = ctx.KwF("time", _theme != null ? _theme.timeLimit : 0f);
             if (_freeMode) _timeLimit = ctx.KwF("time", 0f);   // 自由拍照默认不限时
@@ -276,6 +284,15 @@ namespace VNEffects
             foreach (var f in frames)
                 if (f != null && f.frameId == id) return f;
             Debug.LogWarning($"[VNPhoto] 边框库里没有「{id}」（按无边框处理）");
+            return null;
+        }
+
+        VNPhotoBackdropDef FindBackdrop(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (var b in backdrops)
+                if (b != null && b.backdropId == id) return b;
+            Debug.LogWarning($"[VNPhoto] 背景库里没有「{id}」（按无背景处理）");
             return null;
         }
 
@@ -383,6 +400,9 @@ namespace VNEffects
             var mask = _windowImage.gameObject.AddComponent<Mask>();
             mask.showMaskGraphic = true;   // 遮罩图本身就是开窗底色
 
+            // 背景在开窗内、两个人身后（同样被遮罩裁成开窗形状）
+            _backdropImage = VNPhotoBoothUi.CreateImage("Backdrop", _window, null, Color.white);
+
             _meImage = VNPhotoBoothUi.CreateImage("MePortrait", _window, null, Color.white);
             _herImage = VNPhotoBoothUi.CreateImage("HerPortrait", _window, null, Color.white);
 
@@ -419,47 +439,114 @@ namespace VNEffects
                 new Vector2(300f, 700f), new Vector2(-MachineW * 0.5f + 190f, -20f));
             _leftPanel = panel.gameObject;
 
-            // 顶部两个标签：边框样式 / 贴纸
+            // 顶部三个标签：边框 / 背景 / 贴纸
+            const float tabW = 92f;
+            var tabs = new List<(Button button, TextMeshProUGUI text, GameObject page)>();
+
             Button frameTab = VNPhotoBoothUi.CreateButton("TabFrame", rect,
-                new Vector2(138f, 52f), new Vector2(-72f, 700f * 0.5f - 36f),
-                VNLocale.T("photo.tab.frame"), VNPhotoBoothUi.Accent, Color.white, 26,
+                new Vector2(tabW, 52f), new Vector2(-96f, 700f * 0.5f - 36f),
+                VNLocale.T("photo.tab.frame"), VNPhotoBoothUi.Accent, Color.white, 24,
                 out var frameTabText);
+            Button backdropTab = VNPhotoBoothUi.CreateButton("TabBackdrop", rect,
+                new Vector2(tabW, 52f), new Vector2(0f, 700f * 0.5f - 36f),
+                VNLocale.T("photo.tab.backdrop"), VNPhotoBoothUi.CellBg,
+                VNPhotoBoothUi.TextDark, 24, out var backdropTabText);
             Button stickerTab = VNPhotoBoothUi.CreateButton("TabSticker", rect,
-                new Vector2(138f, 52f), new Vector2(72f, 700f * 0.5f - 36f),
+                new Vector2(tabW, 52f), new Vector2(96f, 700f * 0.5f - 36f),
                 VNLocale.T("photo.tab.sticker"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 26, out var stickerTabText);
+                VNPhotoBoothUi.TextDark, 24, out var stickerTabText);
 
             var frameScroll = VNPhotoBoothUi.CreateScrollList("FrameList", rect,
                 new Vector2(284f, 610f), new Vector2(0f, -28f), 1,
                 new Vector2(258f, 150f), 12f, out _frameContent);
+            var backdropScroll = VNPhotoBoothUi.CreateScrollList("BackdropList", rect,
+                new Vector2(284f, 610f), new Vector2(0f, -28f), 1,
+                new Vector2(258f, 150f), 12f, out _backdropContent);
             var stickerScroll = VNPhotoBoothUi.CreateScrollList("StickerList", rect,
                 new Vector2(284f, 610f), new Vector2(0f, -28f), 2,
                 new Vector2(124f, 124f), 12f, out _stickerContent);
+            backdropScroll.gameObject.SetActive(false);
             stickerScroll.gameObject.SetActive(false);
 
-            var frameTabImage = frameTab.targetGraphic as Image;
-            var stickerTabImage = stickerTab.targetGraphic as Image;
-            frameTab.onClick.AddListener(() =>
+            tabs.Add((frameTab, frameTabText, frameScroll.gameObject));
+            tabs.Add((backdropTab, backdropTabText, backdropScroll.gameObject));
+            tabs.Add((stickerTab, stickerTabText, stickerScroll.gameObject));
+
+            for (int i = 0; i < tabs.Count; i++)
             {
-                frameScroll.gameObject.SetActive(true);
-                stickerScroll.gameObject.SetActive(false);
-                if (frameTabImage != null) frameTabImage.color = VNPhotoBoothUi.Accent;
-                if (stickerTabImage != null) stickerTabImage.color = VNPhotoBoothUi.CellBg;
-                frameTabText.color = Color.white;
-                stickerTabText.color = VNPhotoBoothUi.TextDark;
-            });
-            stickerTab.onClick.AddListener(() =>
-            {
-                frameScroll.gameObject.SetActive(false);
-                stickerScroll.gameObject.SetActive(true);
-                if (frameTabImage != null) frameTabImage.color = VNPhotoBoothUi.CellBg;
-                if (stickerTabImage != null) stickerTabImage.color = VNPhotoBoothUi.Accent;
-                frameTabText.color = VNPhotoBoothUi.TextDark;
-                stickerTabText.color = Color.white;
-            });
+                int index = i;
+                tabs[i].button.onClick.AddListener(() => SelectTab(tabs, index));
+            }
 
             BuildFrameCells();
+            BuildBackdropCells();
             BuildStickerCells();
+        }
+
+        static void SelectTab(
+            List<(Button button, TextMeshProUGUI text, GameObject page)> tabs, int active)
+        {
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                bool on = i == active;
+                tabs[i].page.SetActive(on);
+                if (tabs[i].button.targetGraphic is Image image)
+                    image.color = on ? VNPhotoBoothUi.Accent : VNPhotoBoothUi.CellBg;
+                tabs[i].text.color = on ? Color.white : VNPhotoBoothUi.TextDark;
+            }
+        }
+
+        /// <summary>背景列表：第一项固定是「无背景」（露出边框自己的开窗底色）</summary>
+        void BuildBackdropCells()
+        {
+            _backdropCells.Clear();
+            AddBackdropCell(null, VNLocale.T("photo.backdrop.none"));
+            foreach (var def in backdrops)
+                if (def != null) AddBackdropCell(def, def.DisplayName);
+        }
+
+        void AddBackdropCell(VNPhotoBackdropDef def, string label)
+        {
+            var cell = VNPhotoBoothUi.CreateImage($"BackdropCell_{label}", _backdropContent,
+                VNProceduralTextures.RoundedRectSprite, VNPhotoBoothUi.CellBg, true);
+            var rect = (RectTransform)cell.transform;
+
+            if (def != null)
+            {
+                var preview = VNPhotoBoothUi.CreateImage("Preview", rect,
+                    def.ResolveSprite(), Color.white);
+                VNPhotoBoothUi.Center((RectTransform)preview.transform,
+                    new Vector2(236f, 96f), new Vector2(0f, 16f));
+            }
+
+            var text = VNPhotoBoothUi.CreateText("Label", rect, 24,
+                VNPhotoBoothUi.TextDark, label);
+            VNPhotoBoothUi.Center((RectTransform)text.transform, new Vector2(236f, 36f),
+                new Vector2(0f, def != null ? -52f : 0f));
+
+            var button = cell.gameObject.AddComponent<Button>();
+            button.targetGraphic = cell;
+            var captured = def;
+            button.onClick.AddListener(() =>
+            {
+                if (_phase != Phase.Dressing) return;
+                ApplyBackdrop(captured);
+                RefreshBackdropCells();
+            });
+
+            _backdropCells.Add(cell);
+        }
+
+        void RefreshBackdropCells()
+        {
+            for (int i = 0; i < _backdropCells.Count; i++)
+            {
+                if (_backdropCells[i] == null) continue;
+                bool selected = i == 0 ? _backdrop == null
+                    : i - 1 < backdrops.Count && backdrops[i - 1] == _backdrop;
+                _backdropCells[i].color = selected
+                    ? VNPhotoBoothUi.CellSelected : VNPhotoBoothUi.CellBg;
+            }
         }
 
         /// <summary>边框列表：第一项固定是「默认」（不加边框），对应参考实现的 0 号</summary>
@@ -686,8 +773,13 @@ namespace VNEffects
             _windowRing.color = ringColor;
             _windowRing.enabled = ringColor.a > 0.01f && edge > 0f;
 
-            // 人物能被拖多远，跟着开窗大小走（别拖到框外去）
-            if (_dragger != null) _dragger.bounds = windowSize * 0.34f;
+            ApplyBackdrop(_backdrop);   // 开窗尺寸变了，背景要重新按 cover 铺一次
+
+            // 人物能被拖多远，跟着开窗大小走。
+            // ★ x 必须给到 0.75W：基准站位在 ±0.275W，要让左边那个能越过中线走到
+            //   右边去（换位），单侧行程至少得有 0.55W，再留点余量才够用。
+            if (_dragger != null)
+                _dragger.bounds = new Vector2(windowSize.x * 0.75f, windowSize.y * 0.55f);
             VNPhotoBoothUi.Center((RectTransform)_windowRing.transform,
                 windowSize + Vector2.one * edge, windowPos);
 
@@ -703,6 +795,38 @@ namespace VNEffects
 
             RebuildFrameDecorations();
             RefreshPortraits();
+        }
+
+        /// <summary>
+        /// 换背景。图按 **cover** 铺满开窗（宁可裁掉两侧也不留白边、不拉变形）——
+        /// 背景是「照相馆的背景布」，露白比裁切难看得多。
+        /// </summary>
+        void ApplyBackdrop(VNPhotoBackdropDef def)
+        {
+            _backdrop = def;
+            if (_backdropImage == null) return;
+
+            var sprite = def != null ? def.ResolveSprite() : null;
+            if (sprite == null)
+            {
+                _backdropImage.enabled = false;   // 没选背景 = 露出边框的开窗底色
+                return;
+            }
+
+            _backdropImage.enabled = true;
+            _backdropImage.sprite = sprite;
+            _backdropImage.preserveAspect = false;
+
+            Vector2 window = _window != null ? _window.sizeDelta : new Vector2(ViewW, ViewH);
+            float winAspect = window.y > 0f ? window.x / window.y : 1f;
+            float imgAspect = sprite.rect.height > 0f
+                ? sprite.rect.width / sprite.rect.height : winAspect;
+
+            var rect = (RectTransform)_backdropImage.transform;
+            VNPhotoBoothUi.Center(rect, imgAspect > winAspect
+                ? new Vector2(window.y * imgAspect, window.y)   // 图更宽 → 以高为准，裁两侧
+                : new Vector2(window.x, window.x / imgAspect),  // 图更高 → 以宽为准，裁上下
+                Vector2.zero);
         }
 
         /// <summary>边框自带装饰件：换边框时整批重建（它们属于边框，不计分）</summary>
@@ -1302,6 +1426,7 @@ namespace VNEffects
                 meExpression = _meExpr,
                 herExpression = _herExpr,
                 frameId = _frame != null ? _frame.frameId : null,
+                backdropId = _backdrop != null ? _backdrop.backdropId : null,
             };
             foreach (var item in _playerStickers)
                 if (item != null) dressing.stickerIds.Add(item.stickerId);

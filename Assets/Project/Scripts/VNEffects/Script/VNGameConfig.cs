@@ -190,9 +190,10 @@ namespace VNEffects
         public List<VNQuizDef> quizzes = new List<VNQuizDef>();
         public List<VNBadmintonDef> badmintons = new List<VNBadmintonDef>();
 
-        [Header("大头贴：边框样式 / 贴纸 / 拍照主题（event photo 用）")]
+        [Header("大头贴：边框样式 / 贴纸 / 背景 / 拍照主题（event photo 用）")]
         public List<VNPhotoFrameDef> photoFrames = new List<VNPhotoFrameDef>();
         public List<VNPhotoStickerDef> photoStickers = new List<VNPhotoStickerDef>();
+        public List<VNPhotoBackdropDef> photoBackdrops = new List<VNPhotoBackdropDef>();
         public List<VNPhotoThemeDef> photoThemes = new List<VNPhotoThemeDef>();
 
         [Header("大头贴里「我」默认用哪个角色的立绘（剧本 me: 可覆盖）")]

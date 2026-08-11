@@ -12,6 +12,7 @@ namespace VNEffects
         public string meExpression;
         public string herExpression;
         public string frameId;
+        public string backdropId;
         public List<string> stickerIds = new List<string>();
     }
 
@@ -83,6 +84,15 @@ namespace VNEffects
                     if (rule == null || !IdEquals(dressing.frameId, rule.frameId)) continue;
                     total += AddHit(result, $"边框「{rule.frameId}」", rule.score, rule.comment);
                     break;  // 一张照片只有一个边框，命中即止
+                }
+
+            // ---- 背景 ----
+            if (theme.backdropRules != null && !string.IsNullOrEmpty(dressing.backdropId))
+                foreach (var rule in theme.backdropRules)
+                {
+                    if (rule == null || !IdEquals(dressing.backdropId, rule.backdropId)) continue;
+                    total += AddHit(result, $"背景「{rule.backdropId}」", rule.score, rule.comment);
+                    break;  // 背景同样只有一个，命中即止
                 }
 
             // ---- 贴纸 ----

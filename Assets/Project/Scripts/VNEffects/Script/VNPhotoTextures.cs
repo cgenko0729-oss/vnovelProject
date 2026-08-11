@@ -132,6 +132,102 @@ namespace VNEffects
         }
 
         // ==================================================================
+        // 背景（画在人物身后，被开窗形状裁切）
+        // ==================================================================
+
+        static readonly Dictionary<string, Sprite> _backdrops = new Dictionary<string, Sprite>();
+
+        /// <summary>程序化背景。两色各缓存一份。</summary>
+        public static Sprite BackdropSprite(VNPhotoBackdropStyle style, Color main, Color second)
+        {
+            string key = $"{style}_{ColorUtility.ToHtmlStringRGB(main)}" +
+                         $"_{ColorUtility.ToHtmlStringRGB(second)}";
+            if (_backdrops.TryGetValue(key, out var cached) && cached != null) return cached;
+
+            var pixels = new Color32[FrameW * FrameH];
+            for (int y = 0; y < FrameH; y++)
+                for (int x = 0; x < FrameW; x++)
+                {
+                    float u = (x + 0.5f) / FrameW;
+                    float v = (y + 0.5f) / FrameH;
+                    pixels[y * FrameW + x] = BackdropPixel(style, main, second, u, v, x, y);
+                }
+
+            var sprite = MakeSprite($"PhotoBackdrop_{key}", FrameW, FrameH, pixels);
+            _backdrops[key] = sprite;
+            return sprite;
+        }
+
+        static Color32 BackdropPixel(VNPhotoBackdropStyle style, Color main, Color second,
+            float u, float v, int x, int y)
+        {
+            switch (style)
+            {
+                case VNPhotoBackdropStyle.SolidColor:
+                    return ToColor32(main);
+
+                case VNPhotoBackdropStyle.VerticalGradient:
+                    return ToColor32(Color.Lerp(second, main, v));
+
+                case VNPhotoBackdropStyle.RadialBurst:
+                {
+                    // 大头贴机的经典放射线：从画面中心射出的交替色楔形
+                    float dx = u - 0.5f, dy = (v - 0.5f) * 0.75f;   // 4:3 修正成圆
+                    float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+                    const int wedges = 24;
+                    float t = Mathf.Repeat(angle / (360f / wedges), 1f);
+                    var c = t < 0.5f ? main : second;
+                    // 中心亮一点，像打了顶光
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    return ToColor32(Color.Lerp(Lighten(c, 0.45f), c, Mathf.Clamp01(r / 0.42f)));
+                }
+                case VNPhotoBackdropStyle.Stripes:
+                {
+                    bool on = Mathf.Repeat((x + y) / 36f, 2f) < 1f;
+                    return ToColor32(on ? main : second);
+                }
+                case VNPhotoBackdropStyle.Dots:
+                {
+                    const int cell = 44;
+                    int cx = x % cell - cell / 2;
+                    int cy = y % cell - cell / 2;
+                    bool dot = cx * cx + cy * cy < 12 * 12;
+                    return ToColor32(dot ? main : second);
+                }
+                case VNPhotoBackdropStyle.StarryNight:
+                {
+                    var night = Color.Lerp(Darken(main, 0.45f), main, v * 0.7f);
+                    float star = StarNoise(x, y);
+                    return ToColor32(Color.Lerp(night, second, star));
+                }
+                case VNPhotoBackdropStyle.Rainbow:
+                {
+                    var c = Color.HSVToRGB(Mathf.Repeat(u, 1f), 0.42f, 1f);
+                    return ToColor32(Color.Lerp(c, second, 0.25f));
+                }
+                default: // Bokeh
+                {
+                    var c = Color.Lerp(second, main, v * 0.8f);
+                    // 几个固定位置的柔光斑（写死坐标，保证每次生成都一样）
+                    float glow = Blob(u, v, 0.22f, 0.68f, 0.16f)
+                               + Blob(u, v, 0.72f, 0.78f, 0.11f)
+                               + Blob(u, v, 0.55f, 0.32f, 0.14f)
+                               + Blob(u, v, 0.14f, 0.24f, 0.09f)
+                               + Blob(u, v, 0.88f, 0.42f, 0.13f);
+                    return ToColor32(Color.Lerp(c, Lighten(main, 0.7f), Mathf.Clamp01(glow)));
+                }
+            }
+        }
+
+        /// <summary>柔边圆斑的强度（用于 Bokeh）</summary>
+        static float Blob(float u, float v, float cx, float cy, float radius)
+        {
+            float dx = u - cx, dy = (v - cy) * 0.75f;
+            float d = Mathf.Sqrt(dx * dx + dy * dy);
+            return Mathf.Clamp01(1f - d / radius) * 0.55f;
+        }
+
+        // ==================================================================
         // 人物开窗遮罩 / 描边
         // ==================================================================
 

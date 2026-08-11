@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 383c586bc2ad3eb418975d71e0707be7, type: 3}
+  m_Name: "\u5F69\u8679"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPhotoBackdropDef
+  backdropId: "\u5F69\u8679"
+  displayName: "\u5F69\u8679"
+  displayNameEn: Rainbow
+  displayNameJa: "\u30EC\u30A4\u30F3\u30DC\u30FC"
+  sprite: {fileID: 0}
+  style: 6
+  mainColor: {r: 1, g: 1, b: 1, a: 1}
+  secondColor: {r: 1, g: 1, b: 1, a: 1}

@@ -72,6 +72,16 @@ namespace VNEffects
             public VNPhotoLine comment = new VNPhotoLine();
         }
 
+        /// <summary>背景加分项（与边框同级：一张照片只有一个背景，命中即止）</summary>
+        [System.Serializable]
+        public class BackdropRule
+        {
+            [Header("背景 id（VNPhotoBackdropDef.backdropId）")]
+            public string backdropId;
+            public int score = 10;
+            public VNPhotoLine comment = new VNPhotoLine();
+        }
+
         /// <summary>贴纸加分项</summary>
         [System.Serializable]
         public class StickerRule
@@ -115,6 +125,7 @@ namespace VNEffects
         [Header("──────── 加分清单 ────────")]
         public List<ExpressionRule> expressionRules = new List<ExpressionRule>();
         public List<FrameRule> frameRules = new List<FrameRule>();
+        public List<BackdropRule> backdropRules = new List<BackdropRule>();
         public List<StickerRule> stickerRules = new List<StickerRule>();
 
         [Header("──────── 分档总评 ────────")]

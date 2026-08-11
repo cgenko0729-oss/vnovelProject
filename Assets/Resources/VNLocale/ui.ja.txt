@@ -243,3 +243,5 @@ photo.finish = 完了
 photo.grade.perfect = 大 成 功
 photo.grade.normal = ま あ ま あ
 photo.grade.fail = 失 敗
+photo.tab.backdrop = 背景
+photo.backdrop.none = なし

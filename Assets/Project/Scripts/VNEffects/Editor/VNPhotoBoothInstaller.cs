@@ -24,6 +24,7 @@ namespace VNEffects.EditorTools
         const string RootDir = "Assets/VNEffects/Photo";
         const string FrameDir = RootDir + "/Frames";
         const string StickerDir = RootDir + "/Stickers";
+        const string BackdropDir = RootDir + "/Backdrops";
         const string ThemeDir = RootDir + "/Themes";
 
         [MenuItem("Tools/VN Effects/Install Photo Booth Module To Scene", priority = 212)]
@@ -68,8 +69,10 @@ namespace VNEffects.EditorTools
 
             var frames = LoadAll<VNPhotoFrameDef>();
             var stickers = LoadAll<VNPhotoStickerDef>();
+            var backdrops = LoadAll<VNPhotoBackdropDef>();
             var themes = LoadAll<VNPhotoThemeDef>();
-            report.Add($"边框 ×{frames.Count} / 贴纸 ×{stickers.Count} / 主题 ×{themes.Count}");
+            report.Add($"边框 ×{frames.Count} / 贴纸 ×{stickers.Count} / " +
+                       $"背景 ×{backdrops.Count} / 主题 ×{themes.Count}");
 
             // ② 场景里的模板
             var entry = registry.modules.FirstOrDefault(e => e != null && e.id == ModuleId);
@@ -103,6 +106,7 @@ namespace VNEffects.EditorTools
 
             module.frames = new List<VNPhotoFrameDef>(frames);
             module.stickers = new List<VNPhotoStickerDef>(stickers);
+            module.backdrops = new List<VNPhotoBackdropDef>(backdrops);
             module.themes = new List<VNPhotoThemeDef>(themes);
             EditorUtility.SetDirty(module);
             EditorUtility.SetDirty(registry);
@@ -115,6 +119,7 @@ namespace VNEffects.EditorTools
                 Undo.RecordObject(config, "Register photo assets");
                 config.photoFrames = new List<VNPhotoFrameDef>(frames);
                 config.photoStickers = new List<VNPhotoStickerDef>(stickers);
+                config.photoBackdrops = new List<VNPhotoBackdropDef>(backdrops);
                 config.photoThemes = new List<VNPhotoThemeDef>(themes);
                 EditorUtility.SetDirty(config);
                 AssetDatabase.SaveAssets();
@@ -142,6 +147,7 @@ namespace VNEffects.EditorTools
         {
             EnsureFolder(FrameDir);
             EnsureFolder(StickerDir);
+            EnsureFolder(BackdropDir);
             EnsureFolder(ThemeDir);
 
             int created = 0;
@@ -180,6 +186,24 @@ namespace VNEffects.EditorTools
             created += Frame("樱花", VNPhotoFrameStyle.Sakura, "Sakura", "さくら",
                 new Color(1f, 0.72f, 0.82f), VNPhotoMaskShape.Ellipse, "SPRING DAYS");
 
+            // ---- 背景 ----
+            created += Backdrop("放射线", VNPhotoBackdropStyle.RadialBurst, "Sunburst", "集中線",
+                new Color(1f, 0.62f, 0.78f), new Color(1f, 0.93f, 0.96f));
+            created += Backdrop("波点", VNPhotoBackdropStyle.Dots, "Polka dots", "水玉",
+                new Color(1f, 0.72f, 0.82f), new Color(1f, 0.97f, 0.98f));
+            created += Backdrop("斜条纹", VNPhotoBackdropStyle.Stripes, "Stripes", "ストライプ",
+                new Color(0.68f, 0.85f, 1f), new Color(0.97f, 0.99f, 1f));
+            created += Backdrop("黄昏", VNPhotoBackdropStyle.VerticalGradient, "Dusk", "夕暮れ",
+                new Color(1f, 0.72f, 0.5f), new Color(0.55f, 0.5f, 0.8f));
+            created += Backdrop("星夜", VNPhotoBackdropStyle.StarryNight, "Starry night", "星空",
+                new Color(0.32f, 0.36f, 0.72f), new Color(1f, 1f, 0.9f));
+            created += Backdrop("彩虹", VNPhotoBackdropStyle.Rainbow, "Rainbow", "レインボー",
+                new Color(1f, 1f, 1f), new Color(1f, 1f, 1f));
+            created += Backdrop("光斑", VNPhotoBackdropStyle.Bokeh, "Bokeh", "ボケ",
+                new Color(1f, 0.85f, 0.62f), new Color(0.42f, 0.35f, 0.55f));
+            created += Backdrop("纯白", VNPhotoBackdropStyle.SolidColor, "Plain white", "白",
+                new Color(0.98f, 0.98f, 1f), new Color(0.98f, 0.98f, 1f));
+
             // ---- 主题 ----
             created += ThemeSweet();
             created += ThemeFunny();
@@ -201,6 +225,21 @@ namespace VNEffects.EditorTools
                 a.shape = shape;
                 a.tint = tint;
                 a.defaultSize = size;
+            });
+        }
+
+        static int Backdrop(string id, VNPhotoBackdropStyle style, string en, string ja,
+            Color main, Color second)
+        {
+            return Create<VNPhotoBackdropDef>(BackdropDir, id, a =>
+            {
+                a.backdropId = id;
+                a.displayName = id;
+                a.displayNameEn = en;
+                a.displayNameJa = ja;
+                a.style = style;
+                a.mainColor = main;
+                a.secondColor = second;
             });
         }
 
@@ -265,6 +304,11 @@ namespace VNEffects.EditorTools
                         "ピンクチェックがぴったり")));
                 a.frameRules.Add(FrameRule("樱花", 15, null));
 
+                a.backdropRules.Add(BackdropRule("放射线", 15,
+                    Line("放射线一衬，整张都甜起来了", "The sunburst really sells the sweetness",
+                        "集中線で一気に甘くなった")));
+                a.backdropRules.Add(BackdropRule("波点", 12, null));
+
                 a.stickerRules.Add(StickerRule("爱心", 8, 3,
                     Line("爱心贴得恰到好处", "Just the right amount of hearts",
                         "ハートの量がちょうどいい")));
@@ -302,6 +346,11 @@ namespace VNEffects.EditorTools
                 a.frameRules.Add(FrameRule("胶片", 18, null));
                 a.frameRules.Add(FrameRule("星空", 10, null));
 
+                a.backdropRules.Add(BackdropRule("彩虹", 15,
+                    Line("彩虹背景把荒唐感拉满了", "The rainbow maxes out the absurdity",
+                        "レインボーでバカバカしさ全開")));
+                a.backdropRules.Add(BackdropRule("斜条纹", 10, null));
+
                 a.stickerRules.Add(StickerRule("猫耳", 10, 2,
                     Line("猫耳是犯规的", "The cat ears are cheating", "猫耳は反則")));
                 a.stickerRules.Add(StickerRule("皇冠", 8, 2, null));
@@ -338,6 +387,11 @@ namespace VNEffects.EditorTools
                 a.frameRules.Add(FrameRule("简约白框", 20, null));
                 a.frameRules.Add(FrameRule("星空", 15, null));
 
+                a.backdropRules.Add(BackdropRule("黄昏", 18,
+                    Line("黄昏的光线太犯规了", "That dusk light is unfair",
+                        "夕暮れの光は反則")));
+                a.backdropRules.Add(BackdropRule("星夜", 12, null));
+
                 a.stickerRules.Add(StickerRule("星星", 8, 3, null));
                 a.stickerRules.Add(StickerRule("音符", 6, 2, null));
 
@@ -371,6 +425,15 @@ namespace VNEffects.EditorTools
             new VNPhotoThemeDef.FrameRule
             {
                 frameId = frameId,
+                score = score,
+                comment = comment ?? new VNPhotoLine(),
+            };
+
+        static VNPhotoThemeDef.BackdropRule BackdropRule(string backdropId, int score,
+            VNPhotoLine comment) =>
+            new VNPhotoThemeDef.BackdropRule
+            {
+                backdropId = backdropId,
                 score = score,
                 comment = comment ?? new VNPhotoLine(),
             };

@@ -107,6 +107,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> badmintonIds = new HashSet<string>();
             public HashSet<string> photoThemeIds = new HashSet<string>();
             public HashSet<string> photoFrameIds = new HashSet<string>();
+            public HashSet<string> photoBackdropIds = new HashSet<string>();
             public HashSet<string> weatherIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
@@ -306,6 +307,13 @@ namespace VNEffects.EditorTools
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (def != null && !string.IsNullOrEmpty(def.frameId))
                     reg.photoFrameIds.Add(def.frameId);
+            }
+            foreach (var guid in AssetDatabase.FindAssets("t:VNPhotoBackdropDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNPhotoBackdropDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def != null && !string.IsNullOrEmpty(def.backdropId))
+                    reg.photoBackdropIds.Add(def.backdropId);
             }
 
             // 自定义飘落天气资产（内置叶型别名与 VNWeather 枚举另行判定，不进这个集合）
@@ -811,6 +819,15 @@ namespace VNEffects.EditorTools
                             "边框是 VN/Photo Frame 资产（Assets/VNEffects/Photo/Frames）；" +
                             "拼错只会静默退回「无边框」开局。" +
                             $"当前已有：{string.Join(" / ", reg.photoFrameIds.OrderBy(s => s))}");
+
+                    string bgId = c.Kw("bg");
+                    if (!string.IsNullOrEmpty(bgId) && !Dynamic(bgId) &&
+                        reg.photoBackdropIds.Count > 0 && !reg.photoBackdropIds.Contains(bgId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-photo-backdrop", f, c.line,
+                            $"没有 id 为「{bgId}」的照片背景资产",
+                            "背景是 VN/Photo Backdrop 资产（Assets/VNEffects/Photo/Backdrops）；" +
+                            "拼错只会静默退回「无背景」开局。" +
+                            $"当前已有：{string.Join(" / ", reg.photoBackdropIds.OrderBy(s => s))}");
 
                     // 评分模式与结果行必须对得上（两套结果名互斥）
                     bool free = string.IsNullOrEmpty(themeId) || c.Kw("mode") == "free";

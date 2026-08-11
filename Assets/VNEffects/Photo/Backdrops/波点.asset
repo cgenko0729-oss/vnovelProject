@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 383c586bc2ad3eb418975d71e0707be7, type: 3}
+  m_Name: "\u6CE2\u70B9"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPhotoBackdropDef
+  backdropId: "\u6CE2\u70B9"
+  displayName: "\u6CE2\u70B9"
+  displayNameEn: Polka dots
+  displayNameJa: "\u6C34\u7389"
+  sprite: {fileID: 0}
+  style: 4
+  mainColor: {r: 1, g: 0.72, b: 0.82, a: 1}
+  secondColor: {r: 1, g: 0.97, b: 0.98, a: 1}

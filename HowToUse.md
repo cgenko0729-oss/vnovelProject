@@ -1022,8 +1022,9 @@ event photo vs:星野结衣 me:川岛葵 theme:甜蜜 frame:粉格子 time:60 st
 * 失败 -> 拍砸了
 ```
 
-商店街那种大头贴机。左栏选**边框样式**或**贴纸**（两个标签页），右栏两列点**表情**
-（左列是「我」右列是「对方」），贴纸可以**左键拖动、滚轮缩放、Shift+滚轮旋转、右键删除**。
+商店街那种大头贴机。左栏三个标签页：**边框 ｜ 背景 ｜ 贴纸**；右栏两列点**表情**
+（左列是「我」右列是「对方」）。**人物可以拖动移位、滚轮缩放**（素材大小不统一时靠它救场），
+贴纸可以**拖动、滚轮缩放、Shift+滚轮旋转、右键删除**。
 按 ◉ 快门 → 3・2・1 倒数 → 闪白咔嚓 → 相纸飞出来冲分 → **重拍 / 完成**。
 **ESC** 放弃（会弹确认）。照片存进相册，重拍的那张会被删掉，只有点「完成」的算数。
 
@@ -1044,6 +1045,7 @@ event photo vs:星野结衣 me:川岛葵 theme:甜蜜 frame:粉格子 time:60 st
 | `theme:` | 主题资产 id；不写 = 自由拍照 |
 | `mode:` | `match` 评分（默认）/ `free` 自由拍照 |
 | `frame:` | 开局用哪个边框（省略 = 无边框，玩家自己选） |
+| `bg:` | 开局用哪个背景（省略 = 无背景，玩家自己选） |
 | `time:` | 装扮限时秒（默认取主题的；`0` = 不限时。自由拍照默认不限时） |
 | `stat:` `rate:` | 分数自动换算成属性：`加成 = round(分数 × rate)`，走 HUD 飘字 |
 | `flag:` | 成绩 flag 前缀（默认 `大头照`） |
@@ -1070,6 +1072,7 @@ if 大头照_次数 >= 3 jump 拍上瘾了
 |---|---|
 | 表情加分项 | 针对谁（我/对方/任意）+ 表情名 + 分数 + 命中评语（可负分，惩罚跑题的表情） |
 | 边框加分项 | 边框 id + 分数 + 评语 |
+| 背景加分项 | 背景 id + 分数 + 评语（与边框同级，一张照片只有一个背景） |
 | 贴纸加分项 | 贴纸 id + 每个的分数 + **最多计几个**（防止满屏刷同一种贴纸） |
 
 再加基础分、完美线、及格线、贴纸总数上限、三档总评。
@@ -1077,10 +1080,15 @@ if 大头照_次数 >= 3 jump 拍上瘾了
 内置三个主题：**甜蜜**（害羞+微笑，粉格子/樱花，爱心）/ **搞怪**（坏笑+惊讶，
 胶片，猫耳皇冠）/ **青春**（微笑，简约白框，星星音符）。
 
-**边框与贴纸**（`Assets/VNEffects/Photo/{Frames,Stickers}`）都是**留空就程序化生成**：
-边框有 5 套内置样式（粉格子/星空/胶片/简约白框/樱花），贴纸有 10 种图形
+**边框、背景与贴纸**（`Assets/VNEffects/Photo/{Frames,Backdrops,Stickers}`）
+都是**留空就程序化生成**：边框 5 套（粉格子/星空/胶片/简约白框/樱花）、
+背景 8 套（放射线/波点/斜条纹/黄昏/星夜/彩虹/光斑/纯白）、贴纸 10 种
 （爱心/星星/闪光/蝴蝶结/对话泡/小花/音符/皇冠/猫耳/云朵）。
 以后有美术图，往资产的 Sprite 槽里一放就自动替换，代码不用动。
+
+> 背景画在两个人身后、被边框的开窗形状裁掉，并且按 **cover** 铺满（宁可裁两侧
+> 也不留白边、不拉变形）。背景与剧情背景库是分开的两套 —— 剧情背景是 16:9 场景大图，
+> 塞进 4:3 开窗要裁掉大半；大头贴要的是「照相馆背景布」那种放射线、波点。
 
 **人物取景对不上时调这三个**（模块 Inspector）：
 
@@ -1648,6 +1656,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `photo-missing-vs` | `event photo` 没写 `vs:`（**错误级**：没有合影对象，模块直接返回「完成」，整段白跑） |
 | | `unknown-photo-theme` | `event photo` 的 `theme:` 没有对应的 VNPhotoThemeDef（会静默退回自由拍照，分档结果行全接不住） |
 | | `unknown-photo-frame` | `event photo` 的 `frame:` 没有对应的 VNPhotoFrameDef（静默退回无边框） |
+| | `unknown-photo-backdrop` | `event photo` 的 `bg:` 没有对应的 VNPhotoBackdropDef（静默退回无背景） |
 | | `photo-outcome-mode` | `event photo` 的结果行与模式对不上（写了 `theme:` 却接「完成」，或自由拍照却接「完美/普通/失败」） |
 | | `sns-not-closed` | 最后一次 `sns open` 之后没有 `sns close`（手机会一直盖在画面上） |
 | | `sns-timeout-no-late` | `sns reply` 写了 `timeout:` 却没写 `late:` → 运行时退回成不限时 |
@@ -1763,7 +1772,7 @@ event plan slots:7 pool:… / event plan op:next   周日程排程 / 逐格派�
 event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
 event badminton vs:<角色> [id:] [target:] [first:] [mode:free] [powerstat:]  羽毛球对战
-event photo vs:<角色> [me:] [theme:] [mode:free] [frame:] [time:] [stat: rate:]  拍大头照
+event photo vs:<角色> [me:] [theme:] [mode:free] [frame:] [bg:] [time:] [stat: rate:] 拍大头照
                                                  结果 全对/及格/失败
 quest <start|stage|done|fail> <id> [阶段]        任务
 
