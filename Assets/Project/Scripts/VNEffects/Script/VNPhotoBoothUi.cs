@@ -25,6 +25,8 @@ namespace VNEffects
         public Vector2 bounds = new Vector2(500f, 380f);
 
         public Action<VNPhotoStickerItem> onDelete;
+        /// <summary>双击：在「人前」与「人后」之间翻转（由模块换父层实现）</summary>
+        public Action<VNPhotoStickerItem> onToggleLayer;
         public Action onChanged;      // 任何一次拖/缩/转之后（模块用来重置「未动过」提示）
 
         RectTransform _rect;
@@ -78,7 +80,13 @@ namespace VNEffects
         {
             if (locked) return;
             if (e.button == PointerEventData.InputButton.Right)
+            {
                 onDelete?.Invoke(this);
+                return;
+            }
+            // 双击 = 钻到人物背后 / 回到人物前面
+            if (e.button == PointerEventData.InputButton.Left && e.clickCount >= 2)
+                onToggleLayer?.Invoke(this);
         }
 
         void Update()
@@ -123,7 +131,8 @@ namespace VNEffects
     /// 这样切表情重摆立绘时，玩家挪好的位置不会被冲掉。
     /// </summary>
     public class VNPhotoPortraitDragger : MonoBehaviour,
-        IPointerDownHandler, IDragHandler, IPointerEnterHandler, IPointerExitHandler
+        IPointerDownHandler, IDragHandler, IPointerEnterHandler, IPointerExitHandler,
+        IPointerClickHandler
     {
         public RectTransform me, her;
         public Vector2 meOffset, herOffset;
@@ -132,6 +141,8 @@ namespace VNEffects
         /// <summary>相对基准站位的最大偏移（别让人物被拖出开窗外）</summary>
         public Vector2 bounds = new Vector2(220f, 160f);
         public System.Action onChanged;
+        /// <summary>双击某个人：把他提到另一个人前面（true = 我）</summary>
+        public System.Action<bool> onDoubleClick;
 
         const float MinScale = 0.45f;
         const float MaxScale = 2.6f;
@@ -168,6 +179,13 @@ namespace VNEffects
 
         public void OnPointerEnter(PointerEventData e) => _hover = true;
         public void OnPointerExit(PointerEventData e) => _hover = false;
+
+        public void OnPointerClick(PointerEventData e)
+        {
+            if (e.button != PointerEventData.InputButton.Left || e.clickCount < 2) return;
+            if (!ToLocal(e.position, e.pressEventCamera, out var local)) return;
+            onDoubleClick?.Invoke(NearerIsMe(local.x));
+        }
 
         void Update()
         {

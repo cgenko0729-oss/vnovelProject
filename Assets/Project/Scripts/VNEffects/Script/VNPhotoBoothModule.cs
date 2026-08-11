@@ -136,7 +136,8 @@ namespace VNEffects
         readonly List<GameObject> _frameDecorations = new List<GameObject>();
 
         // UI
-        RectTransform _machine, _viewFinder, _window, _stickerLayer, _timerFill;
+        RectTransform _machine, _viewFinder, _window, _stickerLayer, _backStickerLayer;
+        RectTransform _timerFill;
         Image _frameBack, _windowImage, _windowRing, _frameFront, _backdropImage;
         Image _meImage, _herImage;
         TextMeshProUGUI _watermark, _timerText, _hintText;
@@ -400,21 +401,27 @@ namespace VNEffects
             var mask = _windowImage.gameObject.AddComponent<Mask>();
             mask.showMaskGraphic = true;   // 遮罩图本身就是开窗底色
 
-            // 背景在开窗内、两个人身后（同样被遮罩裁成开窗形状）
+            // ★ 开窗内的层序（从后往前）：背景 → 拖动板 → 人后贴纸 → 我 → 她
+            //   拖动板压在最底下是刻意的：它 raycastTarget=true 会吃掉射线，
+            //   放上面的话「人后贴纸」就永远点不到了。人物本身不接收射线，不用担心被挡。
             _backdropImage = VNPhotoBoothUi.CreateImage("Backdrop", _window, null, Color.white);
 
-            _meImage = VNPhotoBoothUi.CreateImage("MePortrait", _window, null, Color.white);
-            _herImage = VNPhotoBoothUi.CreateImage("HerPortrait", _window, null, Color.white);
-
-            // 人物拖动层：铺满开窗，在两个立绘之上、贴纸层之下
-            //（贴纸层是 ViewFinder 的后一个子节点，射线自然优先命中贴纸）
             var dragPad = VNPhotoBoothUi.CreateImage("DragPad", _window, null,
                 new Color(0f, 0f, 0f, 0f), true);
             VNPhotoBoothUi.Stretch((RectTransform)dragPad.transform);
             _dragger = dragPad.gameObject.AddComponent<VNPhotoPortraitDragger>();
+            _dragger.onChanged = RefreshPortraits;
+            _dragger.onDoubleClick = BringPortraitToFront;
+
+            // 人后贴纸层：尺寸与取景框一致（超出开窗的部分被 Mask 裁掉，正好），
+            // 这样它与人前贴纸层坐标系相同，翻层时贴纸不会跳位
+            _backStickerLayer = VNPhotoBoothUi.CreateNode("BackStickerLayer", _window);
+            VNPhotoBoothUi.Center(_backStickerLayer, new Vector2(ViewW, ViewH), Vector2.zero);
+
+            _meImage = VNPhotoBoothUi.CreateImage("MePortrait", _window, null, Color.white);
+            _herImage = VNPhotoBoothUi.CreateImage("HerPortrait", _window, null, Color.white);
             _dragger.me = (RectTransform)_meImage.transform;
             _dragger.her = (RectTransform)_herImage.transform;
-            _dragger.onChanged = RefreshPortraits;
 
             // 描边环必须在 Mask 外面，否则会被自己裁掉
             _windowRing = VNPhotoBoothUi.CreateImage("WindowRing", _viewFinder, null, Color.white);
@@ -775,6 +782,11 @@ namespace VNEffects
 
             ApplyBackdrop(_backdrop);   // 开窗尺寸变了，背景要重新按 cover 铺一次
 
+            // 人后贴纸层要抵消开窗偏移，才能与人前贴纸层共用同一套坐标
+            //（否则边框换成偏心开窗时，翻层的贴纸会整体跳位）
+            if (_backStickerLayer != null)
+                _backStickerLayer.anchoredPosition = -windowPos;
+
             // 人物能被拖多远，跟着开窗大小走。
             // ★ x 必须给到 0.75W：基准站位在 ±0.275W，要让左边那个能越过中线走到
             //   右边去（换位），单侧行程至少得有 0.55W，再留点余量才够用。
@@ -865,9 +877,36 @@ namespace VNEffects
             item.bounds = new Vector2(ViewW * 0.5f, ViewH * 0.5f);
             item.Place(position, scale, rotation);
             item.onDelete = RemoveSticker;
+            item.onToggleLayer = ToggleStickerLayer;
 
             if (!fromFrame) _playerStickers.Add(item);
             return item;
+        }
+
+        /// <summary>
+        /// 双击贴纸：在「人前」与「人后」之间翻转。
+        /// 两个贴纸层尺寸都等于取景框，坐标系一致，所以换父节点后位置原样不动
+        /// （人后那层在 Mask 里，超出开窗的部分会被裁掉——它已经在照片"里面"了）。
+        /// </summary>
+        void ToggleStickerLayer(VNPhotoStickerItem item)
+        {
+            if (_phase != Phase.Dressing || item == null || item.locked) return;
+            if (_stickerLayer == null || _backStickerLayer == null) return;
+
+            bool inFront = item.transform.parent == _stickerLayer;
+            item.transform.SetParent(inFront ? _backStickerLayer : _stickerLayer, false);
+            item.transform.SetAsLastSibling();
+            _sfx?.Play(VNPhotoSfx.Kind.Place, inFront ? 0.8f : 1.15f);
+        }
+
+        /// <summary>双击某个人：把他提到另一个人前面</summary>
+        void BringPortraitToFront(bool isMe)
+        {
+            if (_phase != Phase.Dressing) return;
+            var target = isMe ? _meImage : _herImage;
+            if (target == null || !target.enabled) return;
+            target.transform.SetAsLastSibling();
+            _sfx?.Play(VNPhotoSfx.Kind.Place, isMe ? 1.1f : 0.9f);
         }
 
         void RemoveSticker(VNPhotoStickerItem item)
