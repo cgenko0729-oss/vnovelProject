@@ -223,3 +223,19 @@ badminton.quitYes = 认输（Y）
 badminton.quitNo = 继续打（N）
 badminton.goal = 先到 {0} 分 · 需净胜 2 分
 badminton.goalFree = 自由练习 · 不计胜负 · ESC 结束
+
+# ---- 大头贴（event photo）----
+photo.title = 大头贴
+photo.free = 自由拍照 · 随便拍着玩
+photo.theme = 主题：{0}
+photo.tab.frame = 边框样式
+photo.tab.sticker = 贴纸
+photo.frame.none = 默认
+photo.sticker.empty = 还没有登记贴纸
+photo.expression = 切换表情
+photo.hint = 左键拖动贴纸　滚轮缩放　Shift+滚轮旋转　右键删除　ESC 放弃
+photo.quit.confirm = 现在离开就没有照片了。\n确定要放弃拍照吗？
+photo.quit.cancel = 继续拍
+photo.quit.ok = 放弃
+photo.me = 我
+photo.her = 对方

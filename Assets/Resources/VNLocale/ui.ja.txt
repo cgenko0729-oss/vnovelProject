@@ -222,3 +222,19 @@ badminton.quitYes = 棄権（Y）
 badminton.quitNo = 続ける（N）
 badminton.goal = 先に {0} 点 · 2 点差が必要
 badminton.goalFree = 自由練習 · 勝敗なし · ESC で終了
+
+# ---- プリクラ（event photo）----
+photo.title = プリクラ
+photo.free = 自由撮影 · 気軽に一枚
+photo.theme = テーマ：{0}
+photo.tab.frame = フレーム
+photo.tab.sticker = スタンプ
+photo.frame.none = なし
+photo.sticker.empty = スタンプが未登録です
+photo.expression = 表情チェンジ
+photo.hint = 左ドラッグで移動　ホイールで拡縮　Shift+ホイールで回転　右クリックで削除　ESCで中止
+photo.quit.confirm = 今やめると写真は残りません。\n撮影をあきらめますか？
+photo.quit.cancel = 続ける
+photo.quit.ok = やめる
+photo.me = 自分
+photo.her = 相手

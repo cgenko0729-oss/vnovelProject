@@ -222,3 +222,19 @@ badminton.quitYes = Forfeit (Y)
 badminton.quitNo = Keep playing (N)
 badminton.goal = First to {0} · must lead by 2
 badminton.goalFree = Free practice · no winner · ESC to end
+
+# ---- Photo booth (event photo) ----
+photo.title = Photo Booth
+photo.free = Free shot · just for fun
+photo.theme = Theme: {0}
+photo.tab.frame = Frames
+photo.tab.sticker = Stickers
+photo.frame.none = None
+photo.sticker.empty = No stickers registered
+photo.expression = Expressions
+photo.hint = Drag stickers · Wheel to resize · Shift+Wheel to rotate · Right-click to remove · ESC to quit
+photo.quit.confirm = Leaving now means no photo at all.\nGive up on the shot?
+photo.quit.cancel = Keep shooting
+photo.quit.ok = Give up
+photo.me = Me
+photo.her = Her
