@@ -997,7 +997,14 @@ if 羽球_精准数 >= 3 jump 打得漂亮
 **王牌**（轨迹只给 22%、AI 又快又爱扣杀，7 分制）。
 
 **调手感的办法**：Play Mode 里直接拖 Def 资产的 Inspector，**改了立刻生效**
-（编辑器下每帧重读，不用退出 Play Mode）。
+（编辑器下每帧重读，不用退出 Play Mode）。最常用的四个旋钮：
+
+| 想改什么 | 拧哪个 |
+|---|---|
+| 球来球往太平 / 太高 | `netClearance`（普通球至少高出网顶多少，默认 120）——**抬高它球路变高，飞行还会自动变慢**（速度由曲率反解，弧越弯越慢） |
+| 整体太快 / 太慢 | `flySpeedScale`（默认 0.866）。注意这个值是按分辨率换算推导出来的，改了就不再与参考实现同手感 |
+| 击球太难 / 太容易 | `perfectDistance`（精准窗口，默认 90px）与 `perfectRate`（非精准球的界内概率） |
+| 对手太强 / 太弱 | `opponentHitRate`（接球率）＞ `trackDisplayRate`（给玩家看多少轨迹）＞ `opponentMoveSpeed` |
 
 **第一次用要先装模块**：**Tools → VN Effects → Install Badminton Module To Scene**
 ——只往当前场景的 VNEventRegistry 补一个禁用的 BadmintonTemplate 并登记对手库，

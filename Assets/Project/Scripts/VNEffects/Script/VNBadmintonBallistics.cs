@@ -27,10 +27,12 @@ namespace VNEffects
         public float serveTargetX = 300f;
         [Tooltip("双方开局站位 x（距中线）")]
         public float startStandX = 375f;
-        [Tooltip("球网上沿高度 = 过网最低高度")]
+        [Tooltip("球网上沿高度")]
         public float netTopY = 450f;
+        [Tooltip("普通球过网时至少高出网顶多少（★ 抬高它 = 整体球路变高、回合变慢；扣杀不受此限）")]
+        public float netClearance = 120f;
         [Tooltip("过网最高高度（高吊球上限）")]
-        public float netMaxY = 750f;
+        public float netMaxY = 880f;
         [Tooltip("低手/高手挥拍的球高分界")]
         public float lowSwingY = 488f;
         [Tooltip("来球最高点高于这个值才值得起跳扣杀")]
@@ -44,8 +46,8 @@ namespace VNEffects
         [Tooltip("出界落点抽样：边线外 min~max")]
         public float outMarginMin = 38f;
         public float outMarginMax = 225f;
-        [Tooltip("抛物线顶点钳制上限（别让球飞出画面太多）")]
-        public float apexClamp = 900f;
+        [Tooltip("抛物线顶点钳制上限（别让球飞出画面；回合中记分板已收起，1000 以内安全）")]
+        public float apexClamp = 1000f;
 
         [Header("──── 判定 ────")]
         [Tooltip("精准判定窗口：球在身前这个距离内击中 = 必定界内")]
@@ -186,7 +188,9 @@ namespace VNEffects
             // ① 直线在 x=0 处的高度
             float lineAtNet = (-end.x) / (start.x - end.x) * (start.y - end.y) + end.y;
 
-            // ② 过网高度
+            // ② 过网高度。扣杀贴着网上沿走；普通球至少高出网顶 netClearance——
+            //    这个下限就是「回合整体有多高」的旋钮，抬高它球路变高、飞行也自动变慢
+            //    （速度由曲率反解，弧越弯越慢）。
             float netY;
             if (heavy)
             {
@@ -194,7 +198,7 @@ namespace VNEffects
             }
             else
             {
-                float lo = Mathf.Max(t.netTopY + 10f, lineAtNet);
+                float lo = Mathf.Max(t.netTopY + t.netClearance, lineAtNet);
                 float hi = Mathf.Max(lo + 1f, t.netMaxY);
                 netY = Mathf.Lerp(lo, hi, (float)rng.NextDouble());
             }

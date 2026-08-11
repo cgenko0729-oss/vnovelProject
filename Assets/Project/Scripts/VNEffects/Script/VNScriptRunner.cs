@@ -1531,8 +1531,18 @@ namespace VNEffects
             _uiHidden = hidden;
             if (stage != null && stage.dialogue != null)
                 stage.dialogue.SetInterfaceVisible(!hidden);
-            _statsHud?.SetHudVisible(!hidden);
-            _calendarHud?.SetVisible(!hidden);
+            SetGameplayHudVisible(!hidden);
+        }
+
+        /// <summary>
+        /// 常驻养成 HUD（属性条 / 日历）的显隐。事件模块期间一律藏掉——
+        /// 小游戏自己会画满屏 UI，顶上再压一条属性条只是噪音。
+        /// 事件结束时恢复成「玩家是否手动隐藏了 UI」的状态，不会把手动隐藏的又翻出来。
+        /// </summary>
+        void SetGameplayHudVisible(bool visible)
+        {
+            _statsHud?.SetHudVisible(visible);
+            _calendarHud?.SetVisible(visible);
         }
 
         IEnumerator CaptureSaveThumbnailCo(int token)
@@ -2462,6 +2472,7 @@ namespace VNEffects
             _eventActive = true;
             _activeEventModule = module;
             stage.dialogue?.HideBox();
+            SetGameplayHudVisible(false);
 
             var outcomes = new List<string>();
             if (cmd.options != null)
@@ -2482,6 +2493,7 @@ namespace VNEffects
             bool recordInBacklog = module.RecordInBacklog; // 销毁前读取
             Destroy(module.gameObject);
             stage.dialogue?.Show();
+            SetGameplayHudVisible(!_uiHidden);
             _eventActive = false;
 
             if (recordInBacklog)

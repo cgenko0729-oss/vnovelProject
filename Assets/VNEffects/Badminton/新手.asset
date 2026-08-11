@@ -25,6 +25,7 @@ MonoBehaviour:
   racket: {fileID: 0}
   arm: {fileID: 0}
   backdrop: {fileID: 0}
+  ballSprite: {fileID: 0}
   targetScore: 5
   tuning:
     groundY: 195
@@ -32,14 +33,15 @@ MonoBehaviour:
     serveTargetX: 300
     startStandX: 375
     netTopY: 450
-    netMaxY: 750
+    netClearance: 120
+    netMaxY: 880
     lowSwingY: 488
     smashNeedY: 600
     moveMinX: 150
     moveMaxX: 750
     outMarginMin: 38
     outMarginMax: 225
-    apexClamp: 900
+    apexClamp: 1000
     perfectDistance: 90
     behindTolerance: 15
     heavyTolerance: 120
@@ -61,7 +63,16 @@ MonoBehaviour:
     opponentHeavyRate: 0.05
     trackDisplayRate: 1
     trackSpacing: 38
-  talkRate: 0
+  powerPerStat: 0.04
+  speedPerStat: 0.12
+  jumpPerStat: 0.05
+  statCap: 20
+  serveSe: {fileID: 0}
+  hitSe: {fileID: 0}
+  perfectSe: {fileID: 0}
+  smashSe: {fileID: 0}
+  landSe: {fileID: 0}
+  talkRate: 0.598
   opponentTalk:
     serve: []
     hit: []
