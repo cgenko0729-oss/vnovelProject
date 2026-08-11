@@ -138,18 +138,29 @@ namespace VNEffects
         public Vector2 meOffset, herOffset;
         /// <summary>玩家滚轮缩出来的倍率（叠在取景倍率上）。素材大小不统一时这就是解药</summary>
         public float meScale = 1f, herScale = 1f;
+        /// <summary>玩家 Shift+滚轮转出来的角度</summary>
+        public float meRotation, herRotation;
         /// <summary>相对基准站位的最大偏移（别让人物被拖出开窗外）</summary>
         public Vector2 bounds = new Vector2(220f, 160f);
         public System.Action onChanged;
         /// <summary>双击某个人：把他提到另一个人前面（true = 我）</summary>
         public System.Action<bool> onDoubleClick;
 
+        /// <summary>Ctrl 按住时操作的是背景：位移与倍率（1 = 刚好铺满开窗）。
+        /// 真正的钳制在模块里做（那边才知道 cover 尺寸），这里只累积。</summary>
+        public Vector2 backdropOffset;
+        public float backdropScale = 1f;
+        public System.Action onBackdropChanged;
+
         const float MinScale = 0.45f;
         const float MaxScale = 2.6f;
+        const float MinBackdropScale = 1f;    // 1 = cover，再小就要露边了
+        const float MaxBackdropScale = 3f;
 
         RectTransform _rect;
         Canvas _canvas;
         bool _dragMe;
+        bool _dragBackdrop;
         bool _hover;
         Vector2 _last;
 
@@ -163,6 +174,7 @@ namespace VNEffects
         {
             if (!ToLocal(e.position, e.pressEventCamera, out var local)) return;
             _last = local;
+            _dragBackdrop = CtrlHeld;      // Ctrl 按下的那一刻决定这一次拖的是谁
             _dragMe = NearerIsMe(local.x);
         }
 
@@ -171,6 +183,13 @@ namespace VNEffects
             if (!ToLocal(e.position, e.pressEventCamera, out var local)) return;
             Vector2 delta = local - _last;
             _last = local;
+
+            if (_dragBackdrop)
+            {
+                backdropOffset += delta;
+                onBackdropChanged?.Invoke();   // 钳制由模块做完再写回来
+                return;
+            }
 
             if (_dragMe) meOffset = Clamp(meOffset + delta);
             else herOffset = Clamp(herOffset + delta);
@@ -189,7 +208,7 @@ namespace VNEffects
 
         void Update()
         {
-            // 滚轮缩放指针底下那个人。贴纸挡住时 uGUI 会先给贴纸发 PointerEnter、
+            // 滚轮作用在指针底下那个人。贴纸挡住时 uGUI 会先给贴纸发 PointerEnter、
             // 给这块板发 PointerExit，所以不会出现「一滚同时缩人物和贴纸」
             if (!_hover) return;
             var mouse = Mouse.current;
@@ -198,23 +217,63 @@ namespace VNEffects
             float wheel = mouse.scroll.ReadValue().y;
             if (Mathf.Abs(wheel) < 0.01f) return;
 
+            // Ctrl 优先：缩背景
+            if (CtrlHeld)
+            {
+                backdropScale = Mathf.Clamp(backdropScale + Mathf.Sign(wheel) * 0.08f,
+                    MinBackdropScale, MaxBackdropScale);
+                onBackdropChanged?.Invoke();
+                return;
+            }
+
             Camera cam = _canvas != null && _canvas.rootCanvas.renderMode
                 != RenderMode.ScreenSpaceOverlay ? _canvas.rootCanvas.worldCamera : null;
             if (!ToLocal(mouse.position.ReadValue(), cam, out var local)) return;
 
-            float step = Mathf.Sign(wheel) * 0.08f;
-            if (NearerIsMe(local.x))
-                meScale = Mathf.Clamp(meScale + step, MinScale, MaxScale);
+            bool nearMe = NearerIsMe(local.x);
+
+            if (ShiftHeld)
+            {
+                // Shift+滚轮 = 转角度，和贴纸完全一样的手势
+                float step = Mathf.Sign(wheel) * 5f;
+                if (nearMe) meRotation += step; else herRotation += step;
+            }
             else
-                herScale = Mathf.Clamp(herScale + step, MinScale, MaxScale);
+            {
+                float step = Mathf.Sign(wheel) * 0.08f;
+                if (nearMe) meScale = Mathf.Clamp(meScale + step, MinScale, MaxScale);
+                else herScale = Mathf.Clamp(herScale + step, MinScale, MaxScale);
+            }
             onChanged?.Invoke();
+        }
+
+        static bool CtrlHeld
+        {
+            get
+            {
+                var k = Keyboard.current;
+                return k != null && (k.leftCtrlKey.isPressed || k.rightCtrlKey.isPressed);
+            }
+        }
+
+        static bool ShiftHeld
+        {
+            get
+            {
+                var k = Keyboard.current;
+                return k != null && (k.leftShiftKey.isPressed || k.rightShiftKey.isPressed);
+            }
         }
 
         public void ResetAdjustments()
         {
             meOffset = herOffset = Vector2.zero;
             meScale = herScale = 1f;
+            meRotation = herRotation = 0f;
+            backdropOffset = Vector2.zero;
+            backdropScale = 1f;
             onChanged?.Invoke();
+            onBackdropChanged?.Invoke();
         }
 
         /// <summary>本地 x 离谁的当前站位更近</summary>
@@ -393,7 +452,8 @@ namespace VNEffects
         /// faceAnchor = 脸在立绘里的纵向位置（0 = 图顶，1 = 图底），用来把脸推到窗口中心。
         /// </summary>
         public static void ApplyPortrait(Image image, VNCharacterDef def, string expression,
-            float slotWidth, float fit, float faceAnchor, Vector2 extraOffset, bool mirror)
+            float slotWidth, float fit, float faceAnchor, Vector2 extraOffset, bool mirror,
+            float rotation = 0f)
         {
             if (image == null) return;
             if (def == null)
@@ -425,6 +485,8 @@ namespace VNEffects
             float lift = -height * (0.5f - Mathf.Clamp01(faceAnchor));
             rect.anchoredPosition = extraOffset + new Vector2(0f, lift);
             rect.localScale = new Vector3(mirror ? -1f : 1f, 1f, 1f);
+            // 镜像的那一位要把角度取反，否则同样往右滚两人会朝相反方向倒
+            rect.localRotation = Quaternion.Euler(0f, 0f, mirror ? -rotation : rotation);
         }
 
         // ---- 杂项 ----

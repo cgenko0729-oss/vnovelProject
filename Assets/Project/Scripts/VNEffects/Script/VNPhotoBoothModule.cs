@@ -412,6 +412,7 @@ namespace VNEffects
             _dragger = dragPad.gameObject.AddComponent<VNPhotoPortraitDragger>();
             _dragger.onChanged = RefreshPortraits;
             _dragger.onDoubleClick = BringPortraitToFront;
+            _dragger.onBackdropChanged = () => ApplyBackdrop(_backdrop);
 
             // 人后贴纸层：尺寸与取景框一致（超出开窗的部分被 Mask 裁掉，正好），
             // 这样它与人前贴纸层坐标系相同，翻层时贴纸不会跳位
@@ -537,6 +538,12 @@ namespace VNEffects
             button.onClick.AddListener(() =>
             {
                 if (_phase != Phase.Dressing) return;
+                // 换了图构图就不一样了，上一张调好的位移/缩放没有意义，重置
+                if (_dragger != null)
+                {
+                    _dragger.backdropOffset = Vector2.zero;
+                    _dragger.backdropScale = 1f;
+                }
                 ApplyBackdrop(captured);
                 RefreshBackdropCells();
             });
@@ -834,11 +841,27 @@ namespace VNEffects
             float imgAspect = sprite.rect.height > 0f
                 ? sprite.rect.width / sprite.rect.height : winAspect;
 
-            var rect = (RectTransform)_backdropImage.transform;
-            VNPhotoBoothUi.Center(rect, imgAspect > winAspect
+            // cover 基准：刚好铺满开窗的尺寸（玩家的缩放倍率从这里往上乘）
+            Vector2 cover = imgAspect > winAspect
                 ? new Vector2(window.y * imgAspect, window.y)   // 图更宽 → 以高为准，裁两侧
-                : new Vector2(window.x, window.x / imgAspect),  // 图更高 → 以宽为准，裁上下
-                Vector2.zero);
+                : new Vector2(window.x, window.x / imgAspect);  // 图更高 → 以宽为准，裁上下
+
+            float scale = _dragger != null ? Mathf.Max(1f, _dragger.backdropScale) : 1f;
+            Vector2 size = cover * scale;
+
+            // 可移动范围 = 溢出开窗的那一半。scale=1 时某个方向恰好是 0，
+            // 于是「不允许露边」这条规则天然由这个钳制保证，不需要额外判断。
+            var slack = new Vector2(
+                Mathf.Max(0f, (size.x - window.x) * 0.5f),
+                Mathf.Max(0f, (size.y - window.y) * 0.5f));
+
+            Vector2 offset = _dragger != null ? _dragger.backdropOffset : Vector2.zero;
+            offset = new Vector2(
+                Mathf.Clamp(offset.x, -slack.x, slack.x),
+                Mathf.Clamp(offset.y, -slack.y, slack.y));
+            if (_dragger != null) _dragger.backdropOffset = offset;   // 钳制后写回
+
+            VNPhotoBoothUi.Center((RectTransform)_backdropImage.transform, size, offset);
         }
 
         /// <summary>边框自带装饰件：换边框时整批重建（它们属于边框，不计分）</summary>
@@ -941,12 +964,15 @@ namespace VNEffects
             float meScale = _dragger != null ? _dragger.meScale : 1f;
             float herScale = _dragger != null ? _dragger.herScale : 1f;
 
+            float meRot = _dragger != null ? _dragger.meRotation : 0f;
+            float herRot = _dragger != null ? _dragger.herRotation : 0f;
+
             VNPhotoBoothUi.ApplyPortrait(_meImage, _meDef, _meExpr, slotWidth,
                 FitFor(_meDef) * meScale, AnchorFor(_meDef),
-                new Vector2(-half, 0f) + meDrag, mirrorMe);
+                new Vector2(-half, 0f) + meDrag, mirrorMe, meRot);
             VNPhotoBoothUi.ApplyPortrait(_herImage, _herDef, _herExpr, slotWidth,
                 FitFor(_herDef) * herScale, AnchorFor(_herDef),
-                new Vector2(solo ? 0f : half, 0f) + herDrag, false);
+                new Vector2(solo ? 0f : half, 0f) + herDrag, false, herRot);
         }
 
         PortraitTweak TweakFor(VNCharacterDef def)
