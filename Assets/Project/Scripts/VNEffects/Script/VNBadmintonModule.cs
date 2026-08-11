@@ -1,0 +1,717 @@
+using System.Collections.Generic;
+using DG.Tweening;
+using TMPro;
+using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
+
+namespace VNEffects
+{
+    /// <summary>
+    /// 事件模块：羽毛球对战小游戏。
+    ///
+    /// 玩法逻辑 1:1 复刻参考实现（Student Age 的 BadmintonMiniGameView），但：
+    ///   · 弹道数学抽到 VNBadmintonBallistics（纯静态、可单测）
+    ///   · 球场与 HUD 抽到 VNBadmintonCourt，角色表现抽到 VNBadmintonActor
+    ///   · **不使用 Physics2D**——参考实现靠 Rigidbody2D/Collider2D 做击球判定，
+    ///     我们改成纯数学距离判定，代价是必须自己做子步进（见 StepBall 注释）
+    ///
+    /// 剧本用法（P1 已支持的部分）：
+    ///   event badminton target:5 first:me
+    ///   * 胜利 -> 赢了
+    ///   * 失败 -> 输了
+    ///
+    /// 操作：A/D（或 ←/→）移动，J / 鼠标左键 发球兼击球，K / 鼠标右键 起跳扣杀，ESC 认输。
+    ///
+    /// 遵守事件模块三铁律：不碰舞台演出 / unscaled 计时 + SetUpdate(true) / 全部 Tween SetLink。
+    /// </summary>
+    public class VNBadmintonModule : VNEventModule
+    {
+        [Header("手感参数（换算表见《羽毛球小游戏实施计划.md》第四节）")]
+        public VNBadmintonTuning tuning = new VNBadmintonTuning();
+
+        [Header("默认目标分数（剧本 target: 覆盖；净胜 2 分制）")]
+        public int targetScore = 5;
+
+        [Header("角色底图（留空 = 剪影占位；规格见计划书第八节）")]
+        public Sprite playerBody;
+        public Sprite opponentBody;
+        public Sprite racketSprite;
+
+        [Header("远景底图（留空 = 程序化渐变天空）")]
+        public Sprite backdrop;
+
+        [Header("调试：玩家也交给 AI（自动对拉，用来验证回合逻辑，正式使用请关掉）")]
+        public bool debugAutoPlayer;
+
+        // ── 判定常量 ──
+        /// <summary>拍面命中半径</summary>
+        const float HitRadius = 105f;
+        /// <summary>子步进的最大单步位移（px）——低帧率下防止球穿过拍面</summary>
+        const float MaxSubStep = 12f;
+        const int MaxSubSteps = 16;
+        /// <summary>AI 提前多久起拍（要让拍面在接触时正好处于有效窗内）</summary>
+        const float AiSwingLead = 0.10f;
+
+        enum Phase { Intro, Serve, Rally, Point, Over }
+
+        Phase _phase = Phase.Intro;
+        float _phaseTimer;
+
+        readonly System.Random _rng = new System.Random();
+        VNBadmintonCourt _court;
+        VNBadmintonActor _me, _op;
+
+        // 比分与赛制
+        int _scoreMe, _scoreOp, _target;
+        /// <summary>发球方：-1 = 玩家（左）/ +1 = 对手（右）</summary>
+        int _serverSide = -1;
+        bool _playerWon;
+
+        // 球
+        Vector2 _ball;
+        VNBadmintonArc _arc;
+        /// <summary>球当前飞行方向：+1 向右（飞向对手）/ -1 向左（飞向玩家）</summary>
+        int _ballDir;
+        RectTransform _ballRect, _ballShadow, _hitMarker;
+
+        // 角色运动状态
+        float _meX, _meY, _opX, _opY;
+        bool _meAir, _opAir;
+        float _meJumpT, _opJumpT, _meJumpV0, _opJumpV0;
+
+        // AI 本回合的计划
+        Vector2 _receivePoint;
+        bool _opWillReturn, _opSwung, _opJumped, _opWantsSmash;
+        bool _meSwung;   // 仅 debugAutoPlayer 用
+
+        // 轨迹虚点
+        readonly List<RectTransform> _trackPool = new List<RectTransform>();
+        readonly Queue<KeyValuePair<float, RectTransform>> _tracks =
+            new Queue<KeyValuePair<float, RectTransform>>();
+        RectTransform _trackRoot;
+
+        // 战绩（回写 flag 用）
+        int _perfectCount, _rallyCount, _bestRally;
+        string _flagPrefix = "羽球";
+
+        // 输入
+        float _moveInput;
+        bool _pressHit, _pressJump, _pressQuit;
+
+        // ------------------------------------------------------------------
+        // 生命周期
+        // ------------------------------------------------------------------
+
+        protected override void OnLaunch(VNEventContext ctx)
+        {
+            _target = Mathf.Max(1, ctx.KwI("target", targetScore));
+            _flagPrefix = ctx.Kw("flag", _flagPrefix);
+
+            string first = ctx.Kw("first", "random");
+            _serverSide = first == "me" ? -1
+                        : first == "opponent" ? 1
+                        : (_rng.NextDouble() < 0.5 ? -1 : 1);
+
+            _court = new VNBadmintonCourt();
+            _court.Build((RectTransform)transform, tuning, backdrop, gameObject);
+            _court.SetNames(ctx.Kw("pname", VNLocale.T("badminton.player")),
+                            ctx.Kw("vs", VNLocale.T("badminton.opponent")));
+
+            // 顺序有依赖：ResetPositions 会碰 _hitMarker，所以必须等 BuildBall 之后才调
+            BuildActors();
+            BuildBall();
+            ResetPositions();
+
+            _scoreMe = _scoreOp = 0;
+            _court.SetScore(0, 0, false);
+            _phase = Phase.Intro;
+            _phaseTimer = 1.2f;
+            _court.ShowTips(VNLocale.T("badminton.start", _target));
+        }
+
+        void BuildActors()
+        {
+            _me = new VNBadmintonActor();
+            _me.Build(_court.ActorLayer, playerBody, racketSprite,
+                new Color(0.35f, 0.52f, 0.85f, 1f), true, gameObject);
+
+            _op = new VNBadmintonActor();
+            _op.Build(_court.ActorLayer, opponentBody, racketSprite,
+                new Color(0.85f, 0.40f, 0.46f, 1f), false, gameObject);
+        }
+
+        void BuildBall()
+        {
+            _trackRoot = VNBadmintonUi.CreateNode("Track", _court.ActorLayer);
+            VNBadmintonUi.AnchorBottomCenter(_trackRoot);
+            _trackRoot.anchoredPosition = Vector2.zero;
+            _trackRoot.sizeDelta = Vector2.zero;
+
+            // 扣杀机会指示圈（虚线圈用发光贴图近似）
+            _hitMarker = VNBadmintonUi.CreateImage("HitMarker", _court.ActorLayer,
+                VNProceduralTextures.RadialGlowSprite, new Color(1f, 1f, 1f, 0.35f));
+            VNBadmintonUi.AnchorBottomCenter(_hitMarker);
+            _hitMarker.sizeDelta = new Vector2(150f, 150f);
+            _hitMarker.gameObject.SetActive(false);
+
+            _ballShadow = VNBadmintonUi.CreateImage("BallShadow", _court.ActorLayer,
+                VNProceduralTextures.RadialGlowSprite, new Color(0f, 0f, 0f, 0.28f));
+            VNBadmintonUi.AnchorBottomCenter(_ballShadow);
+            _ballShadow.sizeDelta = new Vector2(56f, 20f);
+
+            // 球体：软光晕打底 + 实心球头。纯 Sparkle 贴图在亮底上几乎看不见，
+            // 而「看得见球」是这个玩法的生命线。
+            _ballRect = VNBadmintonUi.CreateImage("Ball", _court.ActorLayer,
+                VNProceduralTextures.RadialGlowSprite, new Color(1f, 1f, 1f, 0.55f));
+            VNBadmintonUi.AnchorBottomCenter(_ballRect);
+            _ballRect.sizeDelta = new Vector2(52f, 52f);
+
+            // 羽毛裙（拉长的半透明尾）
+            var skirt = VNBadmintonUi.CreateImage("Skirt", _ballRect,
+                VNProceduralTextures.RoundedRectSprite, new Color(1f, 1f, 1f, 0.8f));
+            skirt.GetComponent<Image>().type = Image.Type.Sliced;
+            skirt.anchorMin = skirt.anchorMax = new Vector2(0.5f, 0.5f);
+            skirt.anchoredPosition = new Vector2(0f, 11f);
+            skirt.sizeDelta = new Vector2(17f, 26f);
+
+            // 球头（实心，最显眼的那一点）
+            var head = VNBadmintonUi.CreateImage("Head", _ballRect,
+                VNProceduralTextures.RoundedRectSprite, Color.white);
+            head.GetComponent<Image>().type = Image.Type.Sliced;
+            head.anchorMin = head.anchorMax = new Vector2(0.5f, 0.5f);
+            head.anchoredPosition = new Vector2(0f, -6f);
+            head.sizeDelta = new Vector2(19f, 19f);
+        }
+
+        void ResetPositions()
+        {
+            _meX = -tuning.startStandX;
+            _opX = tuning.startStandX;
+            _meY = _opY = tuning.groundY;
+            _meAir = _opAir = false;
+            _me.SetPosition(_meX, _meY);
+            _op.SetPosition(_opX, _opY);
+            ParkBallForServe();
+        }
+
+        void ParkBallForServe()
+        {
+            _ball = new Vector2(tuning.serveTargetX * _serverSide, tuning.ballStartY);
+            _ballDir = 0;
+            ClearTrack();
+            _hitMarker.gameObject.SetActive(false);
+        }
+
+        public override void CancelForDebug()
+        {
+            _court?.Dispose();
+            _me?.Dispose();
+            _op?.Dispose();
+        }
+
+        void OnDestroy()
+        {
+            _court?.Dispose();
+        }
+
+        // ------------------------------------------------------------------
+        // 主循环
+        // ------------------------------------------------------------------
+
+        void Update()
+        {
+            // 事件模块三铁律②：unscaled 计时，不受 Skip 快进影响。
+            // 上限 0.05s：切窗口回来时的巨大 dt 会让球瞬移过整个球场。
+            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+
+            ReadInput();
+
+            if (_pressQuit && _phase != Phase.Over)
+            {
+                // TODO(P4)：这里要弹「退出将判负」确认框，确认后才结算。
+                Finish(false);
+                return;
+            }
+
+            switch (_phase)
+            {
+                case Phase.Intro:
+                case Phase.Point:
+                    _phaseTimer -= dt;
+                    if (_phaseTimer <= 0f) EnterServe();
+                    break;
+                case Phase.Serve:
+                    TickServe(dt);
+                    break;
+                case Phase.Rally:
+                    TickAi();
+                    StepBall(dt);
+                    break;
+            }
+
+            TickActors(dt);
+            SyncVisuals();
+        }
+
+        void ReadInput()
+        {
+            _moveInput = 0f;
+            _pressHit = _pressJump = _pressQuit = false;
+
+            var k = Keyboard.current;
+            if (k != null)
+            {
+                if (k.aKey.isPressed || k.leftArrowKey.isPressed) _moveInput -= 1f;
+                if (k.dKey.isPressed || k.rightArrowKey.isPressed) _moveInput += 1f;
+                if (k.jKey.wasPressedThisFrame) _pressHit = true;
+                if (k.kKey.wasPressedThisFrame) _pressJump = true;
+                if (k.escapeKey.wasPressedThisFrame) _pressQuit = true;
+            }
+
+            // 决策 8：鼠标只负责击球，移动只能键盘
+            var m = Mouse.current;
+            if (m != null)
+            {
+                if (m.leftButton.wasPressedThisFrame) _pressHit = true;
+                if (m.rightButton.wasPressedThisFrame) _pressJump = true;
+            }
+
+            if (_phase != Phase.Rally && _phase != Phase.Serve) return;
+
+            if (_pressJump && !_meAir && _me.CanSwing) StartJump(true);
+            if (_pressHit && _phase == Phase.Rally && !_meAir)
+                _me.PlaySwing(_ball.y < tuning.lowSwingY
+                    ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+        }
+
+        void EnterServe()
+        {
+            ResetPositions();
+            _rallyCount = 0;
+            _phase = Phase.Serve;
+            _phaseTimer = 0.9f;   // 对手发球的准备时间
+            _court.ShowScoreBoard(true);
+        }
+
+        void TickServe(float dt)
+        {
+            if (_serverSide < 0 && !debugAutoPlayer)
+            {
+                if (_pressHit) DoServe();
+                return;
+            }
+            _phaseTimer -= dt;
+            if (_phaseTimer <= 0f) DoServe();
+        }
+
+        void DoServe()
+        {
+            bool byPlayer = _serverSide < 0;
+            var server = byPlayer ? _me : _op;
+            int outDir = -_serverSide;   // 球飞向对面
+
+            var end = new Vector2(tuning.serveTargetX * outDir, tuning.groundY);
+            float power = byPlayer ? tuning.playerPower : tuning.opponentPower;
+            if (!VNBadmintonBallistics.BuildArc(_ball, end, tuning, power, false, _rng, out _arc))
+                return;
+
+            _ballDir = outDir;
+            server.PlaySwing(VNBadmintonSwing.High);
+            BuildTrack();
+            PlanReceive();
+
+            _phase = Phase.Rally;
+            _court.ShowScoreBoard(false);
+        }
+
+        // ------------------------------------------------------------------
+        // 球的推进
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 球沿抛物线推进。**必须子步进**：扣杀球速度可达 1350+ px/s，
+        /// 30fps 下单帧位移 45px，而拍面命中半径只有 105px——不切小步的话
+        /// 低帧率时球会直接穿过球拍（参考实现靠 Physics2D 的连续碰撞规避了这点，
+        /// 我们改纯数学判定后必须自己补）。
+        /// </summary>
+        void StepBall(float dt)
+        {
+            float total = _arc.speed * dt;
+            int steps = Mathf.Clamp(Mathf.CeilToInt(Mathf.Abs(total) / MaxSubStep),
+                                    1, MaxSubSteps);
+            float sub = total / steps;
+
+            for (int i = 0; i < steps; i++)
+            {
+                float prevX = _ball.x;
+                float nx = prevX + sub;
+                float ny = _arc.Y(nx);
+                _ball = new Vector2(nx, ny);
+
+                // 触网：跨越 x=0 且高度不足
+                if (prevX * nx <= 0f && ny < tuning.netTopY) { NetFault(); return; }
+                // 击球
+                if (TryReceive()) return;
+                // 落地
+                if (ny <= tuning.groundY + 8f) { LandPoint(); return; }
+            }
+        }
+
+        /// <summary>接球方的拍面此刻是否碰到球；碰到就当场解算回球</summary>
+        bool TryReceive()
+        {
+            bool playerReceives = _ballDir < 0;
+            var actor = playerReceives ? _me : _op;
+            bool airborne = playerReceives ? _meAir : _opAir;
+
+            // AI 本回合注定漏球：让它照样挥空，但不结算
+            if (!playerReceives && !_opWillReturn) return false;
+
+            var kind = airborne ? VNBadmintonSwing.Smash : actor.CurrentSwing;
+            if (!airborne && !actor.RacketActive) return false;
+
+            if (Vector2.Distance(_ball, actor.RacketPointFor(kind)) > HitRadius) return false;
+
+            ResolveHit(playerReceives, airborne);
+            return true;
+        }
+
+        void ResolveHit(bool byPlayer, bool airborne)
+        {
+            var actor = byPlayer ? _me : _op;
+            float actorX = byPlayer ? _meX : _opX;
+            int outDir = byPlayer ? 1 : -1;
+
+            // 「身前为正」的水平距离——精准判定的唯一输入
+            float distance = (_ball.x - actorX) * outDir;
+            bool perfect = VNBadmintonBallistics.IsPerfect(distance, tuning);
+            bool heavy = airborne || perfect;
+            float accuracy = VNBadmintonBallistics.Accuracy(distance, tuning, heavy);
+
+            var end = VNBadmintonBallistics.SampleEndPos(outDir, accuracy, tuning, _rng);
+            float power = byPlayer ? tuning.playerPower : tuning.opponentPower;
+
+            if (!VNBadmintonBallistics.BuildArc(_ball, end, tuning, power, heavy, _rng,
+                    out var next))
+                return;   // 极端角度解不出球路：当作没碰到，球继续飞
+
+            _arc = next;
+            _ballDir = outDir;
+            _rallyCount++;
+
+            actor.PlaySwing(airborne ? VNBadmintonSwing.Smash
+                : _ball.y < tuning.lowSwingY ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+
+            if (perfect)
+            {
+                if (byPlayer) _perfectCount++;
+                ShowFloat(VNLocale.T("badminton.perfect"), _ball,
+                    new Color(1f, 0.85f, 0.35f, 1f));
+            }
+
+            BuildTrack();
+            PlanReceive();
+        }
+
+        /// <summary>算出接球方该在哪接、要不要扣杀、这一球会不会被接到</summary>
+        void PlanReceive()
+        {
+            int recvDir = _ballDir > 0 ? 1 : -1;
+            _opWantsSmash = _rng.NextDouble() < tuning.opponentHeavyRate;
+
+            if (!VNBadmintonBallistics.SolveReceivePoint(_arc, recvDir,
+                    recvDir > 0 && _opWantsSmash, tuning, _rng, out _receivePoint))
+                _receivePoint = new Vector2(tuning.startStandX * recvDir,
+                                            tuning.groundY + 200f);
+
+            if (recvDir > 0)
+            {
+                // 对手侧：先掷一次「接不接得到」，注定漏球也照样跑位挥空
+                _opWillReturn = _rng.NextDouble() <= tuning.opponentHitRate;
+                _opSwung = _opJumped = false;
+                _opWantsSmash = _opWantsSmash && _receivePoint.y > tuning.smashNeedY;
+            }
+
+            if (recvDir < 0) _meSwung = false;
+
+            // 玩家侧：来球够高时亮出扣杀机会指示圈
+            bool marker = recvDir < 0 && _receivePoint.y > tuning.smashNeedY;
+            _hitMarker.gameObject.SetActive(marker);
+            if (marker) _hitMarker.anchoredPosition = _receivePoint;
+        }
+
+        // ------------------------------------------------------------------
+        // AI
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 对手不是实时追球——球路一解出来就知道该站哪、什么时候起拍。
+        /// 起拍/起跳的时机按「还有多久到位」算，比参考实现的距离阈值稳（帧率无关）。
+        /// </summary>
+        void TickAi()
+        {
+            if (_ballDir == 0 || Mathf.Approximately(_arc.speed, 0f)) return;
+
+            float timeToArrive = (_receivePoint.x - _ball.x) / _arc.speed;
+            if (timeToArrive < 0f) return;
+
+            if (_ballDir > 0)
+            {
+                if (!_opJumped && _opWantsSmash && !_opAir &&
+                    timeToArrive <= JumpRiseTime(tuning.opponentJumpHeight))
+                { StartJump(false); _opJumped = true; }
+
+                if (!_opSwung && !_opAir && timeToArrive <= AiSwingLead)
+                {
+                    _op.PlaySwing(_receivePoint.y < tuning.lowSwingY
+                        ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+                    _opSwung = true;
+                }
+            }
+            else if (debugAutoPlayer && !_meSwung && !_meAir && timeToArrive <= AiSwingLead)
+            {
+                _me.PlaySwing(_receivePoint.y < tuning.lowSwingY
+                    ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+                _meSwung = true;
+            }
+        }
+
+        /// <summary>起跳到最高点要多久（AI 按这个提前量起跳，与帧率无关）</summary>
+        float JumpRiseTime(float heightUnits) =>
+            tuning.JumpSpeed(heightUnits) / Mathf.Max(0.01f, Mathf.Abs(tuning.JumpGravity));
+
+        // ------------------------------------------------------------------
+        // 角色运动
+        // ------------------------------------------------------------------
+
+        void StartJump(bool player)
+        {
+            if (player)
+            {
+                _meAir = true; _meJumpT = 0f;
+                _meJumpV0 = tuning.JumpSpeed(tuning.playerJumpHeight);
+            }
+            else
+            {
+                _opAir = true; _opJumpT = 0f;
+                _opJumpV0 = tuning.JumpSpeed(tuning.opponentJumpHeight);
+            }
+        }
+
+        void TickActors(float dt)
+        {
+            // 玩家
+            if (_meAir)
+            {
+                _meJumpT += dt;
+                float h = JumpHeightAt(_meJumpV0, _meJumpT);
+                if (h <= 0f) { h = 0f; _meAir = false; }
+                _meY = tuning.groundY + h;
+            }
+            else
+            {
+                _meY = tuning.groundY;
+                // 挥拍中减速移动（参考实现是完全锁死；0.42s 全锁在本作手感偏僵，折中 35%）
+                float speed = tuning.playerMoveSpeed * tuning.pixelsPerUnit
+                              * (_me.Swinging ? 0.35f : 1f);
+
+                if (debugAutoPlayer)
+                {
+                    float want = _ballDir < 0 ? _receivePoint.x : -tuning.startStandX;
+                    want = Mathf.Clamp(want, -tuning.moveMaxX, -tuning.moveMinX);
+                    float d = want - _meX;
+                    _meX += Mathf.Clamp(d, -speed * dt, speed * dt);
+                    _moveInput = Mathf.Abs(d) < 2f ? 0f : Mathf.Sign(d);
+                }
+                else
+                {
+                    _meX = Mathf.Clamp(_meX + _moveInput * dt * speed,
+                                       -tuning.moveMaxX, -tuning.moveMinX);
+                }
+            }
+            _me.SetMoveInput(_meAir ? 0f : _moveInput);
+            _me.SetPosition(_meX, _meY);
+            _me.Tick(dt, _meY - tuning.groundY);
+
+            // 对手
+            if (_opAir)
+            {
+                _opJumpT += dt;
+                float h = JumpHeightAt(_opJumpV0, _opJumpT);
+                if (h <= 0f) { h = 0f; _opAir = false; }
+                _opY = tuning.groundY + h;
+            }
+            else
+            {
+                _opY = tuning.groundY;
+                float targetX = _ballDir > 0 ? _receivePoint.x : tuning.startStandX;
+                targetX = Mathf.Clamp(targetX, tuning.moveMinX, tuning.moveMaxX);
+                float step = tuning.opponentMoveSpeed * tuning.pixelsPerUnit * dt;
+                float delta = targetX - _opX;
+                float move = Mathf.Clamp(delta, -step, step);
+                _opX += move;
+                _op.SetMoveInput(Mathf.Abs(delta) < 2f ? 0f : Mathf.Sign(delta));
+            }
+            _op.SetPosition(_opX, _opY);
+            _op.Tick(dt, _opY - tuning.groundY);
+        }
+
+        /// <summary>抛体：h = (v0·t + ½·g·t²) × pixelsPerUnit</summary>
+        float JumpHeightAt(float v0, float t) =>
+            (v0 * t + 0.5f * tuning.JumpGravity * t * t) * tuning.pixelsPerUnit;
+
+        // ------------------------------------------------------------------
+        // 得分
+        // ------------------------------------------------------------------
+
+        void LandPoint()
+        {
+            bool outOfBounds = !VNBadmintonBallistics.InBounds(_ball.x, tuning);
+            bool playerReceives = _ballDir < 0;
+            // 出界 = 击球方失分；界内 = 接球方没接住失分
+            AwardPoint(playerReceives == outOfBounds,
+                outOfBounds ? "badminton.out" : null);
+        }
+
+        void NetFault()
+        {
+            bool hitterIsPlayer = _ballDir > 0;
+            AwardPoint(!hitterIsPlayer, "badminton.net");
+        }
+
+        void AwardPoint(bool toPlayer, string reasonKey)
+        {
+            if (toPlayer) _scoreMe++; else _scoreOp++;
+            _serverSide = toPlayer ? -1 : 1;   // 拿分方发球
+            _bestRally = Mathf.Max(_bestRally, _rallyCount);
+
+            ClearTrack();
+            _hitMarker.gameObject.SetActive(false);
+            _ballDir = 0;
+
+            _court.SetScore(_scoreMe, _scoreOp, true);
+            _court.ShowScoreBoard(true);
+
+            string msg = VNLocale.T(toPlayer ? "badminton.pointMe" : "badminton.pointOp");
+            if (!string.IsNullOrEmpty(reasonKey)) msg = VNLocale.T(reasonKey) + msg;
+
+            bool meWin = _scoreMe >= _target && _scoreMe - _scoreOp >= 2;
+            bool opWin = _scoreOp >= _target && _scoreOp - _scoreMe >= 2;
+
+            if (meWin || opWin)
+            {
+                _phase = Phase.Over;
+                _court.ShowTips(msg, () => Finish(meWin));
+                return;
+            }
+
+            // 赛点提醒并进同一条横幅——ShowTips 是单条通道，连喊两次会把前一条掐掉
+            if (Mathf.Max(_scoreMe, _scoreOp) >= _target - 1 &&
+                Mathf.Abs(_scoreMe - _scoreOp) >= 1)
+                msg += "  " + VNLocale.T("badminton.matchPoint");
+
+            _phase = Phase.Point;
+            _phaseTimer = 1.7f;
+            _court.ShowTips(msg);
+        }
+
+        void Finish(bool win)
+        {
+            _phase = Phase.Over;
+            _playerWon = win;
+
+            // 与剧情通信只走 flags（事件模块状态不进存档）
+            VNFlags.Set($"{_flagPrefix}_我方得分", _scoreMe);
+            VNFlags.Set($"{_flagPrefix}_对方得分", _scoreOp);
+            VNFlags.Set($"{_flagPrefix}_精准数", _perfectCount);
+            VNFlags.Set($"{_flagPrefix}_最长回合", Mathf.Max(_bestRally, _rallyCount));
+
+            _court.ShowTips(VNLocale.T(win ? "badminton.win" : "badminton.lose"),
+                () => Done(win ? "胜利" : "失败"));
+        }
+
+        // ------------------------------------------------------------------
+        // 轨迹虚点与视觉同步
+        // ------------------------------------------------------------------
+
+        /// <summary>沿抛物线铺一串虚点；trackDisplayRate 控制预告多长（难度旋钮）</summary>
+        void BuildTrack()
+        {
+            ClearTrack();
+            if (!_arc.Valid || tuning.trackDisplayRate <= 0f) return;
+
+            int dir = _ballDir;
+            float span = Mathf.Abs(_arc.endX - _arc.startX) * tuning.trackDisplayRate;
+            float limit = _arc.startX + span * dir;
+
+            for (float x = _arc.startX + tuning.trackSpacing * dir;
+                 (x - limit) * dir < 0f;
+                 x += tuning.trackSpacing * dir)
+            {
+                var dot = RentTrackDot();
+                dot.anchoredPosition = new Vector2(x, _arc.Y(x));
+                _tracks.Enqueue(new KeyValuePair<float, RectTransform>(x, dot));
+                if (_tracks.Count > 200) break;   // 保险丝
+            }
+        }
+
+        RectTransform RentTrackDot()
+        {
+            foreach (var d in _trackPool)
+                if (!d.gameObject.activeSelf) { d.gameObject.SetActive(true); return d; }
+
+            var dot = VNBadmintonUi.CreateImage("Dot", _trackRoot,
+                VNProceduralTextures.RoundedRectSprite, new Color(1f, 1f, 1f, 0.85f));
+            dot.GetComponent<Image>().type = Image.Type.Sliced;
+            VNBadmintonUi.AnchorBottomCenter(dot);
+            dot.sizeDelta = new Vector2(11f, 11f);
+            _trackPool.Add(dot);
+            return dot;
+        }
+
+        void ClearTrack()
+        {
+            while (_tracks.Count > 0) _tracks.Dequeue().Value.gameObject.SetActive(false);
+        }
+
+        void SyncVisuals()
+        {
+            _ballRect.anchoredPosition = _ball;
+            _ballShadow.anchoredPosition = new Vector2(_ball.x, tuning.groundY - 2f);
+
+            // 球头朝向飞行方向
+            if (_phase == Phase.Rally && _arc.Valid)
+            {
+                float slope = 2f * _arc.a * _ball.x + _arc.b;
+                float angle = Mathf.Atan2(slope * Mathf.Sign(_arc.speed),
+                                          Mathf.Sign(_arc.speed)) * Mathf.Rad2Deg;
+                _ballRect.localRotation = Quaternion.Euler(0f, 0f, angle - 90f);
+            }
+
+            // 球飞过的虚点回收
+            while (_tracks.Count > 0)
+            {
+                var head = _tracks.Peek();
+                if ((_ball.x - head.Key) * _ballDir < 0f) break;
+                head.Value.gameObject.SetActive(false);
+                _tracks.Dequeue();
+            }
+        }
+
+        void ShowFloat(string message, Vector2 at, Color color)
+        {
+            var text = VNBadmintonUi.CreateText("Float", _court.ActorLayer, 46, color, message);
+            var rect = VNBadmintonUi.Rect(text);
+            VNBadmintonUi.AnchorBottomCenter(rect);
+            rect.anchoredPosition = new Vector2(at.x, Mathf.Max(at.y + 60f, 620f));
+            rect.sizeDelta = new Vector2(300f, 60f);
+
+            var seq = DOTween.Sequence();
+            seq.Append(rect.DOAnchorPosY(rect.anchoredPosition.y + 70f, 0.8f));
+            seq.Join(text.DOFade(0f, 0.8f).SetEase(Ease.InQuad));
+            seq.AppendCallback(() => { if (rect != null) Destroy(rect.gameObject); });
+            seq.SetUpdate(true).SetLink(gameObject);
+        }
+    }
+}

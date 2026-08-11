@@ -201,3 +201,17 @@ sns.timer = {0}秒
 sns.noReply = （返信しなかった）
 sns.imageMissing = 画像を読み込めません
 sns.closeImage = クリックで閉じる
+
+# —— バドミントン ミニゲーム ——
+badminton.player = 自分
+badminton.opponent = 相手
+badminton.start = 先に {0} 点、2 点差で勝利
+badminton.perfect = ジャスト
+badminton.pointMe = こちらの得点！
+badminton.pointOp = 相手の得点！
+badminton.out = アウト！
+badminton.net = ネット！
+badminton.matchPoint = マッチポイント！
+badminton.win = 勝利！
+badminton.lose = 惜敗……
+badminton.hint = A/D 移動　J 打つ　K スマッシュ　ESC 棄権

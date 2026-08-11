@@ -202,3 +202,17 @@ sns.timer = {0}s
 sns.noReply = （你没有回复）
 sns.imageMissing = 图片加载失败
 sns.closeImage = 点击任意处关闭
+
+# —— 羽毛球小游戏 ——
+badminton.player = 我方
+badminton.opponent = 对手
+badminton.start = 先得 {0} 分者胜（须净胜 2 分）
+badminton.perfect = 精准
+badminton.pointMe = 我方得分！
+badminton.pointOp = 对方得分！
+badminton.out = 出界！
+badminton.net = 触网！
+badminton.matchPoint = 赛点！
+badminton.win = 胜利！
+badminton.lose = 惜败……
+badminton.hint = A/D 移动　J 击球　K 扣杀　ESC 认输

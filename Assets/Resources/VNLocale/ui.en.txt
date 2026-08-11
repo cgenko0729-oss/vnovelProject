@@ -201,3 +201,17 @@ sns.timer = {0}s
 sns.noReply = (You didn't reply)
 sns.imageMissing = Image unavailable
 sns.closeImage = Click anywhere to close
+
+# —— Badminton minigame ——
+badminton.player = You
+badminton.opponent = Rival
+badminton.start = First to {0} points wins (must lead by 2)
+badminton.perfect = PERFECT
+badminton.pointMe = Point for you!
+badminton.pointOp = Point for your rival!
+badminton.out = OUT!
+badminton.net = NET!
+badminton.matchPoint = Match point!
+badminton.win = You win!
+badminton.lose = You lose...
+badminton.hint = A/D move　J hit　K smash　ESC forfeit
