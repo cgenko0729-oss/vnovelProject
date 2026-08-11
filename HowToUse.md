@@ -878,6 +878,7 @@ event qte time:3 target:12 title:鼓起勇气连打！
 | `battle` | `event battle enemy:史莱姆 ehp:22` | 回合制小战斗，结果 `胜利` / `失败` / `逃跑` |
 | `quiz` | `event quiz id:社团常识 count:3 time:15` | 限时问答（见下） |
 | `badminton` | `event badminton vs:小雪 id:校队 target:5` | 羽毛球对战，结果 `胜利` / `失败` / `结束`（见下） |
+| `photo` | `event photo vs:星野结衣 theme:甜蜜` | 拍大头照，结果 `完美` / `普通` / `失败`；不写 `theme:` 只返回 `完成`（见下） |
 
 新玩法（战斗/钓鱼/番长镇日程……）就是照 VNQteModule 的样子再写一个模块类，
 接口/铁律见 `ProjectCodeGuide.md`。
@@ -1011,6 +1012,93 @@ if 羽球_精准数 >= 3 jump 打得漂亮
 **不重建场景**。装完记得 Ctrl+S。重复执行安全。
 
 完整示例见 `Assets/Scenarios/BadmintonDemo.vn.txt`。
+
+### 拍大头照：photo 📷
+
+```
+event photo vs:星野结衣 me:川岛葵 theme:甜蜜 frame:粉格子 time:60 stat:魅力 rate:0.1
+* 完美 -> 拍得真好
+* 普通 -> 还行吧
+* 失败 -> 拍砸了
+```
+
+商店街那种大头贴机。左栏选**边框样式**或**贴纸**（两个标签页），右栏两列点**表情**
+（左列是「我」右列是「对方」），贴纸可以**左键拖动、滚轮缩放、Shift+滚轮旋转、右键删除**。
+按 ◉ 快门 → 3・2・1 倒数 → 闪白咔嚓 → 相纸飞出来冲分 → **重拍 / 完成**。
+**ESC** 放弃（会弹确认）。照片存进相册，重拍的那张会被删掉，只有点「完成」的算数。
+
+**两套结果名互斥，别写混了**：
+
+| 情况 | 结果名 |
+|---|---|
+| 写了 `theme:` | `完美` / `普通` / `失败`（按主题评分分档） |
+| 没写 `theme:` 或 `mode:free` | 只有 `完成`（自由拍照，不评分） |
+
+写错了 Lint 会报 `photo-outcome-mode`——这是最容易踩的一个，因为拼错主题 id 也会
+**静默退回自由拍照**，那样三条分档结果行一条都接不住。
+
+| 参数 | 说明 |
+|---|---|
+| `vs:` | 合影对象的角色 id（**必填**，缺了整段白跑） |
+| `me:` | 主角的角色 id；省略取 VNGameConfig 的「大头贴里我用哪个角色」 |
+| `theme:` | 主题资产 id；不写 = 自由拍照 |
+| `mode:` | `match` 评分（默认）/ `free` 自由拍照 |
+| `frame:` | 开局用哪个边框（省略 = 无边框，玩家自己选） |
+| `time:` | 装扮限时秒（默认取主题的；`0` = 不限时。自由拍照默认不限时） |
+| `stat:` `rate:` | 分数自动换算成属性：`加成 = round(分数 × rate)`，走 HUD 飘字 |
+| `flag:` | 成绩 flag 前缀（默认 `大头照`） |
+| `title:` | 面板标题覆盖 |
+
+同时写入三个 flag：
+
+```
+if 大头照_分数 >= 90 jump 满分照
+if 大头照_档位 == 2 jump 拍得真好
+if 大头照_次数 >= 3 jump 拍上瘾了
+```
+
+| flag | 内容 |
+|---|---|
+| `<前缀>_分数` | 本次总分 |
+| `<前缀>_档位` | 2 完美 / 1 普通 / 0 失败 |
+| `<前缀>_次数` | 累计拍了几张（自由拍照也算） |
+
+**主题＝评分表**（`Assets/VNEffects/Photo/Themes/`，右键 **Create → VN → Photo Theme**）。
+采用**清单制**：这个主题想要什么，就在三张清单里直接列出来——
+
+| 清单 | 一行写什么 |
+|---|---|
+| 表情加分项 | 针对谁（我/对方/任意）+ 表情名 + 分数 + 命中评语（可负分，惩罚跑题的表情） |
+| 边框加分项 | 边框 id + 分数 + 评语 |
+| 贴纸加分项 | 贴纸 id + 每个的分数 + **最多计几个**（防止满屏刷同一种贴纸） |
+
+再加基础分、完美线、及格线、贴纸总数上限、三档总评。
+得分 = 基础分 + 命中项之和，结算时逐条弹出来给玩家看。
+内置三个主题：**甜蜜**（害羞+微笑，粉格子/樱花，爱心）/ **搞怪**（坏笑+惊讶，
+胶片，猫耳皇冠）/ **青春**（微笑，简约白框，星星音符）。
+
+**边框与贴纸**（`Assets/VNEffects/Photo/{Frames,Stickers}`）都是**留空就程序化生成**：
+边框有 5 套内置样式（粉格子/星空/胶片/简约白框/樱花），贴纸有 10 种图形
+（爱心/星星/闪光/蝴蝶结/对话泡/小花/音符/皇冠/猫耳/云朵）。
+以后有美术图，往资产的 Sprite 槽里一放就自动替换，代码不用动。
+
+**人物取景对不上时调这三个**（模块 Inspector）：
+
+| 参数 | 什么时候拧 |
+|---|---|
+| `photoFit` | 人太远/太近（立绘宽度 = 每人分到的宽度 × 它） |
+| `faceAnchor` | 拍到的位置偏了：看到的偏下就**调小**，偏上就**调大** |
+| `pairSpread` | 两人挤在一起或离太远 |
+
+> ⚠ 取景框用的是**表情立绘**（`expressions`），不是对话框头像（`portraits`）——
+> 因为头像列表找不到同名表情会退回第一张，那样点表情脸根本不会变。
+
+**第一次用要先装模块**：**Tools → VN Effects → Install Photo Booth Module To Scene**
+——补一个禁用的 PhotoBoothTemplate 并登记资产库，**缺资产会自动铺一套默认的**
+（已有的绝不覆盖）。装完记得 Ctrl+S。重复执行安全。
+
+照片存在 `persistentDataPath/vn_photos/`（与存档槽分离，读旧档也不会丢）。
+完整示例见 `Assets/Scenarios/PhotoDemo.vn.txt`。
 
 ### 商店与物品栏 🛒
 
@@ -1557,6 +1645,10 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `unknown-event-module` | 模块 id 没注册进 VNEventRegistry |
 | | `unknown-quiz` | `event quiz` 的 `id:` 没有对应的 VNQuizDef 题库资产（整段问答会被静默跳过） |
 | | `unknown-badminton` | `event badminton` 的 `id:` 没有对应的 VNBadmintonDef 对手资产（会静默退回兜底难度） |
+| | `photo-missing-vs` | `event photo` 没写 `vs:`（**错误级**：没有合影对象，模块直接返回「完成」，整段白跑） |
+| | `unknown-photo-theme` | `event photo` 的 `theme:` 没有对应的 VNPhotoThemeDef（会静默退回自由拍照，分档结果行全接不住） |
+| | `unknown-photo-frame` | `event photo` 的 `frame:` 没有对应的 VNPhotoFrameDef（静默退回无边框） |
+| | `photo-outcome-mode` | `event photo` 的结果行与模式对不上（写了 `theme:` 却接「完成」，或自由拍照却接「完美/普通/失败」） |
 | | `sns-not-closed` | 最后一次 `sns open` 之后没有 `sns close`（手机会一直盖在画面上） |
 | | `sns-timeout-no-late` | `sns reply` 写了 `timeout:` 却没写 `late:` → 运行时退回成不限时 |
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
@@ -1671,6 +1763,7 @@ event plan slots:7 pool:… / event plan op:next   周日程排程 / 逐格派�
 event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
 event badminton vs:<角色> [id:] [target:] [first:] [mode:free] [powerstat:]  羽毛球对战
+event photo vs:<角色> [me:] [theme:] [mode:free] [frame:] [time:] [stat: rate:]  拍大头照
                                                  结果 全对/及格/失败
 quest <start|stage|done|fail> <id> [阶段]        任务
 

@@ -5640,3 +5640,154 @@ Play 着直接拖 Def 资产的 Inspector 就能实时看到变化，不用反�
 
 - 用户提供侧身运动立绘后替换占位剪影（规格见实施计划第八节，逻辑零改动）。
 - `VNGameConfig.asset` 的对手库登记需要用户自行提交（或跑一次装机器）。
+
+---
+
+## 一〇三、拍大头照小游戏（P1~P4）（2026-08-12，分支 `agent/photo-booth`）
+
+### 需求 / 背景
+
+用户要求把参考项目 `Student Age new`（学生时代）里的「大头贴」做进本专案，
+并给了游戏内截图作为目标形态。
+
+参考实现只有两个文件：`View.Love/PhotoboothView.cs`（304 行）与
+`Config/LovePhotoboothCfg.cs`（只有 `id / name / itemPos` 三个字段）。
+读完发现它比看上去简单得多——**没有输赢、没有评分**，关闭时固定 `result(1f)`，
+本质是「选边框 + 切表情 + 摆贴纸 → 快门 → 截屏存 PNG」的装扮互动。
+
+四轮问答定案（每轮 3~4 题）：
+
+1. 玩法定位 = **装扮 + 主题评分**（不照抄「无输赢」）；合影 = **双人**，主角先用现有角色占位；
+   素材 = **程序化生成默认 + 资产可覆盖**；照片 = **存 PNG + 相册界面**
+2. 评分 = **清单制**（每个主题直接列出加分项）；主角立绘先占位；
+   相册做成 **G 键画廊的第二个标签页**；装扮自由度 = **拖动 + 缩放旋转 + 右键删除**
+3. 结算 = **模块内自绘**（照片 + 分数 + 评语）；分数 **写 flag + 可选自动加属性**；
+   **限时装扮 + free 模式**；相册要**删除**能力
+4. 分支起点 = 先把羽毛球合并回 main，再从 main 切
+
+本章覆盖 P1（数据与数学）、P2（界面与交互）、P3（演出）、P4（系统接线）。
+P5（画廊照片页）未做。
+
+### 参考实现的核心配方
+
+- 左栏「边框样式」= 配置表条数 + 1，第 0 项是「默认」（不加边框）。
+- 边框的装饰件表 `itemPos` 每行 `[图号, x, y]`，生成后**可自由拖拽**。
+- 右栏「切换表情」两列，各自角色的表情数，点一下 `l2d_role.SetExpression(i)`。
+- 快门：倒数 3/2/1 换图 → 算出取景框的屏幕矩形 → `CaptureScreenshot(rect, path)`
+  截屏裁剪存外部 PNG → 弹结果层，带「重拍 / 完成」。
+- 结算一律走 `CloseView()` 一条路径（`ReferenceProjectLearnings.md` §43b 的老规矩）。
+
+### 文件改动清单
+
+**新增运行时**（`Assets/Project/Scripts/VNEffects/Script/`）
+
+- `VNPhotoStickerDef.cs` —— 贴纸资产（id / 三语名 / Sprite 或程序化图形 / 色调 / 初始尺寸）。
+  参考实现里贴纸是边框图的附属小图，这里拆成独立资产，因为同一张贴纸要被多个边框、
+  多个主题的评分表复用。
+- `VNPhotoFrameDef.cs` —— 边框资产。比参考多出：程序化兜底、人物开窗形状（椭圆/圆角/无）、
+  前景层、水印文字、自带装饰件（可锁定）。
+- `VNPhotoThemeDef.cs` —— 主题 + 清单制评分表（表情/边框/贴纸三张清单，每项带分数与命中评语）
+  + 限时 + 基础分 + 完美线/及格线 + 贴纸总数上限（防刷分）+ 三档总评。
+  另含共用的三语文本类 `VNPhotoLine`。
+- `VNPhotoScore.cs` —— **纯静态评分数学**，无 MonoBehaviour / UI 依赖，可单测。
+  故意保持无状态、无随机：同样的装扮永远同样的分，玩家才学得会「什么样算好照片」。
+- `VNPhotoTextures.cs` —— 程序化贴图：5 套边框（粉格子/星空/胶片/简约白框/樱花）、
+  椭圆与圆角遮罩、开窗描边环、10 种贴纸隐函数图形、相纸（九宫格）、实心圆。
+- `VNPhotoCapture.cs` —— 取景框区域截图。**「怎么拍」全关在这一个文件里**，
+  以后要换成独立 Camera + RenderTexture 只改它，模块不用动。
+- `VNPhotoAlbum.cs` —— 相册全局存储（`persistentDataPath/vn_photos/` 的 PNG + index.json），
+  与 20 槽存档完全分离（同 `VNCgUnlocks` 的道理）。索引损坏可从文件名恢复；
+  纹理走 LRU 缓存（上限 12 张）防翻相册爆内存；容量上限 200 张。
+- `VNPhotoBoothUi.cs` —— 程序化 UI 辅助 + `VNPhotoStickerItem`
+  （左键拖 / 滚轮缩放 / Shift+滚轮旋转 / 右键删，走新版 Input System）。
+- `VNPhotoSfx.cs` —— 五个代码合成音效（倒数滴 / 快门咔嚓 / 贴纸落位 / 计分嗒 / 结算琶音）。
+  快门声是 noise 高 + 衰减快的**两下**——单簧快门就是「咔」+「嗒」。
+- `VNPhotoBoothModule.cs` —— `VNEventModule` 子类。五态状态机
+  （Dressing → Confirm / Shooting → Result → Ending）、装扮交互、限时、
+  快门序列、结算演出、flag 与属性结算。
+
+**新增编辑器**
+
+- `Editor/VNPhotoBoothInstaller.cs` —— `Tools → VN Effects → Install Photo Booth
+  Module To Scene`，增量装机（照 `VNBadmintonInstaller` 范式）。
+  额外做一件事：**缺资产就铺一套默认的**（5 边框 / 10 贴纸 / 3 主题），
+  已存在的绝不覆盖（那可能是用户改过的）。
+  拆成 `Install()`（菜单外壳，弹框）+ `InstallCore(out ok)`（无弹框内核，供脚本调用）。
+
+**修改**
+
+- `VNGameConfig.cs` —— 新增 `photoFrames` / `photoStickers` / `photoThemes` 三个列表
+  与 `photoMeCharacterId`（大头贴里「我」默认用哪个角色）。
+- `Editor/VNScenarioLinter.cs` —— `photo` 的结果名集合、主题/边框 id 集合（扫资产）、
+  以及四项专项校验（见下）。
+- `Editor/VNScenarioSchema.cs` —— `event` 说明里补 `photo` 与 `badminton` 的参数用法。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— 新增 photo.* 共 19 条 UI 字符串。
+- `Assets/Scenarios/PhotoDemo.vn.txt` —— 演示剧本（自由拍照 / 主题评分 / 分数细分支 /
+  换主题重拍 / 分数换算属性）。
+
+### 剧本语法
+
+```
+event photo vs:<她> [me:<我>] [theme:<主题>] [mode:match|free] [frame:<边框>]
+                    [time:<秒>] [stat:<属性>] [rate:<换算率>] [flag:<前缀>] [title:<标题>]
+```
+
+- 写了 `theme:` 才评分，结果 `完美 / 普通 / 失败`；不写（或 `mode:free`）= 自由拍照，
+  只返回 `完成`。**两套结果名互斥**，Lint 会检查剧本写的结果行与模式对不对得上。
+- 写 flag：`<前缀>_分数`、`<前缀>_档位`（2/1/0）、`<前缀>_次数`。
+  原计划的 `_主题` 去掉了——flag 只存整数，主题名塞不进去。
+- `stat:` + `rate:` 可让分数自动换算成属性（`加成 = round(分数 × rate)`，走 HUD 飘字）。
+
+### 技术决策与取舍
+
+1. **取景框不用 `GetPortrait`，必须用 `GetSprite`。** `GetPortrait` 在 `portraits` 列表里
+   找不到同名表情时会退回 `portraits[0]`——本专案两个角色的 `portraits` 都只配了同一张
+   `p01`，结果是**不管点哪个表情脸都不变**，而切表情正是这个玩法的核心。
+2. **不复用角色资产的 `portraitScale`。** 那个值（4.96）是为对话框那个 230px 小窗
+   「把脸怼满」标定的；合影要的是「头带肩、两人并排」，放大倍率完全不同。
+   改用模块自己的 `photoFit` / `faceAnchor` / `pairSpread` 三个参数，
+   换素材只调这三个数。
+3. **截图走屏幕裁剪而不是 RenderTexture。** 代价是分辨率跟随窗口、快门那一帧必须
+   把侧栏藏掉；换来的是照片天然带 URP 的 Bloom / Vignette（大头贴要的就是这个味道），
+   而且代码量小。想换实现只改 `VNPhotoCapture`。
+4. **相册里「重拍」会把上一张删掉。** 拍完先存，点「重拍」再删——否则玩家反复重拍
+   会把相册塞满废片；只有点「完成」的那张才算数。
+5. **贴纸计分只算玩家自己贴的。** 边框自带的装饰属于边框的一部分，已经由边框加分项
+   算过一次，再算等于同一件事给两次分。
+6. **星光爆发自己画。** 事件模块三铁律之一是不碰舞台演出，所以没用
+   `VNAmbientParticles.PlaySparkleBurst`，改在 UI 层生成 8 个 sparkle 飞散。
+
+### 修复记录（本章踩的坑）
+
+1. **立绘定位连错三次**，一次比一次接近：
+   ① 按**高度**算基准 → 脸被顶出框外（立绘是横图，宽高基准差三四倍）；
+   ② 改宽度基准但复用 `portraitScale=4.96` → 人物放大五倍、两人重叠成一团；
+   ③ `lift` 符号写反 → 脸在图片上半部却把图往**上**推，拍出一框裙子和腿。
+   最终公式：`图宽 = slot宽 × photoFit`，`lift = −图高 × (0.5 − faceAnchor)`。
+2. **粉格子边框第一版像 Photoshop 的透明棋盘格**（两级方格对比度太高）。
+   压到 `Lighten(main, 0.58/0.76)` 才像格纹布。
+3. **又一次被装机器的 `EditorUtility.DisplayDialog` 卡住 MCP**——
+   一〇二章「坑」第 8 条已经记过这件事，这次还是踩了。
+   这回做了根治：装机器拆成 `Install()`（弹框）+ `InstallCore()`（不弹框），
+   **以后所有装机器都按这个形状写，脚本一律调 Core**。
+
+### 验证方法
+
+- 评分数学：`VNPhotoScore.Evaluate` 三个用例——满配 90 分/完美、
+  白板 20 分/失败、中等 60 分/普通；贴纸贴 5 个但 `maxCount=3` 只按 3 个计分。
+- 程序化贴图：逐张统计 alpha 覆盖率，确认既不是空图也不是实心方块
+  （椭圆遮罩 78% ≈ π/4，验证了形状函数正确）。
+- 界面：在 `VNScriptDemo` 场景里用 `HideFlags.DontSave` 的临时对象搭出面板，
+  用 `screenshot-camera` 逐轮确认（**不能用 `screenshot-game-view`**，
+  非播放状态它返回旧帧——一〇二章「坑」第 6 条）。验证完销毁，不写进场景。
+- 剧本：`Tools → VN Effects → Lint Scenarios`（Ctrl+Shift+L）对 `PhotoDemo.vn.txt` 无报错。
+
+### 待办
+
+- **P5：G 键画廊的「照片」标签页 + 删除**（`VNCgGallery` 加标签切换、
+  `VNCgGallerySkin` 加两个可选槽位）。当前照片能拍能存，但只能去
+  `persistentDataPath/vn_photos/` 目录看。
+- 主角立绘：`VNGameConfig.photoMeCharacterId` 现在留空，剧本用 `me:` 临时指定；
+  用户做好主角角色资产后填进去即可，代码零改动。
+- 三个内置主题的加分表是按现有角色的表情名（害羞/微笑/坏笑/惊讶/生气/沮丧）写的，
+  新增角色时记得对一遍表情名。

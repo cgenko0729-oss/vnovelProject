@@ -329,7 +329,11 @@ namespace VNEffects.EditorTools
             Add("event", "Flow", "event <module id> [key:value…] + '*' outcome lines\n" +
                 "运行 VNEventRegistry 登记的玩法模块（地图/战斗/迷你游戏），按结果分支\n" +
                 "内置：qte 连打 / map 地图 / shop 商店 / plan 周日程排程 / result 结算弹窗\n" +
-                "     battle 小战斗 / quiz 限时问答（id:题库 count:题数 time:秒 pass:及格线）",
+                "     battle 小战斗 / quiz 限时问答（id:题库 count:题数 time:秒 pass:及格线）\n" +
+                "     badminton 羽球对战（vs:角色 id:对手 target:分 mode:match|free）\n" +
+                "     photo 拍大头照（vs:角色 me:主角 theme:主题 frame:边框 time:秒\n" +
+                "           stat:属性 rate:换算率）；写了 theme: 才评分（完美/普通/失败），\n" +
+                "           不写 = 自由拍照只返回「完成」",
                 Pos("id", "id", VNParamSource.EventId));
             ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
             // ---- SNS 手机聊天 ----

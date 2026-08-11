@@ -129,6 +129,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNCamWaypoint / VNCamseqText / VNCamseqTemplates (Editor) | camseq 路径点行的结构化视图（严格 TryParse/Format，语法与运行时 ParseCamWaypoint 同构）/ 一整段 camseq 文本的 TrySplit·Join / 11 条内置运镜模板（`{char}` 占位按当前角色替换）。**存储仍是 VNRow.camLines 字符串**，本层只做每帧现解析、改完写回的中转 |
 | VNBadmintonModule / VNBadmintonDef | 羽毛球对战事件模块（`event badminton vs: id: target: first: mode: powerstat:/speedstat:/jumpstat: flag:`，结果 胜利/失败/结束）/ 对手+难度+台词+立绘+音效定义资产（登记进 VNGameConfig）；战绩写 flag `<前缀>_我方得分/_对方得分/_精准数/_最长回合`；装机走 Tools → VN Effects → **Install Badminton Module To Scene** |
 | VNBadmintonBallistics / VNBadmintonCourt / VNBadmintonActor / VNBadmintonSfx / VNBadmintonUi | 羽球的四层拆分：**纯静态弹道数学**（三点定抛物线/落点抽样/精准判定，无 MonoBehaviour 依赖可单测）/ 程序化球场与 HUD / 角色表现层（六态假动画，**换真动画只改这一个文件**）/ 五个代码合成音效 / 共用 UI 辅助 + 画梯形的 `VNBadmintonQuad` |
+| VNPhotoBoothModule / VNPhotoFrameDef / VNPhotoStickerDef / VNPhotoThemeDef | 拍大头照事件模块（`event photo vs: me: theme: mode: frame: time: stat:/rate: flag:`，写了 theme: 才评分＝完美/普通/失败，不写＝自由拍照只返回完成）/ 边框（程序化样式+开窗形状+水印+自带装饰）/ 贴纸 / 主题＋**清单制**评分表（表情·边框·贴纸三张加分清单＋命中评语）；成绩写 flag `<前缀>_分数/_档位/_次数`；装机走 Tools → VN Effects → **Install Photo Booth Module To Scene**（缺资产会自动铺一套默认的） |
+| VNPhotoScore / VNPhotoTextures / VNPhotoCapture / VNPhotoAlbum / VNPhotoBoothUi / VNPhotoSfx | 大头贴的六层拆分：**纯静态评分数学**（无 MonoBehaviour 可单测）/ 程序化边框·遮罩·10 种贴纸·相纸 / **取景框截图**（「怎么拍」全在这一个文件，换 RenderTexture 只改它）/ 相册全局存储（PNG+index.json，与存档槽分离、LRU 纹理缓存、上限 200 张）/ 共用 UI 辅助 + 贴纸拖拽组件 `VNPhotoStickerItem`（拖·滚轮缩放·Shift+滚轮旋转·右键删）/ 五个代码合成音效 |
 | VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
@@ -168,6 +170,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 玩法事件接口 | `event <id>` + `* 结果行`；示例 qte/map/battle/shop/plan/result/quiz | 四十一~四十四、七十、八十一 |
 | 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
 | 羽毛球对战 | `event badminton vs:角色 id:对手资产 target: first:me\|opponent\|random mode:match\|free`；A/D 移动 + J 击球 + K 扣杀 + ESC 认输（弹确认，退出即判负）；弹道 = 三点定抛物线，**不用 Physics2D**（改纯数学判定，代价是必须子步进）；难度靠 VNBadmintonDef 六参数，轨迹预告 `trackDisplayRate` 是最大杠杆 | 一〇二 |
+| 拍大头照 | `event photo vs:角色 [me:主角] [theme:主题] [mode:match\|free] [frame:边框] [time:秒] [stat:属性 rate:换算率]`；左栏边框/贴纸两个标签页 + 右栏我/对方两列表情格 + 贴纸拖拽缩放旋转右键删 + 限时 + 快门倒数闪白 + 相纸飞入冲分结算；照片存 `persistentDataPath/vn_photos/`（与存档槽分离）。**两套结果名互斥**：写了 theme: = 完美/普通/失败，不写 = 完成 | 一〇三 |
 | SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
 | 液体喷溅 | `liquid splash\|spray\|click\|wet\|dry\|cover [on\|off] [x:] [y:] [type:] [power:] [dir:] [spread:] [rate:] [screen:] [amount:]`，type = water/blood/ink/slime（+中文别名）；x/y 是屏幕比例 0~1；**dir 留空=朝镜头扑面而来（默认，正交相机下走伪透视：放射+加速+放大），填了才侧喷**；screen 是溅上镜头的概率倍率；click 模式下左键归喷水、Enter/空格仍推进 | 九十四 |
 | 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → **Weather Preview** | 九十二 |

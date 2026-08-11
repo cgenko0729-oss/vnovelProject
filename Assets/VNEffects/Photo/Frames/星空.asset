@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af36d1215749be448b8c3ca9561a367c, type: 3}
+  m_Name: "\u661F\u7A7A"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPhotoFrameDef
+  frameId: "\u661F\u7A7A"
+  displayName: "\u661F\u7A7A"
+  displayNameEn: Starry sky
+  displayNameJa: "\u661F\u7A7A"
+  frameSprite: {fileID: 0}
+  style: 1
+  mainColor: {r: 0.45, g: 0.5, b: 0.95, a: 1}
+  frontSprite: {fileID: 0}
+  maskShape: 2
+  maskSize: {x: 0.72, y: 0.82}
+  maskOffset: {x: 0, y: 0}
+  windowColor: {r: 0.9, g: 0.95, b: 1, a: 1}
+  maskEdgeColor: {r: 0.505, g: 0.55, b: 0.955, a: 1}
+  maskEdgeWidth: 10
+  watermark: GOOD NIGHT
+  watermarkEn: GOOD NIGHT
+  watermarkJa: GOOD NIGHT
+  watermarkColor: {r: 1, g: 1, b: 1, a: 0.92}
+  decorations: []

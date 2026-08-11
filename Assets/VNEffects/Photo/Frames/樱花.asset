@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: af36d1215749be448b8c3ca9561a367c, type: 3}
+  m_Name: "\u6A31\u82B1"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPhotoFrameDef
+  frameId: "\u6A31\u82B1"
+  displayName: "\u6A31\u82B1"
+  displayNameEn: Sakura
+  displayNameJa: "\u3055\u304F\u3089"
+  frameSprite: {fileID: 0}
+  style: 4
+  mainColor: {r: 1, g: 0.72, b: 0.82, a: 1}
+  frontSprite: {fileID: 0}
+  maskShape: 1
+  maskSize: {x: 0.72, y: 0.82}
+  maskOffset: {x: 0, y: 0}
+  windowColor: {r: 0.9, g: 0.95, b: 1, a: 1}
+  maskEdgeColor: {r: 1, g: 0.748, b: 0.838, a: 1}
+  maskEdgeWidth: 10
+  watermark: SPRING DAYS
+  watermarkEn: SPRING DAYS
+  watermarkJa: SPRING DAYS
+  watermarkColor: {r: 1, g: 1, b: 1, a: 0.92}
+  decorations: []

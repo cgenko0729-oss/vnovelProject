@@ -1,0 +1,89 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de3c6071bf1b36a41adae480a3d58242, type: 3}
+  m_Name: "\u751C\u871C"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPhotoThemeDef
+  themeId: "\u751C\u871C"
+  displayName: "\u751C\u871C"
+  displayNameEn: Sweet
+  displayNameJa: "\u3042\u307E\u3042\u307E"
+  hint:
+    text: "\u62CD\u4E00\u5F20\u751C\u751C\u7684\u5408\u7167\u5427"
+    textEn: Let's take a sweet one together
+    textJa: "\u3042\u307E\u30FC\u3044\u4E00\u679A\u3092\u64AE\u308D\u3046"
+  timeLimit: 60
+  baseScore: 20
+  perfectLine: 75
+  passLine: 45
+  stickerScoreCap: 5
+  expressionRules:
+  - slot: 2
+    expression: "\u5BB3\u7F9E"
+    score: 25
+    comment:
+      text: "\u5979\u5BB3\u7F9E\u7684\u8868\u60C5\u6293\u5F97\u771F\u597D"
+      textEn: You caught her shy face perfectly
+      textJa: "\u7167\u308C\u9854\u304C\u3044\u3044\u611F\u3058"
+  - slot: 0
+    expression: "\u5FAE\u7B11"
+    score: 18
+    comment:
+      text: "\u7B11\u5BB9\u5F88\u81EA\u7136"
+      textEn: A natural smile
+      textJa: "\u81EA\u7136\u306A\u7B11\u9854"
+  - slot: 0
+    expression: "\u751F\u6C14"
+    score: -10
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  frameRules:
+  - frameId: "\u7C89\u683C\u5B50"
+    score: 20
+    comment:
+      text: "\u7C89\u683C\u5B50\u8FB9\u6846\u5F88\u914D\u8FD9\u4E2A\u4E3B\u9898"
+      textEn: The pink check fits the mood
+      textJa: "\u30D4\u30F3\u30AF\u30C1\u30A7\u30C3\u30AF\u304C\u3074\u3063\u305F\u308A"
+  - frameId: "\u6A31\u82B1"
+    score: 15
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  stickerRules:
+  - stickerId: "\u7231\u5FC3"
+    score: 8
+    maxCount: 3
+    comment:
+      text: "\u7231\u5FC3\u8D34\u5F97\u6070\u5230\u597D\u5904"
+      textEn: Just the right amount of hearts
+      textJa: "\u30CF\u30FC\u30C8\u306E\u91CF\u304C\u3061\u3087\u3046\u3069\u3044\u3044"
+  - stickerId: "\u5C0F\u82B1"
+    score: 5
+    maxCount: 2
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  perfectComment:
+    text: "\u8FD9\u5F20\u53EF\u4EE5\u5F53\u58C1\u7EB8\u4E86"
+    textEn: This one's wallpaper material
+    textJa: "\u3053\u308C\u306F\u58C1\u7D19\u306B\u3067\u304D\u308B"
+  normalComment:
+    text: "\u633A\u597D\u7684\u4E00\u5F20"
+    textEn: Not bad at all
+    textJa: "\u306A\u304B\u306A\u304B\u3044\u3044\u4E00\u679A"
+  failComment:
+    text: "\u4E0B\u6B21\u518D\u52AA\u529B\u5427\u2026\u2026"
+    textEn: Maybe next time...
+    textJa: "\u6B21\u306F\u3082\u3063\u3068\u9811\u5F35\u308D\u3046\u2026\u2026"

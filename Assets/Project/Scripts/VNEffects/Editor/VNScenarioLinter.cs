@@ -72,6 +72,8 @@ namespace VNEffects.EditorTools
                 ["quiz"] = new HashSet<string> { "全对", "及格", "失败" },
                 // badminton 的「结束」只在 mode:free 下出现，正式赛只有胜利/失败
                 ["badminton"] = new HashSet<string> { "胜利", "失败", "结束" },
+                // photo 的「完成」只在自由拍照（不写 theme: 或 mode:free）下出现
+                ["photo"] = new HashSet<string> { "完美", "普通", "失败", "完成" },
                 // map 的结果名 = 地点名，取自场景模板，运行时补
             };
 
@@ -103,6 +105,8 @@ namespace VNEffects.EditorTools
             public HashSet<string> mapLocations = new HashSet<string>();
             public HashSet<string> quizIds = new HashSet<string>();
             public HashSet<string> badmintonIds = new HashSet<string>();
+            public HashSet<string> photoThemeIds = new HashSet<string>();
+            public HashSet<string> photoFrameIds = new HashSet<string>();
             public HashSet<string> weatherIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
@@ -286,6 +290,22 @@ namespace VNEffects.EditorTools
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (def != null && !string.IsNullOrEmpty(def.badmintonId))
                     reg.badmintonIds.Add(def.badmintonId);
+            }
+
+            // 大头贴的主题与边框 id：同理扫资产
+            foreach (var guid in AssetDatabase.FindAssets("t:VNPhotoThemeDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNPhotoThemeDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def != null && !string.IsNullOrEmpty(def.themeId))
+                    reg.photoThemeIds.Add(def.themeId);
+            }
+            foreach (var guid in AssetDatabase.FindAssets("t:VNPhotoFrameDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNPhotoFrameDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def != null && !string.IsNullOrEmpty(def.frameId))
+                    reg.photoFrameIds.Add(def.frameId);
             }
 
             // 自定义飘落天气资产（内置叶型别名与 VNWeather 枚举另行判定，不进这个集合）
@@ -759,6 +779,58 @@ namespace VNEffects.EditorTools
                             "对手是 VN/Badminton Definition 资产（Assets/VNEffects/Badminton），" +
                             "badmintonId 要和剧本写的一致；拼错只会静默退回兜底难度。" +
                             $"当前已有：{string.Join(" / ", reg.badmintonIds.OrderBy(s => s))}");
+                }
+
+                // 大头贴：vs 是必填的，主题/边框拼错都会静默降级
+                if (module == "photo")
+                {
+                    string vs = c.Kw("vs");
+                    if (string.IsNullOrEmpty(vs))
+                        Add(issues, VNLintSeverity.Error, "photo-missing-vs", f, c.line,
+                            "event photo 必须写 vs:<角色 id>",
+                            "没有合影对象，模块会直接返回「完成」，整段拍照白跑。");
+                    else CheckCharacter(issues, f, c.line, vs, reg);
+
+                    CheckCharacter(issues, f, c.line, c.Kw("me"), reg);
+
+                    string themeId = c.Kw("theme");
+                    if (!string.IsNullOrEmpty(themeId) && !Dynamic(themeId) &&
+                        reg.photoThemeIds.Count > 0 && !reg.photoThemeIds.Contains(themeId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-photo-theme", f, c.line,
+                            $"没有 id 为「{themeId}」的拍照主题资产",
+                            "主题是 VN/Photo Theme 资产（Assets/VNEffects/Photo/Themes）。" +
+                            "拼错会静默退回自由拍照——那样只返回「完成」，" +
+                            "写在下面的 完美/普通/失败 结果行一条都接不住。" +
+                            $"当前已有：{string.Join(" / ", reg.photoThemeIds.OrderBy(s => s))}");
+
+                    string frameId = c.Kw("frame");
+                    if (!string.IsNullOrEmpty(frameId) && !Dynamic(frameId) &&
+                        reg.photoFrameIds.Count > 0 && !reg.photoFrameIds.Contains(frameId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-photo-frame", f, c.line,
+                            $"没有 id 为「{frameId}」的边框资产",
+                            "边框是 VN/Photo Frame 资产（Assets/VNEffects/Photo/Frames）；" +
+                            "拼错只会静默退回「无边框」开局。" +
+                            $"当前已有：{string.Join(" / ", reg.photoFrameIds.OrderBy(s => s))}");
+
+                    // 评分模式与结果行必须对得上（两套结果名互斥）
+                    bool free = string.IsNullOrEmpty(themeId) || c.Kw("mode") == "free";
+                    if (c.options != null)
+                        foreach (var o in c.options)
+                        {
+                            string outcome = o.text?.Trim();
+                            if (string.IsNullOrEmpty(outcome) || Dynamic(outcome)) continue;
+                            if (free && outcome != "完成")
+                                Add(issues, VNLintSeverity.Warning, "photo-outcome-mode",
+                                    f, o.line,
+                                    $"自由拍照不会返回「{outcome}」",
+                                    "没写 theme:（或写了 mode:free）就是自由拍照，不评分，" +
+                                    "只返回「完成」。要分档结果就补上 theme:。");
+                            else if (!free && outcome == "完成")
+                                Add(issues, VNLintSeverity.Warning, "photo-outcome-mode",
+                                    f, o.line,
+                                    "评分模式不会返回「完成」",
+                                    "写了 theme: 就会评分，结果是 完美 / 普通 / 失败 三选一。");
+                        }
                 }
 
                 if (c.options == null || c.options.Count == 0) continue;

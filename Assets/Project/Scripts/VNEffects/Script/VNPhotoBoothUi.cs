@@ -113,6 +113,74 @@ namespace VNEffects
     }
 
     /// <summary>
+    /// 取景框里的人物拖动层：铺满开窗的一块透明板，按下时**离谁近就拖谁**。
+    ///
+    /// 为什么不直接把拖拽挂在立绘 Image 上：立绘是 1000px 级的大图、大部分是透明像素，
+    /// 两个人的矩形几乎完全重叠，点谁全看渲染顺序；按 alpha 命中又要求贴图开
+    /// Read/Write。用一块板 + 就近判定，行为可预测且对素材零要求。
+    ///
+    /// 自己不改立绘，只累积玩家的偏移量，由模块在 RefreshPortraits 里统一应用——
+    /// 这样切表情重摆立绘时，玩家挪好的位置不会被冲掉。
+    /// </summary>
+    public class VNPhotoPortraitDragger : MonoBehaviour,
+        IPointerDownHandler, IDragHandler
+    {
+        public RectTransform me, her;
+        public Vector2 meOffset, herOffset;
+        /// <summary>相对基准站位的最大偏移（别让人物被拖出开窗外）</summary>
+        public Vector2 bounds = new Vector2(220f, 160f);
+        public System.Action onChanged;
+
+        RectTransform _rect;
+        bool _dragMe;
+        Vector2 _last;
+
+        void Awake() => _rect = (RectTransform)transform;
+
+        public void OnPointerDown(PointerEventData e)
+        {
+            if (!ToLocal(e, out var local)) return;
+            _last = local;
+
+            float dMe = me != null && me.gameObject.activeSelf && me.GetComponent<Image>().enabled
+                ? Mathf.Abs(local.x - me.anchoredPosition.x) : float.MaxValue;
+            float dHer = her != null && her.gameObject.activeSelf &&
+                         her.GetComponent<Image>().enabled
+                ? Mathf.Abs(local.x - her.anchoredPosition.x) : float.MaxValue;
+            _dragMe = dMe <= dHer;
+        }
+
+        public void OnDrag(PointerEventData e)
+        {
+            if (!ToLocal(e, out var local)) return;
+            Vector2 delta = local - _last;
+            _last = local;
+
+            if (_dragMe) meOffset = Clamp(meOffset + delta);
+            else herOffset = Clamp(herOffset + delta);
+            onChanged?.Invoke();
+        }
+
+        public void ResetOffsets()
+        {
+            meOffset = herOffset = Vector2.zero;
+            onChanged?.Invoke();
+        }
+
+        bool ToLocal(PointerEventData e, out Vector2 local)
+        {
+            local = Vector2.zero;
+            if (_rect == null) _rect = (RectTransform)transform;
+            return RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _rect, e.position, e.pressEventCamera, out local);
+        }
+
+        Vector2 Clamp(Vector2 v) => new Vector2(
+            Mathf.Clamp(v.x, -bounds.x, bounds.x),
+            Mathf.Clamp(v.y, -bounds.y, bounds.y));
+    }
+
+    /// <summary>
     /// 大头贴模块的程序化 UI 辅助（与 VNBadmintonUi 同一路数：模块只管逻辑，
     /// 怎么摆节点、怎么做滚动列表都在这里，换皮肤时只动这个文件）。
     ///
@@ -131,6 +199,8 @@ namespace VNEffects
         public static readonly Color CellSelected = new Color(0.99f, 0.62f, 0.76f, 1f);
         public static readonly Color TextDark = new Color(0.22f, 0.18f, 0.22f, 1f);
         public static readonly Color Urgent = new Color(1f, 0.35f, 0.35f, 1f);
+        /// <summary>倒数数字的粉——白字太硬，粉字配白描边才是大头贴机的味道</summary>
+        public static readonly Color CountdownPink = new Color(1f, 0.42f, 0.62f, 1f);
 
         // ---- 基础节点 ----
 

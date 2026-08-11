@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de3c6071bf1b36a41adae480a3d58242, type: 3}
+  m_Name: "\u641E\u602A"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPhotoThemeDef
+  themeId: "\u641E\u602A"
+  displayName: "\u641E\u602A"
+  displayNameEn: Silly
+  displayNameJa: "\u304A\u3075\u3056\u3051"
+  hint:
+    text: "\u8D8A\u5938\u5F20\u8D8A\u597D\uFF0C\u522B\u6B63\u7ECF"
+    textEn: The sillier the better
+    textJa: "\u3068\u306B\u304B\u304F\u5909\u9854\u3067"
+  timeLimit: 45
+  baseScore: 20
+  perfectLine: 70
+  passLine: 40
+  stickerScoreCap: 6
+  expressionRules:
+  - slot: 0
+    expression: "\u574F\u7B11"
+    score: 22
+    comment:
+      text: "\u8FD9\u4E2A\u574F\u7B11\u5F88\u6709\u620F"
+      textEn: That smirk sells it
+      textJa: "\u305D\u306E\u30CB\u30E4\u30EA\u304C\u3044\u3044"
+  - slot: 0
+    expression: "\u60CA\u8BB6"
+    score: 18
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  - slot: 0
+    expression: "\u751F\u6C14"
+    score: 12
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  frameRules:
+  - frameId: "\u80F6\u7247"
+    score: 18
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  - frameId: "\u661F\u7A7A"
+    score: 10
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  stickerRules:
+  - stickerId: "\u732B\u8033"
+    score: 10
+    maxCount: 2
+    comment:
+      text: "\u732B\u8033\u662F\u72AF\u89C4\u7684"
+      textEn: The cat ears are cheating
+      textJa: "\u732B\u8033\u306F\u53CD\u5247"
+  - stickerId: "\u7687\u51A0"
+    score: 8
+    maxCount: 2
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  - stickerId: "\u5BF9\u8BDD\u6CE1"
+    score: 6
+    maxCount: 3
+    comment:
+      text: 
+      textEn: 
+      textJa: 
+  perfectComment:
+    text: "\u7B11\u5230\u505C\u4E0D\u4E0B\u6765"
+    textEn: Can't stop laughing
+    textJa: "\u7B11\u3044\u304C\u6B62\u307E\u3089\u306A\u3044"
+  normalComment:
+    text: "\u8FD8\u7B97\u597D\u7B11"
+    textEn: Mildly funny
+    textJa: "\u305D\u3053\u305D\u3053\u9762\u767D\u3044"
+  failComment:
+    text: "\u592A\u6B63\u7ECF\u4E86\uFF0C\u4E0D\u597D\u7B11"
+    textEn: Way too serious
+    textJa: "\u771F\u9762\u76EE\u3059\u304E"
