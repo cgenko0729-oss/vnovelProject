@@ -252,3 +252,11 @@ photo.pen.eraser = 消しゴム
 photo.pen.undo = 元に戻す
 photo.pen.clear = 全消し
 photo.pen.hint = ドラッグで描ける　Ctrl+Zで戻す
+gallery.tab.cg = CG
+gallery.tab.photo = 写真
+gallery.photoCount = アルバム {0} / {1}
+gallery.photoEmpty = まだ写真がありません（event photo で撮ってみよう）
+gallery.photoDelete = 削除
+gallery.photoCancel = キャンセル
+gallery.photoConfirm = この写真を削除しますか？
+ディスク上のファイルも消えます。元に戻せません。

@@ -142,7 +142,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNInventory | I 键背包：左道具一览 + 右 7 格装备栏 + 介绍区，右键菜单 装备/卸下/使用（文案图标装备数据取自 VNShopDef；外观走系统主题 inventoryPrefab + VNInventorySkin 槽位，缺失退回程序化 UI） |
 | VNEquipment | 装备核心（纯静态）：状态全存 flags——装备_&lt;道具id&gt;=部位编号、装备实增_（卸下按实际生效量扣回防钳制不对称）、装备效果_&lt;效果id&gt;（特殊效果合计，生效逻辑由剧本 if 判断） |
 | VNCalendarHud | 右下日历 HUD（flag 月份/剩余月数，time 命令驱动；月份 flag 不存在时自动隐藏） |
-| VNCgUnlocks / VNCgGallery | CG 全局解锁存储（独立 JSON，与存档槽分离）/ G 键鉴赏画廊（目录取 cgLibrary，解锁取 VNCgUnlocks，group 相同的合并成一格翻差分） |
+| VNCgUnlocks / VNCgGallery | CG 全局解锁存储（独立 JSON，与存档槽分离）/ G 键鉴赏画廊（目录取 cgLibrary，解锁取 VNCgUnlocks，group 相同的合并成一格翻差分）；左上角 `CG｜照片` 两标签，照片页 = 大头贴相册（读 VNPhotoAlbum，缩略图走独立不驱逐缓存，全屏可翻页+删除带二次确认）。标签/删除按钮/确认框都是程序化补的，皮肤 prefab 不用重导 |
 | VNTitleMenu | 开始菜单（同场景覆盖层 Canvas 500）：开始/继续(最新档含快存)/读档/鉴赏/设置/退出，后四者复用现成面板；Runner 启动时接管 playOnStart，ResumeAt 自动收层；标题文字/背景/BGM 配在 VNGameConfig「标题画面」区 |
 | VNSnsView / VNSnsMessage | SNS 手机聊天视图（`sns open` 后台词行渲染成气泡：「我」在右、对方在左）+ 单条消息数据；支持文字/语音/图片/正在输入/已读/限时回复（`sns reply timeout: late:`）；手工测量布局，会话与消息列表进存档，聊天中途可存档 |
 | VNLocale / VNScriptLocale | 本地化（中/英/日）：语言管理+UI 字符串表 / 剧本台词翻译查表（表在 Resources/VNLocale/，抽取工具 Tools→VN Effects→Localization） |

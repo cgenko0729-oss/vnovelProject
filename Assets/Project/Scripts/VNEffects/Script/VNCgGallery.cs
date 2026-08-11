@@ -36,6 +36,17 @@ namespace VNEffects
         int _viewerGroup = -1;
         int _viewerIndex;
 
+        // ---- 照片页（大头贴拍的照片，与 CG 共用同一套网格与全屏浏览）----
+        enum Page { Cg, Photo }
+        Page _page = Page.Cg;
+        readonly List<VNPhotoAlbum.Entry> _photos = new List<VNPhotoAlbum.Entry>();
+        int _photoIndex = -1;
+        Button _cgTab, _photoTab;
+        TMP_Text _cgTabText, _photoTabText;
+        GameObject _deleteButtonRoot, _confirmRoot;
+        Vector2 _cgCellSize;
+        GridLayoutGroup _gridLayout;
+
         public bool IsOpen => _open;
         public bool IsViewerOpen => _viewer != null && _viewer.activeSelf;
 
@@ -85,9 +96,41 @@ namespace VNEffects
         {
             if (!_open) return;
             CloseViewer();
+            HideConfirm();
             _panel.SetActive(false);
             _open = false;
+            // 相册的纹理与缩略图都在这里放掉——关了界面就没有必要再占内存
+            VNPhotoAlbum.ClearCache();
         }
+
+        /// <summary>切到 CG 页 / 照片页</summary>
+        void SelectPage(Page page)
+        {
+            if (_page == page && _grid.childCount > 0) return;
+            _page = page;
+            CloseViewer();
+            HideConfirm();
+            RefreshTabs();
+            RebuildGrid();
+            Canvas.ForceUpdateCanvases();
+            if (_scroll != null) _scroll.verticalNormalizedPosition = 1f;
+        }
+
+        void RefreshTabs()
+        {
+            if (_cgTab == null || _photoTab == null) return;
+            bool cg = _page == Page.Cg;
+            if (_cgTab.targetGraphic is Image cgImage)
+                cgImage.color = cg ? TabOn : TabOff;
+            if (_photoTab.targetGraphic is Image photoImage)
+                photoImage.color = cg ? TabOff : TabOn;
+            if (_cgTabText != null) _cgTabText.color = cg ? Color.white : TabTextOff;
+            if (_photoTabText != null) _photoTabText.color = cg ? TabTextOff : Color.white;
+        }
+
+        static readonly Color TabOn = new Color(0.98f, 0.62f, 0.76f, 1f);
+        static readonly Color TabOff = new Color(1f, 1f, 1f, 0.16f);
+        static readonly Color TabTextOff = new Color(1f, 1f, 1f, 0.7f);
 
         // ==============================================================
         // ==============================================================
@@ -140,8 +183,18 @@ namespace VNEffects
             {
                 var child = _grid.GetChild(i);
                 if (_cellTemplate != null && child == _cellTemplate.transform) continue;
+                // ★ 必须先脱离父节点再销毁：Destroy 要等到帧末才真正执行，
+                //   在那之前旧格子仍挂在 GridLayoutGroup 下参与布局——
+                //   切页时会看到上一页的格子和新格子挤在一起。
+                child.SetParent(null, false);
                 Destroy(child.gameObject);
             }
+
+            if (_page == Page.Photo) { RebuildPhotoGrid(); return; }
+
+            // CG 页恢复原本的格子尺寸（照片页会把它改成 4:3）
+            if (_gridLayout != null && _cgCellSize != Vector2.zero)
+                _gridLayout.cellSize = _cgCellSize;
 
             BuildGroups();
 
@@ -169,6 +222,108 @@ namespace VNEffects
             }
 
             for (int g = 0; g < _groups.Count; g++) CreateCell(g);
+        }
+
+        // ==============================================================
+        // 照片页
+        // ==============================================================
+
+        void RebuildPhotoGrid()
+        {
+            _photos.Clear();
+            foreach (var e in VNPhotoAlbum.All) if (e != null) _photos.Add(e);
+
+            // 照片是 4:3，CG 是 16:9——同一套网格，切页时换格子尺寸
+            if (_gridLayout != null)
+            {
+                if (_cgCellSize == Vector2.zero) _cgCellSize = _gridLayout.cellSize;
+                _gridLayout.cellSize = new Vector2(_cgCellSize.x, _cgCellSize.x * 0.75f);
+            }
+
+            _progress.text = VNLocale.T("gallery.photoCount",
+                _photos.Count, VNPhotoAlbum.Capacity);
+
+            if (_photos.Count == 0)
+            {
+                var empty = CreateText(_grid, 28, TextAlignmentOptions.Center);
+                empty.text = VNLocale.T("gallery.photoEmpty");
+                empty.color = new Color(1f, 1f, 1f, 0.55f);
+                var le = empty.gameObject.AddComponent<LayoutElement>();
+                le.preferredWidth = cellWidth * columns;
+                le.preferredHeight = 120f;
+                return;
+            }
+
+            for (int i = 0; i < _photos.Count; i++) CreatePhotoCell(i);
+        }
+
+        void CreatePhotoCell(int index)
+        {
+            var go = Instantiate(_cellTemplate.gameObject, _grid, false);
+            go.name = "Photo_" + index;
+            go.SetActive(true);
+            var cell = go.GetComponent<VNCgCellSkin>();
+
+            if (cell.lockedRoot != null) cell.lockedRoot.SetActive(false);
+            if (cell.countBadge != null) cell.countBadge.gameObject.SetActive(false);
+            if (cell.frameGraphic != null) cell.frameGraphic.color = cell.unlockedFrameColor;
+
+            cell.thumbnail.sprite = VNPhotoAlbum.LoadThumbnail(_photos[index].file);
+            cell.thumbnail.color = Color.white;
+            cell.thumbnail.preserveAspect = true;
+
+            cell.button.onClick.RemoveAllListeners();
+            cell.button.interactable = true;
+            int captured = index;
+            cell.button.onClick.AddListener(() => OpenPhotoViewer(captured));
+        }
+
+        void OpenPhotoViewer(int index)
+        {
+            if (index < 0 || index >= _photos.Count) return;
+            _photoIndex = index;
+            _viewerGroup = -1;
+            _viewer.SetActive(true);
+            _viewer.transform.SetAsLastSibling();
+            ApplyPhotoViewer();
+        }
+
+        void ApplyPhotoViewer()
+        {
+            var entry = _photos[_photoIndex];
+            _viewerImage.sprite = VNPhotoAlbum.LoadSprite(entry.file);
+            _viewerImage.preserveAspect = true;
+
+            _viewerImage.DOKill();
+            _viewerImage.color = new Color(1f, 1f, 1f, 0.25f);
+            _viewerImage.DOFade(1f, 0.18f)
+                .SetLink(_viewerImage.gameObject)
+                .SetUpdate(true);
+
+            _viewerCaption.text =
+                $"{entry.Time:yyyy/MM/dd HH:mm}    ({_photoIndex + 1}/{_photos.Count})";
+            if (_deleteButtonRoot != null) _deleteButtonRoot.SetActive(true);
+        }
+
+        void StepPhotoViewer(int dir)
+        {
+            if (_photos.Count <= 1) return;
+            _photoIndex = (_photoIndex + dir + _photos.Count) % _photos.Count;
+            ApplyPhotoViewer();
+        }
+
+        /// <summary>删掉当前正在看的这张（磁盘 PNG 一并删）。误删不可逆，所以要确认。</summary>
+        void DeleteCurrentPhoto()
+        {
+            HideConfirm();
+            if (_photoIndex < 0 || _photoIndex >= _photos.Count) return;
+
+            string file = _photos[_photoIndex].file;
+            VNPhotoAlbum.Delete(file);
+
+            CloseViewer();
+            RebuildGrid();
+            Canvas.ForceUpdateCanvases();
         }
 
         void CreateCell(int groupIndex)
@@ -227,6 +382,9 @@ namespace VNEffects
             if (_viewer == null || !_viewer.activeSelf) return;
             _viewer.SetActive(false);
             _viewerGroup = -1;
+            _photoIndex = -1;
+            HideConfirm();
+            if (_deleteButtonRoot != null) _deleteButtonRoot.SetActive(false);
         }
 
         public void ViewerNext() => StepViewer(1);
@@ -234,7 +392,9 @@ namespace VNEffects
 
         void StepViewer(int dir)
         {
-            if (!IsViewerOpen || _viewerGroup < 0) return;
+            if (!IsViewerOpen) return;
+            if (_page == Page.Photo) { StepPhotoViewer(dir); return; }
+            if (_viewerGroup < 0) return;
             var group = _groups[_viewerGroup];
             if (group.Count <= 1) return;
 
@@ -294,7 +454,133 @@ namespace VNEffects
                 throw new System.InvalidOperationException("CG gallery prefab is missing or invalid.");
 
             BindCustomSkin(_skin);
+            BuildPhotoExtras();
             _panel.SetActive(false);
+        }
+
+        /// <summary>
+        /// 照片页需要的三样东西（标签条 / 删除按钮 / 删除确认）。
+        /// 皮肤 prefab 里没有这些槽位，所以在这里程序化补——
+        /// 老 prefab 不必重新导出，符合项目「单项缺失只退回该项程序化 UI」的规则。
+        /// </summary>
+        void BuildPhotoExtras()
+        {
+            var panelRect = _panel.transform as RectTransform;
+            if (panelRect == null) return;
+
+            _gridLayout = _grid.GetComponent<GridLayoutGroup>();
+            if (_gridLayout != null) _cgCellSize = _gridLayout.cellSize;
+
+            // ---- 顶部标签条（标题与进度都从 x=600 开始，左上这块是空的）----
+            _cgTab = CreateTabButton(panelRect, "TabCg", new Vector2(40f, -26f),
+                VNLocale.T("gallery.tab.cg"), out _cgTabText);
+            _photoTab = CreateTabButton(panelRect, "TabPhoto", new Vector2(180f, -26f),
+                VNLocale.T("gallery.tab.photo"), out _photoTabText);
+            _cgTab.onClick.AddListener(() => SelectPage(Page.Cg));
+            _photoTab.onClick.AddListener(() => SelectPage(Page.Photo));
+            RefreshTabs();
+
+            // ---- 全屏里的删除按钮（只在照片页显示）----
+            var viewerRect = _viewer.transform as RectTransform;
+            if (viewerRect != null)
+            {
+                var deleteButton = CreateSimpleButton(viewerRect, "DeletePhoto",
+                    new Vector2(0f, 1f), new Vector2(150f, -26f), new Vector2(180f, 52f),
+                    VNLocale.T("gallery.photoDelete"),
+                    new Color(0.75f, 0.26f, 0.32f, 0.95f), out _);
+                deleteButton.onClick.AddListener(ShowConfirm);
+                _deleteButtonRoot = deleteButton.gameObject;
+                _deleteButtonRoot.SetActive(false);
+            }
+
+            BuildConfirm(panelRect);
+        }
+
+        void BuildConfirm(RectTransform parent)
+        {
+            var dim = new GameObject("DeleteConfirm", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)dim.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            var dimImage = dim.GetComponent<Image>();
+            dimImage.color = new Color(0f, 0f, 0f, 0.72f);
+            dimImage.raycastTarget = true;
+            _confirmRoot = dim;
+
+            var box = new GameObject("Box", typeof(RectTransform), typeof(Image));
+            var boxRect = (RectTransform)box.transform;
+            boxRect.SetParent(rect, false);
+            boxRect.sizeDelta = new Vector2(720f, 260f);
+            box.GetComponent<Image>().color = new Color(0.14f, 0.13f, 0.17f, 0.98f);
+
+            var text = CreateText(boxRect, 30, TextAlignmentOptions.Center);
+            text.text = VNLocale.T("gallery.photoConfirm");
+            var textRect = (RectTransform)text.transform;
+            textRect.sizeDelta = new Vector2(660f, 110f);
+            textRect.anchoredPosition = new Vector2(0f, 40f);
+
+            CreateSimpleButton(boxRect, "Cancel", new Vector2(0.5f, 0.5f),
+                new Vector2(-130f, -60f), new Vector2(220f, 66f),
+                VNLocale.T("gallery.photoCancel"),
+                new Color(0.3f, 0.32f, 0.4f, 1f), out _).onClick.AddListener(HideConfirm);
+
+            CreateSimpleButton(boxRect, "Confirm", new Vector2(0.5f, 0.5f),
+                new Vector2(130f, -60f), new Vector2(220f, 66f),
+                VNLocale.T("gallery.photoDelete"),
+                new Color(0.78f, 0.26f, 0.32f, 1f), out _)
+                .onClick.AddListener(DeleteCurrentPhoto);
+
+            dim.SetActive(false);
+        }
+
+        void ShowConfirm()
+        {
+            if (_confirmRoot == null) return;
+            _confirmRoot.transform.SetAsLastSibling();
+            _confirmRoot.SetActive(true);
+        }
+
+        void HideConfirm()
+        {
+            if (_confirmRoot != null) _confirmRoot.SetActive(false);
+        }
+
+        Button CreateTabButton(RectTransform parent, string name, Vector2 pos,
+            string label, out TMP_Text text) =>
+            CreateSimpleButton(parent, name, new Vector2(0f, 1f), pos,
+                new Vector2(130f, 46f), label, TabOff, out text);
+
+        Button CreateSimpleButton(RectTransform parent, string name, Vector2 anchor,
+            Vector2 pos, Vector2 size, string label, Color color, out TMP_Text text)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = pos + new Vector2(size.x * 0.5f, 0f) *
+                                    (anchor.x < 0.5f ? 1f : 0f);
+
+            var image = go.GetComponent<Image>();
+            image.color = color;
+            image.sprite = VNProceduralTextures.RoundedRectSprite;
+            image.type = Image.Type.Sliced;
+
+            var button = go.GetComponent<Button>();
+            button.targetGraphic = image;
+
+            text = CreateText(rect, 24, TextAlignmentOptions.Center);
+            text.text = label;
+            var textRect = (RectTransform)text.transform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            return button;
         }
 
 

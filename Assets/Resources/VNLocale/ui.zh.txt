@@ -253,3 +253,11 @@ photo.pen.eraser = 橡皮
 photo.pen.undo = 撤销
 photo.pen.clear = 清空
 photo.pen.hint = 拖动即可作画　Ctrl+Z 撤销
+gallery.tab.cg = CG
+gallery.tab.photo = 照片
+gallery.photoCount = 相册 {0} / {1}
+gallery.photoEmpty = 还没有拍过照片　（剧本里用 event photo 拍一张吧）
+gallery.photoDelete = 删除
+gallery.photoCancel = 取消
+gallery.photoConfirm = 删掉这张照片？
+磁盘上的文件会一起删除，不能恢复。

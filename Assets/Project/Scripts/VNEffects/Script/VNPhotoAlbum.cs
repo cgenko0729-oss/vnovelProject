@@ -25,6 +25,9 @@ namespace VNEffects
         /// <summary>纹理缓存上限（翻相册时不要把 200 张全解码进内存）</summary>
         const int TextureCacheSize = 12;
 
+        /// <summary>缩略图宽度（网格用）。192×144 约 110KB，200 张也才 22MB</summary>
+        const int ThumbnailWidth = 192;
+
         [Serializable]
         public class Entry
         {
@@ -49,6 +52,7 @@ namespace VNEffects
         static readonly Dictionary<string, Texture2D> _textureCache =
             new Dictionary<string, Texture2D>();
         static readonly List<string> _cacheOrder = new List<string>();
+        static readonly Dictionary<string, Sprite> _thumbnails = new Dictionary<string, Sprite>();
 
         public static string Dir => Path.Combine(Application.persistentDataPath, "vn_photos");
         static string IndexPath => Path.Combine(Dir, "index.json");
@@ -206,6 +210,16 @@ namespace VNEffects
             }
 
             DropFromCache(file);
+            if (_thumbnails.TryGetValue(file, out var thumb))
+            {
+                if (thumb != null)
+                {
+                    var tex = thumb.texture;
+                    UnityEngine.Object.Destroy(thumb);
+                    if (tex != null) UnityEngine.Object.Destroy(tex);
+                }
+                _thumbnails.Remove(file);
+            }
             int removed = _entries.RemoveAll(e => e.file == file);
             if (removed > 0) Save();
             return true;
@@ -254,6 +268,66 @@ namespace VNEffects
             }
         }
 
+        /// <summary>
+        /// 缩略图（网格用）。**不能让网格走 LoadTexture**：那是 12 张的 LRU，
+        /// 一屏显示几十张时先加载的纹理会被驱逐，而 Sprite 还引用着它 —— 直接变成白块。
+        /// 所以缩略图单独一份缓存、降到 192×144（约 110KB/张）、不驱逐。
+        /// </summary>
+        public static Sprite LoadThumbnail(string file)
+        {
+            if (string.IsNullOrEmpty(file)) return null;
+            if (_thumbnails.TryGetValue(file, out var cached) && cached != null) return cached;
+
+            Texture2D full = null;
+            try
+            {
+                string path = Path.Combine(Dir, file);
+                if (!File.Exists(path)) return null;
+
+                full = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+                {
+                    hideFlags = HideFlags.DontSave,
+                };
+                if (!full.LoadImage(File.ReadAllBytes(path)))
+                {
+                    UnityEngine.Object.Destroy(full);
+                    return null;
+                }
+
+                int height = Mathf.Max(1, Mathf.RoundToInt(
+                    ThumbnailWidth * full.height / (float)full.width));
+                var small = new Texture2D(ThumbnailWidth, height, TextureFormat.RGBA32, false)
+                {
+                    name = "thumb_" + file,
+                    wrapMode = TextureWrapMode.Clamp,
+                    hideFlags = HideFlags.DontSave,
+                };
+                var pixels = new Color[ThumbnailWidth * height];
+                for (int y = 0; y < height; y++)
+                    for (int x = 0; x < ThumbnailWidth; x++)
+                        pixels[y * ThumbnailWidth + x] = full.GetPixelBilinear(
+                            (x + 0.5f) / ThumbnailWidth, (y + 0.5f) / height);
+                small.SetPixels(pixels);
+                small.Apply(false);
+
+                var sprite = Sprite.Create(small, new Rect(0, 0, ThumbnailWidth, height),
+                    new Vector2(0.5f, 0.5f), 100f);
+                sprite.name = "thumb_" + file;
+                sprite.hideFlags = HideFlags.DontSave;
+                _thumbnails[file] = sprite;
+                return sprite;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VNPhoto] 缩略图生成失败（{file}）：{e.Message}");
+                return null;
+            }
+            finally
+            {
+                if (full != null) UnityEngine.Object.Destroy(full);
+            }
+        }
+
         /// <summary>把一张照片包成 Sprite（每次调用都新建 Sprite，纹理仍走缓存）</summary>
         public static Sprite LoadSprite(string file)
         {
@@ -266,13 +340,22 @@ namespace VNEffects
             return sprite;
         }
 
-        /// <summary>关掉相册界面时调用，把解码出来的纹理都放掉</summary>
+        /// <summary>关掉相册界面时调用，把解码出来的纹理与缩略图都放掉</summary>
         public static void ClearCache()
         {
             foreach (var kv in _textureCache)
                 if (kv.Value != null) UnityEngine.Object.Destroy(kv.Value);
             _textureCache.Clear();
             _cacheOrder.Clear();
+
+            foreach (var kv in _thumbnails)
+            {
+                if (kv.Value == null) continue;
+                var tex = kv.Value.texture;
+                UnityEngine.Object.Destroy(kv.Value);
+                if (tex != null) UnityEngine.Object.Destroy(tex);
+            }
+            _thumbnails.Clear();
         }
 
         static void Touch(string file)

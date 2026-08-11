@@ -252,3 +252,11 @@ photo.pen.eraser = Eraser
 photo.pen.undo = Undo
 photo.pen.clear = Clear
 photo.pen.hint = Drag to draw - Ctrl+Z undo
+gallery.tab.cg = CG
+gallery.tab.photo = Photos
+gallery.photoCount = Album {0} / {1}
+gallery.photoEmpty = No photos yet (take one with event photo)
+gallery.photoDelete = Delete
+gallery.photoCancel = Cancel
+gallery.photoConfirm = Delete this photo?
+The file on disk goes too - this cannot be undone.

@@ -5884,3 +5884,27 @@ event photo vs:<她> [me:<我>] [theme:<主题>] [mode:match|free] [frame:<边�
 - 输入板（`VNPhotoDoodleInput`）只在停留于「涂鸦」页时 `raycastTarget = true`，
   离开立刻关掉，否则它铺在最上层会把人物与贴纸的操作全吃掉。
 - 笔粗预览圆点按 `ViewW / 画布宽` 换算显示尺寸，做到所见即所得。
+
+### 追加（同分支）：P5 画廊照片页 + 删除
+
+G 键画廊左上角加 `CG ｜ 照片` 两个标签，照片页就是大头贴的相册。
+
+- **标签条、删除按钮、删除确认全部程序化补**：`VNCgGallery` 是完全依赖皮肤 prefab 的
+  （槽位缺失直接抛异常），但为这三样加 prefab 槽位就意味着用户得重新导出皮肤。
+  按项目「单项缺失只退回该项程序化 UI」的规则，直接在 `BuildPhotoExtras()` 里补。
+  位置能放在左上角，是因为读了 prefab：标题与进度文本的 `anchoredPosition.x` 都是 600，
+  左边那块是空的。
+- CG 是 16:9、照片是 4:3，共用同一套网格 —— 切页时改 `GridLayoutGroup.cellSize`，
+  切回 CG 时恢复（进 Build 时先把原值记下来）。
+- **缩略图必须走独立缓存**：`VNPhotoAlbum.LoadTexture` 是 12 张的 LRU，
+  一屏几十张的话先加载的纹理会被驱逐，而 Sprite 还引用着它——直接变成白块。
+  所以新增 `LoadThumbnail`，降采样到 192×144（约 110KB/张）、单独字典、不驱逐；
+  全屏浏览仍走原来的大图 LRU。关画廊时两份一起释放。
+
+### 追加的坑
+
+- **`Destroy` 的延迟害了网格重建**：`RebuildGrid` 里 `Destroy(child)` 要等帧末才执行，
+  在那之前旧格子仍挂在 `GridLayoutGroup` 下参与布局。原来的画廊只在打开时构建一次
+  （那时网格是空的）所以一直没暴露；加了切页之后立刻现形——实测切一次
+  `childCount` 从 7 变成 13，两页的格子挤在一起。
+  修法：`child.SetParent(null, false)` 之后再 `Destroy`。
