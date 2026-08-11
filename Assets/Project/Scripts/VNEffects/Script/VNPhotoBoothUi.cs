@@ -388,6 +388,58 @@ namespace VNEffects
             return button;
         }
 
+        /// <summary>
+        /// 一条横向滑块（程序化搭：底槽 + 填充 + 圆把手）。
+        /// uGUI 的 Slider 需要 fillRect / handleRect 都齐全才不会报错。
+        /// </summary>
+        public static Slider CreateSlider(string name, RectTransform parent, Vector2 size,
+            Vector2 pos, float min, float max, float value)
+        {
+            var root = CreateNode(name, parent);
+            root.sizeDelta = size;
+            root.anchoredPosition = pos;
+
+            var background = CreateImage("Background", root,
+                VNProceduralTextures.RoundedRectSprite, new Color(0f, 0f, 0f, 0.18f));
+            var backgroundRect = (RectTransform)background.transform;
+            backgroundRect.anchorMin = new Vector2(0f, 0.5f);
+            backgroundRect.anchorMax = new Vector2(1f, 0.5f);
+            backgroundRect.offsetMin = new Vector2(0f, -7f);
+            backgroundRect.offsetMax = new Vector2(0f, 7f);
+
+            var fillArea = CreateNode("FillArea", root);
+            fillArea.anchorMin = new Vector2(0f, 0.5f);
+            fillArea.anchorMax = new Vector2(1f, 0.5f);
+            fillArea.offsetMin = new Vector2(0f, -7f);
+            fillArea.offsetMax = new Vector2(0f, 7f);
+
+            var fill = CreateImage("Fill", fillArea,
+                VNProceduralTextures.RoundedRectSprite, Accent);
+            var fillRect = (RectTransform)fill.transform;
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = new Vector2(0f, 1f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+
+            var handleArea = CreateNode("HandleArea", root);
+            Stretch(handleArea);
+
+            var handle = CreateImage("Handle", handleArea,
+                VNPhotoTextures.CircleSprite(), Color.white, true);
+            var handleRect = (RectTransform)handle.transform;
+            handleRect.sizeDelta = new Vector2(30f, 30f);
+
+            var slider = root.gameObject.AddComponent<Slider>();
+            slider.fillRect = fillRect;
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handle;
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.value = value;
+            return slider;
+        }
+
         /// <summary>竖排 / 网格滚动列表。content 是往里塞格子的父节点。</summary>
         public static ScrollRect CreateScrollList(string name, RectTransform parent,
             Vector2 size, Vector2 pos, int columns, Vector2 cellSize, float spacing,

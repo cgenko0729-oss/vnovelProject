@@ -150,6 +150,9 @@ namespace VNEffects
         readonly List<Image> _herCells = new List<Image>();
 
         VNPhotoPortraitDragger _dragger;
+        VNPhotoDoodle _doodle;
+        Button _undoButton;
+        Image _penPreview;
 
         // 演出（P3）
         VNPhotoSfx _sfx;
@@ -437,6 +440,12 @@ namespace VNEffects
             // 贴纸层在最上：贴纸可以压到边框上（参考图里的爱心就在框上）
             _stickerLayer = VNPhotoBoothUi.CreateNode("StickerLayer", _viewFinder);
             VNPhotoBoothUi.Stretch(_stickerLayer);
+
+            // 涂鸦层再压一层：笔是画在「洗好的照片」上的，盖住一切
+            var doodleRoot = VNPhotoBoothUi.CreateNode("DoodleLayer", _viewFinder);
+            VNPhotoBoothUi.Stretch(doodleRoot);
+            _doodle = new VNPhotoDoodle();
+            _doodle.Build(doodleRoot);
         }
 
         void BuildLeftPanel(RectTransform parent)
@@ -447,22 +456,27 @@ namespace VNEffects
                 new Vector2(300f, 700f), new Vector2(-MachineW * 0.5f + 190f, -20f));
             _leftPanel = panel.gameObject;
 
-            // 顶部三个标签：边框 / 背景 / 贴纸
-            const float tabW = 92f;
+            // 顶部四个标签：边框 / 背景 / 贴纸 / 涂鸦
+            const float tabW = 68f;
             var tabs = new List<(Button button, TextMeshProUGUI text, GameObject page)>();
+            float tabY = 700f * 0.5f - 36f;
+            float[] tabX = { -105f, -35f, 35f, 105f };
+            string[] tabKeys =
+            {
+                "photo.tab.frame", "photo.tab.backdrop",
+                "photo.tab.sticker", "photo.tab.doodle",
+            };
 
-            Button frameTab = VNPhotoBoothUi.CreateButton("TabFrame", rect,
-                new Vector2(tabW, 52f), new Vector2(-96f, 700f * 0.5f - 36f),
-                VNLocale.T("photo.tab.frame"), VNPhotoBoothUi.Accent, Color.white, 24,
-                out var frameTabText);
-            Button backdropTab = VNPhotoBoothUi.CreateButton("TabBackdrop", rect,
-                new Vector2(tabW, 52f), new Vector2(0f, 700f * 0.5f - 36f),
-                VNLocale.T("photo.tab.backdrop"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 24, out var backdropTabText);
-            Button stickerTab = VNPhotoBoothUi.CreateButton("TabSticker", rect,
-                new Vector2(tabW, 52f), new Vector2(96f, 700f * 0.5f - 36f),
-                VNLocale.T("photo.tab.sticker"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 24, out var stickerTabText);
+            var buttons = new Button[4];
+            var labels = new TextMeshProUGUI[4];
+            for (int i = 0; i < 4; i++)
+            {
+                buttons[i] = VNPhotoBoothUi.CreateButton($"Tab{i}", rect,
+                    new Vector2(tabW, 52f), new Vector2(tabX[i], tabY),
+                    VNLocale.T(tabKeys[i]),
+                    i == 0 ? VNPhotoBoothUi.Accent : VNPhotoBoothUi.CellBg,
+                    i == 0 ? Color.white : VNPhotoBoothUi.TextDark, 22, out labels[i]);
+            }
 
             var frameScroll = VNPhotoBoothUi.CreateScrollList("FrameList", rect,
                 new Vector2(284f, 610f), new Vector2(0f, -28f), 1,
@@ -473,12 +487,15 @@ namespace VNEffects
             var stickerScroll = VNPhotoBoothUi.CreateScrollList("StickerList", rect,
                 new Vector2(284f, 610f), new Vector2(0f, -28f), 2,
                 new Vector2(124f, 124f), 12f, out _stickerContent);
+            var doodlePage = BuildDoodlePage(rect);
             backdropScroll.gameObject.SetActive(false);
             stickerScroll.gameObject.SetActive(false);
+            doodlePage.SetActive(false);
 
-            tabs.Add((frameTab, frameTabText, frameScroll.gameObject));
-            tabs.Add((backdropTab, backdropTabText, backdropScroll.gameObject));
-            tabs.Add((stickerTab, stickerTabText, stickerScroll.gameObject));
+            tabs.Add((buttons[0], labels[0], frameScroll.gameObject));
+            tabs.Add((buttons[1], labels[1], backdropScroll.gameObject));
+            tabs.Add((buttons[2], labels[2], stickerScroll.gameObject));
+            tabs.Add((buttons[3], labels[3], doodlePage));
 
             for (int i = 0; i < tabs.Count; i++)
             {
@@ -491,7 +508,7 @@ namespace VNEffects
             BuildStickerCells();
         }
 
-        static void SelectTab(
+        void SelectTab(
             List<(Button button, TextMeshProUGUI text, GameObject page)> tabs, int active)
         {
             for (int i = 0; i < tabs.Count; i++)
@@ -502,6 +519,163 @@ namespace VNEffects
                     image.color = on ? VNPhotoBoothUi.Accent : VNPhotoBoothUi.CellBg;
                 tabs[i].text.color = on ? Color.white : VNPhotoBoothUi.TextDark;
             }
+
+            // 只有停在「涂鸦」页时画布才吃鼠标，否则挡住人物与贴纸的操作
+            _doodle?.SetInteractive(active == 3);
+        }
+
+        // ==================================================================
+        // 涂鸦工具页
+        // ==================================================================
+
+        static readonly Color[] PenColors =
+        {
+            new Color(1f, 0.35f, 0.55f), new Color(1f, 0.55f, 0.25f),
+            new Color(1f, 0.85f, 0.25f), new Color(0.55f, 0.85f, 0.35f),
+            new Color(0.3f, 0.78f, 0.72f), new Color(0.35f, 0.6f, 1f),
+            new Color(0.65f, 0.45f, 1f), new Color(1f, 0.45f, 0.85f),
+            new Color(1f, 1f, 1f), new Color(0.25f, 0.22f, 0.28f),
+            new Color(0.75f, 0.55f, 0.4f), new Color(0.6f, 0.85f, 1f),
+        };
+
+        GameObject BuildDoodlePage(RectTransform parent)
+        {
+            var page = VNPhotoBoothUi.CreateNode("DoodlePage", parent);
+            VNPhotoBoothUi.Center(page, new Vector2(284f, 610f), new Vector2(0f, -28f));
+
+            float y = 610f * 0.5f - 30f;
+
+            // ---- 颜色格 4×3 ----
+            var colorCells = new List<Image>();
+            for (int i = 0; i < PenColors.Length; i++)
+            {
+                int row = i / 4, col = i % 4;
+                var cell = VNPhotoBoothUi.CreateImage($"Pen{i}", page,
+                    VNProceduralTextures.RoundedRectSprite, PenColors[i], true);
+                VNPhotoBoothUi.Center((RectTransform)cell.transform, new Vector2(56f, 56f),
+                    new Vector2(-96f + col * 64f, y - row * 64f));
+
+                var button = cell.gameObject.AddComponent<Button>();
+                button.targetGraphic = cell;
+                var captured = PenColors[i];
+                int index = i;
+                button.onClick.AddListener(() =>
+                {
+                    _doodle.penColor = captured;
+                    _doodle.eraser = false;
+                    RefreshPenUi(colorCells, index);
+                });
+                colorCells.Add(cell);
+            }
+            y -= 3 * 64f + 18f;
+
+            // ---- 笔粗滑块（自由调，不是几个档位）----
+            var sizeLabel = VNPhotoBoothUi.CreateText("SizeLabel", page, 22,
+                VNPhotoBoothUi.TextDark, VNLocale.T("photo.pen.size"),
+                TextAlignmentOptions.Left);
+            VNPhotoBoothUi.Center((RectTransform)sizeLabel.transform,
+                new Vector2(150f, 30f), new Vector2(-60f, y));
+
+            _penPreview = VNPhotoBoothUi.CreateImage("PenPreview", page,
+                VNPhotoTextures.CircleSprite(), VNPhotoBoothUi.TextDark);
+            VNPhotoBoothUi.Center((RectTransform)_penPreview.transform,
+                new Vector2(24f, 24f), new Vector2(104f, y));
+
+            y -= 34f;
+            var slider = VNPhotoBoothUi.CreateSlider("PenSize", page,
+                new Vector2(252f, 30f), new Vector2(0f, y), 2f, 40f, _doodle.penSize);
+            slider.onValueChanged.AddListener(v =>
+            {
+                _doodle.penSize = v;
+                UpdatePenPreview();
+            });
+            UpdatePenPreview();
+
+            y -= 52f;
+
+            // ---- 荧光笔 / 橡皮 ----
+            var glowButton = VNPhotoBoothUi.CreateButton("GlowPen", page,
+                new Vector2(122f, 52f), new Vector2(-64f, y),
+                VNLocale.T("photo.pen.glow"), VNPhotoBoothUi.CellBg,
+                VNPhotoBoothUi.TextDark, 22, out var glowText);
+            var eraserButton = VNPhotoBoothUi.CreateButton("Eraser", page,
+                new Vector2(122f, 52f), new Vector2(64f, y),
+                VNLocale.T("photo.pen.eraser"), VNPhotoBoothUi.CellBg,
+                VNPhotoBoothUi.TextDark, 22, out var eraserText);
+
+            glowButton.onClick.AddListener(() =>
+            {
+                _doodle.glowPen = !_doodle.glowPen;
+                _doodle.eraser = false;
+                RefreshToolButtons(glowButton, glowText, eraserButton, eraserText);
+            });
+            eraserButton.onClick.AddListener(() =>
+            {
+                _doodle.eraser = !_doodle.eraser;
+                RefreshToolButtons(glowButton, glowText, eraserButton, eraserText);
+            });
+
+            y -= 62f;
+
+            // ---- 撤销 / 清空 ----
+            _undoButton = VNPhotoBoothUi.CreateButton("Undo", page,
+                new Vector2(122f, 52f), new Vector2(-64f, y),
+                VNLocale.T("photo.pen.undo"), VNPhotoBoothUi.CellBg,
+                VNPhotoBoothUi.TextDark, 22, out _);
+            _undoButton.onClick.AddListener(() => _doodle.Undo());
+
+            VNPhotoBoothUi.CreateButton("ClearDoodle", page,
+                new Vector2(122f, 52f), new Vector2(64f, y),
+                VNLocale.T("photo.pen.clear"), VNPhotoBoothUi.CellBg,
+                VNPhotoBoothUi.TextDark, 22, out _)
+                .onClick.AddListener(() => _doodle.Clear());
+
+            y -= 60f;
+            var hint = VNPhotoBoothUi.CreateText("DoodleHint", page, 20,
+                new Color(0.45f, 0.4f, 0.45f), VNLocale.T("photo.pen.hint"));
+            VNPhotoBoothUi.Center((RectTransform)hint.transform,
+                new Vector2(266f, 60f), new Vector2(0f, y));
+
+            RefreshPenUi(colorCells, 0);
+            return page.gameObject;
+        }
+
+        void UpdatePenPreview()
+        {
+            if (_penPreview == null) return;
+            // 画布 640 宽显示成 880，所以预览点按同一比例放大才是「所见即所得」
+            float shown = Mathf.Clamp(_doodle.penSize * 2f * (ViewW / VNPhotoDoodle.Width),
+                6f, 56f);
+            ((RectTransform)_penPreview.transform).sizeDelta = new Vector2(shown, shown);
+            _penPreview.color = _doodle.eraser ? new Color(0.6f, 0.6f, 0.62f)
+                : _doodle.penColor;
+        }
+
+        void RefreshPenUi(List<Image> cells, int active)
+        {
+            for (int i = 0; i < cells.Count; i++)
+            {
+                var rect = (RectTransform)cells[i].transform;
+                rect.localScale = Vector3.one * (i == active && !_doodle.eraser ? 1.16f : 1f);
+            }
+            UpdatePenPreview();
+        }
+
+        void RefreshToolButtons(Button glow, TextMeshProUGUI glowText,
+            Button eraser, TextMeshProUGUI eraserText)
+        {
+            if (glow.targetGraphic is Image glowImage)
+                glowImage.color = _doodle.glowPen && !_doodle.eraser
+                    ? VNPhotoBoothUi.Accent : VNPhotoBoothUi.CellBg;
+            glowText.color = _doodle.glowPen && !_doodle.eraser
+                ? Color.white : VNPhotoBoothUi.TextDark;
+
+            if (eraser.targetGraphic is Image eraserImage)
+                eraserImage.color = _doodle.eraser
+                    ? VNPhotoBoothUi.Accent : VNPhotoBoothUi.CellBg;
+            eraserText.color = _doodle.eraser ? Color.white : VNPhotoBoothUi.TextDark;
+
+            UpdatePenPreview();
         }
 
         /// <summary>背景列表：第一项固定是「无背景」（露出边框自己的开窗底色）</summary>
@@ -1041,6 +1215,15 @@ namespace VNEffects
                 else if (_phase == Phase.Confirm) ShowConfirm(false);
                 else if (_phase == Phase.Result) Finish();   // 照片已经拍好了，ESC = 收下
             }
+
+            // Ctrl+Z 撤销涂鸦（装扮阶段才有意义）
+            if (_phase == Phase.Dressing && _doodle != null &&
+                keyboard.zKey.wasPressedThisFrame &&
+                (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed))
+                _doodle.Undo();
+
+            if (_undoButton != null && _doodle != null)
+                _undoButton.interactable = _doodle.CanUndo;
         }
 
         void TickTimer()
@@ -1482,7 +1665,11 @@ namespace VNEffects
             if (_shotTexture != null) { Destroy(_shotTexture); _shotTexture = null; }
         }
 
-        void OnDestroy() => ReleaseShot();
+        void OnDestroy()
+        {
+            ReleaseShot();
+            _doodle?.Destroy();   // 两张画布纹理 + 加法材质
+        }
 
         VNPhotoDressing BuildDressing()
         {
