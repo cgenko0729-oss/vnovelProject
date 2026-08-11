@@ -109,6 +109,16 @@ namespace VNEffects
         public float JumpGravity => -Mathf.Abs(Physics2D.gravity.y) * gravityScale;
 
         public VNBadmintonTuning Clone() => (VNBadmintonTuning)MemberwiseClone();
+
+        /// <summary>
+        /// 就地覆盖为另一份参数（不产生新对象）。用 Json 往返而不是逐字段赋值，
+        /// 是为了以后加字段时不会漏改这里——这个方法只在编辑器实时调参路径上每帧调用。
+        /// </summary>
+        public void CopyFrom(VNBadmintonTuning other)
+        {
+            if (other == null || ReferenceEquals(other, this)) return;
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(other), this);
+        }
     }
 
     /// <summary>一条已解出的球路：y = a·x² + b·x + c，外加飞行速度</summary>

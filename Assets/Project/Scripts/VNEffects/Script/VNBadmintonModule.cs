@@ -27,18 +27,22 @@ namespace VNEffects
     /// </summary>
     public class VNBadmintonModule : VNEventModule
     {
-        [Header("手感参数（换算表见《羽毛球小游戏实施计划.md》第四节）")]
+        [Header("对手 / 难度库（剧本 id: 引用；VNGameConfig 登记的会覆盖这里）")]
+        public List<VNBadmintonDef> defs = new List<VNBadmintonDef>();
+
+        [Header("兜底手感参数（没匹配到 Def 时用；换算表见《羽毛球小游戏实施计划.md》第四节）")]
         public VNBadmintonTuning tuning = new VNBadmintonTuning();
 
-        [Header("默认目标分数（剧本 target: 覆盖；净胜 2 分制）")]
+        [Header("默认目标分数（Def / 剧本 target: 逐级覆盖；净胜 2 分制）")]
         public int targetScore = 5;
 
-        [Header("角色底图（留空 = 剪影占位；规格见计划书第八节）")]
+        [Header("兜底角色底图（留空 = 剪影占位；规格见计划书第八节）")]
         public Sprite playerBody;
         public Sprite opponentBody;
         public Sprite racketSprite;
+        public Sprite armSprite;
 
-        [Header("远景底图（留空 = 程序化渐变天空）")]
+        [Header("兜底远景底图（留空 = 程序化渐变天空）")]
         public Sprite backdrop;
 
         [Header("调试：玩家也交给 AI（自动对拉，用来验证回合逻辑，正式使用请关掉）")]
@@ -50,8 +54,8 @@ namespace VNEffects
         /// <summary>子步进的最大单步位移（px）——低帧率下防止球穿过拍面</summary>
         const float MaxSubStep = 12f;
         const int MaxSubSteps = 16;
-        /// <summary>AI 提前多久起拍（要让拍面在接触时正好处于有效窗内）</summary>
-        const float AiSwingLead = 0.10f;
+        /// <summary>AI 起拍提前量 = 拍面有效窗起点 + 这个余量（确保接触时稳稳落在窗内）</summary>
+        const float AiSwingMargin = 0.03f;
 
         enum Phase { Intro, Serve, Rally, Point, Over }
 
@@ -61,6 +65,8 @@ namespace VNEffects
         readonly System.Random _rng = new System.Random();
         VNBadmintonCourt _court;
         VNBadmintonActor _me, _op;
+        VNBadmintonDef _def;
+        Sprite _opponentBody;   // 三级回退的结果，OnLaunch 里定下来
 
         // 比分与赛制
         int _scoreMe, _scoreOp, _target;
@@ -105,7 +111,10 @@ namespace VNEffects
 
         protected override void OnLaunch(VNEventContext ctx)
         {
-            _target = Mathf.Max(1, ctx.KwI("target", targetScore));
+            ResolveDef(ctx);
+
+            _target = Mathf.Max(1, ctx.KwI("target",
+                _def != null ? _def.targetScore : targetScore));
             _flagPrefix = ctx.Kw("flag", _flagPrefix);
 
             string first = ctx.Kw("first", "random");
@@ -114,9 +123,11 @@ namespace VNEffects
                         : (_rng.NextDouble() < 0.5 ? -1 : 1);
 
             _court = new VNBadmintonCourt();
-            _court.Build((RectTransform)transform, tuning, backdrop, gameObject);
-            _court.SetNames(ctx.Kw("pname", VNLocale.T("badminton.player")),
-                            ctx.Kw("vs", VNLocale.T("badminton.opponent")));
+            _court.Build((RectTransform)transform, tuning,
+                _def != null && _def.backdrop != null ? _def.backdrop : backdrop, gameObject);
+            _court.SetNames(ctx.Kw("pname", VNLocale.T("badminton.player")), OpponentName(ctx));
+
+            _opponentBody = ResolveOpponentBody(ctx);
 
             // 顺序有依赖：ResetPositions 会碰 _hitMarker，所以必须等 BuildBall 之后才调
             BuildActors();
@@ -130,14 +141,85 @@ namespace VNEffects
             _court.ShowTips(VNLocale.T("badminton.start", _target));
         }
 
+        /// <summary>
+        /// 解析对手 / 难度资产：剧本 id: > 剧本 vs:（角色 id 同名资产）> 库里只有一条时直接用。
+        /// 匹配到就把它的手感参数整块吃进来（后续 Editor 下每帧重读同一份）。
+        /// </summary>
+        void ResolveDef(VNEventContext ctx)
+        {
+            var cfg = VNGameConfig.Active;
+            if (cfg != null) VNGameConfig.ApplyList(cfg.badmintons, ref defs);
+
+            string id = ctx.Kw("id");
+            string vs = ctx.Kw("vs");
+            _def = FindDef(id) ?? FindDef(vs);
+            if (_def == null && defs.Count == 1 && string.IsNullOrEmpty(id)) _def = defs[0];
+
+            if (_def == null)
+            {
+                if (!string.IsNullOrEmpty(id))
+                    Debug.LogWarning($"[VNEvent] 第 {ctx.line} 行：没有 id 为「{id}」的 " +
+                                     "VNBadmintonDef，本局用模板上的兜底参数");
+                return;
+            }
+            tuning.CopyFrom(_def.tuning);
+        }
+
+        VNBadmintonDef FindDef(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (var d in defs)
+                if (d != null && d.badmintonId == id) return d;
+            return null;
+        }
+
+        string OpponentName(VNEventContext ctx)
+        {
+            if (_def != null && !string.IsNullOrEmpty(_def.DisplayOpponentName))
+                return _def.DisplayOpponentName;
+
+            // 退回 vs: 指定角色的显示名
+            string vs = ctx.Kw("vs");
+            var character = FindCharacter(vs);
+            if (character != null) return character.LocalizedDisplayName;
+            return string.IsNullOrEmpty(vs) ? VNLocale.T("badminton.opponent") : vs;
+        }
+
+        static VNCharacterDef FindCharacter(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            var cfg = VNGameConfig.Active;
+            if (cfg == null || cfg.characters == null) return null;
+            foreach (var c in cfg.characters)
+                if (c != null && c.id == id) return c;
+            return null;
+        }
+
+        /// <summary>立绘三级回退：Def 的羽球专用图 → Def 指定角色的默认立绘 → 模板兜底图</summary>
+        Sprite ResolveOpponentBody(VNEventContext ctx)
+        {
+            if (_def != null && _def.opponentBody != null) return _def.opponentBody;
+
+            string charId = _def != null && !string.IsNullOrEmpty(_def.opponentCharacterId)
+                ? _def.opponentCharacterId : ctx?.Kw("vs");
+            var character = FindCharacter(charId);
+            if (character != null && character.DefaultSprite != null) return character.DefaultSprite;
+
+            return opponentBody;
+        }
+
         void BuildActors()
         {
+            Sprite racket = _def != null && _def.racket != null ? _def.racket : racketSprite;
+            Sprite arm = _def != null && _def.arm != null ? _def.arm : armSprite;
+            Sprite mine = _def != null && _def.playerBody != null ? _def.playerBody : playerBody;
+
             _me = new VNBadmintonActor();
-            _me.Build(_court.ActorLayer, playerBody, racketSprite,
+            _me.Build(_court.ActorLayer, mine, racket, arm,
                 new Color(0.35f, 0.52f, 0.85f, 1f), true, gameObject);
 
             _op = new VNBadmintonActor();
-            _op.Build(_court.ActorLayer, opponentBody, racketSprite,
+            _op.Build(_court.ActorLayer, _opponentBody, racket, arm,
                 new Color(0.85f, 0.40f, 0.46f, 1f), false, gameObject);
         }
 
@@ -224,6 +306,12 @@ namespace VNEffects
             // 事件模块三铁律②：unscaled 计时，不受 Skip 快进影响。
             // 上限 0.05s：切窗口回来时的巨大 dt 会让球瞬移过整个球场。
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+
+#if UNITY_EDITOR
+            // 决策 10 没做 Editor 调参窗口的补偿：Play 着直接拖 Def 资产的 Inspector
+            // 就能实时看到手感变化，不用反复进出 Play Mode。运行时构建整段编译掉。
+            if (_def != null) tuning.CopyFrom(_def.tuning);
+#endif
 
             ReadInput();
 
@@ -318,6 +406,7 @@ namespace VNEffects
 
             _ballDir = outDir;
             server.PlaySwing(VNBadmintonSwing.High);
+            Talk(byPlayer, TalkKind.Serve);
             BuildTrack();
             PlanReceive();
 
@@ -410,8 +499,47 @@ namespace VNEffects
                     new Color(1f, 0.85f, 0.35f, 1f));
             }
 
+            // 台词：扣杀 > 精准（打得好，对面隔一拍夸一句）> 普通击球
+            if (airborne) Talk(byPlayer, TalkKind.Smash);
+            else if (perfect)
+            {
+                Talk(byPlayer, TalkKind.Hit);
+                DOVirtual.DelayedCall(0.9f, () => Talk(!byPlayer, TalkKind.Praise), true)
+                         .SetLink(gameObject);
+            }
+            else Talk(byPlayer, TalkKind.Hit, 0.25f);   // 平球少说话，免得一直在刷气泡
+
             BuildTrack();
             PlanReceive();
+        }
+
+        // ------------------------------------------------------------------
+        // 台词气泡
+        // ------------------------------------------------------------------
+
+        enum TalkKind { Serve, Hit, Smash, Praise, Score, LoseScore }
+
+        /// <summary>说一句。没配 Def / 没配这一类台词 / 没抽中概率 / 同侧气泡还在，都静默跳过。</summary>
+        void Talk(bool player, TalkKind kind, float rate = -1f)
+        {
+            if (_def == null || !_def.TalkEnabled) return;
+            var actor = player ? _me : _op;
+            if (actor == null) return;
+
+            var set = player ? _def.playerTalk : _def.opponentTalk;
+            var lines = kind switch
+            {
+                TalkKind.Serve => set.serve,
+                TalkKind.Hit => set.hit,
+                TalkKind.Smash => set.smash,
+                TalkKind.Praise => set.praise,
+                TalkKind.Score => set.score,
+                _ => set.loseScore,
+            };
+
+            string line = set.Pick(lines, _rng);
+            if (string.IsNullOrEmpty(line)) return;
+            actor.ShowTalk(line, rate < 0f ? _def.talkRate : rate, _rng);
         }
 
         /// <summary>算出接球方该在哪接、要不要扣杀、这一球会不会被接到</summary>
@@ -456,23 +584,26 @@ namespace VNEffects
             float timeToArrive = (_receivePoint.x - _ball.x) / _arc.speed;
             if (timeToArrive < 0f) return;
 
+            var kind = _receivePoint.y < tuning.lowSwingY
+                ? VNBadmintonSwing.Low : VNBadmintonSwing.High;
+            // 提前量直接问表现层要「拍面几时开始有效」，动画时长改了这里自动跟上
+            float lead = VNBadmintonActor.ActiveWindowStart(kind) + AiSwingMargin;
+
             if (_ballDir > 0)
             {
                 if (!_opJumped && _opWantsSmash && !_opAir &&
                     timeToArrive <= JumpRiseTime(tuning.opponentJumpHeight))
-                { StartJump(false); _opJumped = true; }
+                { StartJump(false); _opJumped = true; Talk(false, TalkKind.Smash); }
 
-                if (!_opSwung && !_opAir && timeToArrive <= AiSwingLead)
+                if (!_opSwung && !_opAir && timeToArrive <= lead)
                 {
-                    _op.PlaySwing(_receivePoint.y < tuning.lowSwingY
-                        ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+                    _op.PlaySwing(kind);
                     _opSwung = true;
                 }
             }
-            else if (debugAutoPlayer && !_meSwung && !_meAir && timeToArrive <= AiSwingLead)
+            else if (debugAutoPlayer && !_meSwung && !_meAir && timeToArrive <= lead)
             {
-                _me.PlaySwing(_receivePoint.y < tuning.lowSwingY
-                    ? VNBadmintonSwing.Low : VNBadmintonSwing.High);
+                _me.PlaySwing(kind);
                 _meSwung = true;
             }
         }
@@ -592,6 +723,11 @@ namespace VNEffects
 
             _court.SetScore(_scoreMe, _scoreOp, true);
             _court.ShowScoreBoard(true);
+
+            // 得分/失分的台词是必说的（rate 1），跟参考实现一致
+            Talk(toPlayer, TalkKind.Score, 1f);
+            DOVirtual.DelayedCall(0.5f, () => Talk(!toPlayer, TalkKind.LoseScore, 1f), true)
+                     .SetLink(gameObject);
 
             string msg = VNLocale.T(toPlayer ? "badminton.pointMe" : "badminton.pointOp");
             if (!string.IsNullOrEmpty(reasonKey)) msg = VNLocale.T(reasonKey) + msg;

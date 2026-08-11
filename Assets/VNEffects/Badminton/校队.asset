@@ -1,0 +1,156 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 498229597acbbc1458b09bd142fed245, type: 3}
+  m_Name: "\u6821\u961F"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNBadmintonDef
+  badmintonId: "\u6821\u961F"
+  title: "\u6821\u961F\u4E3B\u529B"
+  titleEn: 
+  titleJa: 
+  opponentName: "\u6821\u961F\u4E3B\u529B"
+  opponentNameEn: 
+  opponentNameJa: 
+  opponentBody: {fileID: 0}
+  opponentCharacterId: 
+  playerBody: {fileID: 0}
+  racket: {fileID: 0}
+  arm: {fileID: 0}
+  backdrop: {fileID: 0}
+  targetScore: 5
+  tuning:
+    groundY: 195
+    ballStartY: 375
+    serveTargetX: 300
+    startStandX: 375
+    netTopY: 450
+    netMaxY: 750
+    lowSwingY: 488
+    smashNeedY: 600
+    moveMinX: 150
+    moveMaxX: 750
+    outMarginMin: 38
+    outMarginMax: 225
+    apexClamp: 900
+    perfectDistance: 90
+    behindTolerance: 15
+    heavyTolerance: 120
+    perfectRate: 0.72
+    speedConstant: 1962
+    flySpeedScale: 0.866
+    heavySpeedThreshold: 1350
+    maxFlySpeed: 4000
+    gravityScale: 3
+    pixelsPerUnit: 75
+    fallSpeed: 750
+    playerPower: 1
+    playerMoveSpeed: 8
+    playerJumpHeight: 3
+    opponentPower: 0.75
+    opponentMoveSpeed: 8
+    opponentJumpHeight: 3
+    opponentHitRate: 0.88
+    opponentHeavyRate: 0.25
+    trackDisplayRate: 0.55
+    trackSpacing: 38
+  talkRate: 0.5
+  opponentTalk:
+    serve:
+    - text: "\u63A5\u597D\u4E86\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u8FD9\u4E00\u7403\u53EF\u4E0D\u5BA2\u6C14\u54AF"
+      textEn: 
+      textJa: 
+    - text: "\u6765\u5427\uFF01"
+      textEn: 
+      textJa: 
+    hit:
+    - text: "\u8FD8\u7ED9\u4F60\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u54FC\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u6CA1\u90A3\u4E48\u5BB9\u6613"
+      textEn: 
+      textJa: 
+    smash:
+    - text: "\u5403\u6211\u8FD9\u4E00\u8BB0\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u63A5\u5F97\u4F4F\u5417\uFF01"
+      textEn: 
+      textJa: 
+    praise:
+    - text: "\u8FD9\u7403\u6F02\u4EAE\u2026\u2026"
+      textEn: 
+      textJa: 
+    - text: "\u6709\u4E24\u4E0B\u5B50\u561B"
+      textEn: 
+      textJa: 
+    score:
+    - text: "\u6211\u7684\u5206\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u770B\u5230\u6CA1\uFF0C\u8FD9\u5C31\u662F\u5DEE\u8DDD"
+      textEn: 
+      textJa: 
+    loseScore:
+    - text: "\u53EF\u6076\u2026\u2026"
+      textEn: 
+      textJa: 
+    - text: "\u53EA\u662F\u8FD0\u6C14\u597D\u800C\u5DF2"
+      textEn: 
+      textJa: 
+  playerTalk:
+    serve:
+    - text: "\u6211\u53D1\u7403\u4E86\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u5F00\u59CB\u5427"
+      textEn: 
+      textJa: 
+    hit:
+    - text: "\u63A5\u4F4F\u4E86\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u8FD8\u6CA1\u5B8C\u5462"
+      textEn: 
+      textJa: 
+    smash:
+    - text: "\u8FD9\u4E00\u7403\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u4E0A\uFF01"
+      textEn: 
+      textJa: 
+    praise:
+    - text: "\u597D\u5389\u5BB3\u7684\u7403\u2026\u2026"
+      textEn: 
+      textJa: 
+    - text: "\u771F\u4E0D\u6127\u662F\u4E3B\u529B"
+      textEn: 
+      textJa: 
+    score:
+    - text: "\u597D\u7403\uFF01"
+      textEn: 
+      textJa: 
+    - text: "\u8FFD\u4E0A\u6765\u4E86\uFF01"
+      textEn: 
+      textJa: 
+    loseScore:
+    - text: "\u7CDF\u4E86\u2026\u2026"
+      textEn: 
+      textJa: 
+    - text: "\u8FD8\u5DEE\u4E00\u70B9"
+      textEn: 
+      textJa: 
