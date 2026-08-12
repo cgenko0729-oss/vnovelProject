@@ -95,14 +95,35 @@ namespace VNEffects
         // ==================================================================
 
         /// <summary>取景框尺寸（4:3，照片就是这块区域）</summary>
-        const float ViewW = 880f;
-        const float ViewH = 660f;
-        const float MachineW = 1720f;
-        const float MachineH = 900f;
+        const float ViewW = 1040f;
+        const float ViewH = 780f;
+        /// <summary>取景框中心的纵向位置：上方让出标题条，下方让出快门</summary>
+        const float ViewY = 22f;
+        const float MachineW = 1860f;
+        const float MachineH = 1020f;
+
+        // 左右侧栏统一尺寸。三块（左栏 / 取景框 / 右栏）横向排开：
+        // 机身内边距 30 + 栏 340 + 间隙 40 + 取景框 1040 + 间隙 40 + 栏 340 + 30 = 1860
+        const float PanelW = 340f;
+        const float PanelH = 900f;
+        const float PanelX = MachineW * 0.5f - 200f;
+        const float PanelY = -40f;
+        /// <summary>栏内滚动列表的尺寸（宽度扣掉栏的左右留白，纵向让出顶部标签行）</summary>
+        const float ListW = PanelW - 16f;
+        const float ListH = PanelH - 90f;
+        const float ListY = -33f;
+
+        /// <summary>标题条基线（机身顶部往下一点，说明钮与限时条也排在这条线上）</summary>
+        const float TitleY = MachineH * 0.5f - 58f;
         const float UrgentSeconds = 3f;
 
         /// <summary>表情格里的取景倍率（格子只要脸，比取景框拉得近得多）</summary>
         const float FaceCellFit = 6f;
+        /// <summary>表情格尺寸与格内裁窗（两列刚好塞进 ListW）</summary>
+        const float FaceCellSize = 146f;
+        const float FaceClipSize = 130f;
+        /// <summary>表情列表一屏能放下的行数，超过才需要滚动</summary>
+        const int FaceRowsPerPage = 5;
 
         public const string FlagScoreSuffix = "_分数";
         public const string FlagGradeSuffix = "_档位";
@@ -140,7 +161,7 @@ namespace VNEffects
         RectTransform _timerFill;
         Image _frameBack, _windowImage, _windowRing, _frameFront, _backdropImage;
         Image _meImage, _herImage;
-        TextMeshProUGUI _watermark, _timerText, _hintText;
+        TextMeshProUGUI _watermark, _timerText;
         GameObject _leftPanel, _rightPanel, _bottomBar, _confirmLayer;
         RectTransform _frameContent, _backdropContent, _stickerContent;
         Button _shutterButton;
@@ -331,6 +352,7 @@ namespace VNEffects
             BuildLeftPanel(machineRect);
             BuildRightPanel(machineRect);
             BuildBottomBar(machineRect);
+            BuildHelpPanel(machineRect);   // 最后建 = 展开时压在所有面板之上
 
             // 倒数数字：压在取景框中央（拍照那一刻会被藏起来，不会入镜）
             _countdownText = VNPhotoBoothUi.CreateText("Countdown", machineRect, 220,
@@ -339,7 +361,7 @@ namespace VNEffects
             _countdownText.outlineWidth = 0.22f;      // 白描边，压在任何背景上都看得清
             _countdownText.outlineColor = new Color32(255, 255, 255, 235);
             VNPhotoBoothUi.Center((RectTransform)_countdownText.transform,
-                new Vector2(400f, 400f), new Vector2(0f, -20f));
+                new Vector2(400f, 400f), new Vector2(0f, ViewY));
             _countdownText.gameObject.SetActive(false);
 
             // 闪光层：铺满整屏，快门瞬间白一下
@@ -354,7 +376,7 @@ namespace VNEffects
             var title = VNPhotoBoothUi.CreateText("Title", parent, 42,
                 VNPhotoBoothUi.AccentSoft, _title, TextAlignmentOptions.Left);
             VNPhotoBoothUi.Center((RectTransform)title.transform, new Vector2(500f, 60f),
-                new Vector2(-MachineW * 0.5f + 300f, MachineH * 0.5f - 62f));
+                new Vector2(-MachineW * 0.5f + 300f, TitleY));
 
             string themeLine = _freeMode
                 ? VNLocale.T("photo.free")
@@ -364,15 +386,16 @@ namespace VNEffects
             var hint = VNPhotoBoothUi.CreateText("ThemeHint", parent, 28,
                 Color.white, themeLine, TextAlignmentOptions.Center);
             VNPhotoBoothUi.Center((RectTransform)hint.transform, new Vector2(700f, 50f),
-                new Vector2(0f, MachineH * 0.5f - 62f));
+                new Vector2(0f, TitleY));
 
-            // 限时条（不限时就整条不建）
+            // 限时条（不限时就整条不建）。
+            // 右上角那块归说明钮，所以限时条整体往左让出 100px。
             if (_timeLimit <= 0f) return;
 
             var barBg = VNPhotoBoothUi.CreateImage("TimerBg", parent,
                 VNProceduralTextures.RoundedRectSprite, new Color(1f, 1f, 1f, 0.18f));
             var barRect = VNPhotoBoothUi.Center((RectTransform)barBg.transform,
-                new Vector2(360f, 20f), new Vector2(MachineW * 0.5f - 260f, MachineH * 0.5f - 68f));
+                new Vector2(360f, 20f), new Vector2(MachineW * 0.5f - 300f, TitleY - 6f));
 
             var fill = VNPhotoBoothUi.CreateImage("TimerFill", barRect,
                 VNProceduralTextures.RoundedRectSprite, VNPhotoBoothUi.AccentSoft);
@@ -384,16 +407,121 @@ namespace VNEffects
             _timerFill.offsetMax = Vector2.zero;
             _timerFill.sizeDelta = new Vector2(360f, 0f);
 
+            // 秒数摆在条的左侧（右侧被说明钮占了），右对齐贴着条的左端
             _timerText = VNPhotoBoothUi.CreateText("TimerText", parent, 26, Color.white,
-                Mathf.CeilToInt(_timeLeft).ToString());
+                Mathf.CeilToInt(_timeLeft).ToString(), TextAlignmentOptions.Right);
             VNPhotoBoothUi.Center((RectTransform)_timerText.transform, new Vector2(90f, 40f),
-                new Vector2(MachineW * 0.5f - 100f, MachineH * 0.5f - 66f));
+                new Vector2(MachineW * 0.5f - 537f, TitleY - 4f));
+        }
+
+        // ==================================================================
+        // 操作说明（右上角「?」，点一下展开卡片）
+        // ==================================================================
+
+        /// <summary>
+        /// 说明卡片整组（钮 + 卡片）。拍照时要整组藏掉——
+        /// 卡片是往左下展开的，会盖住取景框右上角，不藏就会入镜。
+        /// </summary>
+        GameObject _helpRoot;
+        CanvasGroup _helpCard;
+        bool _helpOpen;
+
+        void BuildHelpPanel(RectTransform parent)
+        {
+            var root = VNPhotoBoothUi.CreateNode("Help", parent);
+            VNPhotoBoothUi.Stretch(root);
+            _helpRoot = root.gameObject;
+
+            // ---- 折叠钮 ----
+            var button = VNPhotoBoothUi.CreateImage("HelpButton", root,
+                VNPhotoTextures.CircleSprite(), VNPhotoBoothUi.Accent, true);
+            var buttonRect = VNPhotoBoothUi.Center((RectTransform)button.transform,
+                new Vector2(54f, 54f), new Vector2(MachineW * 0.5f - 64f, TitleY));
+            var icon = VNPhotoBoothUi.CreateText("HelpIcon", buttonRect, 34, Color.white, "?");
+            VNPhotoBoothUi.Stretch((RectTransform)icon.transform);
+
+            var toggle = button.gameObject.AddComponent<Button>();
+            toggle.targetGraphic = button;
+            toggle.onClick.AddListener(ToggleHelp);
+
+            // ---- 展开的卡片 ----
+            // 底色必须**不透明**：它会盖在右栏的表情格上，留一点透明度就变成
+            // 一层脏兮兮的滤镜，字反而看不清
+            var card = VNPhotoBoothUi.CreateImage("HelpCard", root,
+                VNProceduralTextures.RoundedRectSprite,
+                new Color(0.13f, 0.13f, 0.17f, 1f), true);
+            var cardRect = (RectTransform)card.transform;
+            cardRect.anchorMin = cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.pivot = new Vector2(1f, 1f);      // 右上角钉在钮的下方，向左下展开
+
+            var titleText = VNPhotoBoothUi.CreateText("HelpTitle", cardRect, 26,
+                VNPhotoBoothUi.AccentSoft, VNLocale.T("photo.help.title"),
+                TextAlignmentOptions.TopLeft);
+            var titleRect = (RectTransform)titleText.transform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(24f, 0f);
+            titleRect.offsetMax = new Vector2(-24f, -18f);
+            titleRect.sizeDelta = new Vector2(titleRect.sizeDelta.x, 34f);
+
+            var bodyText = VNPhotoBoothUi.CreateText("HelpBody", cardRect, 22,
+                new Color(1f, 1f, 1f, 0.85f), VNLocale.T("photo.help.body"),
+                TextAlignmentOptions.TopLeft);
+            bodyText.lineSpacing = 8f;
+            var bodyRect = (RectTransform)bodyText.transform;
+            bodyRect.anchorMin = new Vector2(0f, 1f);
+            bodyRect.anchorMax = new Vector2(1f, 1f);
+            bodyRect.pivot = new Vector2(0.5f, 1f);
+            bodyRect.offsetMin = new Vector2(24f, 0f);
+            bodyRect.offsetMax = new Vector2(-24f, -60f);
+
+            // 卡片高度按正文实测（TMP + ContentSizeFitter 首帧量不准，手工量更稳）
+            const float cardWidth = 440f;
+            cardRect.sizeDelta = new Vector2(cardWidth, 400f);
+            bodyRect.sizeDelta = new Vector2(bodyRect.sizeDelta.x, 400f);
+            bodyText.ForceMeshUpdate();
+            float bodyHeight = bodyText.preferredHeight;
+            bodyRect.sizeDelta = new Vector2(bodyRect.sizeDelta.x, bodyHeight);
+            cardRect.sizeDelta = new Vector2(cardWidth, bodyHeight + 82f);
+            cardRect.anchoredPosition = new Vector2(
+                MachineW * 0.5f - 38f, TitleY - 40f);
+
+            _helpCard = card.gameObject.AddComponent<CanvasGroup>();
+            _helpCard.alpha = 0f;
+            _helpCard.blocksRaycasts = false;
+            card.gameObject.SetActive(false);
+        }
+
+        /// <summary>点「?」开合。展开时卡片自己吃掉射线，免得点到底下的取景框</summary>
+        void ToggleHelp()
+        {
+            if (_helpCard == null) return;
+            _helpOpen = !_helpOpen;
+
+            var rect = (RectTransform)_helpCard.transform;
+            _helpCard.gameObject.SetActive(true);
+            _helpCard.blocksRaycasts = _helpOpen;
+            _helpCard.DOKill();
+            rect.DOKill();
+
+            if (_helpOpen)
+                rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, TitleY - 26f);
+
+            _helpCard.DOFade(_helpOpen ? 1f : 0f, 0.16f)
+                .SetUpdate(true).SetLink(_helpCard.gameObject)
+                .OnComplete(() =>
+                {
+                    if (!_helpOpen) _helpCard.gameObject.SetActive(false);
+                });
+            rect.DOAnchorPosY(_helpOpen ? TitleY - 40f : TitleY - 26f, 0.16f)
+                .SetEase(Ease.OutCubic).SetUpdate(true).SetLink(_helpCard.gameObject);
         }
 
         void BuildViewFinder(RectTransform parent)
         {
             _viewFinder = VNPhotoBoothUi.CreateNode("ViewFinder", parent);
-            VNPhotoBoothUi.Center(_viewFinder, new Vector2(ViewW, ViewH), new Vector2(0f, -20f));
+            VNPhotoBoothUi.Center(_viewFinder, new Vector2(ViewW, ViewH), new Vector2(0f, ViewY));
 
             _frameBack = VNPhotoBoothUi.CreateImage("FrameBack", _viewFinder, null, Color.white);
             VNPhotoBoothUi.Stretch((RectTransform)_frameBack.transform);
@@ -453,14 +581,14 @@ namespace VNEffects
             var panel = VNPhotoBoothUi.CreateImage("LeftPanel", parent,
                 VNProceduralTextures.RoundedRectSprite, VNPhotoBoothUi.PanelBg, true);
             var rect = VNPhotoBoothUi.Center((RectTransform)panel.transform,
-                new Vector2(300f, 700f), new Vector2(-MachineW * 0.5f + 190f, -20f));
+                new Vector2(PanelW, PanelH), new Vector2(-PanelX, PanelY));
             _leftPanel = panel.gameObject;
 
             // 顶部四个标签：边框 / 背景 / 贴纸 / 涂鸦
-            const float tabW = 68f;
+            const float tabW = 76f;
             var tabs = new List<(Button button, TextMeshProUGUI text, GameObject page)>();
-            float tabY = 700f * 0.5f - 36f;
-            float[] tabX = { -105f, -35f, 35f, 105f };
+            float tabY = PanelH * 0.5f - 36f;
+            float[] tabX = { -117f, -39f, 39f, 117f };
             string[] tabKeys =
             {
                 "photo.tab.frame", "photo.tab.backdrop",
@@ -479,14 +607,14 @@ namespace VNEffects
             }
 
             var frameScroll = VNPhotoBoothUi.CreateScrollList("FrameList", rect,
-                new Vector2(284f, 610f), new Vector2(0f, -28f), 1,
-                new Vector2(258f, 150f), 12f, out _frameContent);
+                new Vector2(ListW, ListH), new Vector2(0f, ListY), 1,
+                new Vector2(300f, 176f), 12f, out _frameContent);
             var backdropScroll = VNPhotoBoothUi.CreateScrollList("BackdropList", rect,
-                new Vector2(284f, 610f), new Vector2(0f, -28f), 1,
-                new Vector2(258f, 150f), 12f, out _backdropContent);
+                new Vector2(ListW, ListH), new Vector2(0f, ListY), 1,
+                new Vector2(300f, 176f), 12f, out _backdropContent);
             var stickerScroll = VNPhotoBoothUi.CreateScrollList("StickerList", rect,
-                new Vector2(284f, 610f), new Vector2(0f, -28f), 2,
-                new Vector2(124f, 124f), 12f, out _stickerContent);
+                new Vector2(ListW, ListH), new Vector2(0f, ListY), 2,
+                new Vector2(144f, 144f), 12f, out _stickerContent);
             var doodlePage = BuildDoodlePage(rect);
             backdropScroll.gameObject.SetActive(false);
             stickerScroll.gameObject.SetActive(false);
@@ -541,9 +669,9 @@ namespace VNEffects
         GameObject BuildDoodlePage(RectTransform parent)
         {
             var page = VNPhotoBoothUi.CreateNode("DoodlePage", parent);
-            VNPhotoBoothUi.Center(page, new Vector2(284f, 610f), new Vector2(0f, -28f));
+            VNPhotoBoothUi.Center(page, new Vector2(ListW, ListH), new Vector2(0f, ListY));
 
-            float y = 610f * 0.5f - 30f;
+            float y = ListH * 0.5f - 40f;
 
             // ---- 颜色格 4×3 ----
             var colorCells = new List<Image>();
@@ -552,8 +680,8 @@ namespace VNEffects
                 int row = i / 4, col = i % 4;
                 var cell = VNPhotoBoothUi.CreateImage($"Pen{i}", page,
                     VNProceduralTextures.RoundedRectSprite, PenColors[i], true);
-                VNPhotoBoothUi.Center((RectTransform)cell.transform, new Vector2(56f, 56f),
-                    new Vector2(-96f + col * 64f, y - row * 64f));
+                VNPhotoBoothUi.Center((RectTransform)cell.transform, new Vector2(76f, 76f),
+                    new Vector2(-120f + col * 80f, y - row * 96f));
 
                 var button = cell.gameObject.AddComponent<Button>();
                 button.targetGraphic = cell;
@@ -567,23 +695,23 @@ namespace VNEffects
                 });
                 colorCells.Add(cell);
             }
-            y -= 3 * 64f + 18f;
+            y -= 2 * 96f + 94f;
 
             // ---- 笔粗滑块（自由调，不是几个档位）----
-            var sizeLabel = VNPhotoBoothUi.CreateText("SizeLabel", page, 22,
+            var sizeLabel = VNPhotoBoothUi.CreateText("SizeLabel", page, 24,
                 VNPhotoBoothUi.TextDark, VNLocale.T("photo.pen.size"),
                 TextAlignmentOptions.Left);
             VNPhotoBoothUi.Center((RectTransform)sizeLabel.transform,
-                new Vector2(150f, 30f), new Vector2(-60f, y));
+                new Vector2(150f, 32f), new Vector2(-68f, y));
 
             _penPreview = VNPhotoBoothUi.CreateImage("PenPreview", page,
                 VNPhotoTextures.CircleSprite(), VNPhotoBoothUi.TextDark);
             VNPhotoBoothUi.Center((RectTransform)_penPreview.transform,
-                new Vector2(24f, 24f), new Vector2(104f, y));
+                new Vector2(24f, 24f), new Vector2(120f, y));
 
-            y -= 34f;
+            y -= 50f;
             var slider = VNPhotoBoothUi.CreateSlider("PenSize", page,
-                new Vector2(252f, 30f), new Vector2(0f, y), 2f, 40f, _doodle.penSize);
+                new Vector2(292f, 32f), new Vector2(0f, y), 2f, 40f, _doodle.penSize);
             slider.onValueChanged.AddListener(v =>
             {
                 _doodle.penSize = v;
@@ -591,17 +719,17 @@ namespace VNEffects
             });
             UpdatePenPreview();
 
-            y -= 52f;
+            y -= 84f;
 
             // ---- 荧光笔 / 橡皮 ----
             var glowButton = VNPhotoBoothUi.CreateButton("GlowPen", page,
-                new Vector2(122f, 52f), new Vector2(-64f, y),
+                new Vector2(144f, 60f), new Vector2(-76f, y),
                 VNLocale.T("photo.pen.glow"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 22, out var glowText);
+                VNPhotoBoothUi.TextDark, 24, out var glowText);
             var eraserButton = VNPhotoBoothUi.CreateButton("Eraser", page,
-                new Vector2(122f, 52f), new Vector2(64f, y),
+                new Vector2(144f, 60f), new Vector2(76f, y),
                 VNLocale.T("photo.pen.eraser"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 22, out var eraserText);
+                VNPhotoBoothUi.TextDark, 24, out var eraserText);
 
             glowButton.onClick.AddListener(() =>
             {
@@ -615,26 +743,27 @@ namespace VNEffects
                 RefreshToolButtons(glowButton, glowText, eraserButton, eraserText);
             });
 
-            y -= 62f;
+            y -= 88f;
 
             // ---- 撤销 / 清空 ----
             _undoButton = VNPhotoBoothUi.CreateButton("Undo", page,
-                new Vector2(122f, 52f), new Vector2(-64f, y),
+                new Vector2(144f, 60f), new Vector2(-76f, y),
                 VNLocale.T("photo.pen.undo"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 22, out _);
+                VNPhotoBoothUi.TextDark, 24, out _);
             _undoButton.onClick.AddListener(() => _doodle.Undo());
 
             VNPhotoBoothUi.CreateButton("ClearDoodle", page,
-                new Vector2(122f, 52f), new Vector2(64f, y),
+                new Vector2(144f, 60f), new Vector2(76f, y),
                 VNLocale.T("photo.pen.clear"), VNPhotoBoothUi.CellBg,
-                VNPhotoBoothUi.TextDark, 22, out _)
+                VNPhotoBoothUi.TextDark, 24, out _)
                 .onClick.AddListener(() => _doodle.Clear());
 
-            y -= 60f;
-            var hint = VNPhotoBoothUi.CreateText("DoodleHint", page, 20,
+            // 说明跟在工具区下面（不钉到页底，否则中间空一大块）
+            y -= 100f;
+            var hint = VNPhotoBoothUi.CreateText("DoodleHint", page, 21,
                 new Color(0.45f, 0.4f, 0.45f), VNLocale.T("photo.pen.hint"));
             VNPhotoBoothUi.Center((RectTransform)hint.transform,
-                new Vector2(266f, 60f), new Vector2(0f, y));
+                new Vector2(300f, 70f), new Vector2(0f, y));
 
             RefreshPenUi(colorCells, 0);
             return page.gameObject;
@@ -643,7 +772,7 @@ namespace VNEffects
         void UpdatePenPreview()
         {
             if (_penPreview == null) return;
-            // 画布 640 宽显示成 880，所以预览点按同一比例放大才是「所见即所得」
+            // 画布 768 宽显示成 1040，所以预览点按同一比例放大才是「所见即所得」
             float shown = Mathf.Clamp(_doodle.penSize * 2f * (ViewW / VNPhotoDoodle.Width),
                 6f, 56f);
             ((RectTransform)_penPreview.transform).sizeDelta = new Vector2(shown, shown);
@@ -698,13 +827,13 @@ namespace VNEffects
                 var preview = VNPhotoBoothUi.CreateImage("Preview", rect,
                     def.ResolveSprite(), Color.white);
                 VNPhotoBoothUi.Center((RectTransform)preview.transform,
-                    new Vector2(236f, 96f), new Vector2(0f, 16f));
+                    new Vector2(276f, 112f), new Vector2(0f, 20f));
             }
 
-            var text = VNPhotoBoothUi.CreateText("Label", rect, 24,
+            var text = VNPhotoBoothUi.CreateText("Label", rect, 26,
                 VNPhotoBoothUi.TextDark, label);
-            VNPhotoBoothUi.Center((RectTransform)text.transform, new Vector2(236f, 36f),
-                new Vector2(0f, def != null ? -52f : 0f));
+            VNPhotoBoothUi.Center((RectTransform)text.transform, new Vector2(276f, 40f),
+                new Vector2(0f, def != null ? -60f : 0f));
 
             var button = cell.gameObject.AddComponent<Button>();
             button.targetGraphic = cell;
@@ -757,13 +886,13 @@ namespace VNEffects
                 var preview = VNPhotoBoothUi.CreateImage("Preview", rect,
                     def.ResolveFrameSprite(), Color.white);
                 VNPhotoBoothUi.Center((RectTransform)preview.transform,
-                    new Vector2(236f, 96f), new Vector2(0f, 16f));
+                    new Vector2(276f, 112f), new Vector2(0f, 20f));
             }
 
-            var text = VNPhotoBoothUi.CreateText("Label", rect, 24,
+            var text = VNPhotoBoothUi.CreateText("Label", rect, 26,
                 VNPhotoBoothUi.TextDark, label);
-            VNPhotoBoothUi.Center((RectTransform)text.transform, new Vector2(236f, 36f),
-                new Vector2(0f, def != null ? -52f : 0f));
+            VNPhotoBoothUi.Center((RectTransform)text.transform, new Vector2(276f, 40f),
+                new Vector2(0f, def != null ? -60f : 0f));
 
             var button = cell.gameObject.AddComponent<Button>();
             button.targetGraphic = cell;
@@ -792,7 +921,7 @@ namespace VNEffects
                     sticker.ResolveSprite(), sticker.tint);
                 icon.preserveAspect = true;
                 VNPhotoBoothUi.Center((RectTransform)icon.transform,
-                    new Vector2(80f, 80f), Vector2.zero);
+                    new Vector2(96f, 96f), Vector2.zero);
 
                 var button = cell.gameObject.AddComponent<Button>();
                 button.targetGraphic = cell;
@@ -815,7 +944,7 @@ namespace VNEffects
             var panel = VNPhotoBoothUi.CreateImage("RightPanel", parent,
                 VNProceduralTextures.RoundedRectSprite, VNPhotoBoothUi.PanelBg, true);
             var rect = VNPhotoBoothUi.Center((RectTransform)panel.transform,
-                new Vector2(330f, 700f), new Vector2(MachineW * 0.5f - 205f, -20f));
+                new Vector2(PanelW, PanelH), new Vector2(PanelX, PanelY));
             _rightPanel = panel.gameObject;
 
             var title = VNPhotoBoothUi.CreateText("RightTitle", rect, 28,
@@ -823,24 +952,24 @@ namespace VNEffects
             var titleBg = VNPhotoBoothUi.CreateImage("RightTitleBg", rect,
                 VNProceduralTextures.RoundedRectSprite, VNPhotoBoothUi.Accent);
             VNPhotoBoothUi.Center((RectTransform)titleBg.transform,
-                new Vector2(300f, 52f), new Vector2(0f, 700f * 0.5f - 36f));
+                new Vector2(310f, 52f), new Vector2(0f, PanelH * 0.5f - 36f));
             ((RectTransform)title.transform).SetAsLastSibling();
             VNPhotoBoothUi.Center((RectTransform)title.transform,
-                new Vector2(300f, 52f), new Vector2(0f, 700f * 0.5f - 36f));
+                new Vector2(310f, 52f), new Vector2(0f, PanelH * 0.5f - 36f));
 
             // 列标题：左列是我、右列是她（不然两栏头像分不清谁是谁）
             var meLabel = VNPhotoBoothUi.CreateText("ColMe", rect, 22,
                 VNPhotoBoothUi.TextDark, VNLocale.T("photo.me"));
             VNPhotoBoothUi.Center((RectTransform)meLabel.transform, new Vector2(140f, 30f),
-                new Vector2(-76f, 700f * 0.5f - 76f));
+                new Vector2(-78f, PanelH * 0.5f - 78f));
             var herLabel = VNPhotoBoothUi.CreateText("ColHer", rect, 22,
                 VNPhotoBoothUi.TextDark, VNLocale.T("photo.her"));
             VNPhotoBoothUi.Center((RectTransform)herLabel.transform, new Vector2(140f, 30f),
-                new Vector2(76f, 700f * 0.5f - 76f));
+                new Vector2(78f, PanelH * 0.5f - 78f));
 
             var scroll = VNPhotoBoothUi.CreateScrollList("FaceList", rect,
-                new Vector2(314f, 580f), new Vector2(0f, -44f), 2,
-                new Vector2(140f, 140f), 10f, out var content);
+                new Vector2(ListW, PanelH - 120f), new Vector2(0f, -50f), 2,
+                new Vector2(FaceCellSize, FaceCellSize), 10f, out var content);
 
             // 两列：左列是「我」，右列是「她」。行数取两边表情数的较大值，缺的补空格子。
             int meCount = _meDef?.expressions?.Count ?? 0;
@@ -854,7 +983,7 @@ namespace VNEffects
                 AddFaceCell(content, _herDef, i < herCount ? _herDef.expressions[i].name : null,
                     false, i);
             }
-            scroll.enabled = rows > 4;
+            scroll.enabled = rows > FaceRowsPerPage;
         }
 
         void AddFaceCell(RectTransform parent, VNCharacterDef def, string expression,
@@ -874,12 +1003,12 @@ namespace VNEffects
 
             // 裁一个方窗把脸框进去（和取景框同一套 portrait 参数）
             var clip = VNPhotoBoothUi.CreateNode("Clip", rect);
-            VNPhotoBoothUi.Center(clip, new Vector2(124f, 124f), Vector2.zero);
+            VNPhotoBoothUi.Center(clip, new Vector2(FaceClipSize, FaceClipSize), Vector2.zero);
             clip.gameObject.AddComponent<RectMask2D>();
 
             var face = VNPhotoBoothUi.CreateImage("Face", clip, null, Color.white);
             // 格子要看清表情 → 比取景框拉得更近（脸怼满格子）
-            VNPhotoBoothUi.ApplyPortrait(face, def, expression, 124f, FaceCellFit,
+            VNPhotoBoothUi.ApplyPortrait(face, def, expression, FaceClipSize, FaceCellFit,
                 AnchorFor(def), Vector2.zero, false);
 
             var button = cell.gameObject.AddComponent<Button>();
@@ -898,29 +1027,25 @@ namespace VNEffects
 
         void BuildBottomBar(RectTransform parent)
         {
+            // 操作说明搬去了右上角的「?」，这条只剩快门
             var bar = VNPhotoBoothUi.CreateNode("BottomBar", parent);
             VNPhotoBoothUi.Center(bar, new Vector2(MachineW, 120f),
-                new Vector2(0f, -MachineH * 0.5f + 70f));
+                new Vector2(0f, -MachineH * 0.5f + 74f));
             _bottomBar = bar.gameObject;
 
             var shutter = VNPhotoBoothUi.CreateImage("Shutter", bar,
                 VNPhotoTextures.CircleSprite(), VNPhotoBoothUi.Accent, true);
             var shutterRect = VNPhotoBoothUi.Center((RectTransform)shutter.transform,
-                new Vector2(104f, 104f), Vector2.zero);
+                new Vector2(112f, 112f), Vector2.zero);
 
-            var icon = VNPhotoBoothUi.CreateText("ShutterIcon", shutterRect, 44,
+            var icon = VNPhotoBoothUi.CreateText("ShutterIcon", shutterRect, 48,
                 Color.white, "◉");
-            VNPhotoBoothUi.Center((RectTransform)icon.transform, new Vector2(104f, 104f),
+            VNPhotoBoothUi.Center((RectTransform)icon.transform, new Vector2(112f, 112f),
                 Vector2.zero);
 
             _shutterButton = shutter.gameObject.AddComponent<Button>();
             _shutterButton.targetGraphic = shutter;
             _shutterButton.onClick.AddListener(Shoot);
-
-            _hintText = VNPhotoBoothUi.CreateText("Hint", bar, 22,
-                new Color(1f, 1f, 1f, 0.75f), VNLocale.T("photo.hint"));
-            VNPhotoBoothUi.Center((RectTransform)_hintText.transform,
-                new Vector2(1200f, 40f), new Vector2(0f, -56f));
         }
 
         // ==================================================================
@@ -1362,9 +1487,10 @@ namespace VNEffects
             // ---- 抓图（协程内部会把这些藏一帧，所以取景框上不会有杂物）----
             // ★ _flash 必须进这个列表：闪白要 0.45 秒才淡完，而抓图只等一帧，
             //   不藏它拍下来的就是一张白纱。闪光是"拍照瞬间"的表现，不该进照片。
+            //   _helpRoot 同理：说明卡片是往左下展开的，会压住取景框右上角。
             var hide = new List<GameObject>
             {
-                _leftPanel, _rightPanel, _bottomBar, _flash.gameObject,
+                _leftPanel, _rightPanel, _bottomBar, _flash.gameObject, _helpRoot,
             };
             Texture2D shot = null;
             yield return VNPhotoCapture.Capture(_viewFinder, _canvas, hide, tex => shot = tex);
@@ -1404,14 +1530,18 @@ namespace VNEffects
 
         IEnumerator ShowResult()
         {
-            // 快门按钮会从半透明结算层后面透出来，正好卡在两个按钮中间——藏掉
+            // 快门按钮会从半透明结算层后面透出来，正好卡在两个按钮中间——藏掉。
+            // 左右两栏同理：分数栏与右栏的表情格横向重叠，加分项飘在头像上根本读不清。
+            // 机身与取景框留着，相纸才有"从这儿飞出来"的连续感。
             if (_bottomBar != null) _bottomBar.SetActive(false);
+            if (_leftPanel != null) _leftPanel.SetActive(false);
+            if (_rightPanel != null) _rightPanel.SetActive(false);
 
             BuildResultLayer(out var paper, out var scoreText, out var barFill,
                 out var hitList, out var gradeText, out var commentText);
 
             // ---- 相纸从取景框位置飞出来 ----
-            paper.anchoredPosition = new Vector2(0f, -20f);
+            paper.anchoredPosition = new Vector2(0f, ViewY);
             paper.localScale = Vector3.one * 0.42f;
             paper.localRotation = Quaternion.Euler(0f, 0f, -14f);
             paper.DOAnchorPos(new Vector2(_freeMode ? 0f : -430f, 20f), 0.55f)
@@ -1423,6 +1553,10 @@ namespace VNEffects
             _sfx.Play(VNPhotoSfx.Kind.Place);
 
             yield return WaitUnscaled(0.65f);
+
+            // 相纸落定后取景框就没用了：留着的话它那张亮底会从背板后面顶出来，
+            // 跟分数、评语叠在一起。飞入过程要留着，所以只能等动画完再藏
+            if (_viewFinder != null) _viewFinder.gameObject.SetActive(false);
 
             // 自由拍照：不评分，看一眼就完事
             if (_freeMode) yield break;
@@ -1488,6 +1622,9 @@ namespace VNEffects
         }
 
         const float BarWidth = 520f;
+        /// <summary>结算相纸（照片 780×585 + 上下白边 + 主题标题）</summary>
+        const float PaperW = 860f;
+        const float PaperH = 770f;
 
         string GradeLabel(int grade) => VNLocale.T(
             grade >= 2 ? "photo.grade.perfect"
@@ -1541,8 +1678,10 @@ namespace VNEffects
             out TextMeshProUGUI gradeText, out TextMeshProUGUI commentText)
         {
             var root = (RectTransform)transform;
+            // 背板要压得够黑：相纸放大后与分数栏几乎铺满整屏，底下的机身、
+            // 右栏表情格再透出来就会跟分数、评语搅在一起看不清
             var layer = VNPhotoBoothUi.CreateImage("ResultLayer", root, null,
-                new Color(0.03f, 0.03f, 0.06f, 0.72f), true);
+                new Color(0.03f, 0.03f, 0.06f, 0.9f), true);
             VNPhotoBoothUi.Stretch((RectTransform)layer.transform);
             _resultLayer = layer.gameObject;
             var layerRect = (RectTransform)layer.transform;
@@ -1550,22 +1689,23 @@ namespace VNEffects
             // ---- 相纸 ----
             var paperImage = VNPhotoBoothUi.CreateImage("Paper", layerRect,
                 VNPhotoTextures.PaperSprite(), Color.white);
+            // 相纸左移到与分数栏对半分屏；自由拍照没有分数栏，居中放
             paper = VNPhotoBoothUi.Center((RectTransform)paperImage.transform,
-                new Vector2(560f, 500f), new Vector2(-430f, 20f));
+                new Vector2(PaperW, PaperH), new Vector2(-430f, 20f));
 
             var photo = VNPhotoBoothUi.CreateImage("Photo", paper, _shotSprite, Color.white);
             photo.preserveAspect = true;
             VNPhotoBoothUi.Center((RectTransform)photo.transform,
-                new Vector2(500f, 375f), new Vector2(0f, 42f));
+                new Vector2(780f, 585f), new Vector2(0f, 65f));
             if (_shotSprite == null) photo.color = new Color(0.85f, 0.85f, 0.88f, 1f);
 
             string caption = _freeMode
                 ? VNLocale.T("photo.free")
                 : VNLocale.T("photo.theme", _theme.DisplayName);
-            var captionText = VNPhotoBoothUi.CreateText("Caption", paper, 26,
+            var captionText = VNPhotoBoothUi.CreateText("Caption", paper, 30,
                 new Color(0.35f, 0.3f, 0.35f), caption);
             VNPhotoBoothUi.Center((RectTransform)captionText.transform,
-                new Vector2(500f, 50f), new Vector2(0f, -196f));
+                new Vector2(780f, 56f), new Vector2(0f, -302f));
 
             // ---- 分数区（自由拍照没有）----
             scoreText = null; barFill = null; hitList = null;
@@ -1611,14 +1751,14 @@ namespace VNEffects
                     new Vector2(620f, 90f), new Vector2(0f, -272f));
             }
 
-            // ---- 重拍 / 完成 ----
+            // ---- 重拍 / 完成（相纸变高了，按钮跟着往下让）----
             VNPhotoBoothUi.CreateButton("Retake", layerRect, new Vector2(240f, 72f),
-                new Vector2(-160f, -400f), VNLocale.T("photo.retake"),
+                new Vector2(-160f, -450f), VNLocale.T("photo.retake"),
                 new Color(0.28f, 0.3f, 0.4f, 1f), Color.white, 30, out _)
                 .onClick.AddListener(Retake);
 
             VNPhotoBoothUi.CreateButton("Finish", layerRect, new Vector2(240f, 72f),
-                new Vector2(160f, -400f), VNLocale.T("photo.finish"),
+                new Vector2(160f, -450f), VNLocale.T("photo.finish"),
                 VNPhotoBoothUi.Accent, Color.white, 30, out _)
                 .onClick.AddListener(Finish);
         }
@@ -1634,6 +1774,9 @@ namespace VNEffects
 
             if (_resultLayer != null) { Destroy(_resultLayer); _resultLayer = null; }
             if (_bottomBar != null) _bottomBar.SetActive(true);
+            if (_leftPanel != null) _leftPanel.SetActive(true);
+            if (_rightPanel != null) _rightPanel.SetActive(true);
+            if (_viewFinder != null) _viewFinder.gameObject.SetActive(true);
 
             _timeLeft = _timeLimit;
             UpdateTimerUi();

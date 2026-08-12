@@ -61,15 +61,16 @@ namespace VNEffects
     /// 所以普通笔与荧光笔各占一张，叠着显示。一笔只会落在其中一张上，
     /// 撤销快照因此也只需要存被改动的那一张（橡皮除外，它两张一起擦）。
     ///
-    /// 画布分辨率 640×480，显示时拉伸到取景框（880×660）。笔刷本身带柔边，
-    /// 放大后看不出马赛克；换来的是每帧 Apply 只要半毫秒、撤销快照只要 1.2MB。
+    /// 画布分辨率 768×576，显示时拉伸到取景框（1040×780）——放大倍率控制在 1.35x
+    /// 以内，笔刷自带柔边就看不出马赛克；换来的是每帧 Apply 只要半毫秒、
+    /// 撤销快照只要 1.7MB。取景框再放大的话这两个数要一起调。
     /// </summary>
     public class VNPhotoDoodle
     {
-        public const int Width = 640;
-        public const int Height = 480;
+        public const int Width = 768;
+        public const int Height = 576;
 
-        /// <summary>撤销步数。一步最多 2.4MB（橡皮会同时动两张画布）</summary>
+        /// <summary>撤销步数。一步最多 3.4MB（橡皮会同时动两张画布）</summary>
         const int MaxUndo = 5;
 
         // ---- 画笔状态（UI 直接改这几个字段）----
