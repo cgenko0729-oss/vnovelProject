@@ -43,10 +43,42 @@ namespace VNEffects
         /// <summary>日文随包源字体（OTF）的 Resources 路径</summary>
         public const string SourceFontPathJa = "VNFonts/NotoSansJP-Regular";
 
+        // ---- 装饰字体（Display）：名牌等少量大字用的 Heavy 字重 ----
+        /// <summary>中文 / 英文装饰字体预烘焙资产路径（思源黑体 Black，暂未烘焙时自动走随包源字体）</summary>
+        public const string BakedAssetPathDisplay = "VNFonts/NotoSansSC-Black-Dynamic";
+        /// <summary>中文 / 英文装饰随包源字体（思源黑体 Black）</summary>
+        public const string SourceFontPathDisplay = "VNFonts/NotoSansSC-Black";
+        /// <summary>日文装饰字体预烘焙资产路径</summary>
+        public const string BakedAssetPathDisplayJa = "VNFonts/NotoSansJP-Black-Dynamic";
+        /// <summary>日文装饰随包源字体（思源黑体 JP Black）。
+        /// 不能拿 SC Black 顶：SC 的假名字形不合日文排印规范（与正文字体同一条原则）。</summary>
+        public const string SourceFontPathDisplayJa = "VNFonts/NotoSansJP-Black";
+
         /// <summary>动态创建字体资产时的采样点大小 / 图集内边距 / 图集尺寸</summary>
         const int SamplePointSize = 64;
         const int AtlasPadding = 6;
         const int AtlasSize = 1024;
+
+        /// <summary>
+        /// 装饰字体的采样点大小。比正文的 64 大得多，是因为 padding 必须跟着
+        /// 采样点等比例放大——**padding 相对采样点过大反而会毁掉描边**：
+        /// 实测 64pt 采样配 padding 24（37%）时，字形在图集里的有效分辨率被挤掉，
+        /// SDF 梯度变缓，描边和投影一起糊成一层淡影，比 padding 14 还差。
+        /// 120pt 采样配 padding 22 保持在 ~18%，既能撑住厚描边又不糊。
+        /// </summary>
+        const int DisplaySamplePointSize = 120;
+
+        /// <summary>
+        /// 装饰字体的图集内边距。SDF 的描边 / 外发光只能长在 padding 里：
+        /// 描边实际像素厚度 ≈ outlineWidth ×(padding+1)×(显示字号/采样点)，
+        /// 所以 padding 是描边粗细的天花板——padding 14 时描边推到 0.2 就饱和，
+        /// 再调大数值没有任何视觉变化（不是被切角，是直接被钳住）。
+        /// 正文那几千个汉字用不起这么大的采样点和 padding（图集会爆），
+        /// 所以装饰字体单开一套资产：反正只有角色名那十几个字。
+        /// </summary>
+        const int DisplayAtlasPadding = 22;
+        /// <summary>装饰字体图集尺寸（字少但每个字占地大，1024 起步，不够时自动多图集扩展）</summary>
+        const int DisplayAtlasSize = 1024;
 
         /// <summary>UI 常用符号预热集（界面按键提示、箭头、省略号等，启动即备好）</summary>
         const string CommonUiChars =
@@ -62,6 +94,14 @@ namespace VNEffects
             public string[] osCandidates;
             /// <summary>解析失败时兜底改用的档案；解析成功时也会把它挂进 TMP fallback 表补缺字</summary>
             public Profile fallback;
+            /// <summary>动态创建时的图集内边距（装饰字体要留出粗描边的空间）</summary>
+            public int padding = AtlasPadding;
+            /// <summary>动态创建时的采样点大小（必须与 padding 等比例，见 DisplaySamplePointSize）</summary>
+            public int samplePointSize = SamplePointSize;
+            /// <summary>动态创建时的图集边长</summary>
+            public int atlasSize = AtlasSize;
+            /// <summary>是否为装饰字体档案（语言切换时与正文字体分开替换）</summary>
+            public bool isDisplay;
         }
 
         static readonly string[] ScOsCandidates =
@@ -98,6 +138,41 @@ namespace VNEffects
             fallback = GeneralCjkProfile,
         };
 
+        // ------------------------------------------------------------------
+        // 装饰字体档案（Heavy 字重，只给名牌这类少量大字用）
+        // ------------------------------------------------------------------
+
+        /// <summary>中文 / 英文装饰字体（思源黑体 Black）。缺字兜底回正文 Noto Regular。</summary>
+        static readonly Profile DisplayZhProfile = new Profile
+        {
+            bakedPath = BakedAssetPathDisplay,
+            sourcePath = SourceFontPathDisplay,
+            osCandidates = ScOsCandidates,
+            fallback = GeneralCjkProfile,
+            padding = DisplayAtlasPadding,
+            samplePointSize = DisplaySamplePointSize,
+            atlasSize = DisplayAtlasSize,
+            isDisplay = true,
+        };
+
+        /// <summary>日文装饰字体（思源黑体 JP Black）。
+        /// 缺字先回中文 Black 保住粗字重，再由它接力兜到 Regular。</summary>
+        static readonly Profile DisplayJaProfile = new Profile
+        {
+            bakedPath = BakedAssetPathDisplayJa,
+            sourcePath = SourceFontPathDisplayJa,
+            osCandidates = new[]
+            {
+                "Yu Gothic UI", "Yu Gothic", "Meiryo", "MS Gothic",
+                "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", "Source Han Sans",
+            },
+            fallback = DisplayZhProfile,
+            padding = DisplayAtlasPadding,
+            samplePointSize = DisplaySamplePointSize,
+            atlasSize = DisplayAtlasSize,
+            isDisplay = true,
+        };
+
         /// <summary>档案 → 已解析字体</summary>
         static readonly Dictionary<Profile, TMP_FontAsset> _cache =
             new Dictionary<Profile, TMP_FontAsset>();
@@ -130,6 +205,19 @@ namespace VNEffects
                 case VNLanguage.Japanese: profile = JaProfile; break;
                 default: profile = GeneralCjkProfile; break;
             }
+            return Resolve(profile);
+        }
+
+        /// <summary>
+        /// 装饰字体（Heavy 字重，当前语言）：名牌等少量大字专用，图集 padding 大，
+        /// 撑得住粗描边 / 外发光。正文一律别用它——图集成本和字形气质都不对。
+        /// </summary>
+        public static TMP_FontAsset DisplayAsset => DisplayAssetFor(VNLocale.Language);
+
+        /// <summary>指定语言的装饰字体资产</summary>
+        public static TMP_FontAsset DisplayAssetFor(VNLanguage language)
+        {
+            var profile = language == VNLanguage.Japanese ? DisplayJaProfile : DisplayZhProfile;
             return Resolve(profile);
         }
 
@@ -188,22 +276,49 @@ namespace VNEffects
         /// </summary>
         public static void HandleLanguageChanged()
         {
-            var managed = new HashSet<TMP_FontAsset>();
+            // 正文字体与装饰字体必须分开替换：把名牌的 Heavy 字体也换成正文字体，
+            // 粗描边样式会当场垮掉（这正是加装饰字体后最容易踩的坑）。
+            var managedBody = new HashSet<TMP_FontAsset>();
+            var managedDisplay = new HashSet<TMP_FontAsset>();
             foreach (var kv in _cache)
-                if (kv.Value != null) managed.Add(kv.Value);
-            if (managed.Count == 0) return; // 还没有任何文本用过 VNFont
+            {
+                if (kv.Value == null) continue;
+                if (kv.Key.isDisplay) managedDisplay.Add(kv.Value);
+                else managedBody.Add(kv.Value);
+            }
+            if (managedBody.Count == 0 && managedDisplay.Count == 0)
+                return; // 还没有任何文本用过 VNFont
 
-            var target = Asset;
-            if (target == null) return;
+            var bodyTarget = Asset;
+            var displayTarget = managedDisplay.Count > 0 ? DisplayAsset : null;
+            if (bodyTarget == null && displayTarget == null) return;
 
             var texts = Object.FindObjectsByType<TMP_Text>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var text in texts)
             {
-                if (text.font == target || !managed.Contains(text.font)) continue;
-                text.font = target;
+                var font = text.font;
+                if (font == null) continue;
+                // 先判正文：装饰字体解析失败降级成正文字体时两个集合会重合，
+                // 这种情况下它本来就已经退化成正文字体了，按正文处理即可。
+                if (managedBody.Contains(font))
+                {
+                    if (bodyTarget != null && font != bodyTarget) text.font = bodyTarget;
+                }
+                else if (managedDisplay.Contains(font))
+                {
+                    if (displayTarget != null && font != displayTarget) text.font = displayTarget;
+                }
             }
+
+            DisplayFontChanged?.Invoke();
         }
+
+        /// <summary>
+        /// 装饰字体因语言切换而更换后触发。换 font 会让 TMP 丢掉之前的材质实例，
+        /// 名牌这类自定义了描边 / 渐变的文本必须收到通知后重新应用样式。
+        /// </summary>
+        public static event System.Action DisplayFontChanged;
 
         // ------------------------------------------------------------------
         // 三级来源
@@ -220,7 +335,7 @@ namespace VNEffects
         {
             var font = Resources.Load<Font>(profile.sourcePath);
             if (font == null) return null;
-            var asset = CreateDynamic(font);
+            var asset = CreateDynamic(font, profile);
             if (asset != null)
                 Debug.Log("[VNFont] 由随包字体运行时创建动态字体资产 " + profile.sourcePath);
             return asset;
@@ -230,9 +345,9 @@ namespace VNEffects
         {
             foreach (var name in profile.osCandidates)
             {
-                var font = Font.CreateDynamicFontFromOSFont(name, SamplePointSize);
+                var font = Font.CreateDynamicFontFromOSFont(name, profile.samplePointSize);
                 if (font == null) continue;
-                var asset = CreateDynamic(font);
+                var asset = CreateDynamic(font, profile);
                 if (asset != null)
                 {
                     Debug.LogWarning("[VNFont] 随包字体缺失，回退操作系统字体：" + name);
@@ -242,12 +357,13 @@ namespace VNEffects
             return null;
         }
 
-        static TMP_FontAsset CreateDynamic(Font source)
+        static TMP_FontAsset CreateDynamic(Font source, Profile profile)
         {
             var asset = TMP_FontAsset.CreateFontAsset(
-                source, SamplePointSize, AtlasPadding, GlyphRenderMode.SDFAA,
-                AtlasSize, AtlasSize, AtlasPopulationMode.Dynamic, true);
-            if (asset != null) asset.name = source.name + " (VNFont Dynamic)";
+                source, profile.samplePointSize, profile.padding, GlyphRenderMode.SDFAA,
+                profile.atlasSize, profile.atlasSize, AtlasPopulationMode.Dynamic, true);
+            if (asset != null)
+                asset.name = source.name + (profile.isDisplay ? " (VNFont Display)" : " (VNFont Dynamic)");
             return asset;
         }
     }

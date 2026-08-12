@@ -927,6 +927,7 @@ namespace VNEffects
                 dialogue.SetPortrait(
                     c.def.GetPortrait(string.IsNullOrEmpty(expr) ? c.expression : expr),
                     c.def.portraitScale, c.def.portraitOffset);
+                dialogue.SetSpeakerStyle(c.def); // 名牌配色跟着说话者走
                 dialogue.Say(c.def.LocalizedDisplayName, text);
                 c.mouth?.BeginSpeaking(followVoice, dialogue, vnAudio);
             }
@@ -935,6 +936,7 @@ namespace VNEffects
                 if (speakerHighlight != null && string.IsNullOrEmpty(speaker) == false)
                     speakerHighlight.ClearSpeaker();
                 dialogue.SetPortrait(null); // 旁白/未注册角色不显示头像
+                dialogue.SetSpeakerStyle(null); // 名牌配色回默认底色推算
                 dialogue.Say(speaker, text); // speaker 为空 = 无名牌旁白
             }
         }

@@ -34,6 +34,11 @@ namespace VNEffects
         [Header("名牌默认底色（角色定义里的 nameColor 优先）")]
         public Color nameTagColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
 
+        [Header("名牌装饰样式（粗黑体+描边+渐变，Plain = 老外观）")]
+        public VNNameplateStyleId nameplateStyle = VNNameplateStyleId.Bold;
+        [Header("名牌宽度随名字长度自适应（仅程序化默认皮肤）")]
+        public bool autoResizeNameTag = true;
+
         [Header("头像")]
         [Header("头像窗口尺寸（像素）：窗口外的部分被裁掉，窗口可高出面板顶边（半身像效果）")]
         public Vector2 portraitWindowSize = new Vector2(230f, 300f);
@@ -69,6 +74,15 @@ namespace VNEffects
         Sprite _portraitSprite;
         float _portraitScale = 1f;
         Vector2 _portraitOffset;
+
+        // ---- 名牌装饰样式 ----
+        VNNameplateStyle _style;             // 当前生效的样式参数
+        VNNameplateStyleId _styleId;         // 用于判断 Inspector 里改了预设
+        Image _nameTagPlate;                 // 名牌底板（绑定时从槽位里找）
+        Image _nameTagUnderline;             // 底部横线装饰（按需动态补）
+        Vector2 _nameTagBaseSize;            // 名牌原始尺寸（自适应宽度的下限）
+        VNCharacterDef _speakerDef;          // 当前说话者定义（取配色用）
+        bool _localeHooked;
 
         float _arrowBaseY;
         bool _shown;
@@ -261,6 +275,11 @@ namespace VNEffects
             _bodyBaseOffsetMin = _bodyRect != null ? _bodyRect.offsetMin : Vector2.zero;
             _tagBasePos = _tagRect != null ? _tagRect.anchoredPosition : Vector2.zero;
 
+            // 名牌装饰槽位：底板从皮肤里认（自定义皮肤也能用），横线按需现补
+            _nameTagPlate = _nameTag != null ? FindPlateImage(_nameTag) : null;
+            _nameTagUnderline = null;
+            _nameTagBaseSize = _tagRect != null ? _tagRect.sizeDelta : Vector2.zero;
+
             // 打字机：挂到皮肤的正文上，速度沿用之前的设置
             _typer = null;
             if (skin.bodyText != null)
@@ -289,6 +308,162 @@ namespace VNEffects
 
             if (_arrow != null) SetArrowAlpha(0f);
             ApplyPortrait();
+            ApplyNameplateStyle();
+        }
+
+        // ------------------------------------------------------------------
+        // 名牌装饰样式
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 切换名牌样式预设（Plain = 老外观）。立即作用于当前显示的名牌。
+        /// </summary>
+        public void SetNameplateStyle(VNNameplateStyleId id)
+        {
+            Build();
+            nameplateStyle = id;
+            _style = null; // 丢掉旧参数，下次应用时按新预设重建
+            ApplyNameplateStyle();
+        }
+
+        /// <summary>
+        /// 告诉对话框当前说话者是谁，名牌配色取自它（null = 旁白/未注册角色，用默认底色推算）。
+        /// VNStage 在每次 Say 前调用。
+        /// </summary>
+        public void SetSpeakerStyle(VNCharacterDef def)
+        {
+            Build();
+            if (_speakerDef == def) return;
+            _speakerDef = def;
+            ApplyNameplateStyle();
+        }
+
+        /// <summary>按当前预设 + 当前说话者配色刷新名牌外观</summary>
+        void ApplyNameplateStyle()
+        {
+            if (_nameText == null) return;
+
+            if (_style == null || _styleId != nameplateStyle)
+            {
+                _styleId = nameplateStyle;
+                _style = VNNameplateStyle.Preset(nameplateStyle);
+            }
+
+            Color top, bottom, outline;
+            if (_speakerDef != null)
+            {
+                _speakerDef.GetNameplateColors(out top, out bottom, out outline);
+            }
+            else
+            {
+                // 旁白 / 未注册角色：用对话框自己的默认底色推算，保持同一套观感
+                Color.RGBToHSV(nameTagColor, out float h, out float s, out float v);
+                top = Color.HSVToRGB(h, Mathf.Clamp01(s * 0.82f), Mathf.Clamp01(v * 1.25f + 0.32f));
+                bottom = Color.HSVToRGB(h, Mathf.Clamp01(s * 1.1f + 0.05f), Mathf.Clamp01(v * 0.9f + 0.05f));
+                top.a = 1f;
+                bottom.a = 1f;
+                outline = Color.white;
+            }
+
+            _style.ApplyTo(_nameText, top, bottom, outline);
+
+            // ---- 底板 ----
+            if (_nameTagPlate != null)
+            {
+                _nameTagPlate.enabled = _style.showPlate;
+                if (_style.showPlate)
+                {
+                    Color plate = _speakerDef != null ? _speakerDef.nameColor : nameTagColor;
+                    plate.a *= Mathf.Clamp01(_style.plateAlpha);
+                    _nameTagPlate.color = plate;
+                }
+            }
+
+            // ---- 底部横线 ----
+            if (_style.showUnderline)
+            {
+                EnsureUnderline();
+                if (_nameTagUnderline != null)
+                {
+                    _nameTagUnderline.enabled = true;
+                    Color line = _style.underlineUsesCharacterColor ? bottom : outline;
+                    line.a = 1f;
+                    _nameTagUnderline.color = line;
+                    var lineRect = _nameTagUnderline.rectTransform;
+                    lineRect.offsetMin = new Vector2(_style.underlineInset, 0f);
+                    lineRect.offsetMax = new Vector2(-_style.underlineInset, _style.underlineHeight);
+                }
+            }
+            else if (_nameTagUnderline != null)
+            {
+                _nameTagUnderline.enabled = false;
+            }
+
+            ResizeNameTag();
+            HookLocaleEvents();
+        }
+
+        /// <summary>
+        /// 名牌宽度跟着名字长度走。只动程序化默认皮肤——美术 prefab 的名牌尺寸
+        /// 是照着背景图排的，擅自改会破相。
+        /// </summary>
+        void ResizeNameTag()
+        {
+            if (!autoResizeNameTag || HasCustomSkin) return;
+            if (_tagRect == null || _nameText == null) return;
+            if (string.IsNullOrEmpty(_nameText.text)) return;
+
+            float preferred = _nameText.GetPreferredValues(_nameText.text).x;
+            // 描边和字距会往外溢一圈，留够余量再取原始宽度当下限
+            float width = Mathf.Max(_nameTagBaseSize.x, preferred + 44f);
+            _tagRect.sizeDelta = new Vector2(width, _nameTagBaseSize.y);
+        }
+
+        /// <summary>名牌下的横线装饰按需补建（皮肤 prefab 里没有也能用）</summary>
+        void EnsureUnderline()
+        {
+            if (_nameTagUnderline != null || _nameTag == null) return;
+            var go = new GameObject("StyleUnderline",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(_nameTag.transform, false);
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            var img = go.GetComponent<Image>();
+            img.raycastTarget = false;
+            _nameTagUnderline = img;
+        }
+
+        Image FindPlateImage(GameObject nameTag)
+        {
+            var own = nameTag.GetComponent<Image>();
+            if (own != null) return own;
+            foreach (var img in nameTag.GetComponentsInChildren<Image>(true))
+            {
+                if (img.gameObject.name == "StyleUnderline") continue;
+                return img;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 语言切换会换掉装饰字体，而换 font 会让 TMP 丢掉材质实例——
+        /// 描边/渐变必须在那之后重新应用一次，否则名牌会变回光板白字。
+        /// </summary>
+        void HookLocaleEvents()
+        {
+            if (_localeHooked) return;
+            _localeHooked = true;
+            VNFont.DisplayFontChanged += OnDisplayFontChanged;
+        }
+
+        void OnDisplayFontChanged()
+        {
+            if (this == null || _nameText == null) return;
+            ApplyNameplateStyle();
         }
 
         /// <summary>皮肤切换后恢复可视状态：正在显示的台词满字重现</summary>
@@ -301,7 +476,11 @@ namespace VNEffects
             {
                 bool hasName = !string.IsNullOrEmpty(_lastSpeaker);
                 if (_nameTag != null) _nameTag.SetActive(hasName);
-                if (hasName && _nameText != null) _nameText.text = _lastSpeaker;
+                if (hasName && _nameText != null)
+                {
+                    _nameText.text = _lastSpeaker;
+                    ResizeNameTag();
+                }
                 _typer.onComplete = ShowArrow;
                 _typer.Play(_lastContent);
                 _typer.Complete(); // 满字直出，不重播打字
@@ -442,7 +621,11 @@ namespace VNEffects
 
             bool hasName = !string.IsNullOrEmpty(speakerName);
             if (_nameTag != null) _nameTag.SetActive(hasName);
-            if (hasName && _nameText != null) _nameText.text = speakerName;
+            if (hasName && _nameText != null)
+            {
+                _nameText.text = speakerName;
+                ResizeNameTag(); // 名字长度变了，名牌宽度跟上
+            }
 
             HideArrow();
             if (_typer == null) return; // 皮肤没给正文槽：静默容错（Lint/日志层面提示）
@@ -551,6 +734,7 @@ namespace VNEffects
         {
             _arrowBob?.Kill();
             DOTween.Kill(this);
+            if (_localeHooked) VNFont.DisplayFontChanged -= OnDisplayFontChanged;
         }
     }
 }

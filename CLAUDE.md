@@ -114,9 +114,10 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNParallax / VNMouseStardust / VNClickRipple | 鼠标视差 / 星尘拖尾 / 点击涟漪 |
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮（TMP textInfo 顶点动画）；支持皮肤 prefab（VNDialogueSkin 槽位绑定，程序化默认兜底） |
+| VNNameplateStyle | 名牌装饰样式（粗黑体+描边+渐变+投影）：四套内置预设 Plain(老外观)/Bold(渐变+白描边+下划线,无底板)/Plate(底板+白内描边+深外描边)/Outline(白字+角色色粗描边)，`VNDialogueBox.nameplateStyle` 或 `SetNameplateStyle()` 切换；配色每角色一套（VNCharacterDef 没勾自定义就由 nameColor 自动推算渐变，存量资产零改动）。**三条硬约定**：材质必须走 `text.fontMaterial` 实例（改 sharedMaterial 会污染所有同字体文字）／underlay 通道只有一条所以「第二层外描边」与「投影」二选一／改 underlay 前必须 `EnableKeyword("UNDERLAY_ON")`。名牌宽度自适应只动程序化默认皮肤 |
 | VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI Skins → Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；皮肤状态进存档 |
 | VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页/背包/排程面板/结算弹窗分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章）；只重导排程/结算两项用 Export Event Panel Prefabs（详见八十六章） |
-| VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器 |
+| VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器；另有**装饰字体**入口 `DisplayAsset`（思源黑体 Black，名牌等少量大字专用，正文别用）——单开一套资产是因为 **padding 必须与采样点等比例**：描边厚度 ≈ outlineWidth×(padding+1)×(字号/采样点)，padding 是描边粗细天花板，但 padding 占采样点过大（如 64pt 配 24）反而挤掉字形分辨率、把描边糊成淡影，故装饰字体用 120pt/padding 22（~18%）。语言切换时正文与装饰字体**分开替换**，换 font 会丢材质实例故有 `DisplayFontChanged` 事件通知重新上样式 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技（走 VNFoliageSystem：起手阵风冲击+Burst、中途补风、尾声风力衰减、近景大瓣横掠） |
 | VNCharacterBlink / VNCharacterBlinkOverlay / VNCharacterMouth | 默认表情自动眨眼两选一：整张闭眼立绘替换 / 只在眼部叠一张透明闭眼图（角色资产 `blinkMode` 切换，间隔与闭眼时长共用）；说话口型（透明画布叠加层） |

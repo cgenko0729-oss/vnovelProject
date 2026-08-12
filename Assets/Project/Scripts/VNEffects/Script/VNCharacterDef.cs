@@ -36,6 +36,39 @@ namespace VNEffects
         [Header("名牌底色")]
         public Color nameColor = new Color(0.45f, 0.3f, 0.75f, 0.9f);
 
+        [Header("名牌字色自定义（关 = 由上面的 nameColor 自动推算渐变）")]
+        public bool overrideNameplateColors;
+        [Header("名牌字面 · 渐变上色")]
+        public Color nameplateTopColor = new Color(1f, 0.45f, 0.42f, 1f);
+        [Header("名牌字面 · 渐变下色")]
+        public Color nameplateBottomColor = new Color(0.78f, 0.1f, 0.16f, 1f);
+        [Header("名牌描边色")]
+        public Color nameplateOutlineColor = Color.white;
+
+        /// <summary>
+        /// 取本角色的名牌配色。没勾 overrideNameplateColors 时由 nameColor 自动推算
+        /// （提亮当上色、压暗当下色、描边给白）——这样存量角色资产一个字都不用改，
+        /// 就能各自拿到一套和自己底色同源的名牌配色。
+        /// </summary>
+        public void GetNameplateColors(out Color top, out Color bottom, out Color outline)
+        {
+            if (overrideNameplateColors)
+            {
+                top = nameplateTopColor;
+                bottom = nameplateBottomColor;
+                outline = nameplateOutlineColor;
+                return;
+            }
+
+            Color.RGBToHSV(nameColor, out float h, out float s, out float v);
+            // 字面要压得住背景，所以整体往亮里推；上下拉开明度差做出渐变
+            top = Color.HSVToRGB(h, Mathf.Clamp01(s * 0.82f), Mathf.Clamp01(v * 1.25f + 0.32f));
+            bottom = Color.HSVToRGB(h, Mathf.Clamp01(s * 1.1f + 0.05f), Mathf.Clamp01(v * 0.9f + 0.05f));
+            top.a = 1f;
+            bottom.a = 1f;
+            outline = Color.white;
+        }
+
         /// <summary>当前语言的名牌显示名（译名留空回退中文 displayName）。
         /// 注意剧本引用的角色 id 永远不翻译。</summary>
         public string LocalizedDisplayName

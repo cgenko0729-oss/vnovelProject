@@ -5993,3 +5993,110 @@ Play Mode 实跑 `PhotoDemo.vn.txt`：第 19 行（自由拍照）与第 31 行�
 已知无关现象：编辑器 Game View 未聚焦时 Canvas 不重建，截图偶尔会拍到「立绘对象
 状态全对但没画出来」的一帧（`enabled=True`、`sprite` 有、尺寸位置都对），
 聚焦跑就正常，与本次改动无关。
+
+---
+
+## 一〇五、角色名牌装饰字体样式（2026-08-12，分支 `agent/nameplate-style`）
+
+### 需求 / 背景
+
+用户给了三张日式 galgame 名字栏截图（粗黑体 + 粗描边 + 面色渐变 + 投影 + 拉开的字距），
+希望角色名牌做成同样的风格。原名牌是**霞鹜文楷 Regular + TMP 伪粗 + 紫色圆角底板**，
+气质与参考图正好相反——参考图全是黑体系 Heavy 字重，靠字重本身撑起分量。
+
+顺带发现一个历史遗留：`VNDialogueBox.nameTagColor` 的注释写着「角色定义里的 nameColor 优先」，
+但 `VNStage.Say()` 只传了名字和文本，**从来没有把 `VNCharacterDef.nameColor` 传给名牌**——
+这次一并兑现。
+
+### 文件改动清单
+
+**新增**
+
+- `Assets/Resources/VNFonts/NotoSansSC-Black.otf`——中文 / 英文装饰字体（思源黑体 Black，
+  取自 noto-cjk 的 `Sans/SubsetOTF/SC`，与既有 Regular 同一版本，OFL 可商用，8.4MB）
+- `Assets/Resources/VNFonts/NotoSansJP-Black.otf`——日文装饰字体（4.6MB）。
+  **不能拿 SC Black 顶**：SC 的假名字形不合日文排印规范，这与正文字体是同一条既有原则
+- `Script/VNNameplateStyle.cs`——名牌装饰样式：纯数据 + 静态 `ApplyTo()`，
+  内置四套预设（Plain 老外观 / Bold / Plate / Outline）
+
+**修改**
+
+- `Script/VNFont.cs`——新增装饰字体入口 `DisplayAsset` / `DisplayAssetFor(lang)`；
+  `Profile` 加 `padding` / `samplePointSize` / `atlasSize` / `isDisplay` 四个字段；
+  `HandleLanguageChanged` 改成正文与装饰**分开替换**；新增 `DisplayFontChanged` 事件
+- `Script/VNCharacterDef.cs`——加 `overrideNameplateColors` + 渐变上色 / 下色 / 描边色三字段，
+  以及 `GetNameplateColors()`（没勾自定义时由 `nameColor` 自动推算）
+- `VNDialogueBox.cs`——加 `nameplateStyle` / `autoResizeNameTag` 字段与
+  `SetNameplateStyle()` / `SetSpeakerStyle()` API；内部 `ApplyNameplateStyle()` /
+  `ResizeNameTag()` / `EnsureUnderline()` / `FindPlateImage()`；订阅 `DisplayFontChanged`
+- `Script/VNStage.cs`——`Say()` 里在两条分支上分别 `SetSpeakerStyle(c.def)` / `SetSpeakerStyle(null)`
+
+### 技术决策与取舍
+
+**1. 三个硬约束（写在 VNNameplateStyle 头注释里）**
+
+- **材质必须走实例**。TMP 组件默认用 `fontSharedMaterial`，即字体资产自带的那一份——
+  直接改它会把正文、按钮、Backlog 里所有用同一字体的文字一起改掉。
+  一律通过 `text.fontMaterial` 取（TMP 首次访问时自动 new 一份实例）。
+  实机验证材质名确实是 `Noto Sans SC - Black Material (Instance)`。
+- **underlay 通道只有一条**，所以「第二层外描边」和「投影」二选一（`UnderlayUse` 枚举）。
+  Bold / Outline 用它做投影，Plate 用它做深色外描边（offset 归零 + 大 dilate）。
+  要两者兼得只能叠第二个 TMP 组件，不值得。
+- **改 underlay 参数前必须 `EnableKeyword("UNDERLAY_ON")`**，否则参数完全没反应。
+
+**2. padding 与 samplePointSize 必须等比例（本次最大的坑）**
+
+描边实际像素厚度 ≈ `outlineWidth ×(padding+1)×(显示字号 / 采样点)`，padding 是描边粗细的天花板。
+调参过程实测：
+
+| 采样点 | padding | 结果 |
+|---|---|---|
+| 64 | 14 | 描边推到 0.2 就饱和，再调大数值毫无视觉变化（不是切角，是直接被钳住） |
+| 64 | 24 | **反而更糟**——padding 占采样点 37%，字形在图集里的有效分辨率被挤掉，SDF 梯度变缓，描边和投影一起糊成一层淡影 |
+| 120 | 22 | 正解。比例 ~18%，描边厚实且字形锐利 |
+
+所以装饰字体单开一套资产（`DisplaySamplePointSize = 120` / `DisplayAtlasPadding = 22` /
+图集 1024）：正文那几千个汉字用不起这么大的采样点和 padding，而角色名只有十几个字，
+图集成本几乎为零。
+
+**3. 每角色配色自动推算，零改动向后兼容**
+
+没勾 `overrideNameplateColors` 时，由既有的 `nameColor` 走 HSV 推算：
+提亮当渐变上色、压暗当下色、描边给白。存量角色资产一个字都不用改，
+就能各自拿到一套与自己底色同源的名牌配色。
+
+**4. 语言切换必须把正文字体与装饰字体分开替换**
+
+原 `HandleLanguageChanged` 把所有 VNFont 管理的字体统一换成正文字体。
+加装饰字体后若不区分，切语言会把名牌的 Heavy 字体也换成正文字体，粗描边样式当场垮掉。
+改成两个集合分别替换；两集合重合时（装饰字体解析失败降级成正文字体）按正文处理。
+另外**换 font 会让 TMP 丢掉材质实例**，所以补了 `DisplayFontChanged` 事件，
+`VNDialogueBox` 收到后重新 `ApplyNameplateStyle()`。
+
+**5. 名牌宽度自适应只动程序化默认皮肤**
+
+`ResizeNameTag()` 在 `HasCustomSkin` 时直接返回——美术 prefab 的名牌尺寸是照着背景图排的，
+擅自改会破相。
+
+### 验证方法
+
+`VNScriptDemo` 场景进 Play，用 `script-execute` 关掉标题菜单覆盖层后
+`SetSpeakerStyle(def)` + `Say()`，逐一切换三套预设截 Game View 比对：
+
+- 参数落地：`font=NotoSansSC-Black (VNFont Display)` / `sample=120` / `padding=22` /
+  `outlineW=0.3` / `mat=… (Instance)`
+- Bold：紫色渐变粗黑 + 白描边 + 底部横线，无底板
+- Plate：紫色圆角底板 + 白字 + 白内描边 + 深外描边
+- Outline：白字 + 角色色粗描边，无底板
+
+**排错提示**：Play 里对话框不显示不一定是名牌的问题——标题菜单接管时
+`_interfaceVisible` 是 false，要先 `SetInterfaceVisible(true)`。
+另外 `editor-application-set-state` 返回后 Play 模式未必已完全启动，
+立刻执行的脚本会作用在编辑模式对象上、进 Play 后被重置。
+
+### 后续可做（未做）
+
+- 剧本命令切换名牌样式（`ui nameplate <id>`）：要走 vn-new-command 全链路
+  （Parser / Runner / Schema / Lint / 存档），本次范围是「只改对话框名牌」故未做
+- 名牌入场演出（换人说话时轻微弹一下 + 描边闪光）
+- 把样式铺到 Backlog / SNS / 存档缩略图的说话者名字
