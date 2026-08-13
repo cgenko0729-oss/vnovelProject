@@ -3,7 +3,8 @@
 > 本文件是给 Claude（AI 助手）的项目说明书。所有开发过程的详细记录在 `WhatAiDo.md`；
 > 逐脚本的代码指南（职责/用法/扩展/维护）在 `ProjectCodeGuide.md`，改代码前先查它；
 > 从空场景手动搭建舞台的完整教程（含层级/排序/参数依据）在 `SetUpGuide.md`；
-> 剧本写法教程在 `HowToUse.md`。
+> 剧本写法教程在 `HowToUse.md`；
+> AI 自由聊天的原理与调参（记忆机制/提示词组装/成本/日志/Ideas）在 `AiTalkGuide.md`。
 > **可复用工作流程已做成技能**（`.claude/skills/`），做对应任务时先调用技能拿清单，见下方「技能索引」。
 
 ## 项目概况

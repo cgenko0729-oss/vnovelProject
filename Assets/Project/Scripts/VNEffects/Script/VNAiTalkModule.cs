@@ -50,6 +50,10 @@ namespace VNEffects
         [Header("选项飞入前的停顿（秒）：给眼睛一个缓冲，别紧贴着最后一个字弹出来")]
         [Range(0f, 1.5f)] public float optionDelay = 0.4f;
 
+        [Header("对话日志：聊完把全程写成 .md + .json（调人格 / 查成本用）\n" +
+                "编辑器写到 <项目根>/AiTalkLogs/，Build 写到 persistentDataPath")]
+        public VNAiLogMode logMode = VNAiLogMode.EditorOnly;
+
         static readonly Color HintColor = new Color(1f, 1f, 1f, 0.5f);
         static readonly Color PanelColor = new Color(0.08f, 0.09f, 0.14f, 0.96f);
         static readonly Color AccentColor = new Color(0.45f, 0.8f, 1f, 1f);
@@ -70,6 +74,10 @@ namespace VNEffects
         int _affectionTotal;
         string _statName, _flagPrefix;
         int _statRate = 1;
+
+        // 全程记录，FinishWith 时落盘。就地 new 而不是在 OnLaunch 里建——
+        // OnLaunch 有几条提前 return（找不到人格等），那些路径也会走到 FinishWith
+        readonly VNAiTalkLog _log = new VNAiTalkLog();
 
         // 自绘 UI（全部 raycastTarget=false）
         RectTransform _hintRoot;
@@ -180,6 +188,10 @@ namespace VNEffects
                 SetThinking(true);
 
                 var req = _convo.BuildRequest(playerSaid, BuildContext(turn));
+                // system prompt 只在首轮存进日志：后续轮次只有「剩余轮数」在变
+                if (turn == 0)
+                    _log.Begin(_persona, _ctx, req.systemInstruction, _maxTurns, logMode);
+
                 VNAiResult res = null;
                 yield return VNAiClient.Send(req, r => res = r);
                 while (res == null) yield return null;
@@ -213,6 +225,7 @@ namespace VNEffects
 
                 bool degraded = aiTurn == null;
                 if (degraded) aiTurn = _convo.BuildFallbackTurn();
+                _log.BeginTurn(turn, playerSaid, aiTurn, res, degraded);
 
                 // ③ 演出：换表情 + 打字机 + 漫符
                 yield return SpeakCo(aiTurn);
@@ -243,8 +256,10 @@ namespace VNEffects
                 while (picked < 0 && !_escConfirmed) yield return null;
                 if (_escConfirmed) { _stage?.choicePanel?.ForceClose(); break; }
 
-                var option = aiTurn.options[Mathf.Clamp(picked, 0, aiTurn.options.Count - 1)];
+                int pickedIndex = Mathf.Clamp(picked, 0, aiTurn.options.Count - 1);
+                var option = aiTurn.options[pickedIndex];
                 _convo.RecordPick(option);
+                _log.RecordPick(pickedIndex);
                 playerSaid = option.text;
             }
 
@@ -345,16 +360,31 @@ namespace VNEffects
                 VNFlags.Add(_statName, _affectionTotal * _statRate);
 
             // 成绩写 flag，供剧本 if 判断
+            var flagLines = new List<string>();
             if (!string.IsNullOrEmpty(_flagPrefix))
             {
-                VNFlags.Set(_flagPrefix + "轮数", _convo != null ? _convo.TurnCount : 0);
-                VNFlags.Set(_flagPrefix + "好感变化", _affectionTotal);
+                SetFlag(flagLines, _flagPrefix + "轮数", _convo != null ? _convo.TurnCount : 0);
+                SetFlag(flagLines, _flagPrefix + "好感变化", _affectionTotal);
                 if (_convo != null)
                     foreach (string tone in _persona.optionTones)
-                        VNFlags.Set(_flagPrefix + "倾向_" + tone, CountTone(tone));
+                        SetFlag(flagLines, _flagPrefix + "倾向_" + tone, CountTone(tone));
             }
 
+            // 日志落盘。写盘失败只告警，绝不影响玩法（Save 内部已吞异常）
+            _log.End(outcome, _affectionTotal,
+                     _convo != null ? _convo.pickedTones : null, flagLines, _escConfirmed);
+            string logPath = _log.Save();
+            if (!string.IsNullOrEmpty(logPath))
+                Debug.Log($"[VNAiTalk] 对话日志已保存：{logPath}");
+
             Done(outcome);
+        }
+
+        /// <summary>写 flag 的同时记一行给日志，省得两处各写一遍容易漏。</summary>
+        static void SetFlag(List<string> lines, string key, int value)
+        {
+            VNFlags.Set(key, value);
+            lines.Add($"{key} = {value}");
         }
 
         int CountTone(string tone)
