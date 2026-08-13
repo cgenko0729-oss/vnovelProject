@@ -49,3 +49,8 @@ crashlytics-build.properties
 # 调试截图（本地排错用，不进仓库）
 /Assets/DebugScreenShot/
 /Assets/DebugScreenShot.meta
+
+# API 密钥（绝对不进仓库！仓库是公开的）
+/GeminiAiApiKey.txt
+/*ApiKey*.txt
+/*.apikey
