@@ -320,6 +320,17 @@ outcomes（剧本 * 结果行的结果名，AcceptsOutcome() 判断）/ line`。
 2. 计时用 `unscaledTime`、Tween 加 `SetUpdate(true)`（不受快进影响）
 3. 所有 Tween `SetLink`（模块随时可能被销毁）
 
+> **铁律 1 的唯一破例：`VNAiTalkModule`（一〇六章）。** AI 控制立绘表情就是改舞台，
+> 自绘立绘要把眨眼 / 口型 / 色调匹配 / 出场动画全部重接一遍，代价远大于收益。
+> 破例的代价被这样收住：**只碰表情和对话框内容**（绝不碰位置 / 缩放 / 背景 / 特效），
+> 且进入时记下原表情，**正常结束、ESC 退出、`CancelForDebug` 三条路径都还原**。
+> 要再破例请照这个标准——先证明自绘的代价，再把影响面关进模块自己的生命周期里。
+
+> **射线优先级**：EventLayer 排序 **60** 在 ChoicePanel **45** 之上。模块若想复用
+> `stage.choicePanel` 显示选项（`VNAiTalkModule` 就是这么做的），自绘的一切必须
+> `raycastTarget = false`，否则会把选项点击全部吃掉——它盖在选项面板上面。
+> 需要独占输入的东西（确认框）才单独打开。
+
 ### VNEventRegistry.cs（`Script/`）
 
 - id → 模块模板（预制体或场景内**禁用**的模板物体）。`Create()` 实例化到
@@ -426,6 +437,39 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 - `Editor/VNBadmintonInstaller.cs` 与 `VNQuizInstaller` 同款增量装机。
 - **坑**：`Graphic` 子类必须自己再写一遍 `[RequireComponent(typeof(CanvasRenderer))]`，
   基类那条不会被 `AddComponent` 走继承链读到——不写的症状是「一切状态正常但就是不画」。
+
+### VNAi*.cs —— 示例模块⑥：AI 自由聊天（一〇六章）
+
+四层拆分，每层只干一件事，换任何一层不动其他层：
+
+| 文件 | 职责 |
+|---|---|
+| `VNAiKey.cs` | Key 三级回退读取（环境变量 → 仓库外 → 仓库内），只在内存缓存、永不打印 |
+| `VNAiClient.cs` | **全项目唯一碰 HTTP 的文件**。换模型 / 换供应商 / 改走自建中转只动它 |
+| `VNAiPersonaDef.cs` | 人格资产：性格、边界、白名单、模型参数、兜底台词 |
+| `VNAiConversation.cs` | **纯逻辑（无 MonoBehaviour，可单测）**：提示词组装 / schema 生成 / 历史裁剪 / 解析钳制 |
+| `VNAiTalkModule.cs` | 表现层：只负责「拿 BuildRequest 的结果去发、把 TryParseTurn 的结果去演」 |
+
+- 剧本 `event aitalk vs:星野结衣 [persona:] [turns:] [topic:] [place:] [me:] [stat: rate:] [flag:]`，
+  结果 `好感提升/普通/冷场/失败`（按累计 `affection_delta` 判）。
+  **`* 失败` 是断网 / 无 key / 被内容安全拦下的出口，剧本必须接住**，
+  Lint 规则 `aitalk-no-failure-branch` 会查。
+- **Parser / Runner 一行没改**：`event` 本就是关键字、kwargs 走通用解析。
+  更关键的是 `EventCo` 等模块用的是 `while (result == null) yield return null` 纯轮询——
+  等 1.5 秒网络请求的模块和等玩家点按钮的模块对 Runner 完全一样，不阻塞主线程。
+  **这是本项目接任何异步玩法（联网、下载、TTS）的通用姿势。**
+- **结构化输出是设计核心**：一次请求拿齐 台词 / 表情 / 漫符 / 好感变化 / 三个选项 / 是否收尾。
+  `emotion` 与 `mark` 的 enum **从角色资产实时生成**，AI 物理上编不出不存在的表情名。
+- **演出全部复用现成的**：`VNStage.Say(id, expr, text)` 一个调用带齐表情切换、
+  说话者高亮、头像、名牌配色、打字机、口型；三个候选回复直接走 `stage.choicePanel`，
+  飞入 / 悬停扫光 / 落选溶解白赚。代价是破了铁律 1（见本节开头的破例说明）。
+- 协程而非 async/await：与项目现有 `IEnumerator` 风格一致，也避免 Unity 主线程坑。
+- `Editor/VNAiConnectionTester.cs`：两级自检（网络 / 逻辑层），**不进 Play Mode**。
+  前者过、后者挂 = 问题在提示词或人格配置。
+- `Editor/VNAiTalkInstaller.cs`：与 `VNQuizInstaller` 同款增量装机，
+  额外做 key / 人格 / 表情三项体检；拆了 `Install(bool interactive)` 供自动化调用。
+- **扩展位**：`VNAiContext.memory` 字段已预留，接跨场景记忆时把往期摘要塞进去即可，
+  提示词层不用改（存储仿 `VNCgUnlocks` / `VNPhotoAlbum` 的全局 JSON）。
 
 ### VNSnsView.cs / VNSnsMessage.cs —— SNS 手机聊天（九十章）
 
@@ -719,6 +763,16 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
 - 合并分支报 `unable to unlink ... .unity`：Unity 占用场景文件，
   `git clean -f -- <残留文件>` 后重试
 - UI 不写深度缓冲：别指望真 DoF/深度后处理，模糊走 VNImageEffect 的 9-tap
+- **永远不信任大模型的输出**（一〇六章）：结构化输出只约束**形状**不约束**取值范围**
+  ——Gemini 的 schema 子集不支持 `minimum`/`maximum`，实测让它给 -2~+2 的好感变化
+  它会给 +5。凡是模型输出的数值一律代码内 `Clamp`、枚举一律白名单校验后降级、
+  数组长度一律补齐或截断。宁可演出打折，也不能让模块崩或让数值失控
+- **编辑器里手动泵协程要防重复压栈**（一〇六章）：子协程跑完弹栈后，父协程的
+  `Current` 仍指向那个**已耗尽的**子协程对象。只判断「Current 是不是 IEnumerator」
+  会把它无限重新压栈，父协程永远前进不了一步。表现是「点了菜单没反应也不报错」。
+  用一个 `HashSet<IEnumerator>` 记下已驱动过的，只压栈一次
+- **`EditorUtility.DisplayDialog` 会阻塞主线程**等用户点击。装机器 / 批处理这类
+  可能被自动化调用的入口，拆成 `Xxx(bool interactive)`，非交互模式只写 Console
 - **手感参数别做成 public 序列化字段**：字段一旦被存进场景（生成器/安装器建的组件
   必然如此），改代码里的默认值对已存在的实例**完全无效**。改了半天没反应、
   或者只有一半改动生效（运行时计算的那半生效了、序列化的那半没有），就是这个。

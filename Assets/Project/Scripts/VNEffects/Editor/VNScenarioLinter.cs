@@ -74,6 +74,8 @@ namespace VNEffects.EditorTools
                 ["badminton"] = new HashSet<string> { "胜利", "失败", "结束" },
                 // photo 的「完成」只在自由拍照（不写 theme: 或 mode:free）下出现
                 ["photo"] = new HashSet<string> { "完美", "普通", "失败", "完成" },
+                // aitalk 的「失败」= 断网/无 key/被内容安全拦下，剧本必须接住
+                ["aitalk"] = new HashSet<string> { "好感提升", "普通", "冷场", "失败" },
                 // map 的结果名 = 地点名，取自场景模板，运行时补
             };
 
@@ -105,6 +107,10 @@ namespace VNEffects.EditorTools
             public HashSet<string> mapLocations = new HashSet<string>();
             public HashSet<string> quizIds = new HashSet<string>();
             public HashSet<string> badmintonIds = new HashSet<string>();
+            public HashSet<string> aiPersonaIds = new HashSet<string>();
+            /// <summary>人格 id → 它绑定的角色 id（校验 vs: 和 persona: 是否对得上）</summary>
+            public Dictionary<string, string> aiPersonaCharacter =
+                new Dictionary<string, string>();
             public HashSet<string> photoThemeIds = new HashSet<string>();
             public HashSet<string> photoFrameIds = new HashSet<string>();
             public HashSet<string> photoBackdropIds = new HashSet<string>();
@@ -291,6 +297,17 @@ namespace VNEffects.EditorTools
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (def != null && !string.IsNullOrEmpty(def.badmintonId))
                     reg.badmintonIds.Add(def.badmintonId);
+            }
+
+            // AI 人格 id：同理扫资产，新建人格后不必重建场景就能被校验到
+            foreach (var guid in AssetDatabase.FindAssets("t:VNAiPersonaDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNAiPersonaDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def == null || string.IsNullOrEmpty(def.id)) continue;
+                reg.aiPersonaIds.Add(def.id);
+                if (def.character != null && !string.IsNullOrEmpty(def.character.id))
+                    reg.aiPersonaCharacter[def.id] = def.character.id;
             }
 
             // 大头贴的主题与边框 id：同理扫资产
@@ -848,6 +865,51 @@ namespace VNEffects.EditorTools
                                     "评分模式不会返回「完成」",
                                     "写了 theme: 就会评分，结果是 完美 / 普通 / 失败 三选一。");
                         }
+                }
+
+                // AI 自由聊天：三种配置错误都会让整段对话退化成兜底台词
+                if (module == "aitalk")
+                {
+                    string vs = c.Kw("vs");
+                    string personaId = c.Kw("persona");
+
+                    if (string.IsNullOrEmpty(vs) && string.IsNullOrEmpty(personaId))
+                        Add(issues, VNLintSeverity.Error, "aitalk-missing-target", f, c.line,
+                            "event aitalk 至少要写 vs:<角色 id> 或 persona:<人格 id>",
+                            "两个都没有时模块找不到人格，会直接返回「失败」。");
+
+                    CheckCharacter(issues, f, c.line, vs, reg);
+
+                    if (!string.IsNullOrEmpty(personaId) && !Dynamic(personaId) &&
+                        reg.aiPersonaIds.Count > 0 && !reg.aiPersonaIds.Contains(personaId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-ai-persona", f, c.line,
+                            $"没有 id 为「{personaId}」的 AI 人格资产",
+                            "人格是 VN/AI Persona 资产，id 要和剧本写的一致。" +
+                            $"当前已有：{string.Join(" / ", reg.aiPersonaIds.OrderBy(s => s))}");
+
+                    // persona 绑的角色和 vs 对不上 = 台词是 A 的、立绘换的是 B 的
+                    if (!string.IsNullOrEmpty(personaId) && !string.IsNullOrEmpty(vs) &&
+                        !Dynamic(personaId) && !Dynamic(vs) &&
+                        reg.aiPersonaCharacter.TryGetValue(personaId, out string bound) &&
+                        bound != vs)
+                        Add(issues, VNLintSeverity.Warning, "aitalk-persona-mismatch",
+                            f, c.line,
+                            $"人格「{personaId}」绑的是角色「{bound}」，但 vs 写的是「{vs}」",
+                            "模块会用 vs 的立绘演 persona 的台词，人设和长相会对不上。");
+
+                    // 断网时模块返回「失败」，剧本没接住就会静默继续往下跑
+                    if (c.options != null && c.options.Count > 0)
+                    {
+                        bool hasFailure = false;
+                        foreach (var o in c.options)
+                            if (o.text?.Trim() == VNAiTalkModule.OutcomeFailed) hasFailure = true;
+                        if (!hasFailure)
+                            Add(issues, VNLintSeverity.Warning, "aitalk-no-failure-branch",
+                                f, c.line,
+                                "event aitalk 没有接住「* 失败」结果行",
+                                "玩家断网、没配 key 或被内容安全拦下时模块会返回「失败」，" +
+                                "没接住就会静默按顺序继续，剧情会像什么都没发生一样往下走。");
+                    }
                 }
 
                 if (c.options == null || c.options.Count == 0) continue;

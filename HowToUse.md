@@ -1140,6 +1140,92 @@ if 大头照_次数 >= 3 jump 拍上瘾了
 照片存在 `persistentDataPath/vn_photos/`（与存档槽分离，读旧档也不会丢）。
 完整示例见 `Assets/Scenarios/PhotoDemo.vn.txt`。
 
+### AI 自由聊天：aitalk 🤖
+
+```
+show 星野结衣 at:center
+event aitalk vs:星野结衣 turns:8 topic:社团招新 place:放学后的教室 stat:好感 rate:2 flag:闲聊_
+* 好感提升 -> 聊得不错
+* 普通
+* 冷场 -> 气氛尴尬
+* 失败 -> 连不上
+```
+
+接大模型实时生成女主角的台词，她说完之后给你**三个候选回复**（同一次请求一起生成的），
+选一个送回去进入下一轮。台词、表情、漫符、好感变化、三个选项全是 AI 一次吐出来的。
+
+> ⚠️ **`* 失败` 必须写。** 玩家断网、没配 key、或被内容安全拦下时模块返回「失败」，
+> 没接住就会静默按顺序继续，剧情会像什么都没发生一样往下走。Lint 规则
+> `aitalk-no-failure-branch` 会提醒你。
+>
+> ⚠️ **event 前要先 `show` 角色。** 模块只负责换表情，不负责出场——
+> 人不在台上时台词照常但立绘不会有任何变化（会有告警）。
+
+| 参数 | 说明 |
+|---|---|
+| `vs:` | 角色 id。省略 `persona:` 时按它自动找该角色的人格 |
+| `persona:` | 人格资产 id；省略 = 按 `vs:` 找 |
+| `turns:` | 轮数上限（默认取人格资产的 `defaultTurns`） |
+| `topic:` | 这次想聊什么，注入提示词（只在第一轮给） |
+| `place:` | 场景描述，注入提示词（如「放学后的空教室，夕阳照进来」） |
+| `me:` | 玩家的称呼（默认「我」），影响候选回复的人称 |
+| `stat:` `rate:` | 好感变化 × rate 加到该属性上；同时把当前值翻译成人话喂给 AI |
+| `flag:` | 成绩 flag 前缀 |
+
+结果按**累计好感**判：`>0` 好感提升 / `=0` 普通 / `<0` 冷场。
+聊到一半按 **ESC** 会弹确认框，确认后按当前累计好感照常结算（不惩罚提前退出）。
+
+写入的 flag：
+
+```
+if 闲聊_倾向_直球 >= 3 jump 太直接了
+if 闲聊_好感变化 >= 3 jump 聊得非常好
+```
+
+| flag | 内容 |
+|---|---|
+| `<前缀>轮数` | 实际聊了几轮 |
+| `<前缀>好感变化` | 累计好感增减 |
+| `<前缀>倾向_温柔` / `_玩笑` / `_直球` | 三种语气各选了几次 |
+
+**人格资产**（`Assets/Art/VNEffects/AiPersonas/`，右键 **Create → VN → AI Persona**）
+是调这个模式的唯一入口：
+
+| 想改什么 | 改哪个字段 |
+|---|---|
+| 说话不像这个角色 | `persona` / `speechStyle` / `relationship` |
+| 台词太长太短 | `maxReplyChars` |
+| 好感涨太快 | `affectionClamp` |
+| 表情老是穿帮 | `allowedEmotions`——**只列构图一致的表情**（默认是校服、生气是羽绒服的话，AI 一选中季节就对不上） |
+| 三个选项的维度 | `optionTones` |
+| 太贵太慢 | `model` / `thinking` / `maxOutputTokens` / `historyTurns` |
+| 断网时说什么 | `fallbackLines` / `fallbackOptions` |
+
+**第一次用要先装模块**：**Tools → VN Effects → Install AI Talk Module To Scene**
+——补一个禁用的 AiTalkTemplate 并登记人格库，顺带体检 key / 人格 / 表情三样。装完记得 Ctrl+S。
+
+**API Key**：环境变量 `GEMINI_API_KEY`，或仓库外 / 仓库根目录的 `GeminiAiApiKey.txt`。
+用 **Tools → VN Effects → AI → Show Key Status** 看当前读到的是哪个来源。
+没配 key 也能跑——每轮走人格资产里的兜底台词，结果返回「失败」。
+
+> 🔒 **key 只用于本地开发。** 它不打包进 Build（代码里 `#if` 挡住了）、不进仓库
+> （`.gitignore` 挡掉了）。要发行给玩家必须改成玩家自填或自建中转服务器，
+> 否则 key 会随包泄漏，别人拿去刷你的账单。
+
+> 📌 **定位建议：只用在番外 / 自由时间，主线别依赖它。**
+> 三条硬限制：AI 生成的台词**不进翻译表**（靠切提示词语言解决，但没有译文校对）、
+> **没有配音**、玩家**可能断网**。主线走手写剧本，AI 做增量，这样断网也只是少一个模式。
+
+**排错两级诊断**（都不用进 Play Mode）：
+
+| 菜单 | 验什么 |
+|---|---|
+| AI → Test Gemini Connection | key / 网络 / 模型名 |
+| AI → Test Persona Talk (3 turns) | 提示词组装 / schema / 解析 / 多轮上下文 |
+
+前者过、后者挂 = 问题在提示词或人格配置，不是网络。
+完整示例见 `Assets/Scenarios/AiTalkDemo.vn.txt`。
+
 ### 商店与物品栏 🛒
 
 ```
@@ -1744,6 +1830,11 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | 改了剧本没生效 | Unity 需要焦点回到编辑器让它重新导入 .txt；然后重新 Play |
 | 新加的字段/功能报"未连线" | VNStage 会自动补线；仍报错就重新 Tools → Create Script Demo Scene（内容绑定在 VNGameConfig 里，重建不会丢） |
 | 切语言后台词没翻译 | 跑过 Extract 了吗？表里该句填了吗？跑 Validate 查缺译 |
+| `event aitalk` 每轮都说兜底台词 | key 没读到。Tools → VN Effects → AI → Show Key Status 看来源；再跑 Test Gemini Connection 验网络 |
+| aitalk 台词正常但立绘不动 | `event` 之前没 `show` 角色。模块只换表情不负责出场（Console 有告警） |
+| aitalk 换表情后画面穿帮 | 该角色的表情立绘构图不统一（如默认是校服、生气是冬装）。在人格资产的 `allowedEmotions` 里只列构图一致的那几个 |
+| aitalk 好感涨得离谱 | 人格资产的 `affectionClamp` 调小。AI 不受 schema 数值范围约束，代码已强制钳制并告警 |
+| aitalk 选项点不动 | 模块自绘 UI 吃掉了射线。自绘的东西必须 `raycastTarget=false`（EventLayer 60 在选项面板 45 之上） |
 
 ---
 
@@ -1805,6 +1896,8 @@ event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
 event badminton vs:<角色> [id:] [target:] [first:] [mode:free] [powerstat:]  羽毛球对战
 event photo vs:<角色> [me:] [theme:] [mode:free] [frame:] [bg:] [time:] [stat: rate:] 拍大头照
+event aitalk vs:<角色> [persona:] [turns:] [topic:] [place:] [me:] [stat: rate:] [flag:]  AI自由聊天
+  结果 好感提升/普通/冷场/失败 —— * 失败 必须接住；event 前要先 show 角色
                                                  结果 全对/及格/失败
 quest <start|stage|done|fail> <id> [阶段]        任务
 

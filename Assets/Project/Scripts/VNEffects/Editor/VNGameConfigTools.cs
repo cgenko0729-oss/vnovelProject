@@ -196,6 +196,8 @@ namespace VNEffects.EditorTools
             report.Add($"题库定义 ×{config.quizzes.Count}");
             config.badmintons = FindAll<VNBadmintonDef>();
             report.Add($"羽球对手定义 ×{config.badmintons.Count}");
+            config.aiPersonas = FindAll<VNAiPersonaDef>();
+            report.Add($"AI 人格定义 ×{config.aiPersonas.Count}");
 
             config.chapters = ScanChapters();
             report.Add($"章节剧本 ×{config.chapters.Count}");
