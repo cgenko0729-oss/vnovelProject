@@ -262,3 +262,11 @@ gallery.photoDelete = 删除
 gallery.photoCancel = 取消
 gallery.photoConfirm = 删掉这张照片？
 磁盘上的文件会一起删除，不能恢复。
+
+# AI 自由聊天（event aitalk）
+aitalk.turn = {0}　{1} / {2}　（ESC 结束对话）
+aitalk.typing = {0} 正在输入…
+aitalk.quitTitle = 结束这次对话？
+aitalk.quitTip = 已经聊出来的好感会照常结算。
+aitalk.quitNo = 继续聊
+aitalk.quitYes = 结束对话

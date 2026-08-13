@@ -261,3 +261,11 @@ gallery.photoDelete = Delete
 gallery.photoCancel = Cancel
 gallery.photoConfirm = Delete this photo?
 The file on disk goes too - this cannot be undone.
+
+# AI 自由聊天（event aitalk）
+aitalk.turn = {0}　{1} / {2}　(ESC to end)
+aitalk.typing = {0} is typing…
+aitalk.quitTitle = End this conversation?
+aitalk.quitTip = Affection earned so far still counts.
+aitalk.quitNo = Keep talking
+aitalk.quitYes = End it

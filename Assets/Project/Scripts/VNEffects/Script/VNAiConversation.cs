@@ -175,8 +175,10 @@ namespace VNEffects
             sb.AppendLine("【输出规则】");
             sb.Append("1. reply：你的台词，1~2 句，不超过 ").Append(p.maxReplyChars)
               .AppendLine(" 字。像真人说话，不要旁白、不要动作描写、不要加引号。");
-            // 实测会混出「才、才沒有」这种繁体，和游戏其余文本对不上，必须显式约束
-            sb.AppendLine("   全部文字使用简体中文，禁止出现繁体字。");
+            // AI 生成的台词进不了 FNV-1a 旁路翻译表（那是给写死的剧本用的），
+            // 所以本地化只能靠这里切语言让它直接用目标语言写。
+            // 简体那句是实测补的——不约束会混出「才、才沒有」这种繁体。
+            sb.Append("   ").AppendLine(LanguageRule());
             sb.Append("2. emotion：从这些里挑一个最贴切的 —— ")
               .AppendLine(string.Join(" / ", emotions));
             sb.Append("3. mark：漫画符号，不需要就填 ").Append(VNAiPersonaDef.NoMark)
@@ -198,6 +200,25 @@ namespace VNEffects
             sb.Append("只输出 JSON，不要任何额外文字、不要代码块围栏。");
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// 按当前语言给出「用什么语言写台词」的指令。
+        /// 候选回复（options）也跟着走同一语言，否则会出现她说日文、我的选项是中文。
+        /// </summary>
+        static string LanguageRule()
+        {
+            switch (VNLocale.Language)
+            {
+                case VNLanguage.English:
+                    return "Write reply and all three options in natural English. " +
+                           "Do not use Chinese or Japanese.";
+                case VNLanguage.Japanese:
+                    return "セリフと3つの選択肢はすべて自然な日本語で書くこと。" +
+                           "中国語や英語を混ぜないこと。";
+                default:
+                    return "台词与三个候选回复全部使用简体中文，禁止出现繁体字或其他语言。";
+            }
         }
 
         static void Section(StringBuilder sb, string title, string body)

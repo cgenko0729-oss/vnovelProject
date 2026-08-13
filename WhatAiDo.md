@@ -6100,3 +6100,160 @@ Play Mode 实跑 `PhotoDemo.vn.txt`：第 19 行（自由拍照）与第 31 行�
   （Parser / Runner / Schema / Lint / 存档），本次范围是「只改对话框名牌」故未做
 - 名牌入场演出（换人说话时轻微弹一下 + 描边闪光）
 - 把样式铺到 Backlog / SNS / 存档缩略图的说话者名字
+
+---
+
+## 一〇六、AI 自由聊天模式（P0~P2）（2026-08-13，分支 `agent/ai-free-talk`）
+
+### 需求 / 背景
+
+用户想做一个「AI 自由聊天」模式：把女主角接大模型实时生成台词，一问一答；
+她说完之后给玩家三个候选回复（像现有 choice 一样），玩家选一个再送回 AI 进入下一轮。
+
+四个前置决策（开工前逐条确认，不猜）：
+
+| 决策 | 结论 | 理由 |
+|---|---|---|
+| 模型 | Gemini 3.5 Flash Lite | 用户指定；$0.30/$2.50 每 MTok，实测一轮约 $0.0003 |
+| Key 部署 | 仅本地开发 / 自用 | key 不打包不进仓库；要发行必须改玩家自填或自建中转 |
+| 落地形态 | `event` 事件模块 | 契合现有玩法约定、结果可分支；代价是事件中不可存档 |
+| 三个选项 | AI 同一次请求一起生成 | 一次请求拿齐台词+表情+漫符+好感+选项，延迟与成本都最低 |
+| 内容定位 | 仅番外 / 自由时间 | AI 内容不进翻译表、无配音、玩家可能断网，主线不能依赖 |
+
+### 文件改动清单
+
+**新增（运行时）**
+
+- `Script/VNAiKey.cs`——API Key 三级回退读取（环境变量 → 仓库外文件 → 仓库内文件）。
+  key 只在内存缓存、任何日志都不打印；`#if UNITY_EDITOR` 挡住 Build 版本读取
+- `Script/VNAiClient.cs`——Gemini `generateContent` 的协程封装，**全项目唯一碰 HTTP 的文件**。
+  失败分 8 类（NoKey/Network/Auth/RateLimited/Server/Blocked/Truncated/BadResponse），
+  429/5xx/网络错误自带指数退避重试
+- `Script/VNAiPersonaDef.cs`——人格资产（Create → VN → AI Persona）
+- `Script/VNAiConversation.cs`——纯逻辑层（无 MonoBehaviour）：system prompt 组装、
+  JSON Schema 生成、历史裁剪、响应解析与钳制
+- `Script/VNAiTalkModule.cs`——`event aitalk` 事件模块
+
+**新增（编辑器）**
+
+- `Editor/VNAiConnectionTester.cs`——两级自检菜单（Tools → VN Effects → AI）
+- `Editor/VNAiTalkInstaller.cs`——增量装机（Tools → VN Effects → Install AI Talk Module To Scene）
+
+**新增（资产 / 剧本）**
+
+- `Assets/Art/VNEffects/AiPersonas/星野结衣_日常.asset`——首套人格
+- `Assets/Scenarios/AiTalkDemo.vn.txt`——演示剧本
+
+**修改**
+
+- `Script/VNGameConfig.cs`——加 `aiPersonas` 列表 + `FindAiPersona()`
+- `Editor/VNGameConfigTools.cs`——Sync Game Config 扫描 `VNAiPersonaDef`
+- `Editor/VNScenarioSchema.cs`——`event` 提示文案补 aitalk 用法
+- `Editor/VNScenarioLinter.cs`——四条新规则 + aitalk 结果名表
+- `.gitignore`——挡掉 `/GeminiAiApiKey.txt`、`/*ApiKey*.txt`、`/*.apikey`
+
+### 技术决策与取舍
+
+**1. Parser / Runner 一行未改**
+
+`event` 本来就是关键字，kwargs 走通用解析，`EventCo` 已把 `cmd.kwargs` 塞进 `VNEventContext`。
+所以新玩法只是新的模块 id，和 `event badminton` / `event photo` 同构。
+更关键的是 `EventCo` 等模块的方式是 `while (result == null) yield return null` 纯轮询——
+一个要等 1.5 秒网络请求的模块，和一个等玩家点按钮的模块，对 Runner 完全一样，不阻塞主线程。
+
+**2. 逐项 curl 实测确定的 Gemini 契约（三个假设错了两个）**
+
+| 开工前的假设 | 实测 |
+|---|---|
+| thinking 默认开着，要关掉省延迟 | Flash Lite **默认就不思考**（0 思考 token），白担心 |
+| `thinkingConfig.thinkingBudget: 0` 关思考 | **400**。字段是 `thinkingConfig.thinkingLevel`，取值只有 `minimal/low/medium/high`，没有 `off`/`dynamic`；放 `generationConfig` 外层报 400 Unknown name |
+| （没想到） | 被安全策略拦下时 `candidates[0].content.parts` 是空的，直接取 `parts[0]` 会空引用 |
+
+其余确认可用：`responseSchema` 支持 `enum` / `minItems` / `maxItems` / `propertyOrdering`；
+鉴权走 `x-goog-api-key` 请求头（不用 `?key=` 查询参数，那会把 key 写进日志和 URL 历史）。
+
+**3. 结构化输出是整个设计的核心**
+
+一次请求返回 `reply` / `emotion` / `mark` / `affection_delta` / `options[3]{text,tone}` / `should_end`。
+`emotion` 与 `mark` 的 enum **从角色资产实时生成**，AI 物理上编不出不存在的表情名，换角色自动适配。
+三个选项各带隐藏语气标签（温柔/玩笑/直球），累计写 flag 可统计玩家倾向。
+
+**4. 永远不信任模型输出（三处防御，实测都触发过）**
+
+- `affection_delta` 强制 `Clamp`。Gemini 的 schema 子集**不支持 `minimum`/`maximum`**，
+  不钳的话实测会给 +5 这种值，一轮就能把好感刷爆
+- 表情不在白名单则降级到第一个；漫符非法则这轮不出符号
+- 候选回复不足 3 个用「……」补齐——宁可演出打折，也不让模块崩
+
+**5. 刻意破一次「模块三铁律」**
+
+铁律说「不直接改舞台演出」，但 AI 控制表情恰恰就是改舞台。自绘立绘要把眨眼 / 口型 /
+色调匹配 / 出场动画全部重接一遍，代价远大于收益，所以选择破例，但把边界收紧：
+
+- 只碰**表情**和**对话框内容**两样，绝不碰位置 / 缩放 / 背景 / 特效
+- 进入时记下原表情，**正常结束、ESC 退出、CancelForDebug 三条路径都还原**
+
+回报是 `VNStage.Say(id, expr, text)` 一个调用带齐表情切换、说话者高亮、头像、
+名牌配色、打字机、口型；三个候选回复直接走 `VNChoicePanel`，飞入 / 悬停扫光 /
+落选溶解全部白赚。另两条铁律严格遵守（`unscaledTime`、Tween 全部 `SetUpdate(true)` + `SetLink`）。
+
+**6. 射线的坑**
+
+EventLayer 排序 60，选项面板在 45——**在模块下方**。所以模块自绘的一切默认
+`raycastTarget = false`（在 `CreateImage` / `CreateText` 里默认关掉），否则会把选项点击全吃掉。
+唯一例外是 ESC 确认框，它就是要独占输入。同类坑见一〇三章拍照模块的「拖动板必须压最底」。
+
+**7. 本地化的硬限制**
+
+项目的本地化是「剧本只写中文 + FNV-1a 旁路翻译表」，AI 实时生成的台词**永远不在表里**。
+解法是按 `VNLocale.Language` 切 system prompt 让 AI 直接用目标语言回复；
+UI 文案（「正在输入…」等）照旧走 `VNLocale.T(key)`。同理 AI 台词**没有配音**。
+这也是把本模式限定在番外 / 自由时间的原因之一。
+
+### 修复记录
+
+**开发期自检抓到的**
+
+- **编辑器协程泵死循环**：子协程跑完弹栈后，父协程的 `Current` 仍指向那个**已耗尽的**
+  子协程对象，只判断类型会把它无限重新压栈，父协程永远前进不了。
+  表现是「点了菜单没反应、也不报错」。改用 `_started` 集合保证每个子协程只压栈一次。
+  第一个测试没暴露是因为它没有嵌套协程
+- 人格资产里写的「感叹号」不是合法漫符别名（正确写法是「叹号」），白名单机制正确拦下并告警
+- `EditorUtility.DisplayDialog` 会阻塞主线程等用户点击，自动化调用会把编辑器卡死 →
+  装机器拆成 `Install(bool interactive)`
+
+**Play Mode 实测抓到的**
+
+- **AI 混出繁体字**（「才、才沒有」），与游戏其余文本对不上 →
+  输出规则补「全部文字使用简体中文，禁止出现繁体字」，复测三轮全简体
+- **表情立绘构图不统一时会穿帮**：星野结衣的「默认」是校服、另一个表情是羽绒服 + 围巾，
+  AI 一选中季节就对不上。这是素材问题不是代码问题，
+  在 `allowedEmotions` 的 Header 里写清楚「只列构图一致的表情」
+
+### 验证方法
+
+- **契约验证**：curl 逐项二分，定位 400 的唯一元凶并测出各 thinkingLevel 的
+  思考 token 与延迟（`minimal` 与不写等价，均为 0 token / 约 0.8s）
+- **连通性**：Tools → VN Effects → AI → Test Gemini Connection（不进 Play Mode）
+- **逻辑层**：Tools → VN Effects → AI → Test Persona Talk（3 轮真实对话，
+  每轮随机挑一个选项当玩家回复，验多轮上下文与历史裁剪）。
+  两级诊断——前者过、后者挂 = 问题在逻辑层不在网络
+- **Lint**：写了一份故意错五处的探针剧本，确认
+  `aitalk-missing-target` / `unknown-ai-persona` / `aitalk-persona-mismatch` /
+  `aitalk-no-failure-branch` / `bad-event-outcome` 五条全部按预期触发，验完即删
+- **端到端**：Play Mode 跑 `AiTalkDemo.vn.txt`，截图确认立绘 / 名牌 / 头像 /
+  打字机 / 三选项飞入 / 选完推进到第 2 轮 / 表情随 AI 切换
+
+实测成本与延迟：一轮约 217~230 token、1.4~1.7s、约 $0.0003；一场 12 轮约 $0.004。
+
+### 后续可做（未做）
+
+- **跨场景记忆**（性价比最高）：每场结束让 AI 生成一句摘要写进独立 JSON
+  （仿 `VNCgUnlocks` / `VNPhotoAlbum` 的全局存储），下次注入 `VNAiContext.memory` →
+  「她记得你上次说过喜欢猫」。`VNAiContext.memory` 字段已经预留好
+- **流式输出**（SSE）：边收边打字机，体感更快。要自定义 `DownloadHandlerScript`，
+  且与结构化输出同用会更麻烦，故一期用非流式 + 「正在输入…」动画
+- 中途存档：需要改成非 event 的视图层（仿 `VNSnsView`）+ 走 vn-save-compat 三处同步
+- 每轮进回想：`EventCo` 只在结束后记一条，要逐轮进 Backlog 需经 `VNStage` 开口子
+- 道具联动、AI 当裁判点评、AI 出题喂给 `VNQuizModule`
+- TTS 配音

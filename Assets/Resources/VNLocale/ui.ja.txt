@@ -261,3 +261,11 @@ gallery.photoDelete = 削除
 gallery.photoCancel = キャンセル
 gallery.photoConfirm = この写真を削除しますか？
 ディスク上のファイルも消えます。元に戻せません。
+
+# AI 自由聊天（event aitalk）
+aitalk.turn = {0}　{1} / {2}　（ESC で終了）
+aitalk.typing = {0} が入力中…
+aitalk.quitTitle = この会話を終わりますか？
+aitalk.quitTip = ここまでの好感度はそのまま反映されます。
+aitalk.quitNo = 続ける
+aitalk.quitYes = 終わる

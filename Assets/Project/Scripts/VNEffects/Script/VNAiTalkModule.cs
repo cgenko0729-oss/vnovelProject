@@ -413,8 +413,8 @@ namespace VNEffects
         void RefreshTurnLabel(int turnIndex)
         {
             if (_turnLabel == null) return;
-            _turnLabel.text = $"{_persona.DisplayName}　{turnIndex + 1} / {_maxTurns}　" +
-                              "（ESC 结束对话）";
+            _turnLabel.text = string.Format(VNLocale.T("aitalk.turn"),
+                _persona.DisplayName, turnIndex + 1, _maxTurns);
         }
 
         void SetThinking(bool on)
@@ -424,7 +424,8 @@ namespace VNEffects
             _thinkingLabel.gameObject.SetActive(on);
             if (!on) return;
 
-            _thinkingLabel.text = $"{_persona.DisplayName} 正在输入…";
+            _thinkingLabel.text = string.Format(VNLocale.T("aitalk.typing"),
+                _persona.DisplayName);
             // 用 DOVirtual 而不是 text.DOFade：后者是 DOTween 的 TMP 扩展模块提供的，
             // 模块没启用时会编译不过。这里改成通用补间，零依赖。
             _thinkingTween = DOVirtual.Float(0.35f, 1f, 0.7f, v =>
@@ -454,24 +455,24 @@ namespace VNEffects
             panel.sizeDelta = new Vector2(620f, 260f);
 
             var title = CreateText("Title", panel, 34, Color.white,
-                "结束这次对话？");
+                VNLocale.T("aitalk.quitTitle"));
             var titleRect = (RectTransform)title.transform;
             titleRect.anchorMin = titleRect.anchorMax = new Vector2(0.5f, 0.72f);
             titleRect.sizeDelta = new Vector2(560f, 50f);
 
             var tip = CreateText("Tip", panel, 22, HintColor,
-                "已经聊出来的好感会照常结算。");
+                VNLocale.T("aitalk.quitTip"));
             var tipRect = (RectTransform)tip.transform;
             tipRect.anchorMin = tipRect.anchorMax = new Vector2(0.5f, 0.5f);
             tipRect.sizeDelta = new Vector2(560f, 40f);
 
-            CreateButton(panel, "继续聊", new Vector2(0.28f, 0.22f), () =>
+            CreateButton(panel, VNLocale.T("aitalk.quitNo"), new Vector2(0.28f, 0.22f), () =>
             {
                 CloseConfirm();
                 _phase = _stage != null && _stage.choicePanel != null &&
                          _stage.choicePanel.IsShowing ? Phase.Choosing : Phase.Speaking;
             });
-            CreateButton(panel, "结束对话", new Vector2(0.72f, 0.22f), () =>
+            CreateButton(panel, VNLocale.T("aitalk.quitYes"), new Vector2(0.72f, 0.22f), () =>
             {
                 _escConfirmed = true;
                 CloseConfirm();
