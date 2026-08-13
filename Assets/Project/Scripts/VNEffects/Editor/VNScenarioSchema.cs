@@ -333,7 +333,11 @@ namespace VNEffects.EditorTools
                 "     badminton 羽球对战（vs:角色 id:对手 target:分 mode:match|free）\n" +
                 "     photo 拍大头照（vs:角色 me:主角 theme:主题 frame:边框 bg:背景\n" +
                 "           time:秒 stat:属性 rate:换算率）；写了 theme: 才评分（完美/普通/失败），\n" +
-                "           不写 = 自由拍照只返回「完成」",
+                "           不写 = 自由拍照只返回「完成」\n" +
+                "     aitalk AI 自由聊天（vs:角色 persona:人格 turns:轮数 topic:话题 place:场景\n" +
+                "           me:玩家名 stat:属性 rate:换算率 flag:成绩前缀）；结果 好感提升/普通/冷场/失败\n" +
+                "           ★ 必须接住「* 失败」，否则玩家断网时会卡在事件里\n" +
+                "           ★ event 前先 show 角色，模块只换表情不负责出场",
                 Pos("id", "id", VNParamSource.EventId));
             ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
             // ---- SNS 手机聊天 ----

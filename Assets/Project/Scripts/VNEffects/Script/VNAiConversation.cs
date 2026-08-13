@@ -175,6 +175,8 @@ namespace VNEffects
             sb.AppendLine("【输出规则】");
             sb.Append("1. reply：你的台词，1~2 句，不超过 ").Append(p.maxReplyChars)
               .AppendLine(" 字。像真人说话，不要旁白、不要动作描写、不要加引号。");
+            // 实测会混出「才、才沒有」这种繁体，和游戏其余文本对不上，必须显式约束
+            sb.AppendLine("   全部文字使用简体中文，禁止出现繁体字。");
             sb.Append("2. emotion：从这些里挑一个最贴切的 —— ")
               .AppendLine(string.Join(" / ", emotions));
             sb.Append("3. mark：漫画符号，不需要就填 ").Append(VNAiPersonaDef.NoMark)
