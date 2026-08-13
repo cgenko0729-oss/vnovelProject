@@ -1226,6 +1226,15 @@ if 闲聊_好感变化 >= 3 jump 聊得非常好
 前者过、后者挂 = 问题在提示词或人格配置，不是网络。
 完整示例见 `Assets/Scenarios/AiTalkDemo.vn.txt`。
 
+**对话日志**：每场聊完自动写两份到项目根的 `AiTalkLogs/`（已 gitignore）——
+`.md` 人读版（对话全程、三个选项、玩家选了哪个、token 与成本、附首轮 system prompt），
+`.json` 机读版（每轮 17 个结构化字段，给以后做批量分析）。
+模块的 `logMode` 可关；默认「仅编辑器」，发行版不写玩家硬盘。
+
+> 📖 **想搞懂原理和调参**（记忆是怎么运作的、system prompt 怎么拼出来的、
+> 改哪个字段有什么效果、topic / flag / optionTones 怎么设计、成本怎么算、有哪些玩法 idea）
+> —— 看 **`AiTalkGuide.md`**，那是这个系统的完整说明书。
+
 ### 商店与物品栏 🛒
 
 ```

@@ -54,3 +54,6 @@ crashlytics-build.properties
 /GeminiAiApiKey.txt
 /*ApiKey*.txt
 /*.apikey
+
+# AI 对话调试日志（开发用，不进仓库）
+/AiTalkLogs/
