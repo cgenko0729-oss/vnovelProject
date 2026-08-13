@@ -269,3 +269,13 @@ aitalk.quitTitle = End this conversation?
 aitalk.quitTip = Affection earned so far still counts.
 aitalk.quitNo = Keep talking
 aitalk.quitYes = End it
+aitalk.recording = Writing today down…
+
+# 日记本（D 键）
+diary.title = Diary　({0} entries)
+diary.titleEmpty = Diary
+diary.empty = No pages yet.
+Talk with her and your notes will appear here.
+diary.hint = D / ESC to close　·　scroll to browse
+diary.all = All
+diary.affection = Affection {0}

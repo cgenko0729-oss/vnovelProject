@@ -93,6 +93,18 @@ namespace VNEffects
         [Header("开场引导（作为第一条 user 消息发出去；留空 = 用剧本的 topic:）")]
         [TextArea(2, 5)] public string opening;
 
+        [Header("──────── 跨场记忆 ────────")]
+        [Header("开启后：每场聊完额外发一次请求做总结，下次见面时注入。\n" +
+                "关掉 = 每次见面都是全新的她（也不会写日记本）")]
+        public bool enableMemory = true;
+
+        [Header("最多记住最近几场。调大 = 记性好但每轮输入 token 更多；\n" +
+                "注入的是「摘要 + 已聊过的话题清单」，不是完整对话")]
+        [Range(1, 30)] public int memoryCapacity = 15;
+
+        [Header("聊完把这次写进日记本（主角口吻，全局保存、读旧档也不丢）")]
+        public bool writeDiary = true;
+
         // ──────────────── 模型参数 ────────────────
 
         [Header("──────── 模型 ────────")]

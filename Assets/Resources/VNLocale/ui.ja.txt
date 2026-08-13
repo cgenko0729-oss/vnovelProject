@@ -269,3 +269,13 @@ aitalk.quitTitle = この会話を終わりますか？
 aitalk.quitTip = ここまでの好感度はそのまま反映されます。
 aitalk.quitNo = 続ける
 aitalk.quitYes = 終わる
+aitalk.recording = 今日のことを書き留めている…
+
+# 日记本（D 键）
+diary.title = 日記　（{0} ページ）
+diary.titleEmpty = 日記
+diary.empty = まだ何も書かれていない。
+彼女と話したあと、ここに記録が残る。
+diary.hint = D / ESC で閉じる　·　スクロールでめくる
+diary.all = すべて
+diary.affection = 好感度 {0}
