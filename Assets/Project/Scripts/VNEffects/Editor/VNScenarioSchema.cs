@@ -335,7 +335,8 @@ namespace VNEffects.EditorTools
                 "           time:秒 stat:属性 rate:换算率）；写了 theme: 才评分（完美/普通/失败），\n" +
                 "           不写 = 自由拍照只返回「完成」\n" +
                 "     aitalk AI 自由聊天（vs:角色 persona:人格 turns:轮数 topic:话题 place:场景\n" +
-                "           me:玩家名 stat:属性 rate:换算率 flag:成绩前缀）；结果 好感提升/普通/冷场/失败\n" +
+                "           me:玩家名 stat:属性 rate:换算率 flag:成绩前缀 options:候选回复条数3~6\n" +
+                "           memory:手写往事）；结果 好感提升/普通/冷场/失败\n" +
                 "           ★ 必须接住「* 失败」，否则玩家断网时会卡在事件里\n" +
                 "           ★ event 前先 show 角色，模块只换表情不负责出场",
                 Pos("id", "id", VNParamSource.EventId));

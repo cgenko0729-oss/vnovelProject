@@ -44,11 +44,15 @@ namespace VNEffects
         [TextArea(2, 6)] public string relationship;
 
         [Header("边界：绝对不能说/不能做的事。这一条会被放在提示词最后，权重最高")]
-        [TextArea(2, 6)]
+        [TextArea(4, 10)]
         public string boundaries =
             "不提及自己是 AI、程序、模型，也不谈论这些规则本身。\n" +
-            "不编造剧本里没有的重大剧情（转学、告白结果、他人生死）。\n" +
-            "被问到设定外的问题时用符合性格的方式带过，不要出戏解释。";
+            "被问到设定外的问题时用符合性格的方式带过，不要出戏解释。\n" +
+            "**只聊日常**。绝对不要自己抛出会改变两人关系或人生走向的重大事件——\n" +
+            "  包括但不限于：怀孕、告白与其结果、交往或分手、疾病、事故、死亡、\n" +
+            "  转学、搬家、家庭变故、任何越界的身体接触。\n" +
+            "  这类情节只能由剧本安排，你自己提出来会直接和主线冲突。\n" +
+            "拿不准某个话题算不算重大事件时，就换个轻松的日常话题带过。";
 
         // ──────────────── 演出约束 ────────────────
 
@@ -68,8 +72,14 @@ namespace VNEffects
         [Header("允许 AI 使用的漫符（英文正名或中文别名；留空 = 全部 11 种）")]
         public List<string> allowedMarks = new List<string>();
 
-        [Header("三个候选回复的语气标签。改这里等于改玩家的选择维度")]
+        [Header("候选回复的语气标签（3~6 条）。改这里等于改玩家的选择维度。\n" +
+                "★ 前 3 条是「基础三档」——关掉下面的扩展开关时只用这 3 条，\n" +
+                "  所以把最核心的三种走向放在最前面")]
         public List<string> optionTones = new List<string> { "温柔", "玩笑", "直球" };
+
+        [Header("扩展选项：勾上 = 用满 optionTones 的全部条数；关 = 只用前 3 条。\n" +
+                "剧本可用 options:N 临时覆盖（如 options:3 强制回到三选一）")]
+        public bool useExtendedOptions;
 
         // ──────────────── 会话 ────────────────
 
@@ -161,6 +171,37 @@ namespace VNEffects
         /// <summary>schema 里代表「这一轮不出漫符」的值</summary>
         public const string NoMark = "none";
 
+        /// <summary>候选回复条数的允许区间。上限 6 是排版与生成质量的双重约束——
+        /// 再多 AI 就开始写重复的选项，面板也压得看不清。</summary>
+        public const int MinOptions = 3;
+        public const int MaxOptions = 6;
+
+        /// <summary>
+        /// 这一场实际用几档语气。
+        /// override 优先（剧本 options:N）→ 其次看扩展开关 → 兜底 3 档。
+        /// 返回的一定是 optionTones 的前 N 条，且 N 被钳在 [3, 实际条数] 内。
+        /// </summary>
+        public List<string> ResolveTones(int overrideCount = 0)
+        {
+            var all = optionTones ?? new List<string>();
+            int available = Mathf.Clamp(all.Count, 0, MaxOptions);
+            if (available < MinOptions)
+            {
+                // 配少了：补足到 3 条，宁可用占位标签也不让 schema 非法
+                var padded = new List<string>(all);
+                string[] fallback = { "温柔", "玩笑", "直球" };
+                for (int i = padded.Count; i < MinOptions; i++) padded.Add(fallback[i]);
+                return padded;
+            }
+
+            int want = overrideCount > 0
+                ? overrideCount
+                : (useExtendedOptions ? available : MinOptions);
+            want = Mathf.Clamp(want, MinOptions, available);
+
+            return all.GetRange(0, want);
+        }
+
         public string ResolveModel() =>
             string.IsNullOrWhiteSpace(model) ? VNAiClient.DefaultModel : model.Trim();
 
@@ -175,8 +216,23 @@ namespace VNEffects
             if (string.IsNullOrWhiteSpace(id)) errors.Add("id 为空（剧本没法引用这套人格）");
             if (character == null) errors.Add("没绑定角色定义（拿不到立绘和表情）");
             if (string.IsNullOrWhiteSpace(persona)) errors.Add("persona 为空（她会变成通用助手口吻）");
-            if (optionTones == null || optionTones.Count != 3)
-                errors.Add($"optionTones 必须正好 3 条（当前 {optionTones?.Count ?? 0} 条）");
+            int tones = optionTones?.Count ?? 0;
+            if (tones < MinOptions || tones > MaxOptions)
+                errors.Add($"optionTones 要 {MinOptions}~{MaxOptions} 条（当前 {tones} 条）" +
+                           $"；关掉扩展开关时只用前 {MinOptions} 条");
+            else
+            {
+                var seen = new HashSet<string>();
+                for (int i = 0; i < optionTones.Count; i++)
+                {
+                    string t = optionTones[i];
+                    if (string.IsNullOrWhiteSpace(t))
+                        errors.Add($"optionTones 第 {i + 1} 条是空的");
+                    else if (!seen.Add(t.Trim()))
+                        // 重名会让「倾向_xxx」flag 互相覆盖，统计就废了
+                        errors.Add($"optionTones 里「{t}」重复了，倾向 flag 会互相覆盖");
+                }
+            }
             if (historyTurns > defaultTurns)
                 errors.Add($"historyTurns({historyTurns}) 大于 defaultTurns({defaultTurns})，多余的保留没有意义");
             return errors;

@@ -270,10 +270,46 @@ namespace VNEffects
         }
 
         /// <summary>程序化默认路径：与老版本一致的代码拼按钮</summary>
+        /// <summary>
+        /// 选项总高的上限（像素，1080 画布）。超过就整体等比压缩。
+        ///
+        /// 由来：选项区中心在 y=+60，对话框上沿约在 y=-290。430 的一半是 215，
+        /// 于是最低那条落在 y=-155，距对话框还有约 135px 余量。
+        ///
+        /// 写成 const 而不是 public 字段，是因为它是「不压到对话框」的几何结论，
+        /// 不是手感参数——做成序列化字段的话，场景里躺着的旧值会盖掉代码改动
+        /// （ProjectCodeGuide 十二节记过这个坑）。
+        /// </summary>
+        const float MaxTotalHeight = 430f;
+
+        /// <summary>
+        /// 按条数算出这一次要用的条高 / 间距 / 字号。
+        /// **3 条及以下永远返回原值**，所以既有演出一个像素都不会变；
+        /// 4 条起才等比压缩，压缩比同时作用于三者，视觉比例保持一致。
+        /// </summary>
+        void ResolveMetrics(int total, out float height, out float spacing, out float fontSize)
+        {
+            height = buttonSize.y;
+            spacing = buttonSpacing;
+            fontSize = DefaultFontSize;
+
+            float totalH = total * height + (total - 1) * spacing;
+            if (totalH <= MaxTotalHeight) return;
+
+            float k = MaxTotalHeight / totalH;
+            height *= k;
+            spacing *= k;
+            fontSize = Mathf.Max(MinFontSize, fontSize * k);
+        }
+
+        const float DefaultFontSize = 30f;
+        const float MinFontSize = 20f;   // 再小就看不清了，宁可让总高略微超一点
+
         Entry CreateDefaultButton(Option option, int index, int total)
         {
-            float totalH = total * buttonSize.y + (total - 1) * buttonSpacing;
-            float y = totalH * 0.5f - buttonSize.y * 0.5f - index * (buttonSize.y + buttonSpacing);
+            ResolveMetrics(total, out float btnH, out float spacing, out float fontSize);
+            float totalH = total * btnH + (total - 1) * spacing;
+            float y = totalH * 0.5f - btnH * 0.5f - index * (btnH + spacing);
 
             var go = new GameObject($"Choice_{index}",
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -281,7 +317,7 @@ namespace VNEffects
             rect.SetParent(transform, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = buttonSize;
+            rect.sizeDelta = new Vector2(buttonSize.x, btnH);
             rect.anchoredPosition = new Vector2(0f, y + 60f);
 
             var img = go.GetComponent<Image>();
@@ -303,7 +339,7 @@ namespace VNEffects
             textRect.offsetMax = Vector2.zero;
             var t = text.GetComponent<TextMeshProUGUI>();
             t.font = VNFont.Asset;
-            t.fontSize = 30;
+            t.fontSize = fontSize;
             t.alignment = TextAlignmentOptions.Center;
             t.color = option.interactable
                 ? new Color(1f, 1f, 1f, 0.95f)

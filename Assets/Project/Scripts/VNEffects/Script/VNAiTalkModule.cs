@@ -134,7 +134,14 @@ namespace VNEffects
             _statRate = Mathf.Max(1, ctx.KwI("rate", 1));
             _flagPrefix = ctx.Kw("flag");
 
-            _convo = new VNAiConversation(_persona);
+            // options:N 覆盖人格资产的扩展开关；0 = 用资产的设定
+            int optionOverride = ctx.KwI("options", 0);
+            _convo = new VNAiConversation(_persona, optionOverride);
+            if (optionOverride > 0 && _convo.OptionCount != optionOverride)
+                Debug.LogWarning($"[VNAiTalk] 第 {ctx.line} 行：options:{optionOverride} 超出人格" +
+                                 $"「{_persona.id}」能提供的范围，实际用 {_convo.OptionCount} 条" +
+                                 $"（optionTones 现有 {_persona.optionTones?.Count ?? 0} 条，" +
+                                 $"下限 {VNAiPersonaDef.MinOptions}）");
 
             BuildUi();
             _stage?.dialogue?.Show();   // EventCo 进来前 HideBox 过，这里请回来
@@ -365,8 +372,9 @@ namespace VNEffects
             {
                 SetFlag(flagLines, _flagPrefix + "轮数", _convo != null ? _convo.TurnCount : 0);
                 SetFlag(flagLines, _flagPrefix + "好感变化", _affectionTotal);
+                // 只写本场实际用到的语气档——关掉扩展开关时不该留下空的「倾向_毒舌=0」
                 if (_convo != null)
-                    foreach (string tone in _persona.optionTones)
+                    foreach (string tone in _convo.Tones)
                         SetFlag(flagLines, _flagPrefix + "倾向_" + tone, CountTone(tone));
             }
 

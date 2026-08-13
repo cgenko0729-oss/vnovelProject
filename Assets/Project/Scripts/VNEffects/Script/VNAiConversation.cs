@@ -53,7 +53,14 @@ namespace VNEffects
         readonly List<VNAiMessage> _history = new List<VNAiMessage>();
         readonly List<string> _emotions;
         readonly List<string> _marks;
+        readonly List<string> _tones;    // 本场实际用的语气档（3~6 条）
         readonly string _schema;
+
+        /// <summary>本场每轮给几个候选回复</summary>
+        public int OptionCount => _tones.Count;
+
+        /// <summary>本场实际生效的语气标签（写 flag、统计倾向都用这一份）</summary>
+        public IReadOnlyList<string> Tones => _tones;
 
         /// <summary>已完成的轮数（一轮 = 玩家说一句 + 她回一句）</summary>
         public int TurnCount { get; private set; }
@@ -61,14 +68,18 @@ namespace VNEffects
         /// <summary>玩家历次选择的语气标签，可用来统计倾向写 flag</summary>
         public readonly List<string> pickedTones = new List<string>();
 
-        public VNAiConversation(VNAiPersonaDef persona)
+        /// <param name="optionCount">
+        /// 候选回复条数的临时覆盖（剧本 options:N）。0 = 按人格资产的扩展开关决定。
+        /// </param>
+        public VNAiConversation(VNAiPersonaDef persona, int optionCount = 0)
         {
             this.persona = persona != null
                 ? persona
                 : throw new ArgumentNullException(nameof(persona));
             _emotions = persona.ResolveEmotions();
             _marks = persona.ResolveMarks();
-            _schema = BuildSchema(_emotions, _marks, persona.optionTones);
+            _tones = persona.ResolveTones(optionCount);
+            _schema = BuildSchema(_emotions, _marks, _tones);
         }
 
         // ──────────────── 对外：组装请求 ────────────────
@@ -88,7 +99,7 @@ namespace VNEffects
             var req = new VNAiRequest
             {
                 model = persona.ResolveModel(),
-                systemInstruction = BuildSystemInstruction(persona, ctx, _emotions, _marks),
+                systemInstruction = BuildSystemInstruction(persona, ctx, _emotions, _marks, _tones),
                 responseSchemaJson = _schema,
                 thinking = persona.thinking,
                 safety = persona.safety,
@@ -146,7 +157,7 @@ namespace VNEffects
         /// </summary>
         public static string BuildSystemInstruction(
             VNAiPersonaDef p, VNAiContext ctx,
-            List<string> emotions, List<string> marks)
+            List<string> emotions, List<string> marks, List<string> tones)
         {
             var sb = new StringBuilder(1024);
             string name = string.IsNullOrEmpty(p.DisplayName) ? p.id : p.DisplayName;
@@ -178,7 +189,7 @@ namespace VNEffects
             // AI 生成的台词进不了 FNV-1a 旁路翻译表（那是给写死的剧本用的），
             // 所以本地化只能靠这里切语言让它直接用目标语言写。
             // 简体那句是实测补的——不约束会混出「才、才沒有」这种繁体。
-            sb.Append("   ").AppendLine(LanguageRule());
+            sb.Append("   ").AppendLine(LanguageRule(tones != null ? tones.Count : 3));
             sb.Append("2. emotion：从这些里挑一个最贴切的 —— ")
               .AppendLine(string.Join(" / ", emotions));
             sb.Append("3. mark：漫画符号，不需要就填 ").Append(VNAiPersonaDef.NoMark)
@@ -186,12 +197,19 @@ namespace VNEffects
             sb.Append("4. affection_delta：这一轮她对「").Append(me).Append("」的好感变化，整数，范围 -")
               .Append(p.affectionClamp).Append(" ~ +").Append(p.affectionClamp)
               .AppendLine("。多数轮次应该是 0；只有明显打动或惹恼她时才给非零值。");
-            sb.Append("5. options：正好 3 个候选回复，全部以「").Append(me)
-              .AppendLine("」的第一人称口吻写，每个不超过 25 字。三个的语气必须分别是：");
-            var tones = p.optionTones;
-            for (int i = 0; i < tones.Count; i++)
-                sb.Append("   - ").Append(tones[i]).AppendLine();
-            sb.AppendLine("   三个选项要给出**实质不同**的走向，不要只是同一句话的三种说法。");
+            int n = tones != null ? tones.Count : 3;
+            sb.Append("5. options：正好 ").Append(n).Append(" 个候选回复，全部以「").Append(me)
+              .Append("」的第一人称口吻写，每个不超过 25 字。这 ").Append(n)
+              .AppendLine(" 个的语气必须**按顺序**分别是：");
+            if (tones != null)
+                for (int i = 0; i < tones.Count; i++)
+                    sb.Append("   ").Append(i + 1).Append(". ").AppendLine(tones[i]);
+            sb.Append("   这 ").Append(n)
+              .AppendLine(" 个选项要给出**实质不同**的走向，不要只是同一句话的几种说法。");
+            if (n > 3)
+                // 档位一多，模型容易把相邻两档写成近义句，这句是实测补的
+                sb.AppendLine("   档位较多，务必让每一档都有自己明确的态度，" +
+                              "相邻两档不要写成意思相近的句子。");
             sb.AppendLine("6. should_end：这个话题自然聊完了就填 true，否则 false。");
             sb.AppendLine();
 
@@ -206,18 +224,19 @@ namespace VNEffects
         /// 按当前语言给出「用什么语言写台词」的指令。
         /// 候选回复（options）也跟着走同一语言，否则会出现她说日文、我的选项是中文。
         /// </summary>
-        static string LanguageRule()
+        static string LanguageRule(int optionCount)
         {
             switch (VNLocale.Language)
             {
                 case VNLanguage.English:
-                    return "Write reply and all three options in natural English. " +
+                    return $"Write reply and all {optionCount} options in natural English. " +
                            "Do not use Chinese or Japanese.";
                 case VNLanguage.Japanese:
-                    return "セリフと3つの選択肢はすべて自然な日本語で書くこと。" +
+                    return $"セリフと{optionCount}つの選択肢はすべて自然な日本語で書くこと。" +
                            "中国語や英語を混ぜないこと。";
                 default:
-                    return "台词与三个候选回复全部使用简体中文，禁止出现繁体字或其他语言。";
+                    return $"台词与 {optionCount} 个候选回复全部使用简体中文，" +
+                           "禁止出现繁体字或其他语言。";
             }
         }
 
@@ -242,13 +261,15 @@ namespace VNEffects
         /// </summary>
         public static string BuildSchema(List<string> emotions, List<string> marks, List<string> tones)
         {
+            int n = tones != null && tones.Count > 0 ? tones.Count : 3;
             var sb = new StringBuilder(512);
             sb.Append("{\"type\":\"OBJECT\",\"properties\":{");
             sb.Append("\"reply\":{\"type\":\"STRING\"},");
             sb.Append("\"emotion\":{\"type\":\"STRING\",\"enum\":").Append(JsonStringArray(emotions)).Append("},");
             sb.Append("\"mark\":{\"type\":\"STRING\",\"enum\":").Append(JsonStringArray(marks)).Append("},");
             sb.Append("\"affection_delta\":{\"type\":\"INTEGER\"},");
-            sb.Append("\"options\":{\"type\":\"ARRAY\",\"minItems\":3,\"maxItems\":3,\"items\":{");
+            sb.Append("\"options\":{\"type\":\"ARRAY\",\"minItems\":").Append(n)
+              .Append(",\"maxItems\":").Append(n).Append(",\"items\":{");
             sb.Append("\"type\":\"OBJECT\",\"properties\":{");
             sb.Append("\"text\":{\"type\":\"STRING\"},");
             sb.Append("\"tone\":{\"type\":\"STRING\",\"enum\":").Append(JsonStringArray(tones)).Append('}');
@@ -281,13 +302,14 @@ namespace VNEffects
         /// 选项不足 3 个补齐——宁可演出打折，也不能让模块崩掉或数值失控。
         /// </summary>
         public bool TryParseTurn(string json, out VNAiTurn turn, out string error)
-            => TryParseTurn(json, persona, _emotions, _marks, out turn, out error);
+            => TryParseTurn(json, persona, _emotions, _marks, _tones, out turn, out error);
 
         public static bool TryParseTurn(
             string json, VNAiPersonaDef p,
-            List<string> emotions, List<string> marks,
+            List<string> emotions, List<string> marks, List<string> tones,
             out VNAiTurn turn, out string error)
         {
+            int want = tones != null && tones.Count > 0 ? tones.Count : 3;
             turn = null;
             error = null;
 
@@ -328,16 +350,16 @@ namespace VNEffects
                 if (marks == null || marks.Contains(canonical)) turn.mark = canonical;
             }
 
-            // 选项：不足 3 个补齐，多的截断
-            var tones = p.optionTones;
+            // 选项：不足就补齐，多的截断——条数必须和 schema 要的一致，
+            // 否则面板排版和「倾向」统计都会错位
             if (raw.options != null)
                 foreach (var o in raw.options)
                 {
                     if (o == null || string.IsNullOrWhiteSpace(o.text)) continue;
                     turn.options.Add(new VNAiOption { text = o.text.Trim(), tone = o.tone });
-                    if (turn.options.Count == 3) break;
+                    if (turn.options.Count == want) break;
                 }
-            while (turn.options.Count < 3)
+            while (turn.options.Count < want)
             {
                 int i = turn.options.Count;
                 turn.options.Add(new VNAiOption
@@ -345,7 +367,7 @@ namespace VNEffects
                     text = "……",
                     tone = tones != null && i < tones.Count ? tones[i] : "",
                 });
-                Debug.LogWarning($"[VNAi] 候选回复不足 3 个，已用「……」补齐第 {i + 1} 项");
+                Debug.LogWarning($"[VNAi] 候选回复不足 {want} 个，已用「……」补齐第 {i + 1} 项");
             }
 
             if (turn.reply.Length > p.maxReplyChars * 2)
@@ -391,16 +413,12 @@ namespace VNEffects
                 affectionDelta = 0,
                 shouldEnd = false,
             };
-            var tones = persona.optionTones;
-            for (int i = 0; i < 3; i++)
+            // 兜底轮的条数也要和正常轮一致，否则断网那一轮面板会突然变高矮
+            for (int i = 0; i < _tones.Count; i++)
             {
                 string text = persona.fallbackOptions != null && i < persona.fallbackOptions.Count
                     ? persona.fallbackOptions[i] : "……";
-                t.options.Add(new VNAiOption
-                {
-                    text = text,
-                    tone = tones != null && i < tones.Count ? tones[i] : "",
-                });
+                t.options.Add(new VNAiOption { text = text, tone = _tones[i] });
             }
             return t;
         }
