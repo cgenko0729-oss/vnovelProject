@@ -60,6 +60,7 @@ namespace VNEffects
         VNConfigPanel _configPanel;
         VNQuickToolbar _quickToolbar;
         VNQuestLog _questLog;
+        VNAiDiaryPanel _diaryPanel;   // 日记本（D 键），首次按键时按需创建
         VNStatsHud _statsHud;
         VNInventory _inventory;
         VNCgGallery _cgGallery;
@@ -1501,6 +1502,20 @@ namespace VNEffects
             _questLog.Toggle();
         }
 
+        /// <summary>日记本（D 键）。事件进行中不开，同其他面板。</summary>
+        public void RequestDiary()
+        {
+            if (_eventActive) return;
+            if (_diaryPanel == null)
+            {
+                _diaryPanel = FindFirstObjectByType<VNAiDiaryPanel>();
+                if (_diaryPanel == null)   // 没人手工摆也能用，同任务日志
+                    _diaryPanel = new GameObject("VNAiDiaryPanel")
+                        .AddComponent<VNAiDiaryPanel>();
+            }
+            _diaryPanel.Toggle();
+        }
+
         public void RequestStatsPanel()
         {
             if (_statsHud == null || _eventActive) return;
@@ -1688,6 +1703,14 @@ namespace VNEffects
                 return;
             }
 
+            // 日记本打开期间：同上
+            if (_diaryPanel != null && _diaryPanel.IsOpen)
+            {
+                if (kb.dKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame)
+                    _diaryPanel.Close();
+                return;
+            }
+
             // 属性面板打开期间：只处理关闭，不推进剧情
             if (_statsHud != null && _statsHud.IsOpen)
             {
@@ -1748,6 +1771,12 @@ namespace VNEffects
                 if (kb.jKey.wasPressedThisFrame)
                 {
                     _questLog?.Open();
+                    return;
+                }
+
+                if (kb.dKey.wasPressedThisFrame)
+                {
+                    RequestDiary();   // 面板按需创建，所以走 Request 而不是直接 Open
                     return;
                 }
 

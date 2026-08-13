@@ -746,6 +746,7 @@ namespace VNEffects
 
             // SNS 会话（未打开时写入 snsOpen=false，字段留空）
             if (sns != null) sns.CaptureSnapshot(data);
+            VNAiMemory.CaptureSnapshot(data);   // AI 聊天的跨场记忆（存档态）
 
             data.characters.Clear();
             foreach (var kv in _active)
@@ -826,6 +827,7 @@ namespace VNEffects
 
             // SNS 最后恢复：会话开着就按消息列表重建整屏气泡，否则确保界面收起
             if (sns != null) sns.RestoreSnapshot(data, this);
+            VNAiMemory.RestoreSnapshot(data);   // 与 CaptureSnapshot 成对
         }
 
         /// <summary>SNS 手机聊天界面是否打开（Runner 据此把台词渲染成气泡）</summary>

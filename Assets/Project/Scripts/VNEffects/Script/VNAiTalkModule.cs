@@ -270,18 +270,110 @@ namespace VNEffects
                 playerSaid = option.text;
             }
 
+            yield return SummarizeCo();
             FinishWith(JudgeOutcome());
         }
 
-        VNAiContext BuildContext(int turnIndex) => new VNAiContext
+        /// <summary>
+        /// 收场总结：额外发一次请求，把这场沉淀成「记忆」（进存档）与「日记」（全局）。
+        ///
+        /// 放在 FinishWith 之前而不是之后——Done() 一调 Runner 就会销毁模块，
+        /// 之后启动的协程会跟着死掉，请求发不出去。
+        ///
+        /// 失败一律静默跳过：总结不成功只是少一条记忆，绝不能让玩家卡在这里。
+        /// </summary>
+        IEnumerator SummarizeCo()
         {
-            playerName = _ctx.Kw("me", "我"),
-            topic = turnIndex == 0 ? _ctx.Kw("topic") : null,
-            place = _ctx.Kw("place"),
-            affectionText = BuildAffectionText(),
-            memory = _ctx.Kw("memory"),
-            turnsLeft = _maxTurns - turnIndex,
-        };
+            if (_persona == null || !_persona.enableMemory) yield break;
+            if (_convo == null || _convo.TurnCount == 0) yield break;   // 一句没聊，没什么可记
+
+            _phase = Phase.Thinking;
+            SetThinking(true, VNLocale.T("aitalk.recording"));
+
+            var req = _convo.BuildSummaryRequest(BuildContext(0), _ctx.Kw("me", "我"));
+            VNAiResult res = null;
+            yield return VNAiClient.Send(req, r => res = r);
+            while (res == null) yield return null;
+
+            SetThinking(false);
+
+            if (!res.ok)
+            {
+                Debug.LogWarning($"[VNAiTalk] 收场总结失败（{res.failure}）：{res.errorMessage}" +
+                                 "——本场不写记忆与日记");
+                yield break;
+            }
+            if (!VNAiConversation.TryParseSummary(res.text, out var sum, out string err))
+            {
+                Debug.LogWarning($"[VNAiTalk] 收场总结解析失败：{err}\n原始输出：{res.text}");
+                yield break;
+            }
+
+            string place = _ctx.Kw("place");
+            string now = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+
+            // ① 记忆 → 存档态
+            VNAiMemory.Add(new VNAiMemoryEntry
+            {
+                personaId = _persona.id,
+                characterId = _charId,
+                place = place,
+                savedAt = now,
+                summary = sum.summary,
+                topics = new List<string>(sum.topics),
+                facts = new List<string>(sum.facts),
+                affectionDelta = _affectionTotal,
+                turns = _convo.TurnCount,
+            }, _persona.memoryCapacity);
+
+            // ② 日记 → 全局存储（读旧档也不丢，玩家的收藏品）
+            if (_persona.writeDiary && !string.IsNullOrWhiteSpace(sum.diary))
+                VNAiDiary.Add(new VNAiDiaryEntry
+                {
+                    savedAt = now,
+                    characterId = _charId,
+                    displayName = _persona.DisplayName,
+                    place = place,
+                    body = sum.diary,
+                    topics = new List<string>(sum.topics),
+                    affectionDelta = _affectionTotal,
+                    turns = _convo.TurnCount,
+                });
+
+            Debug.Log($"[VNAiTalk] 已记住这次：{sum.summary}\n" +
+                      $"  话题：{string.Join("、", sum.topics)}" +
+                      (sum.facts.Count > 0 ? $"\n  记住的事：{string.Join("；", sum.facts)}" : "") +
+                      $"\n  记忆库现有 {VNAiMemory.For(_charId).Count} 场，" +
+                      $"日记本现有 {VNAiDiary.Count} 条");
+        }
+
+        VNAiContext BuildContext(int turnIndex)
+        {
+            var ctx = new VNAiContext
+            {
+                playerName = _ctx.Kw("me", "我"),
+                topic = turnIndex == 0 ? _ctx.Kw("topic") : null,
+                place = _ctx.Kw("place"),
+                affectionText = BuildAffectionText(),
+                turnsLeft = _maxTurns - turnIndex,
+            };
+
+            // 跨场记忆：摘要给连续性、话题清单给去重。
+            // 剧本的 memory: 是手写补充，和自动记忆叠加而不是互相覆盖。
+            if (_persona.enableMemory)
+            {
+                ctx.memory = VNAiMemory.BuildContext(_charId, _persona.memoryCapacity);
+                ctx.pastTopics = VNAiMemory.TopicsOf(_charId, _persona.memoryCapacity);
+            }
+
+            string handWritten = _ctx.Kw("memory");
+            if (!string.IsNullOrWhiteSpace(handWritten))
+                ctx.memory = string.IsNullOrEmpty(ctx.memory)
+                    ? handWritten
+                    : ctx.memory + "\n" + handWritten;
+
+            return ctx;
+        }
 
         /// <summary>
         /// 把养成属性翻译成人话喂给 AI。直接丢「好感=42」这种数字，模型只会
@@ -455,14 +547,14 @@ namespace VNEffects
                 _persona.DisplayName, turnIndex + 1, _maxTurns);
         }
 
-        void SetThinking(bool on)
+        void SetThinking(bool on, string customText = null)
         {
             if (_thinkingLabel == null) return;
             _thinkingTween?.Kill();
             _thinkingLabel.gameObject.SetActive(on);
             if (!on) return;
 
-            _thinkingLabel.text = string.Format(VNLocale.T("aitalk.typing"),
+            _thinkingLabel.text = customText ?? string.Format(VNLocale.T("aitalk.typing"),
                 _persona.DisplayName);
             // 用 DOVirtual 而不是 text.DOFade：后者是 DOTween 的 TMP 扩展模块提供的，
             // 模块没启用时会编译不过。这里改成通用补间，零依赖。

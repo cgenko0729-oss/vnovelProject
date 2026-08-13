@@ -53,6 +53,14 @@ namespace VNEffects
         public string choiceSkin;                      // 选项面板皮肤 id（空 = 默认）
 
         /// <summary>
+        /// AI 自由聊天的跨场记忆。**必须跟着存档走**——读回旧档时她不该记得
+        /// 「未来」聊过的事。旧存档没有这个字段时 JsonUtility 给空列表，
+        /// 等价于「那时候还没聊过」，语义正确。
+        /// （日记本是玩家的收藏品，走全局 JSON，不在这里，见 VNAiDiary。）
+        /// </summary>
+        public List<VNAiMemoryEntry> aiMemories = new List<VNAiMemoryEntry>();
+
+        /// <summary>
         /// 液体喷溅的持续状态（liquid 命令）。
         /// 空中飞的水珠和屏幕上已经溅好的水渍都是瞬态的，读档不还原也不违和——
         /// 存的只是"还在喷 / 镜头是湿的 / 点击喷水模式开着"这三个会一直持续下去的开关。

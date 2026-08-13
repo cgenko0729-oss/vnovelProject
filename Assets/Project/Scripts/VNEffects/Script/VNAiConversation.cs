@@ -30,7 +30,8 @@ namespace VNEffects
         public string topic;            // 本次话题引导：剧本 topic:
         public string place;            // 当前场景描述（背景 id / 自由文本）
         public string affectionText;    // 当前好感度的人话描述，如「好感 42 / 100，算是熟了」
-        public string memory;           // 往期聊天摘要（跨场景记忆）
+        public string memory;           // 往期聊天摘要（跨场记忆，VNAiMemory 组装）
+        public List<string> pastTopics; // 已聊过的话题，作为**硬性回避清单**注入
         public int turnsLeft;           // 还剩几轮（让 AI 自己把节奏收住）
     }
 
@@ -55,6 +56,7 @@ namespace VNEffects
         readonly List<string> _marks;
         readonly List<string> _tones;    // 本场实际用的语气档（3~6 条）
         readonly string _schema;
+        string _openingText;            // 合成的开场引导原文，拍平对话时跳过
 
         /// <summary>本场每轮给几个候选回复</summary>
         public int OptionCount => _tones.Count;
@@ -92,7 +94,12 @@ namespace VNEffects
             if (!string.IsNullOrEmpty(playerSaid))
                 _history.Add(VNAiMessage.Player(playerSaid));
             else if (_history.Count == 0)
-                _history.Add(VNAiMessage.Player(OpeningPrompt(ctx)));
+            {
+                // 合成的开场引导：是给模型的指令，不是玩家真说过的话。
+                // 记下原文，收场总结拍平对话时要跳过它。
+                _openingText = OpeningPrompt(ctx);
+                _history.Add(VNAiMessage.Player(_openingText));
+            }
 
             TrimHistory();
 
@@ -176,11 +183,26 @@ namespace VNEffects
             if (!string.IsNullOrWhiteSpace(ctx.place)) now.Append("场景：").AppendLine(ctx.place.Trim());
             if (!string.IsNullOrWhiteSpace(ctx.affectionText)) now.Append("当前关系：").AppendLine(ctx.affectionText.Trim());
             if (!string.IsNullOrWhiteSpace(ctx.topic)) now.Append("这次想聊的：").AppendLine(ctx.topic.Trim());
-            if (!string.IsNullOrWhiteSpace(ctx.memory)) now.Append("你记得的往事：").AppendLine(ctx.memory.Trim());
             if (ctx.turnsLeft > 0)
                 now.Append("这场对话大约还剩 ").Append(ctx.turnsLeft)
                    .AppendLine(" 轮，请自然地把话题引向收尾，别突兀地结束。");
             Section(sb, "此刻的情况", now.ToString());
+
+            // ── 跨场记忆：摘要给连续性，话题清单给去重 ──
+            Section(sb, "你还记得的事", ctx.memory);
+
+            if (ctx.pastTopics != null && ctx.pastTopics.Count > 0)
+            {
+                // 单独成段、措辞强硬。实测把话题揉进摘要里再说「别重复」效果差得多——
+                // 明确列出来让模型逐个避开，才真的避得开。
+                var avoid = new StringBuilder();
+                avoid.AppendLine("下面这些话题**之前已经聊过了，这次不要再当作新话题提起**：");
+                avoid.Append("  ").AppendLine(string.Join("、", ctx.pastTopics));
+                avoid.AppendLine("要开新话题。如果非要提到旧话题，必须是「延续」而不是「重新问一遍」——");
+                avoid.AppendLine("比如上次聊过值日，这次可以说「上次那袋垃圾后来怎么样了」，");
+                avoid.Append("但不能再问一次「今天轮到谁值日」。");
+                Section(sb, "避免重复", avoid.ToString());
+            }
 
             // ── 输出规则 ──
             sb.AppendLine("【输出规则】");
@@ -215,6 +237,10 @@ namespace VNEffects
 
             sb.AppendLine("【绝对边界】");
             sb.AppendLine(string.IsNullOrWhiteSpace(p.boundaries) ? "（无）" : p.boundaries.Trim());
+            // 语言约束放在**最后一行**：越靠后权重越高。
+            // 实测只写在「输出规则第 1 条」时，偶发会在候选回复里混出繁体（「沒」「說」），
+            // 挪到这里之后才稳住。这一条属于宁可重复也不能漏的硬约束。
+            sb.AppendLine(LanguageRule(tones != null ? tones.Count : 3));
             sb.Append("只输出 JSON，不要任何额外文字、不要代码块围栏。");
 
             return sb.ToString();
@@ -324,9 +350,15 @@ namespace VNEffects
             if (raw == null) { error = "JSON 解析结果为空"; return false; }
             if (string.IsNullOrWhiteSpace(raw.reply)) { error = "reply 字段为空"; return false; }
 
+            // 繁体兜底：提示词已经要求简体且放在最后一行，但实测仍会漏（见
+            // VNAiTextNormalize 的注释）。玩家直接看得见的文本一律过一道。
+            int tradCount = VNAiTextNormalize.CountTraditional(raw.reply);
+            if (tradCount > 0)
+                Debug.LogWarning($"[VNAi] 台词里有 {tradCount} 个繁体字，已自动转简体：{raw.reply}");
+
             turn = new VNAiTurn
             {
-                reply = raw.reply.Trim(),
+                reply = VNAiTextNormalize.ToSimplified(raw.reply.Trim()),
                 shouldEnd = raw.should_end,
                 affectionDelta = Mathf.Clamp(raw.affection_delta, -p.affectionClamp, p.affectionClamp),
             };
@@ -356,7 +388,11 @@ namespace VNEffects
                 foreach (var o in raw.options)
                 {
                     if (o == null || string.IsNullOrWhiteSpace(o.text)) continue;
-                    turn.options.Add(new VNAiOption { text = o.text.Trim(), tone = o.tone });
+                    turn.options.Add(new VNAiOption
+                    {
+                        text = VNAiTextNormalize.ToSimplified(o.text.Trim()),
+                        tone = o.tone,
+                    });
                     if (turn.options.Count == want) break;
                 }
             while (turn.options.Count < want)
@@ -400,6 +436,156 @@ namespace VNEffects
             t = t.Substring(nl + 1);
             int fence = t.LastIndexOf("```", StringComparison.Ordinal);
             return (fence >= 0 ? t.Substring(0, fence) : t).Trim();
+        }
+
+        // ──────────────── 收场总结：记忆 + 日记 ────────────────
+
+        /// <summary>
+        /// 聊完之后**额外发一次请求**得到的东西：给模型自己看的记忆，
+        /// 以及给玩家看的日记正文。
+        /// </summary>
+        public class VNAiSessionSummary
+        {
+            public string summary;                            // 一句话，第三人称
+            public List<string> topics = new List<string>();  // 聊过的话题标签
+            public List<string> facts = new List<string>();   // 她透露的具体信息
+            public string diary;                              // 主角口吻的日记正文
+        }
+
+        /// <summary>
+        /// 组装「总结这场对话」的请求。
+        ///
+        /// 为什么单独发一次而不是塞进主 schema：
+        ///   - 主 schema 每轮都在用，加字段等于每轮都在算摘要，纯浪费
+        ///   - ESC 提前退出时主 schema 那条路根本走不到
+        ///   - 总结要的语气（第三人称、给自己看）和台词完全不同，混在一起会互相干扰
+        /// 代价是一场多约 $0.001，相对一场 $0.006~0.013 可以忽略。
+        /// </summary>
+        public VNAiRequest BuildSummaryRequest(VNAiContext ctx, string playerName)
+        {
+            string me = string.IsNullOrWhiteSpace(playerName) ? "我" : playerName.Trim();
+            var sb = new StringBuilder(512);
+
+            string her = persona.DisplayName;
+
+            // ★ 先把角色扮演的身份摘掉。这个请求复用了刚才的对话历史，
+            //   模型仍处在「我就是她」的语境里；不显式切换身份，
+            //   它写日记时会自动用她的口吻（实测踩过：要主角视角，出来的是她的独白）。
+            sb.AppendLine("【现在停止角色扮演。】");
+            sb.Append("你不再是「").Append(her)
+              .AppendLine("」，而是一个旁观刚才那段对话的记录者。");
+            sb.AppendLine();
+            sb.Append("刚才的对话发生在「").Append(her).Append("」（女方）和「").Append(me)
+              .AppendLine("」（男方，玩家扮演的主角）之间。请你做两件事：");
+            sb.AppendLine();
+            sb.Append("1. 为**").Append(her)
+              .AppendLine("**整理这次对话的记忆，供她下次见面时回忆：");
+            sb.AppendLine("   - summary：一句话概括这次聊了什么、气氛如何。用第三人称，30 字以内。");
+            sb.AppendLine("   - topics：这次聊到的话题标签，每个 2~6 字的名词短语");
+            sb.AppendLine("     （如「值日」「数学作业」「草莓牛奶」）。只列真的聊到的，最多 6 个。");
+            sb.Append("   - facts：对话中透露出的、下次仍然成立的具体信息（如「")
+              .Append(me).AppendLine("答应请她喝草莓牛奶」）。没有就给空数组，最多 4 条。");
+            sb.AppendLine();
+            sb.Append("2. diary：**").Append(me).Append("（男方）**当天晚上写的日记，60~120 字。");
+            sb.AppendLine();
+            sb.Append("   ★ 用「我」自称时，这个「我」指的是 ").Append(me)
+              .Append("，**不是** ").Append(her).AppendLine("。");
+            sb.Append("   ★ 绝对不要用 ").Append(her)
+              .AppendLine(" 的口吻或她的口头禅写这段日记——这是他的日记本，不是她的。");
+            sb.Append("   写他眼中的").Append(her)
+              .AppendLine("是什么样子、他当时心里在想什么，可以有藏不住的小心思。");
+            sb.AppendLine("   不要复述对话原文，也不要写成流水账；挑最有感觉的一两个瞬间来写。");
+            sb.AppendLine();
+            sb.AppendLine("全部使用简体中文，禁止繁体字。只输出 JSON。");
+
+            var req = new VNAiRequest
+            {
+                model = persona.ResolveModel(),
+                systemInstruction = sb.ToString(),
+                responseSchemaJson = SummarySchema,
+                // 总结是归纳任务，不需要思考预算；这里固定 Minimal 不跟随人格设置，
+                // 免得人格开了 High 之后每场结束都白白多花几千个思考 token
+                thinking = VNAiThinking.Minimal,
+                safety = persona.safety,
+                temperature = 0.7f,     // 归纳要稳，不要发散
+                maxOutputTokens = 512,
+            };
+            // ★ 关键：把对话**拍平成一段纯文本**放进单条 user 消息，
+            //   而不是按 role:user/model 交替发过去。
+            //   否则她的台词标着 role:model，模型看到「自己说过这些话」，
+            //   会结构性地代入她的身份——实测此时无论 system prompt 怎么强调
+            //   「停止角色扮演」「用男方口吻」，写出来的日记仍是她的独白。
+            //   拍平之后模型只是在读一份别人的对话记录，身份代入自然消失。
+            var transcript = new StringBuilder(1024);
+            transcript.AppendLine("以下是这次对话的完整记录：");
+            transcript.AppendLine();
+            foreach (var m in _history)
+            {
+                // 跳过合成的开场引导——那是给模型的指令，不是玩家说过的话
+                if (m.fromPlayer && !string.IsNullOrEmpty(_openingText) &&
+                    m.text == _openingText) continue;
+                transcript.Append(m.fromPlayer ? me : her).Append("：")
+                          .AppendLine(m.text);
+            }
+            transcript.AppendLine();
+            transcript.Append("请按上面的要求输出 JSON。");
+
+            req.history.Add(VNAiMessage.Player(transcript.ToString()));
+            return req;
+        }
+
+        const string SummarySchema =
+            @"{""type"":""OBJECT"",""properties"":{
+                ""summary"":{""type"":""STRING""},
+                ""topics"":{""type"":""ARRAY"",""maxItems"":6,""items"":{""type"":""STRING""}},
+                ""facts"":{""type"":""ARRAY"",""maxItems"":4,""items"":{""type"":""STRING""}},
+                ""diary"":{""type"":""STRING""}},
+              ""required"":[""summary"",""topics"",""diary""],
+              ""propertyOrdering"":[""summary"",""topics"",""facts"",""diary""]}";
+
+        /// <summary>解析总结。失败时返回 false，调用方跳过记忆与日记即可（不影响结算）。</summary>
+        public static bool TryParseSummary(string json, out VNAiSessionSummary summary,
+                                           out string error)
+        {
+            summary = null;
+            error = null;
+            if (string.IsNullOrWhiteSpace(json)) { error = "总结为空"; return false; }
+
+            RawSummary raw;
+            try { raw = JsonUtility.FromJson<RawSummary>(StripFence(json)); }
+            catch (Exception e) { error = $"总结 JSON 解析失败：{e.Message}"; return false; }
+            if (raw == null) { error = "总结解析结果为空"; return false; }
+
+            // 同台词：日记是玩家直接看的，摘要与话题会被写进存档并注入下一次提示词，
+            // 全部过一道繁转简，免得繁体字在记忆里越积越多
+            summary = new VNAiSessionSummary
+            {
+                summary = VNAiTextNormalize.ToSimplified(raw.summary?.Trim() ?? ""),
+                diary = VNAiTextNormalize.ToSimplified(raw.diary?.Trim() ?? ""),
+            };
+            if (raw.topics != null)
+                foreach (string t in raw.topics)
+                    if (!string.IsNullOrWhiteSpace(t))
+                        summary.topics.Add(VNAiTextNormalize.ToSimplified(t.Trim()));
+            if (raw.facts != null)
+                foreach (string f in raw.facts)
+                    if (!string.IsNullOrWhiteSpace(f))
+                        summary.facts.Add(VNAiTextNormalize.ToSimplified(f.Trim()));
+
+            if (string.IsNullOrEmpty(summary.summary) && summary.topics.Count == 0)
+            {
+                error = "总结既没有 summary 也没有 topics";
+                return false;
+            }
+            return true;
+        }
+
+        [Serializable] class RawSummary
+        {
+            public string summary;
+            public string[] topics;
+            public string[] facts;
+            public string diary;
         }
 
         /// <summary>兜底轮：断网 / 被拦 / 解析失败时用，保证模块永远有东西可演。</summary>

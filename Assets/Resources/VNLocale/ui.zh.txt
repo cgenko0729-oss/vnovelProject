@@ -270,3 +270,13 @@ aitalk.quitTitle = 结束这次对话？
 aitalk.quitTip = 已经聊出来的好感会照常结算。
 aitalk.quitNo = 继续聊
 aitalk.quitYes = 结束对话
+aitalk.recording = 把今天的事记下来…
+
+# 日记本（D 键）
+diary.title = 日记本　（{0} 篇）
+diary.titleEmpty = 日记本
+diary.empty = 还没有写下任何一页。
+和她聊过天之后，这里会留下你的记录。
+diary.hint = D / ESC 关闭　·　滚轮翻页
+diary.all = 全部
+diary.affection = 好感 {0}
