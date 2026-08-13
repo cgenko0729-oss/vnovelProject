@@ -61,8 +61,8 @@ namespace VNEffects
 
         [Header("允许 AI 使用的表情名（留空 = 用角色资产 expressions 里的全部）\n" +
                 "★ 这份列表会变成 schema 的 enum，AI 编不出列表外的表情名\n" +
-                "★ 只列**构图一致**的表情！素材里如果某张表情换了服装/季节/景别，\n" +
-                "  AI 一选中画面就会穿帮（实测：校服的默认表情 → 羽绒服的生气表情）")]
+                "★ 只列**构图一致**的表情！AI 换表情是瞬间切图、没有过渡，\n" +
+                "  素材里某张换了服装/季节/景别的话，一选中画面就会穿帮")]
         public List<string> allowedEmotions = new List<string>();
 
         [Header("允许 AI 使用的漫符（英文正名或中文别名；留空 = 全部 11 种）")]
