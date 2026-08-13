@@ -190,6 +190,19 @@ namespace VNEffects
         public List<VNQuizDef> quizzes = new List<VNQuizDef>();
         public List<VNBadmintonDef> badmintons = new List<VNBadmintonDef>();
 
+        [Header("AI 自由聊天人格（event aitalk persona: 引用）\n" +
+                "留空 = 生成器扫全工程 VNAiPersonaDef 自动登记")]
+        public List<VNAiPersonaDef> aiPersonas = new List<VNAiPersonaDef>();
+
+        /// <summary>按 id 查 AI 人格；找不到返回 null（调用方负责告警）</summary>
+        public VNAiPersonaDef FindAiPersona(string personaId)
+        {
+            if (aiPersonas == null || string.IsNullOrEmpty(personaId)) return null;
+            foreach (var p in aiPersonas)
+                if (p != null && p.id == personaId) return p;
+            return null;
+        }
+
         [Header("大头贴：边框样式 / 贴纸 / 背景 / 拍照主题（event photo 用）")]
         public List<VNPhotoFrameDef> photoFrames = new List<VNPhotoFrameDef>();
         public List<VNPhotoStickerDef> photoStickers = new List<VNPhotoStickerDef>();

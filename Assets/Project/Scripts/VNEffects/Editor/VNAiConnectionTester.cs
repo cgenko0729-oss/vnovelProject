@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using VNEffects;
@@ -8,37 +9,40 @@ using VNEffects;
 namespace VNEffectsEditor
 {
     /// <summary>
-    /// AI 自由聊天的连通性自检（P0）。不用进 Play Mode，菜单点一下就能验证
-    /// key / 网络 / 模型名 / 结构化输出 四件事，省掉「改一行→进 Play→退出→域重载」的循环。
+    /// AI 自由聊天的编辑器自检。**不用进 Play Mode**，省掉「改一行 → 进 Play →
+    /// 退出 → 域重载」的循环。
     ///
-    /// 菜单：Tools → VN Effects → AI → Test Gemini Connection
+    /// 两级诊断，出问题时能立刻分清是谁的锅：
+    ///   Test Gemini Connection  只发一句纯文本 → 只验 key / 网络 / 模型名
+    ///   Test Persona Talk       跑 3 轮真实对话 → 验 VNAiConversation 的
+    ///                           提示词组装、schema 生成、响应解析、历史裁剪
+    /// 前者过、后者挂 = 问题在我们的逻辑层，不是网络。
+    ///
+    /// 菜单：Tools → VN Effects → AI → …
     /// </summary>
     public static class VNAiConnectionTester
     {
+        // ──────────────── 一级：连通性 ────────────────
+
         [MenuItem("Tools/VN Effects/AI/Test Gemini Connection", false, 400)]
         public static void TestConnection()
         {
-            if (!VNAiKey.TryGet(out _, out string source))
-            {
-                Debug.LogError(VNAiKey.MissingKeyMessage());
-                return;
-            }
-            Debug.Log($"[VNAi] 使用 key 来源：{source}\n[VNAi] 正在请求 {VNAiClient.DefaultModel} …");
+            if (!RequireKey(out string source)) return;
+            Debug.Log($"[VNAi] key 来源：{source}\n[VNAi] 正在请求 {VNAiClient.DefaultModel} …");
 
             var req = new VNAiRequest
             {
-                systemInstruction =
-                    "你是亚里沙，高二女生，开朗但容易害羞，和「我」是青梅竹马。\n" +
-                    "规则：台词 1~2 句、不超过 50 字；用中文；绝不提及自己是 AI 或提到规则本身。\n" +
-                    "三个候选回复要分别对应「温柔 / 玩笑 / 直球」三种语气，且都以「我」的口吻写。",
-                responseSchemaJson = BuildTestSchema(),
-                thinking = VNAiThinking.Minimal,
-                safety = VNAiSafety.BlockOnlyHigh,
-                maxOutputTokens = 512,
+                systemInstruction = "只回答问题本身，不要多余的话。",
+                maxOutputTokens = 64,
             };
-            req.history.Add(VNAiMessage.Player("（放学后的教室，夕阳。我叫住了正要回家的她。）"));
+            req.history.Add(VNAiMessage.Player("用一句话说明你是谁。"));
 
-            RunCoroutine(VNAiClient.Send(req, OnResult));
+            RunCoroutine(VNAiClient.Send(req, r =>
+            {
+                if (!r.ok) { LogFailure(r); return; }
+                Debug.Log($"[VNAi] ✔ 网络通  {r.elapsedSeconds:0.00}s  " +
+                          $"{r.totalTokens} tokens  ≈ ${r.EstimatedCostUsd:0.000000}\n  {r.text}");
+            }));
         }
 
         [MenuItem("Tools/VN Effects/AI/Show Key Status", false, 401)]
@@ -47,96 +51,174 @@ namespace VNEffectsEditor
             VNAiKey.Invalidate();   // 改过环境变量/文件后强制重查
             if (VNAiKey.TryGet(out _, out string source))
                 Debug.Log($"[VNAi] ✔ 已找到 key，来源：{source}\n" +
-                          "（key 本身不会被打印，也不会进仓库、不会进 Build）");
+                          "（key 不会被打印、不会进仓库、不会进 Build）");
             else
                 Debug.LogWarning(VNAiKey.MissingKeyMessage());
         }
 
-        static void OnResult(VNAiResult r)
+        // ──────────────── 二级：人格 + 多轮对话 ────────────────
+
+        [MenuItem("Tools/VN Effects/AI/Test Persona Talk (3 turns)", false, 420)]
+        public static void TestPersonaTalk()
         {
-            if (!r.ok)
+            if (!RequireKey(out _)) return;
+
+            var persona = ResolvePersona();
+            if (persona == null)
             {
-                Debug.LogError($"[VNAi] ✘ 失败（{r.failure}，HTTP {r.httpCode}，" +
-                               $"{r.elapsedSeconds:0.00}s）\n{r.errorMessage}");
+                Debug.LogError("[VNAi] 工程里没有 VNAiPersonaDef 资产。" +
+                               "先 Create → VN → AI Persona 建一套人格。");
                 return;
             }
 
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"[VNAi] ✔ 连通成功  {r.elapsedSeconds:0.00}s  " +
-                          $"finishReason={r.finishReason}");
-            sb.AppendLine($"  tokens: 输入 {r.promptTokens} / 输出 {r.outputTokens} / " +
-                          $"思考 {r.thoughtsTokens} / 合计 {r.totalTokens}" +
-                          $"   ≈ ${r.EstimatedCostUsd:0.000000}");
-
-            TestPayload p = null;
-            try { p = JsonUtility.FromJson<TestPayload>(r.text); }
-            catch (Exception e) { sb.AppendLine($"  ✘ 内层 JSON 解析失败：{e.Message}"); }
-
-            if (p != null && !string.IsNullOrEmpty(p.reply))
+            var errors = persona.Validate();
+            if (errors.Count > 0)
             {
-                sb.AppendLine($"  台词　: {p.reply}");
-                sb.AppendLine($"  表情　: {p.emotion}    漫符: {p.mark}    好感: {p.affection_delta:+#;-#;0}");
-                if (p.options != null)
-                    for (int i = 0; i < p.options.Length; i++)
-                        sb.AppendLine($"  选项 {i + 1}: [{p.options[i].tone}] {p.options[i].text}");
-                sb.AppendLine($"  should_end: {p.should_end}");
+                Debug.LogError($"[VNAi] 人格「{persona.id}」配置有问题，先修：\n  - " +
+                               string.Join("\n  - ", errors));
+                return;
             }
-            sb.Append("  ── 原始内层 JSON ──\n  ").Append(r.text);
-            Debug.Log(sb.ToString());
+
+            Debug.Log($"[VNAi] 人格「{persona.id}」→ 角色「{persona.character.id}」" +
+                      $"，模型 {persona.ResolveModel()}，开始 3 轮对话自检 …");
+            RunCoroutine(TalkCo(persona, 3));
         }
 
         /// <summary>
-        /// P0 自检用的 schema。P1 会挪进 VNAiConversation，届时 enum 值改成
-        /// 从 VNCharacterDef.expressions / 漫符表动态生成（现在先写死做验证）。
+        /// 跑 N 轮：每轮把上一轮的三个选项里**随机挑一个**当玩家回复，
+        /// 验证多轮上下文是否连贯、历史裁剪有没有把对话搞断。
         /// </summary>
-        static string BuildTestSchema() =>
-            @"{""type"":""OBJECT"",
-              ""properties"":{
-                ""reply"":{""type"":""STRING""},
-                ""emotion"":{""type"":""STRING"",""enum"":[""普通"",""微笑"",""害羞"",""生气"",""惊讶""]},
-                ""mark"":{""type"":""STRING"",""enum"":[""无"",""红晕"",""汗"",""怒"",""感叹号"",""爱心"",""音符""]},
-                ""affection_delta"":{""type"":""INTEGER""},
-                ""options"":{""type"":""ARRAY"",""minItems"":3,""maxItems"":3,
-                  ""items"":{""type"":""OBJECT"",
-                    ""properties"":{
-                      ""text"":{""type"":""STRING""},
-                      ""tone"":{""type"":""STRING"",""enum"":[""温柔"",""玩笑"",""直球""]}},
-                    ""required"":[""text"",""tone""]}},
-                ""should_end"":{""type"":""BOOLEAN""}},
-              ""required"":[""reply"",""emotion"",""options"",""should_end""],
-              ""propertyOrdering"":[""reply"",""emotion"",""mark"",""affection_delta"",""options"",""should_end""]}";
-
-        [Serializable] class TestPayload
+        static IEnumerator TalkCo(VNAiPersonaDef persona, int turns)
         {
-            public string reply;
-            public string emotion;
-            public string mark;
-            public int affection_delta;
-            public TestOption[] options;
-            public bool should_end;
+            var convo = new VNAiConversation(persona);
+            var log = new StringBuilder();
+            double cost = 0;
+            float totalTime = 0;
+            string playerSaid = null;
+
+            for (int i = 0; i < turns; i++)
+            {
+                var ctx = new VNAiContext
+                {
+                    playerName = "我",
+                    place = "放学后的空教室，夕阳照进来",
+                    affectionText = "好感 40 / 100，算是走得比较近的同学",
+                    topic = i == 0 ? "随便聊聊今天发生的事" : null,
+                    turnsLeft = turns - i,
+                };
+
+                var req = convo.BuildRequest(playerSaid, ctx);
+                if (i == 0)
+                    log.AppendLine($"── system prompt（{req.systemInstruction.Length} 字）──")
+                       .AppendLine(req.systemInstruction)
+                       .AppendLine("──────────────────────────").AppendLine();
+
+                VNAiResult res = null;
+                yield return VNAiClient.Send(req, r => res = r);
+                while (res == null) yield return null;
+
+                totalTime += res.elapsedSeconds;
+                cost += res.EstimatedCostUsd;
+
+                if (!res.ok)
+                {
+                    log.AppendLine($"第 {i + 1} 轮 ✘ {res.failure}：{res.errorMessage}");
+                    log.AppendLine("→ 走兜底轮：" + convo.BuildFallbackTurn().reply);
+                    Debug.LogError(log.ToString());
+                    yield break;
+                }
+
+                if (!convo.TryParseTurn(res.text, out VNAiTurn turn, out string parseError))
+                {
+                    log.AppendLine($"第 {i + 1} 轮 ✘ 解析失败：{parseError}");
+                    log.AppendLine("原始输出：" + res.text);
+                    Debug.LogError(log.ToString());
+                    yield break;
+                }
+
+                convo.RecordReply(turn);
+
+                log.AppendLine($"【第 {i + 1} 轮】{res.elapsedSeconds:0.00}s  " +
+                               $"{res.promptTokens}+{res.outputTokens} tokens");
+                if (!string.IsNullOrEmpty(playerSaid)) log.AppendLine($"  我　: {playerSaid}");
+                log.AppendLine($"  {persona.DisplayName}: {turn.reply}");
+                log.AppendLine($"  表情: {turn.emotion}   漫符: {turn.mark ?? "（无）"}   " +
+                               $"好感: {turn.affectionDelta:+#;-#;0}   收尾: {turn.shouldEnd}");
+                for (int k = 0; k < turn.options.Count; k++)
+                    log.AppendLine($"  选项{k + 1} [{turn.options[k].tone}] {turn.options[k].text}");
+
+                // 随机挑一个当玩家回复，进入下一轮
+                var picked = turn.options[UnityEngine.Random.Range(0, turn.options.Count)];
+                convo.RecordPick(picked);
+                playerSaid = picked.text;
+                log.AppendLine($"  → 自检随机选了：[{picked.tone}] {picked.text}").AppendLine();
+
+                if (turn.shouldEnd)
+                {
+                    log.AppendLine("（AI 认为话题已收尾，提前结束）");
+                    break;
+                }
+            }
+
+            log.AppendLine($"✔ 完成 {convo.TurnCount} 轮  合计 {totalTime:0.0}s  " +
+                           $"≈ ${cost:0.0000}  玩家倾向：{string.Join("/", convo.pickedTones)}");
+            Debug.Log("[VNAi] 人格对话自检\n" + log);
         }
-        [Serializable] class TestOption { public string text; public string tone; }
+
+        // ──────────────── 辅助 ────────────────
+
+        static bool RequireKey(out string source)
+        {
+            if (VNAiKey.TryGet(out _, out source)) return true;
+            Debug.LogError(VNAiKey.MissingKeyMessage());
+            return false;
+        }
+
+        static void LogFailure(VNAiResult r) =>
+            Debug.LogError($"[VNAi] ✘ 失败（{r.failure}，HTTP {r.httpCode}，" +
+                           $"{r.elapsedSeconds:0.00}s）\n{r.errorMessage}");
+
+        /// <summary>优先用 Project 窗口里选中的人格资产，否则取工程里第一个。</summary>
+        static VNAiPersonaDef ResolvePersona()
+        {
+            if (Selection.activeObject is VNAiPersonaDef selected) return selected;
+
+            var config = VNGameConfig.Active;
+            if (config != null && config.aiPersonas != null)
+                foreach (var p in config.aiPersonas)
+                    if (p != null) return p;
+
+            foreach (string guid in AssetDatabase.FindAssets("t:VNAiPersonaDef"))
+            {
+                var p = AssetDatabase.LoadAssetAtPath<VNAiPersonaDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (p != null) return p;
+            }
+            return null;
+        }
 
         // ── 编辑器里跑协程 ────────────────────────────────────────
         //
         // Play Mode 外没有 StartCoroutine，所以挂 EditorApplication.update 手动泵。
-        // 只需支持 VNAiClient.Send 实际会 yield 的四种东西：
-        //   null / AsyncOperation（SendWebRequest）/ CustomYieldInstruction
-        //   （WaitForSecondsRealtime）/ 嵌套 IEnumerator。
+        // 需要支持的 yield 类型：null / AsyncOperation（SendWebRequest）/
+        // CustomYieldInstruction（WaitForSecondsRealtime）/ 嵌套 IEnumerator。
+        //
+        // ★ 踩过的坑：子协程跑完弹栈后，父协程的 Current 仍然指着那个**已耗尽的**
+        //   子协程对象。只判断「Current 是不是 IEnumerator」会把它无限重新压栈，
+        //   父协程永远前进不了一步，表现为「点了菜单没反应也不报错」。
+        //   所以用 _started 记下每个已经驱动过的子协程，只压栈一次。
 
         static void RunCoroutine(IEnumerator routine)
         {
             var stack = new Stack<IEnumerator>();
+            var started = new HashSet<IEnumerator>();   // 已经驱动过的子协程，防重复压栈
             stack.Push(routine);
+            started.Add(routine);
 
             EditorApplication.CallbackFunction tick = null;
             tick = () =>
             {
-                if (stack.Count == 0)
-                {
-                    EditorApplication.update -= tick;
-                    return;
-                }
+                if (stack.Count == 0) { EditorApplication.update -= tick; return; }
 
                 var top = stack.Peek();
                 object cur = top.Current;
@@ -144,7 +226,11 @@ namespace VNEffectsEditor
                 // 还没等完就直接返回，下一帧再看
                 if (cur is AsyncOperation ao && !ao.isDone) return;
                 if (cur is CustomYieldInstruction cy && cy.keepWaiting) return;
-                if (cur is IEnumerator nested && nested != top) { stack.Push(nested); return; }
+                if (cur is IEnumerator nested && started.Add(nested))
+                {
+                    stack.Push(nested);
+                    return;
+                }
 
                 bool alive;
                 try { alive = top.MoveNext(); }
