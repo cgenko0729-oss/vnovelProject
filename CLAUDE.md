@@ -238,8 +238,13 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   镜头视角模式铺满画布；遮挡区尺寸实测 `VNStage.dialogue`，量不到才退回默认布局。
   撤销是**窗口内独立栈**（快照 = `GenerateText()` 文本），Ctrl+Z/Ctrl+Y 走 ShortcutManager
   窗口作用域，**不挂 Unity 全局 Undo**；换绑定行清空历史。详见 WhatAiDo 一〇一章。
+- **打字搜索**（`VNCommandSearch.cs`，与分类菜单并存）：行首命令按钮**右键** = 打字换命令
+  （左键仍是分类菜单）、底部 `+` 加行、各参数格下拉都换成可搜列表；`Ctrl+E` 开命令面板
+  （向导式：选命令 → 逐个问位置参数 → 可选参数菜单循环 → Enter 插入 / Shift+Enter 插上方 /
+  Tab 跳过 / Esc 取消）。候选表从 Schema 现场生成，加新命令自动出现。**匹配只做子串包含**
+  （中英皆可，不做模糊/拼音）。详见 WhatAiDo 一一一章。
 - 快捷键：`Enter` 在选中行下方插入空台词行（自动聚焦输入框）、`Shift+Enter` 插在上方；
-  文本框编辑中的第一下 Enter 只结束编辑。插命令行仍走列表底部 `+` 下拉。
+  文本框编辑中的第一下 Enter 只结束编辑。插命令行走列表底部 `+` 下拉或 `Ctrl+E` 面板。
   调试键位 `F5` 播放选中行 / `F6` 重播上次那行 / `F8` 暂停 / `F10` 单步 / `Ctrl+S` 保存
   （走 ShortcutManager，可在 Edit → Shortcuts 改），另有 `Ctrl+Enter` / `Ctrl+Shift+Enter`。
 - **改编辑器前必读技能 vn-editor-extend**（say 专用字段、行号换算、Bridge 时序等硬规则都在里面）；

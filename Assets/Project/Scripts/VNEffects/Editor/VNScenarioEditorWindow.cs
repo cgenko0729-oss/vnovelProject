@@ -66,6 +66,17 @@ namespace VNEffects.EditorTools
         int _pendingInsertAt = -1;   // 待插入的行号
         int _pendingFocusRow = -1;   // 插完后要把键盘焦点送进去的行号
 
+        // 搜索弹窗 / Ctrl+E 命令面板：回调跑在别的窗口的 GUI 里，改行数一律留到下一个
+        // Layout 事件（和上面那套 _pendingInsertAt 同理）
+        VNRow _pendingNewRow;
+        bool _pendingNewRowAbove;
+        bool _pendingPalette;        // Ctrl+E 请求：PopupWindow 只能在 OnGUI 里开
+        // 参数格搜索弹窗的回填槽：PopupString 是同步返回的（camseq 路径点、choice 选项行
+        // 的值都不在 VNRow.values 里，靠调用方自己写回），所以弹窗只能把结果放这儿，
+        // 由下一帧的 PopupString 同步 return 出去，绝不能像 SpritePopup 那样回调直写 values
+        readonly Dictionary<(VNRow, string), string> _popupResults =
+            new Dictionary<(VNRow, string), string>();
+
         readonly VNScenarioSourceContext _ctx = new VNScenarioSourceContext();
         readonly List<SpritePreviewItem> _backgroundPreviews =
             new List<SpritePreviewItem>();
@@ -298,7 +309,7 @@ namespace VNEffects.EditorTools
                 multiSelect = true,   // Shift=连选 / Ctrl=点选，拖动整体移动
                 elementHeightCallback = i => RowHeight(_doc.rows[i]),
                 drawElementCallback = DrawRow,
-                onAddDropdownCallback = (rect, list) => ShowAddMenu(),
+                onAddDropdownCallback = (rect, list) => ShowAddSearch(rect),
                 onRemoveCallback = list =>
                 {
                     var selected = SelectedRowIndices();
@@ -592,6 +603,10 @@ namespace VNEffects.EditorTools
         void LoadFromText(string text)
         {
             _doc = VNScenarioDoc.Parse(text);
+            // 行对象整批换掉了，按旧行引用记的编辑状态全部作废
+            _popupResults.Clear();
+            _customEdit.Clear();
+            _pendingNewRow = null;
             RebindList();
             Bump();
         }
@@ -660,6 +675,21 @@ namespace VNEffects.EditorTools
             e.Use();
         }
 
+        /// <summary>
+        /// Ctrl+E 命令面板。PopupWindow.Show 只能在 OnGUI 里调（要 GUI 坐标换算），
+        /// 所以这里只置旗标，真正弹出在 DrawEditTab 末尾。
+        /// 键位没选 Ctrl+K：那是 Unity Search 的默认绑定，Shortcuts 面板会标冲突。
+        /// </summary>
+        [Shortcut("VN/Scenario Editor/Command Palette", typeof(VNScenarioEditorWindow),
+            KeyCode.E, ShortcutModifiers.Action)]
+        static void ShortcutCommandPalette(ShortcutArguments args)
+        {
+            if (!(args.context is VNScenarioEditorWindow w)) return;
+            w._tab = Tab.Edit;
+            w._pendingPalette = true;
+            w.Repaint();
+        }
+
         [Shortcut("VN/Scenario Editor/Toggle Debug Pause", typeof(VNScenarioEditorWindow),
             KeyCode.F8)]
         static void ShortcutTogglePause(ShortcutArguments args)
@@ -703,6 +733,33 @@ namespace VNEffects.EditorTools
             Repaint();
         }
 
+        /// <summary>
+        /// 搜索弹窗 / 命令面板攒好的行，在下一个 Layout 事件里插进文档。
+        /// 位置语义与 Enter 一致：选区下方（Shift = 上方），没有选区就追加到末尾。
+        /// </summary>
+        void ApplyPendingNewRow()
+        {
+            if (_pendingNewRow == null) return;
+            VNRow row = _pendingNewRow;
+            bool above = _pendingNewRowAbove;
+            _pendingNewRow = null;
+
+            var selected = SelectedRowIndices();
+            int at;
+            if (selected.Count == 0) at = _doc.rows.Count;
+            else at = above ? selected[0] : selected[selected.Count - 1] + 1;
+            at = Mathf.Clamp(at, 0, _doc.rows.Count);
+
+            MarkStructural();
+            _doc.rows.Insert(at, row);
+            _list.ClearSelection();
+            _list.index = at;
+            _list.Select(at, true);
+            if (row.kind == VNRowKind.Say) _pendingFocusRow = at;   // 台词行直接进输入状态
+            ScrollRowIntoView(at);
+            Bump();
+        }
+
         /// <summary>在下一个 Layout 事件里真正插行（改列表长度必须避开其它 IMGUI 事件）</summary>
         void ApplyPendingInsert()
         {
@@ -740,7 +797,11 @@ namespace VNEffects.EditorTools
 
         void OnGUI()
         {
-            if (Event.current.type == EventType.Layout) ApplyPendingInsert();
+            if (Event.current.type == EventType.Layout)
+            {
+                ApplyPendingInsert();
+                ApplyPendingNewRow();
+            }
 
             // 帧首快照（撤销用：结构操作要拿"改动前"的文本）
             if (Event.current.type == EventType.Layout && _frameSnapshotVersion != _version)
@@ -1089,6 +1150,10 @@ namespace VNEffects.EditorTools
                 "F5/F6/F8/F10/Ctrl+S 可在 Edit → Shortcuts → VN/Scenario Editor 里改键位。\n" +
                 "Enter = 在选中行下方插入台词行（自动聚焦，可直接打字），Shift+Enter = 插在上方；" +
                 "在文本框里打字时第一下 Enter 只是结束编辑，再按一次才插入。\n" +
+                "打字找命令：Ctrl+E = 命令面板（选命令 → 逐个问必填参数 → 可选参数菜单 → " +
+                "Enter 插入，Shift+Enter 插到上方，Tab 跳过参数，Esc 取消）；" +
+                "右键点行首的命令按钮 = 打字换这一行的命令（左键仍是原来的分类菜单）；" +
+                "底部 [+] 与各参数下拉也都能打字筛选。\n" +
                 "Shift+click = select range, Ctrl+click = toggle select; " +
                 "drag moves all selected rows, [-] / Duplicate act on the whole selection. " +
                 "Drag handle to reorder. [+] adds after selection. \"@\" = async (do not wait). " +
@@ -1096,6 +1161,12 @@ namespace VNEffects.EditorTools
                 "camseq waypoint lines are kept as text in this batch " +
                 "(use Tools → VN Effects → Camera Sequence Editor and paste).",
                 MessageType.Info);
+
+            if (_pendingPalette && Event.current.type == EventType.Repaint)
+            {
+                _pendingPalette = false;
+                ShowCommandPalette();
+            }
         }
 
         /// <summary>
@@ -1397,8 +1468,12 @@ namespace VNEffects.EditorTools
         {
             float x = rect.x;
             var typeRect = new Rect(x, rect.y, 128f, rect.height);
+            // 右键 = 打字搜索。按钮本身照画不误：IMGUI 的控件 id 是按调用顺序分配的，
+            // 少画一个控件会让同一帧后面的控件全部错位
+            bool searchType = ConsumeRightClick(typeRect);
             if (CategoryPopupButton(typeRect, "say（对白）", "Dialogue"))
                 ShowRowTypeMenu(typeRect, r);
+            if (searchType) ShowRowTypeSearch(typeRect, r);
             x += 132f;
 
             // 说话者
@@ -1434,9 +1509,11 @@ namespace VNEffects.EditorTools
 
             // 关键字下拉
             var keywordRect = new Rect(x, line0.y, 128f, line0.height);
+            bool searchKeyword = ConsumeRightClick(keywordRect);   // 右键 = 打字搜索
             if (CategoryPopupButton(keywordRect, CommandDisplayName(r.keyword),
                     CommandCategory(r.keyword)))
                 ShowRowTypeMenu(keywordRect, r);
+            if (searchKeyword) ShowRowTypeSearch(keywordRect, r);
             x += 132f;
 
             var def = VNScenarioSchema.Find(r.keyword);
@@ -1887,6 +1964,147 @@ namespace VNEffects.EditorTools
             menu.DropDown(rect);
         }
 
+        /// <summary>
+        /// 右键点行首命令按钮 = 打字换命令。GUI.Button 只吃左键，所以右键要自己收；
+        /// ReorderableList 的选中/拖动也只认左键，这里 Use() 掉不会抢它的事件。
+        /// </summary>
+        static bool ConsumeRightClick(Rect rect)
+        {
+            var e = Event.current;
+            if (e.type != EventType.MouseDown || e.button != 1 ||
+                !rect.Contains(e.mousePosition)) return false;
+            e.Use();
+            return true;
+        }
+
+        /// <summary>右键行首按钮：打字换这一行的命令（左键那套分类菜单原样保留）</summary>
+        void ShowRowTypeSearch(Rect rect, VNRow row)
+        {
+            PopupWindow.Show(rect, new VNSearchPopup(
+                "换成哪个命令？（打字筛选）", BuildCommandItems(true, false),
+                item =>
+                {
+                    if (item.value == "say")
+                    {
+                        if (row.kind == VNRowKind.Say) return;
+                        MarkStructural();
+                        SetSayRow(row);
+                    }
+                    else
+                    {
+                        if (row.kind == VNRowKind.Command && row.keyword == item.value) return;
+                        MarkStructural();
+                        SetKeyword(row, item.value);
+                    }
+                    Repaint();
+                }));
+        }
+
+        /// <summary>底部 [+]：打字挑要加的行（命令 / 台词 / 注释 / 空行）</summary>
+        void ShowAddSearch(Rect rect)
+        {
+            PopupWindow.Show(rect, new VNSearchPopup(
+                "加一行什么？（打字筛选）", BuildCommandItems(true, true),
+                item =>
+                {
+                    _pendingNewRow = NewRowForSearchValue(item.value);
+                    _pendingNewRowAbove = false;
+                    Repaint();
+                }));
+        }
+
+        void ShowCommandPalette()
+        {
+            var activator = new Rect(position.width * 0.5f - 270f, 70f, 540f, 0f);
+            PopupWindow.Show(activator, new VNCommandPalette(
+                BuildCommandItems(true, false),
+                BuildParamCandidates,
+                NewRowForSearchValue,
+                (row, above) =>
+                {
+                    _pendingNewRow = row;
+                    _pendingNewRowAbove = above;
+                    Repaint();
+                }));
+        }
+
+        /// <summary>搜索候选的 value → 新行（"say" / "#" / "" 是三个特殊值）</summary>
+        VNRow NewRowForSearchValue(string value)
+        {
+            switch (value)
+            {
+                case "say": return NewSayRow();
+                case "#": return new VNRow { kind = VNRowKind.Raw, raw = "# " };
+                case "": return new VNRow { kind = VNRowKind.Raw, raw = "" };
+                default: return NewCommandRow(value);
+            }
+        }
+
+        /// <summary>命令候选表：数据源就是 Schema，以后加新命令自动出现在搜索里</summary>
+        List<VNSearchItem> BuildCommandItems(bool includeSay, bool includeRaw)
+        {
+            var items = new List<VNSearchItem>();
+            if (includeSay)
+                items.Add(new VNSearchItem
+                {
+                    value = "say",
+                    title = "say（对白）",
+                    subtitle = "普通台词行",
+                    searchExtra = "Dialogue 对话 台词 duibai",
+                    accent = CategoryColor("Dialogue"),
+                });
+
+            foreach (var command in VNScenarioSchema.Commands)
+                items.Add(new VNSearchItem
+                {
+                    value = command.keyword,
+                    title = CommandDisplayName(command.keyword),
+                    subtitle = FirstLine(command.hint),
+                    searchExtra = CategoryDisplayName(command.category),
+                    accent = CategoryColor(command.category),
+                });
+
+            if (includeRaw)
+            {
+                items.Add(new VNSearchItem
+                    { value = "#", title = "# 注释", searchExtra = "comment 注释" });
+                items.Add(new VNSearchItem
+                    { value = "", title = "（空行）", searchExtra = "blank 空行" });
+            }
+            return items;
+        }
+
+        /// <summary>命令面板问参数时的候选；返回 null = 这个参数是自由文本/数字，直接打</summary>
+        List<VNSearchItem> BuildParamCandidates(VNRow row, VNParamDef parameter)
+        {
+            if (parameter == null) return null;
+
+            string[] options = parameter.id == "say.speaker"
+                ? _ctx.characterIds
+                : OptionsFor(row, parameter);
+            if (options == null) return null;
+
+            string[] display = parameter.id == "say.speaker"
+                ? null : DisplayOptionsFor(row, parameter, options);
+
+            var items = new List<VNSearchItem>();
+            for (int i = 0; i < options.Length; i++)
+                items.Add(new VNSearchItem
+                {
+                    value = options[i],
+                    title = display != null && display.Length == options.Length
+                        ? display[i] : options[i],
+                });
+            return items;
+        }
+
+        static string FirstLine(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            int at = text.IndexOf('\n');
+            return at < 0 ? text : text.Substring(0, at);
+        }
+
         static string CommandDisplayName(string keyword) =>
             CommandTranslations.TryGetValue(keyword, out string translation)
                 ? $"{keyword}（{translation}）" : keyword;
@@ -2118,22 +2336,28 @@ namespace VNEffects.EditorTools
                 return;
             }
 
-            string[] displayOptions = null;
-            if (IsTransitionParameter(r, p))
-                displayOptions = BuildTranslatedOptions(options, TransitionTranslations);
-            else if (IsEmoteParameter(r, p))
-                displayOptions = BuildTranslatedOptions(options, EmoteTranslations);
-            else if (IsMarkParameter(r, p))
-                displayOptions = BuildTranslatedOptions(options, MarkTranslations);
-            else if (r.keyword == "show" && p.id == "with")
-                displayOptions = BuildTranslatedOptions(options, EntranceTranslations);
-            else if (r.keyword == "hide" && p.id == "with")
-                displayOptions = BuildTranslatedOptions(options, ExitTranslations);
-            else if ((r.keyword == "show" && p.id == "from") ||
-                     (r.keyword == "hide" && p.id == "to"))
-                displayOptions = BuildTranslatedOptions(options, SideTranslations);
-            string nv2 = PopupString(rect, v, options, "-", (r, p.id), displayOptions);
+            string nv2 = PopupString(rect, v, options, "-", (r, p.id),
+                DisplayOptionsFor(r, p, options));
             if (nv2 != v) r.Set(p.id, nv2);
+        }
+
+        /// <summary>枚举类参数的中英对照显示名（写进剧本的值仍是英文）；没有对照就返回 null</summary>
+        static string[] DisplayOptionsFor(VNRow r, VNParamDef p, string[] options)
+        {
+            if (IsTransitionParameter(r, p))
+                return BuildTranslatedOptions(options, TransitionTranslations);
+            if (IsEmoteParameter(r, p))
+                return BuildTranslatedOptions(options, EmoteTranslations);
+            if (IsMarkParameter(r, p))
+                return BuildTranslatedOptions(options, MarkTranslations);
+            if (r.keyword == "show" && p.id == "with")
+                return BuildTranslatedOptions(options, EntranceTranslations);
+            if (r.keyword == "hide" && p.id == "with")
+                return BuildTranslatedOptions(options, ExitTranslations);
+            if ((r.keyword == "show" && p.id == "from") ||
+                (r.keyword == "hide" && p.id == "to"))
+                return BuildTranslatedOptions(options, SideTranslations);
+            return null;
         }
 
         static bool IsTransitionParameter(VNRow row, VNParamDef parameter) =>
@@ -2450,10 +2674,26 @@ namespace VNEffects.EditorTools
             }
         }
 
-        /// <summary>下拉 + "custom…" 自由输入的通用控件。emptyLabel 对应空值。</summary>
+        /// <summary>
+        /// 下拉 + "custom…" 自由输入的通用控件。emptyLabel 对应空值。
+        ///
+        /// 【同步契约不能破】本函数是同步返回的：调用方拿返回值自己写回。
+        /// camseq 路径点（值在 camLines 文本里）和 choice 选项行（值在 VNChoiceOptionRow
+        /// 字段里）都靠这一点，所以搜索弹窗只能把选中值丢进 _popupResults，
+        /// 由下一帧的本函数 return 出去——绝不能学 SpritePopup 在回调里直写 values。
+        /// </summary>
         string PopupString(Rect rect, string value, string[] options, string emptyLabel,
             (VNRow, string) key, string[] displayOptions = null)
         {
+            // 上一帧弹窗选的值：同步交还给调用方
+            if (_popupResults.TryGetValue(key, out string picked))
+            {
+                _popupResults.Remove(key);
+                _customEdit.Remove(key);
+                GUI.changed = true;
+                return picked;
+            }
+
             bool custom = _customEdit.Contains(key) ||
                           (!string.IsNullOrEmpty(value) &&
                            System.Array.IndexOf(options, value) < 0);
@@ -2471,26 +2711,45 @@ namespace VNEffects.EditorTools
                 return nv;
             }
 
-            var display = new string[options.Length + 2];
-            display[0] = emptyLabel;
-            for (int i = 0; i < options.Length; i++)
-                display[i + 1] = displayOptions != null && displayOptions.Length == options.Length
-                    ? displayOptions[i] : options[i];
-            display[display.Length - 1] = "custom…";
-
-            int idx = string.IsNullOrEmpty(value) ? 0
-                : System.Array.IndexOf(options, value) + 1;
-            int nidx = EditorGUI.Popup(rect, idx, display);
-            if (nidx != idx)
-            {
-                if (nidx == display.Length - 1)
-                {
-                    _customEdit.Add(key);
-                    return value;
-                }
-                return nidx == 0 ? "" : options[nidx - 1];
-            }
+            int idx = System.Array.IndexOf(options, value);
+            string label = string.IsNullOrEmpty(value) ? emptyLabel
+                : (displayOptions != null && displayOptions.Length == options.Length &&
+                   idx >= 0 ? displayOptions[idx] : value);
+            if (GUI.Button(rect, label, EditorStyles.popup))
+                ShowStringSearch(rect, options, emptyLabel, key, displayOptions);
             return value;
+        }
+
+        /// <summary>参数格的可搜下拉：选中值放进 _popupResults，下一帧由 PopupString 交还</summary>
+        void ShowStringSearch(Rect rect, string[] options, string emptyLabel,
+            (VNRow, string) key, string[] displayOptions)
+        {
+            var items = new List<VNSearchItem>
+            {
+                new VNSearchItem { value = "", title = emptyLabel, searchExtra = "清空 留空" },
+            };
+            for (int i = 0; i < options.Length; i++)
+                items.Add(new VNSearchItem
+                {
+                    value = options[i],
+                    title = displayOptions != null && displayOptions.Length == options.Length
+                        ? displayOptions[i] : options[i],
+                });
+
+            PopupWindow.Show(rect, new VNSearchPopup(
+                "打字筛选，或直接输入自定义值", items,
+                item =>
+                {
+                    _popupResults[key] = item.value;
+                    Repaint();
+                },
+                twoLine: false, allowFreeValue: true,
+                onCustom: () =>
+                {
+                    _customEdit.Add(key);   // 切成常驻文本框（要反复改自由值时用）
+                    Repaint();
+                },
+                width: 300f, height: 280f));
         }
 
         string BackgroundPopup(Rect rect, string value, (VNRow, string) key)
@@ -2818,25 +3077,6 @@ namespace VNEffects.EditorTools
         }
 
         // ---- 添加菜单 ----
-
-        void ShowAddMenu()
-        {
-            var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("Say line"), false, () => InsertRow(NewSayRow()));
-            menu.AddSeparator("");
-            foreach (var c in VNScenarioSchema.Commands)
-            {
-                var keyword = c.keyword;
-                menu.AddItem(new GUIContent($"{c.category}/{keyword}"), false,
-                    () => InsertRow(NewCommandRow(keyword)));
-            }
-            menu.AddSeparator("");
-            menu.AddItem(new GUIContent("Comment (#)"), false,
-                () => InsertRow(new VNRow { kind = VNRowKind.Raw, raw = "# " }));
-            menu.AddItem(new GUIContent("Blank line"), false,
-                () => InsertRow(new VNRow { kind = VNRowKind.Raw, raw = "" }));
-            menu.ShowAsContext();
-        }
 
         VNRow NewSayRow() => new VNRow { kind = VNRowKind.Say };
 

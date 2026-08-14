@@ -18,6 +18,17 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
   所以它们只能用在「值本来就存在 `values`（或 say 专用字段）」的参数格上。
   值存在别处的（camseq 路径点存在 `camLines` 文本里）必须用同步控件——
   `PopupString` / `EditorGUI.Popup`，否则选了不生效还顺手往文档里塞个野参数。
+- **`PopupString` 的同步契约是硬的，别顺手改成回调写值**：它现在内部弹的是搜索窗
+  （`VNSearchPopup`），但选中值只放进 `_popupResults[key]`，**由下一帧的 `PopupString`
+  同步 return 给调用方**，调用方仍旧自己写回。因为它的三个调用点里有两个值不在
+  `values`：camseq 路径点（写 `wp.point`）、choice 选项行（写 `VNChoiceOptionRow`）。
+  给参数格加新控件时照这个模式走。
+- **右键交互：按钮照画不误**。`GUI.Button` 只吃左键，右键要自己 `Use()`；但**不能因此
+  跳过按钮的绘制调用**——IMGUI 控件 id 按调用顺序分配，少画一个控件会让同一帧后面的
+  控件全部错位。先收右键、照常调按钮、再处理右键动作。
+- **弹窗回调里不能直接改 `_doc.rows` 长度**（回调跑在另一个窗口的 GUI 里）：
+  攒进 `_pendingNewRow` / `_pendingInsertAt`，留到下一个 Layout 事件由
+  `ApplyPendingNewRow` / `ApplyPendingInsert` 落地。
 - **UI 行号 ≠ 物理行号**：换算一律走 `SourceLineForRow`——choice 选项行和 camseq waypoint
   都额外占物理行；空行/注释从下一条有效命令启动。反向换算（物理行 → UI 行）走
   `RowForSourceLine`，两个函数的跨行规则必须保持一致，改一个就得改另一个。
@@ -61,6 +72,14 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
   Enter 系快捷键只能在 IMGUI 里自己收，且要排在 `HandleInsertKeys` 之前。
 - 运行时入口：`VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`；
   重建逻辑本身见 [vn-save-compat] 与 [vn-debug]。
+
+## 打字搜索（VNCommandSearch.cs）
+- 四件套：`VNSearchItem`（候选）/ `VNSearchListView`（搜索框+列表+键盘）/
+  `VNSearchPopup`（通用弹窗）/ `VNCommandPalette`（Ctrl+E 向导面板）。
+- **键盘处理必须排在 `EditorGUI.TextField` 之前**：文本框会把 ↑↓ 拿去移光标、
+  把 Enter 当「结束编辑」吃掉，先 `Event.current.Use()` 才轮得到候选列表。
+- 命令候选表从 `VNScenarioSchema.Commands` 现场生成，**加新命令不用回来登记**。
+- 匹配是刻意的子串包含（`VNSearchItem.Matches`），要改成模糊/拼音只动那一个方法。
 
 ## 新行类型 / 新参数
 - 走 [vn-new-command] 清单第 5~6 步（Schema + CommandTranslations + VNParamSource 三处）。
