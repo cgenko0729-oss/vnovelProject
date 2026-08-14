@@ -6801,6 +6801,17 @@ Sunset 红通道从 1.27 降到 1.09，立绘再乘 0.3 强度只剩 1.027 —�
    Shift+Enter 则插在上方，Tab 跳过当前参数，Esc 全程可取消。
 7. 编译验证：`assets-refresh` 后 console 无 error（本次实测只剩既存的 CS0618 警告）。
 
+### 修复记录
+
+- **搜索框清空失效**（向导每换一步都要清 query，结果清不掉）：
+  IMGUI 的文本框只要还持有 `GUIUtility.keyboardControl`，就用它内部 `TextEditor`
+  的缓冲，程序里把源字符串改成 `""` **不生效**——下一帧那个控件把旧文本原样
+  return 回来，等于又写回 `query`。症状是 Ctrl+E 面板选完 `show` 进到「问角色」
+  那步，搜索框里还留着 `show`，候选被错误过滤成空。
+  修法：`VNSearchListView.Reset()` 里先 `GUIUtility.keyboardControl = 0`
+  让文本框重新从源字符串同步，再靠 `_focusPending` 在下一个 Repaint 抢回焦点。
+  **任何「程序化清空 IMGUI 文本框」的地方都要这么写。**
+
 ### 已知遗留
 
 - 匹配是子串包含，打 `sw` 命不中 `show`（要模糊子序列匹配得换打分排序），
