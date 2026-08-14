@@ -468,6 +468,10 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   前者过、后者挂 = 问题在提示词或人格配置。
 - `Editor/VNAiTalkInstaller.cs`：与 `VNQuizInstaller` 同款增量装机，
   额外做 key / 人格 / 表情三项体检；拆了 `Install(bool interactive)` 供自动化调用。
+- `Editor/VNAiStudio*.cs`：**AI 试聊台**（一一二章），调人格与提示词的主力工具，
+  详见第九节。这一层能存在完全是因为 `VNAiConversation` 没继承 MonoBehaviour——
+  提示词组装 / schema / 解析全部在 EditMode 直接可跑。**改那个文件时别把它拖回
+  MonoBehaviour**，会同时废掉试聊台和自检菜单。
 - **扩展位**：`VNAiContext.memory` 字段已预留，接跨场景记忆时把往期摘要塞进去即可，
   提示词层不用改（存储仿 `VNCgUnlocks` / `VNPhotoAlbum` 的全局 JSON）。
 
@@ -677,9 +681,17 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNCamseqEditorWindow.cs | Tools → VN Effects → （镜头编辑器） | camseq 路径的可视化编辑：Game 视图取点、路径预览、交叉叠化支持 |
 | VNCharacterVisualPreviewWindow.cs | Tools → VN Effects → （角色预览） | 角色立绘/头像/眨眼/口型的实时预览与标定，**确认后才写入资产** |
 | VNWeatherPreviewWindow.cs | Tools → VN Effects → Weather Preview | 飘落天气调参：编辑模式播放翻转帧预览（判断叶型像不像就看这里——宽度随帧呼吸 + 背面变暗），Play Mode 滑杆实时应用到场景，另存资产 + 一键登记进 VNGameConfig |
+| VNAiStudioWindow.cs | Tools → VN Effects → AI → **AI Talk Studio** | AI 试聊台主窗口（一一二章）：左改参数 / 中聊天流 / 右 **system prompt 实时预览**。不进 Play Mode 调人格与提示词 |
+| VNAiStudioDraft.cs | （草稿层） | 人格资产的内存副本。**用临时 SO 而不是自建字段**：`SerializedObject` 迭代画＝零 UI 代码就有全部字段，加新字段自动跟上，`VNAiConversation` 也直接能吃。写回逐属性 `CopyFromSerializedProperty`（**不能用 `CopySerialized`**，它连 `m_Name` 一起抄成「xxx(Clone)」） |
+| VNAiStudioSession.cs | （会话层） | 发请求 / 解析 / 轮次记录 / 重跑 / 分岔。域重载后靠轮次记录 `BuildRequest`+`RecordReply` **重建历史**（那两个方法只是组装与追加，不发请求） |
+| VNAiStudioMemory.cs | （记忆层） | 可命名记忆预设 + 从日志 / 从存档两个导入器。**完全独立于运行时 `VNAiMemory`**（那是存档态）；读存档**自己读 JSON，绝不调 `VNSaveSystem.Load()`**——那个会 `VNFlags.Clear()` |
+| VNAiStudioLog.cs | （导出） | 试聊会话按游戏内**同格式**写到 `AiTalkLogs/Editor/`，两边日志可互相对比 |
+| VNAiEditorCoroutine.cs | （基础设施） | Play Mode 外的协程泵，试聊台与自检菜单共用。**坑**：子协程跑完弹栈后父协程的 `Current` 仍指着那个已耗尽的对象，不记 `_started` 会无限重新压栈，表现为「点了没反应也不报错」 |
 
 **编辑器铁律**：文本是唯一真相（编辑器状态不落存档）；`say` 的角色/表情走
 `VNRow.speaker/expression` 专用字段，`show` 才用普通参数——两条路径不能混。
+窗口状态要活过域重载就必须**同时**改 `OnBeforeSerialize` 和 `OnEnable`
+（`VNScenarioEditorWindow` 与 `VNAiStudioWindow` 都遵循这条）。
 
 ---
 

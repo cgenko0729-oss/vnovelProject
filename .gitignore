@@ -55,5 +55,8 @@ crashlytics-build.properties
 /*ApiKey*.txt
 /*.apikey
 
-# AI 对话调试日志（开发用，不进仓库）
+# AI 对话调试日志（开发用，不进仓库）。试聊台的日志在 AiTalkLogs/Editor/ 子目录
 /AiTalkLogs/
+
+# AI 试聊台的记忆预设（本地调试场景，不进仓库）
+/AiTalkStudio/

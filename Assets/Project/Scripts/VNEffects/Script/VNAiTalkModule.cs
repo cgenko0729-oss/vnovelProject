@@ -379,17 +379,26 @@ namespace VNEffects
         /// 把养成属性翻译成人话喂给 AI。直接丢「好感=42」这种数字，模型只会
         /// 复读数字；说成「算是走得比较近」它才会调整语气。
         /// </summary>
-        string BuildAffectionText()
+        string BuildAffectionText() =>
+            string.IsNullOrEmpty(_statName)
+                ? null
+                : BuildAffectionText(_statName, VNFlags.Get(_statName));
+
+        /// <summary>
+        /// 阈值那一份在这里，供编辑器试聊台复用——那边没有真实 flag，
+        /// 好感由人手填，但翻译成人话的档位必须和游戏内**完全一致**，
+        /// 否则窗口里调好的语气分寸，进游戏是另一套。
+        /// </summary>
+        public static string BuildAffectionText(string statName, int value)
         {
-            if (string.IsNullOrEmpty(_statName)) return null;
-            int v = VNFlags.Get(_statName);
+            if (string.IsNullOrEmpty(statName)) return null;
             string level =
-                v >= 80 ? "已经是彼此心照不宣的关系" :
-                v >= 60 ? "关系很好，会主动找对方说话" :
-                v >= 40 ? "走得比较近的同学" :
-                v >= 20 ? "说得上话，但还有点距离" :
-                          "还不太熟";
-            return $"{_statName} {v}，{level}";
+                value >= 80 ? "已经是彼此心照不宣的关系" :
+                value >= 60 ? "关系很好，会主动找对方说话" :
+                value >= 40 ? "走得比较近的同学" :
+                value >= 20 ? "说得上话，但还有点距离" :
+                              "还不太熟";
+            return $"{statName} {value}，{level}";
         }
 
         IEnumerator SpeakCo(VNAiTurn turn)

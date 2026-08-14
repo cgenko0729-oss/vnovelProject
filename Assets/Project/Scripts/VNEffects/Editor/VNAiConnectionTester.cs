@@ -197,57 +197,8 @@ namespace VNEffectsEditor
             return null;
         }
 
-        // ── 编辑器里跑协程 ────────────────────────────────────────
-        //
-        // Play Mode 外没有 StartCoroutine，所以挂 EditorApplication.update 手动泵。
-        // 需要支持的 yield 类型：null / AsyncOperation（SendWebRequest）/
-        // CustomYieldInstruction（WaitForSecondsRealtime）/ 嵌套 IEnumerator。
-        //
-        // ★ 踩过的坑：子协程跑完弹栈后，父协程的 Current 仍然指着那个**已耗尽的**
-        //   子协程对象。只判断「Current 是不是 IEnumerator」会把它无限重新压栈，
-        //   父协程永远前进不了一步，表现为「点了菜单没反应也不报错」。
-        //   所以用 _started 记下每个已经驱动过的子协程，只压栈一次。
-
-        static void RunCoroutine(IEnumerator routine)
-        {
-            var stack = new Stack<IEnumerator>();
-            var started = new HashSet<IEnumerator>();   // 已经驱动过的子协程，防重复压栈
-            stack.Push(routine);
-            started.Add(routine);
-
-            EditorApplication.CallbackFunction tick = null;
-            tick = () =>
-            {
-                if (stack.Count == 0) { EditorApplication.update -= tick; return; }
-
-                var top = stack.Peek();
-                object cur = top.Current;
-
-                // 还没等完就直接返回，下一帧再看
-                if (cur is AsyncOperation ao && !ao.isDone) return;
-                if (cur is CustomYieldInstruction cy && cy.keepWaiting) return;
-                if (cur is IEnumerator nested && started.Add(nested))
-                {
-                    stack.Push(nested);
-                    return;
-                }
-
-                bool alive;
-                try { alive = top.MoveNext(); }
-                catch (Exception e)
-                {
-                    EditorApplication.update -= tick;
-                    Debug.LogError($"[VNAi] 自检协程抛异常：{e}");
-                    return;
-                }
-
-                if (!alive)
-                {
-                    stack.Pop();
-                    if (stack.Count == 0) EditorApplication.update -= tick;
-                }
-            };
-            EditorApplication.update += tick;
-        }
+        // 编辑器里跑协程：泵在 VNAiEditorCoroutine（与试聊台窗口共用同一份，
+        // 那里记着「已耗尽子协程被无限重新压栈」那个坑）
+        static void RunCoroutine(IEnumerator routine) => VNAiEditorCoroutine.Start(routine);
     }
 }

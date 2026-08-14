@@ -70,6 +70,62 @@ namespace VNEffects
         /// <summary>玩家历次选择的语气标签，可用来统计倾向写 flag</summary>
         public readonly List<string> pickedTones = new List<string>();
 
+        // ──────────────── 调试用：历史读取与回退 ────────────────
+        //
+        // 只给编辑器试聊台（VNAiStudioWindow）用，游戏内一条路径都走不到这里。
+        // 目的是「她这句回得不对，我从第 3 轮换个说法重试」和「同一输入连发三次看方差」——
+        // 没有这两个能力，调 temperature 与 boundaries 只能整场重聊。
+        //
+        // 刻意做成裁剪自己而不是让窗口另建一份消息列表：历史裁剪（TrimHistory）的语义
+        // 只应该有一份实现，复制出去将来改 historyTurns 语义时两边必然走偏。
+
+        /// <summary>发给模型的完整历史（含合成的开场引导）。只读用途。</summary>
+        public IReadOnlyList<VNAiMessage> History => _history;
+
+        /// <summary>合成的开场引导原文；null = 还没开场。拍平对话时要跳过它。</summary>
+        public string OpeningText => _openingText;
+
+        /// <summary>
+        /// 回退到「第 turnIndex 轮开始之前」的状态（0 = 整场重来但保留开场引导）。
+        /// 一轮 = 玩家一条 + 她一条，所以留下的消息数是 开场 + turnIndex×2 − 1 …
+        /// 实际按「已完成轮数」数：保留前 turnIndex 组「她的回复」及其之前的全部消息。
+        ///
+        /// 返回是否真的动了历史（已经在那个点上就返回 false）。
+        /// </summary>
+        public bool TruncateToTurn(int turnIndex)
+        {
+            if (turnIndex < 0) turnIndex = 0;
+            if (turnIndex >= TurnCount) return false;
+
+            // 从头扫，数到第 turnIndex 条 model 消息为止（不含它，也不含它后面的一切）
+            int kept = 0, cut = _history.Count;
+            for (int i = 0; i < _history.Count; i++)
+            {
+                if (_history[i].fromPlayer) continue;
+                if (kept == turnIndex) { cut = i; break; }
+                kept++;
+            }
+
+            // 那条 model 消息之前紧挨着的 user 消息也要去掉——它是「触发这一轮的玩家回复」，
+            // 保留下来会让下一次 BuildRequest 追加第二条 user 消息，Gemini 直接 400。
+            // 例外：开场引导（第 0 条）永远保留，否则重来时她不知道该先开口。
+            if (cut > 0 && _history[cut - 1].fromPlayer && cut - 1 > 0) cut--;
+
+            if (cut >= _history.Count) return false;
+            _history.RemoveRange(cut, _history.Count - cut);
+
+            TurnCount = turnIndex;
+
+            // 玩家实际做过几次选择 = 截断后历史里除开场引导之外的 user 消息条数。
+            // 直接按 turnIndex 算会差一个：第 N 轮她说完话时，玩家还没选第 N 次。
+            int picks = 0;
+            for (int i = 1; i < _history.Count; i++)
+                if (_history[i].fromPlayer) picks++;
+            if (pickedTones.Count > picks)
+                pickedTones.RemoveRange(picks, pickedTones.Count - picks);
+            return true;
+        }
+
         /// <param name="optionCount">
         /// 候选回复条数的临时覆盖（剧本 options:N）。0 = 按人格资产的扩展开关决定。
         /// </param>
@@ -476,7 +532,7 @@ namespace VNEffects
               .AppendLine("」，而是一个旁观刚才那段对话的记录者。");
             sb.AppendLine();
             sb.Append("刚才的对话发生在「").Append(her).Append("」（女方）和「").Append(me)
-              .AppendLine("」（男方，玩家扮演的主角）之间。请你做两件事：");
+              .AppendLine("」（男方，玩家扮演的主角宅男）之间。请你做两件事：");
             sb.AppendLine();
             sb.Append("1. 为**").Append(her)
               .AppendLine("**整理这次对话的记忆，供她下次见面时回忆：");
@@ -486,7 +542,7 @@ namespace VNEffects
             sb.Append("   - facts：对话中透露出的、下次仍然成立的具体信息（如「")
               .Append(me).AppendLine("答应请她喝草莓牛奶」）。没有就给空数组，最多 4 条。");
             sb.AppendLine();
-            sb.Append("2. diary：**").Append(me).Append("（男方）**当天晚上写的日记，60~120 字。");
+            sb.Append("2. diary：**").Append(me).Append("（男方宅男）**当天晚上写的宅男日记，60~120 字。");
             sb.AppendLine();
             sb.Append("   ★ 用「我」自称时，这个「我」指的是 ").Append(me)
               .Append("，**不是** ").Append(her).AppendLine("。");

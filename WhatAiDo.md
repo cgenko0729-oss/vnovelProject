@@ -6819,3 +6819,123 @@ Sunset 红通道从 1.27 降到 1.09，立绘再乘 0.3 强度只剩 1.027 —�
   与 `VNSearchListView.Filter` 两处。
 - `Go to label` 下拉仍是 `GenericMenu`，未接入搜索。
 - 角色/背景/CG 参数格走的是另一条 `SpritePopup`（本来就有搜索框），本次未动。
+
+---
+
+## 一一二、AI 试聊台：不进 Play Mode 调人格与提示词（2026-08-14，分支 `agent/ai-talk-studio`）
+
+### 需求 / 背景
+
+调 `aitalk` 的人格与提示词，此前的循环是：改 `.asset` 字段 → 菜单
+`Test Persona Talk (3 turns)` → Console 吐一大坨文本 → 肉眼比对。六个具体瓶颈：
+
+1. 改提示词必须动资产（Git 噪声 diff、容易忘了改回来）
+2. 玩家回复是**随机挑**的，想验证「直球会不会让她乱套」根本试不了
+3. 看不到 system prompt 的变化，改完要重跑一整场才知道拼对没
+4. 无法 A/B 对比
+5. 无法回归验证
+6. 看不到演出效果
+
+本次做 MVP：解决 1/2/3，外加**记忆可编辑**（此前完全无法验证记忆的影响）。
+A/B 与批量回归明确留到以后——但每场试聊都落结构化 json，将来做对比时数据已经在了。
+
+### 文件改动
+
+**新增（Editor，6 个）**
+
+| 文件 | 职责 |
+|---|---|
+| `VNAiStudioWindow.cs` | 主窗口：三栏布局、会话动作、上下文组装、域重载存活 |
+| `VNAiStudioDraft.cs` | 草稿层：临时 SO 副本、脏标记、字段级 diff、写回/还原 |
+| `VNAiStudioSession.cs` | 会话驱动：发请求、解析、轮次记录、重跑/分岔/重建、收场总结 |
+| `VNAiStudioMemory.cs` | 记忆预设存储（项目根 `AiTalkStudio/Memories/*.json`）+ 两个导入器 |
+| `VNAiStudioLog.cs` | 把试聊会话按游戏内同格式导出到 `AiTalkLogs/Editor/` |
+| `VNAiEditorCoroutine.cs` | 编辑器协程泵（从 `VNAiConnectionTester` 提取，两处共用） |
+
+**修改（运行时，3 个，全是纯增量）**
+
+| 文件 | 改了什么 |
+|---|---|
+| `VNAiConversation.cs` | 加 `History` 只读、`OpeningText`、`TruncateToTurn(int)` |
+| `VNAiTalkLog.cs` | `Save(subFolder)` 支持子目录；`Begin` 加不带 `VNEventContext` 的重载 |
+| `VNAiTalkModule.cs` | `BuildAffectionText` 提成 `public static(statName, value)`，实例方法转调 |
+
+`VNAiConnectionTester.cs` 的协程泵改为调用提取出来的公共类；`.gitignore` 加 `/AiTalkStudio/`。
+
+### 技术决策与取舍
+
+**① 草稿层用「临时 ScriptableObject 副本」——本次最关键的一个选择**
+
+```
+Instantiate(persona) → 内存副本（HideFlags.DontSave）
+                     → SerializedObject 迭代画 = 零 UI 代码就有全部字段
+                     → new VNAiConversation(draft) = 逻辑层一行不用改
+```
+
+三个好处：将来给 `VNAiPersonaDef` 加字段窗口自动就有（不会两边脱节）；
+`VNAiConversation` 只认类型不认来源所以直接能吃草稿；写回是逐属性
+`CopyFromSerializedProperty`，自带 Undo。
+
+**写回刻意不用 `EditorUtility.CopySerialized`**：它连 `m_Name` 一起复制，
+副本名字是「xxx(Clone)」，照抄回去资产内部名就和文件名对不上了。
+逐属性复制天然跳过 `m_Name`（它不是 visible property），顺带也跳过 `m_Script`。
+
+**② 记忆预设完全独立于 `VNAiMemory`**
+
+运行时那份是**存档态**——跟着存档走、被读档覆盖、域重载清空。编辑器往里写
+等于凭空制造「读旧档她却记得未来」的幽灵状态。所以试聊台自己一套文件、
+自己的生命周期，只在组装 prompt 那一刻把条目喂进 `VNAiContext`。
+代价是 `BuildContext` / `TopicsOf` 两段格式要和 `VNAiMemory` 手动保持同步。
+
+**③ 从存档导入记忆刻意不走 `VNSaveSystem.Load()`**
+
+那个方法会 `VNFlags.Clear()` 再灌入存档里的全部 flag。在编辑器里点一下「导入」
+就把工程的 flag 状态冲掉，下次进 Play Mode 行为莫名其妙。改为自己读 JSON，纯读无副作用。
+
+**④ 从日志导入记忆要发一次总结请求（约 $0.001），不做「免费骨架导入」**
+
+注入 prompt 时真正被用到的是 `summary` / `topics` / `facts` 三样，
+而日志里一样都没有（总结不写进日志）。导入一条三样全空的条目等于什么都没导入，
+反而让人以为记忆生效了。做法是拿日志里的 `playerSaid` / `reply` 重建一次会话历史
+（不发请求，`BuildRequest` 只是组装），再走现成的 `BuildSummaryRequest`。
+
+**⑤ 域重载后靠轮次记录重建会话**
+
+`VNAiConversation._history` 是 private List 序列化不了，但轮次记录
+（`playerSaid` + `reply`）序列化得了，而这两样**足以重建历史**——
+依次调 `BuildRequest(playerSaid)` + `RecordReply(reply)` 即可，
+顺序与真实聊天完全一致。所以重载后不用重聊。
+**正在飞的那个请求救不回来**，会显示「已中断」，重跑一轮即可。
+
+**⑥ 注入记忆 / 写记忆做成两个独立开关**
+
+前者答「记忆对她有什么影响」——勾掉再跑一遍就能直接对比；
+后者答「这场要不要沉淀下来」。运行时那边看人格的 `enableMemory`，
+窗口这边看自己的开关（就是为了能一键对比）；两者不一致时窗口会提示。
+
+**⑦ 成本可见性**
+
+试聊台天生鼓励反复重跑，所以顶栏常驻累计 `$`，超过 $0.05 变红；
+草稿把 `thinking` 调离 `Minimal` 时顶栏直接标红警告——按实测那是唯一一个
+能让成本翻 6 倍的开关。
+
+### 验证
+
+纯逻辑部分用 `script-execute` 跑过（不进 Play Mode、不发网络请求）：
+
+- 三轮模拟后历史为 `U:开场 | M1 | U:玩家A | M2 | U:玩家B | M3`，`TurnCount=3`、`picks=2`
+- `TruncateToTurn(1)` → 剩 `U:开场 | M1`，`TurnCount=1`、`picks=0`
+- `TruncateToTurn(0)` → 剩 `U:开场`，`TurnCount=0`
+- 回退后重发开场：**历史首条仍是 user**（否则 Gemini 直接 400）
+- 记忆预设存取往返正常；注入后 prompt 里【你还记得的事】【避免重复】与
+  facts 内容都在
+- 窗口实际打开无 OnGUI 异常
+
+### 已知遗留
+
+- **A/B 对比没做**（本次范围外）。每场试聊已落 `AiTalkLogs/Editor/*.json`，
+  将来做并排 diff 时数据现成。
+- **没有演出预览**：立绘表情、漫符、打字机都看不到，纯文本。表情穿帮只能实际跑剧本时发现。
+- 记忆条目的 `topics` / `facts` 用「、」分隔的单行文本框编辑，条目多了不好使。
+- `VNAiStudioMemory.BuildContext` 与 `VNAiMemory.BuildContext` 是两份实现，
+  改一边要记得改另一边（不能复用的原因见决策②）。

@@ -47,6 +47,18 @@ namespace VNEffects
         public void Begin(VNAiPersonaDef persona, VNEventContext ctx,
                           string systemInstruction, int maxTurns, VNAiLogMode mode)
         {
+            Begin(persona, ctx != null ? FormatKwargs(ctx.kwargs) : null,
+                  systemInstruction, maxTurns, mode);
+            if (ctx != null) _s.scriptLine = ctx.line;
+        }
+
+        /// <summary>
+        /// 开场（不带剧本上下文的版本）。编辑器试聊台用这个——那边没有 VNEventContext，
+        /// 情境参数是窗口上手填的，直接给一行人话即可。
+        /// </summary>
+        public void Begin(VNAiPersonaDef persona, string kwargsText,
+                          string systemInstruction, int maxTurns, VNAiLogMode mode)
+        {
             Enabled = mode == VNAiLogMode.Always ||
                       (mode == VNAiLogMode.EditorOnly && Application.isEditor);
             if (!Enabled) return;
@@ -62,12 +74,7 @@ namespace VNEffects
             _s.historyTurns = persona != null ? persona.historyTurns : 0;
             _s.maxTurns = maxTurns;
             _s.systemInstruction = systemInstruction;
-
-            if (ctx != null)
-            {
-                _s.scriptLine = ctx.line;
-                _s.kwargs = FormatKwargs(ctx.kwargs);
-            }
+            _s.kwargs = kwargsText ?? "";
         }
 
         /// <summary>
@@ -139,13 +146,22 @@ namespace VNEffects
 
         // ──────────────── 落盘 ────────────────
 
-        /// <summary>写两份文件。返回 .md 的完整路径（失败返回 null）。</summary>
-        public string Save()
+        /// <summary>
+        /// 写两份文件。返回 .md 的完整路径（失败返回 null）。
+        /// </summary>
+        /// <param name="subFolder">
+        /// 落盘目录下的子目录名。游戏内留空 = 直接写 AiTalkLogs/；
+        /// 编辑器试聊台传 "Editor"，把调试产生的会话与真实游玩记录分开，
+        /// 但格式完全一致，所以两边日志能互相对比、分析脚本一套就够。
+        /// </param>
+        public string Save(string subFolder = null)
         {
             if (!Enabled) return null;
             try
             {
                 string dir = ResolveDirectory();
+                if (!string.IsNullOrWhiteSpace(subFolder))
+                    dir = Path.Combine(dir, subFolder.Trim());
                 Directory.CreateDirectory(dir);
 
                 string stem = $"{DateTime.Now:yyyy-MM-dd_HHmmss}_{Sanitize(_s.personaId)}";

@@ -4,7 +4,8 @@
 > 逐脚本的代码指南（职责/用法/扩展/维护）在 `ProjectCodeGuide.md`，改代码前先查它；
 > 从空场景手动搭建舞台的完整教程（含层级/排序/参数依据）在 `SetUpGuide.md`；
 > 剧本写法教程在 `HowToUse.md`；
-> AI 自由聊天的原理与调参（记忆机制/提示词组装/成本/日志/Ideas）在 `AiTalkGuide.md`。
+> AI 自由聊天的原理与调参（记忆机制/提示词组装/成本/日志）在 `AiTalkGuide.md`，
+> 这一块的改进路线图与构想清单在 `AiTalkIdeas.md`。
 > **可复用工作流程已做成技能**（`.claude/skills/`），做对应任务时先调用技能拿清单，见下方「技能索引」。
 
 ## 项目概况
@@ -150,6 +151,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNAiKey / VNAiClient | Gemini API Key 三级回退读取（环境变量 → 仓库外 → 仓库内；只在内存缓存、永不打印、`#if UNITY_EDITOR` 挡住 Build 版本读取）/ **全项目唯一碰 HTTP 的文件**，换模型换供应商只改它。协程封装而非 async/await（与 EventCo 的轮询等待天然契合），失败分 8 类供上层决定兜底还是重试，429/5xx/网络错误自带指数退避。**契约三坑**：`thinkingLevel` 必须放 `thinkingConfig` 里面且只有 minimal/low/medium/high；鉴权走 `x-goog-api-key` 请求头不用 `?key=`；被安全策略拦下时 `parts` 是空的，直接取 `parts[0]` 会空引用 |
 | VNAiPersonaDef / VNAiConversation | AI 人格资产（独立于 VNCharacterDef，因为一个角色要能有多套人格共用同一套立绘；表情/漫符白名单留空则取角色资产全部）/ **纯逻辑层（无 MonoBehaviour，可单测）**：system prompt 组装、JSON Schema 生成、历史裁剪、响应解析与钳制。提示词顺序 身份→说话方式→关系→此刻情况→输出规则→边界（越靠后权重越高）。**永远不信任模型输出**：好感强制 Clamp（Gemini schema 不支持 minimum/maximum，不钳实测会给 +5）、表情越界降级、选项不足补齐 |
 | VNAiMemory / VNAiDiary / VNAiDiaryPanel | **跨场记忆（存档态）** / **日记本（全局态）** / 日记本面板（D 键）。两者存储语义**刻意相反**：记忆是剧情状态必须跟着存档回退（读旧档她不该记得未来），日记是玩家收藏品不该因读档消失（同 CG 画廊）。一场聊完额外发一次请求，产出 摘要+话题标签+关键事实（→记忆）和 主角口吻日记（→日记本）。**「少重复」的主力是话题清单**——单独成段作为硬性回避清单注入，比把话题揉进摘要里说「别重复」有效得多。**踩过的坑**：总结请求若按 role:user/model 交替发历史，模型会代入她的身份写出「她的日记」，改成把对话拍平成纯文本放进单条 user 消息才对——身份认知不对时先看 role 结构，再改措辞 |
+| VNAiStudioWindow (Editor) | **AI 试聊台**（Tools → VN Effects → AI → AI Talk Studio，人格资产右键也能开）：不进 Play Mode 调人格与提示词。三栏＝左改参数／中聊天流／右 **system prompt 实时预览**（不发请求不花钱，改一个字立刻重拼——调 boundaries、speechStyle 的主力）。中栏可点选项、可自由输入任意回复（绕开三选一）、可重跑本轮看方差、可从任意轮重新分岔。配套 `VNAiStudioDraft`（**临时 SO 副本**当草稿层：SerializedObject 迭代画＝零 UI 代码就有全部字段、加新字段自动跟上；写回逐属性 copy 而**不用 CopySerialized**——那会把 m_Name 一起抄成「xxx(Clone)」）／`VNAiStudioSession`（会话驱动，域重载后靠轮次记录 `BuildRequest`+`RecordReply` 重建历史）／`VNAiStudioMemory`（记忆预设，见下）／`VNAiStudioLog`（导出到 `AiTalkLogs/Editor/`，与游戏内**同格式**所以两边能互相对比）／`VNAiEditorCoroutine`（编辑器协程泵，与自检菜单共用） |
+| VNAiStudioMemory (Editor) | 试聊台的**可命名记忆预设**（`<项目根>/AiTalkStudio/Memories/*.json`，不进 git）：「初次见面（空）」「聊过 3 次」各存一套，一键切换。**完全独立于运行时 `VNAiMemory`**——那份是存档态，编辑器往里写等于造出「读旧档她却记得未来」的幽灵状态。两个独立开关：`注入记忆`（勾掉再跑一遍＝直接对比有无记忆的差别）与 `结束时做总结`（多发一次请求，结果先预览再决定收不收）。导入三源：试聊后总结／从 `AiTalkLogs` 日志（**要发一次总结请求**，因为日志里没有 summary/topics/facts，导空壳等于没导）／从游戏存档槽（**自己读 JSON，绝不调 `VNSaveSystem.Load()`**——那个会 `VNFlags.Clear()` 冲掉工程 flag） |
 | VNAiTextNormalize | AI 输出的繁体字兜底转简体。提示词已把简体约束放在 system prompt 最后一行仍会漏（三次抽查三次中招），这是玩家直接可见的问题，所以加确定性代码兜底。分工：提示词管「大部分时候对」，兜底管「永远不出错」。作用于台词/选项/日记/摘要/话题 |
 | VNAiTalkModule | AI 自由聊天事件模块（event aitalk）。**刻意破一次模块三铁律**——直接驱动舞台立绘换表情，因为自绘立绘要把眨眼/口型/色调匹配/出场动画全部重接一遍；边界收紧为「只碰表情和对话框内容」且正常结束/ESC/CancelForDebug 三条路径都还原原表情。**射线坑**：EventLayer 排序 60 在选项面板 45 之上，模块自绘的一切默认 `raycastTarget=false`，否则吃掉选项点击（唯 ESC 确认框例外）。装机走 Tools → VN Effects → **Install AI Talk Module To Scene** |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
