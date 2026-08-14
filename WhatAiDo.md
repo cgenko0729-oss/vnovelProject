@@ -6575,3 +6575,134 @@ Play Mode 实测时 AI 自己抛出了**怀孕**剧情。原来的 boundaries �
 - 日记条目点开看对应的完整对话（`logFile` 字段已留）
 - 记忆的「遗忘曲线」：越久远的摘要压缩得越狠，而不是一刀切裁掉
 - 让 AI 自己判断哪些记忆重要（现在是无差别保留最近 N 场）
+
+---
+
+## 一一〇、情绪色调改为分层调色（mood 不再染 UI 与立绘）（2026-08-14，分支 `agent/mood-layered-grading`）
+
+### 需求 / 背景
+
+用户反馈：`mood Sunset` 一开，**整个画面连对话框和顶栏 HUD 一起变橙**，难看；
+立绘也被烤成橙色，画面还有过曝发白的"怪怪的"感觉。
+
+排查出三层原因：
+
+1. **架构层（主因）**：`VNMoodGrading` 用 URP 全局 Volume 做调色，而场景是
+   「单相机 + 单个 `Screen Space - Camera` 的 Canvas」——背景、立绘、对话框、
+   HUD 对 URP 来说是同一张画面。后处理作用于整个 color target，
+   **物理上无法只染一部分**，调参调不掉。
+2. **参数层**：Sunset 把 `colorFilter(1.18,0.94,0.72)`、`temperature +30`、
+   `gain(1.08,1,0.9)` 三条暖化通道叠乘，红通道乘到 1.27 直接冲破
+   **Bloom 阈值 1.0** 泛白，蓝通道压到 0.65；配上本来就偏橙的黄昏背景图就是
+   "橙上加橙"。这是过曝糊白的来源。
+3. **叠加层**：`VNToneMatch` 换背景时按背景平均色给立绘乘 9% 染色，
+   橙背景 → 立绘先橙一次，再被 mood 全屏橙一次。
+
+### 方案选型
+
+给用户列了三条路线，用户选 **A（调参）+ B（分层调色）**，
+立绘保留 ~30% 染色，暗角/颗粒继续盖住全屏。
+
+未采用 **C（相机架构拆分）** 的原因，两个硬伤：
+- URP 的 Camera Stack **做不到**「Base 吃调色、Overlay 不吃」——整个 stack 共用
+  一个 color target，后处理在最后一个相机之后统一执行一次。真能 100% 躲开
+  后处理的只有 `Screen Space - Overlay` 模式的 Canvas。
+- 而躲开后处理 = 同时躲开 Bloom。项目的核心约定是「发光 = HDR 颜色(>1) +
+  Bloom」，UI 一旦 Overlay，对话框流光边框、名牌发光、选项扫光**全部变成死板
+  纯色**。代价打在项目最看重的地方，收益却能被 B 用十分之一成本拿到。
+
+### 顺带挖出的既有 bug：六个系统抢同一个 shader 参数
+
+做 B 的过程中发现 `_Brightness` / `_Saturation` 被六处直接抢写，谁最后写谁赢：
+
+| 抢写方 | 场景 |
+|---|---|
+| VNSpeakerHighlight | **每句台词**都改（非说话者压暗） |
+| VNFakeDoF | 背景虚化压暗 |
+| VNCharacterEmotes | 沮丧动作压暗 |
+| VNEntranceAnimator | sink 退场压暗 |
+| VNWeatherController | 天气亮度/饱和联动 |
+| （本次新增）VNMoodGrading | 情绪色调 |
+
+所以 mood 如果也直接写，**每说一句话立绘颜色就会跳回去**。
+另外 `PrepareHidden()` 原本不重置亮度，sink 退场后复用立绘会残留 0.3 亮度
+（既有 bug，本次一并修掉）。合并层因此不是可选项而是必需品。
+
+### 文件改动
+
+**新增**
+- `VNGrade.cs` —— 调色值类型 `VNGrade`（滤镜/色相/饱和/亮度/对比度）+
+  来源通道枚举 `VNGradeLayer`（Mood / Weather / Focus / Emote / Manual）。
+  合并规则：**滤镜相乘、色相相加、其余相乘**；`Scaled(k)` 做强度缩放，
+  「背景全染、立绘轻染、UI 不染」就是靠它。纯静态数学，无 MonoBehaviour 依赖。
+
+**修改**
+- `VNImageEffect.shader` —— Color Grading 区段加 `_ColorFilter`（RGB 乘）与
+  `_Contrast`（绕 0.5 中灰缩放）。对比度会算出负值，**必须 `max(0,…)`**
+  钳掉，否则 uGUI 混合会出脏边。
+- `VNImageEffectController.cs` —— 加分层调色合并层：`SetGrade(layer, grade, dur)`
+  / `DOGradeField` / `ClearGrade` / `GetGrade`。每个通道存自己的目标值，
+  合并后统一补间。老 API（`SetHSV` / `DOBrightness` / `DOSaturation`）保留，
+  内部改走 `Manual` 通道 —— **没改到的调用点自动降级到独立通道，不会冲掉 mood**。
+- `VNMoodGrading.cs` —— 重写。Volume 只留 `FilmGrain + Vignette`
+  （不改色相，压四角反而有电影感，恐怖/回忆的氛围主要靠它俩）；
+  色彩全部移交分层调色，按 `backgroundStrength(1.0)` /
+  `midStrength(0.8)` / `characterStrength(0.3)` 分配。
+  加 `RegisterCharacter` / `UnregisterCharacter` / `SetCharacterTargets` /
+  `RegisterBackground` / `ApplyGradeToAll`。A/B 双 Volume 交叉过渡结构保留。
+- `VNSpeakerHighlight.cs` / `VNFakeDoF.cs` → `Focus` 通道
+- `VNCharacterEmotes.cs` / `VNEntranceAnimator.cs` → `Emote` 通道
+  （并在 `PrepareHidden()` 清 Emote + Focus，**不清 Mood** —— 情绪色调是全局的，
+  角色一出场就该带着当前情绪的颜色）
+- `VNWeatherController.cs` → `Weather` 通道
+- `VNStage.cs` —— `AutoWire()` 里 `RegisterBackground(backgroundFx)`（老场景自愈）；
+  `RefreshRegistries()` 里 `mood.SetCharacterTargets(...)`，
+  **中途出场的角色也会立刻带上当前情绪的颜色**。
+- `VNToneMatch.cs` —— 默认 `strength` 0.09 → 0.05（mood 现在也给立绘上色，
+  两者叠加容易过头）。**场景实例值需单独改**，本次已改 `VNScriptDemo` 场景。
+- `VNEffectsDemoSetup.cs` —— 演示场景没有 VNStage，直接接线 mood 的分层目标。
+
+### 调色预设换算表（100% 强度下的值）
+
+从原 Volume 参数换算并**整体收敛**，全部给 Bloom 留足余量：
+
+| mood | 滤镜 | 饱和 | 亮度 | 对比 | 全屏（颗粒/暗角）|
+|---|---|---|---|---|---|
+| Morning | (0.95, 1.00, 1.07) | 1.05 | 1.08 | 1.02 | — |
+| Sunset | (1.09, 1.00, 0.88) | 1.06 | 1.00 | 1.05 | — |
+| Night | (0.80, 0.87, 1.12) | 0.72 | 0.62 | 1.06 | — |
+| Memory | (1.11, 1.02, 0.87) | 0.62 | 1.06 | 0.85 | 0.28 / 0.34 |
+| Tension | (0.92, 1.03, 0.93) | 0.88 | 0.92 | 1.28 | 0.12 / 0.28 |
+| Horror | (0.88, 0.91, 0.97) | 0.40 | 0.70 | 1.20 | 0.40 / 0.48 |
+| Dream | (1.05, 0.95, 1.11) | 0.86 | 1.16 | 0.82 | — / 0.22 |
+
+Sunset 红通道从 1.27 降到 1.09，立绘再乘 0.3 强度只剩 1.027 —— 不再撞 Bloom。
+
+### 技术决策与取舍
+
+- **表现力降一档**：per-image shader 没有 `LiftGammaGain`，做不出「高光暖、
+  阴影冷」的分区调色。用单条滤镜 + 对比度近似，够用。要补的话给 shader 再加
+  两个参数即可。
+- **不加剧本语法**：立绘强度做成 Inspector 参数（`characterStrength`）而不是
+  `mood Sunset chara:0.5`，保持剧本层不变。以后要逐场切换再加。
+- **存档零改动**：分层调色完全从 `data.mood` 派生，`RestoreSnapshot` 调
+  `SetMood` 就会重新套用；新出场立绘经 `RegisterCharacter` 自动补色。
+- **立绘不做 0% 染色**：`VNToneMatch` 当初存在就是为了消除「立绘像贴纸」的
+  违和感，黄昏场景里立绘一点暖色不沾会明显浮在背景上。
+
+### 验证方法
+
+1. 剧本跑到 `mood Sunset` 处：背景转暖，**对话框、名牌、顶栏 HUD、快捷条
+   保持原色**；立绘只有很淡的暖调。
+2. 连说几句话：立绘在说话/旁听之间切换明暗时，**情绪色不该跳变**
+   （合并层生效的关键验证点）。
+3. `mood Sunset` 期间切 `weather Rain`：天气压暗与情绪色应叠加，而不是互相冲掉。
+4. `mood Horror` / `Memory`：暗角与颗粒仍盖住全屏（本次刻意保留）。
+5. 存档 → 读档：情绪色应完整恢复，含中途出场的角色。
+
+### 已知遗留
+
+- `midTargets`（中景）目前为空 —— GodRays 用的是 `VN/Additive` 材质，
+  不走 `VN/ImageEffect`，接不进分层调色。要染中景得先给它换材质。
+- 演示场景 `VNEffectsDemo` 需重跑 Tools → VN Effects → Create Demo Scene
+  才会带上新接线。

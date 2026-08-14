@@ -382,6 +382,12 @@ namespace VNEffects.EditorTools
                 ? new[] { charFx, charFxB }
                 : (charFx != null ? new[] { charFx } : new VNImageEffectController[0]);
 
+            // 情绪色调分层调色目标：背景全染、立绘轻染、UI 不在列表里所以完全不被染。
+            // 剧本场景由 VNStage 动态维护，这个演示场景没有 VNStage，在此直接接线。
+            if (rig.bgFx != null) rig.mood.backgroundTargets.Add(rig.bgFx);
+            if (charFx != null) rig.mood.characterTargets.Add(charFx);
+            if (charFxB != null) rig.mood.characterTargets.Add(charFxB);
+
             // ---------- 操作提示文字 ----------
             var hint = CreateHintText(rig.canvasGo.transform, 320f);
 

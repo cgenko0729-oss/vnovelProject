@@ -268,8 +268,10 @@ namespace VNEffects
             foreach (var target in moodTargets)
             {
                 if (target == null) continue;
-                target.DOBrightness(brightness, transition);
-                target.DOSaturation(saturation, transition);
+                // Weather 通道：与 mood 的情绪色在合并层相乘叠加。
+                // 从前两者都直接写 shader，切天气会把情绪色整个冲掉。
+                target.SetGrade(VNGradeLayer.Weather,
+                    VNGrade.Dim(brightness, saturation), transition);
             }
         }
     }

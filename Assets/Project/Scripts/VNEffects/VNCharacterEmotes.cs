@@ -127,8 +127,7 @@ namespace VNEffects
             _dejected = true;
             var seq = DOTween.Sequence()
                 .Append(_rect.DOAnchorPosY(_basePos.y - 24f, 0.6f).SetEase(Ease.OutQuad))
-                .Join(_fx.DOBrightness(0.72f, 0.6f))
-                .Join(_fx.DOSaturation(0.68f, 0.6f));
+                .Join(_fx.SetGrade(VNGradeLayer.Emote, VNGrade.Dim(0.72f, 0.68f), 0.6f));
             return End(seq);
         }
 
@@ -140,8 +139,7 @@ namespace VNEffects
             _dejected = false;
             var seq = DOTween.Sequence()
                 .Append(_rect.DOAnchorPosY(_basePos.y, 0.5f).SetEase(Ease.OutQuad))
-                .Join(_fx.DOBrightness(1f, 0.5f))
-                .Join(_fx.DOSaturation(1f, 0.5f));
+                .Join(_fx.ClearGrade(VNGradeLayer.Emote, 0.5f));
             return End(seq);
         }
 

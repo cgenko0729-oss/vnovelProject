@@ -12,6 +12,15 @@ description: 加新特效/演出组件（发光、粒子、全屏运动、转场
 - **发光 = 材质 HDR 颜色(>1) + Bloom（阈值 1.0）**；uGUI 顶点色被钳到 1，别走顶点色。
 - **贴图程序化生成**：先查 `VNProceduralTextures` 有没有现成形状，没有再加生成函数，零美术依赖。
 - **每张图独立材质实例**（VNImageEffectController 自动管理），不共享材质改参数。
+- **要改亮度/饱和/色相 → 走 `SetGrade(VNGradeLayer.X, …)`，禁止直接写
+  `_Brightness` / `_Saturation`**。这两个参数被说话者高亮（每句台词都改）、
+  伪景深、情绪动作、退场动画、天气联动、情绪色调六方共用，直接写谁最后写谁赢。
+  新效果要么复用现成通道，要么在 `VNGrade.cs` 的 `VNGradeLayer` 里加一条
+  （加在 `Count` 之前即可，合并逻辑不用改）。
+- **情绪色调 mood 不是全屏后处理**（一一〇章）：色彩逐层写进各自材质实例。
+  新加的图层想被 mood 染色 → 注册进 `VNMoodGrading` 的目标列表；想躲开 → 别注册。
+  **别试图靠相机拆分让某层躲开后处理**：URP Camera Stack 整个共用一个 color
+  target 躲不掉，`Screen Space - Overlay` 躲得掉但连 Bloom 一起躲开。
 - uGUI 自定义 shader 走传统 CGPROGRAM（Canvas 不经过 URP 光照），保留 UI 裁剪兼容。
 - UI 不写深度缓冲 → 不能用真 DoF/深度后处理，模糊走 VNImageEffect 的 9-tap。
 - 所有 Tween `SetLink(gameObject)`；**循环效果提供 Start/Stop 成对 API**。

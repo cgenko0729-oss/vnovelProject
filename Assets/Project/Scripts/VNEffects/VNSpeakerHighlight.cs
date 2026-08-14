@@ -59,8 +59,11 @@ namespace VNEffects
             {
                 if (c == null) continue;
                 bool isSpeaker = c == speaker;
-                c.DOBrightness(isSpeaker ? speakerBrightness : dimBrightness, transition);
-                c.DOSaturation(isSpeaker ? 1f : dimSaturation, transition);
+                // 走 Focus 通道：压暗只是"谁在说话"的相对关系，
+                // 不该覆盖掉 mood 给立绘上的情绪色（两者在合并层相乘叠加）
+                c.SetGrade(VNGradeLayer.Focus, VNGrade.Dim(
+                    isSpeaker ? speakerBrightness : dimBrightness,
+                    isSpeaker ? 1f : dimSaturation), transition);
                 c.DOScaleMultiplier(isSpeaker ? speakerScale : dimScale, transition);
 
                 var glow = c.GetComponent<VNGlowBackdrop>();
@@ -79,8 +82,7 @@ namespace VNEffects
             foreach (var c in characters)
             {
                 if (c == null) continue;
-                c.DOBrightness(1f, transition);
-                c.DOSaturation(1f, transition);
+                c.ClearGrade(VNGradeLayer.Focus, transition);
                 c.DOScaleMultiplier(1f, transition);
                 var glow = c.GetComponent<VNGlowBackdrop>();
                 if (glow != null) glow.StartPulse();

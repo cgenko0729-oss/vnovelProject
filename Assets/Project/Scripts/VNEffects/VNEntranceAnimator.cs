@@ -117,6 +117,10 @@ namespace VNEffects
             KillCurrent();
             _fx.StopAllLoops();
             _fx.ResetScaleMultiplier(); // 清掉说话者高亮的缩放倍率
+            // 清掉退场压暗与说话者高亮的压暗（Mood 通道不动：情绪色调是全局的，
+            // 角色一出场就该带着当前情绪的颜色）
+            _fx.ClearGrade(VNGradeLayer.Emote);
+            _fx.ClearGrade(VNGradeLayer.Focus);
             _group.alpha = 0f;
             _fx.SetDissolve(0f);
             _fx.SetFlash(0f);
@@ -480,7 +484,7 @@ namespace VNEffects
             _current = DOTween.Sequence()
                 .Append(_fx.Rect.DOAnchorPosY(_basePos.y - 95f, total).SetEase(Ease.InQuad))
                 .Join(_fx.DOBlur(0.006f, total).SetEase(Ease.InQuad))
-                .Join(_fx.DOBrightness(0.3f, total).SetEase(Ease.InQuad))
+                .Join(_fx.SetGrade(VNGradeLayer.Emote, VNGrade.Dim(0.3f, 1f), total))
                 .Join(_group.DOFade(0f, total).SetEase(Ease.InCubic))
                 .SetLink(gameObject);
             return _current;

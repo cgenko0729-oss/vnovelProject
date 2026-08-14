@@ -16,8 +16,11 @@ namespace VNEffects
         public VNImageEffectController[] characters;
 
         [Range(0f, 0.3f)]
-        [Header("染色强度（0.05~0.12 为宜，太高会明显变色）")]
-        public float strength = 0.09f;
+        [Header("染色强度（0.03~0.08 为宜，太高会明显变色）")]
+        // 默认从 0.09 降到 0.05：mood 现在也会给立绘上一层情绪色
+        // （VNMoodGrading.characterStrength），两者叠加容易过头——
+        // 黄昏背景的平均色本来就橙，再被 mood 染一次就是"橙上加橙"。
+        public float strength = 0.05f;
 
         [Header("染色过渡时长")]
         public float transition = 1.2f;

@@ -79,6 +79,18 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - **粒子分两类，别用错混合模式**：会发光的（星光/萤火虫/尘埃/光斑）用 `VN/Additive`
   加法混合；**有实体的（花瓣/落叶/雨/雪）必须用 `VN/ParticleAlpha` 普通透明混合** ——
   加法只能加亮不能遮挡背景，彩色粒子叠明亮背景后通道溢出会被 Bloom 洗成白色
+- **调色一律走 `VNImageEffectController.SetGrade(通道, ...)`，禁止直接写
+  `_Brightness`/`_Saturation`**：这两个参数被说话者高亮（每句台词都改）、伪景深、
+  情绪动作、退场动画、天气联动、情绪色调六方共用，直接写谁最后写谁赢，
+  症状是「说一句话立绘颜色就跳回去」。每个来源占一个 `VNGradeLayer` 通道，
+  合并层负责相乘叠加。老 API（`SetHSV`/`DOBrightness`/`DOSaturation`）已改走
+  `Manual` 兜底通道，能用但别在新代码里用
+- **情绪色调不是全屏后处理**：单相机 + 单个 Screen Space - Camera 的 Canvas 下，
+  Volume 调色作用于整个 color target，没法只染背景。想让某层躲开 mood，
+  把它移出 `VNMoodGrading` 的目标列表即可；反之新加的图层要染色就得注册进去。
+  **别试图用 URP Camera Stack 解决**——整个 stack 共用一个 color target，
+  后处理在最后一个相机之后统一执行一次，Overlay 相机躲不掉；真能躲开的
+  `Screen Space - Overlay` 又会连 Bloom 一起躲开（对话框流光/名牌发光全废）
 - **贴图全程序化生成**（`VNProceduralTextures`），零美术依赖
 - **每张图独立材质实例**（`VNImageEffectController` 管理）；uGUI 自定义 shader 走 CGPROGRAM
 - **UI 不写深度缓冲** → 无真 DoF，模糊走 `VNImageEffect` 9-tap
@@ -101,7 +113,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNAmbientParticles | 粒子预设×8：尘埃/星光/光斑/花瓣/雨(+溅落)/雪/萤火虫/雾 + PlaySparkleBurst |
 | VNWeatherController | 天气总控（双后端）：飘落类走 VNFoliageSystem，雨/雪/萤火虫走 VNAmbientParticles；`SetWeatherId` 三级解析 id（自定义资产 → 内置叶型别名含中文 → VNWeather 枚举），带调色联动 |
 | VNFoliageSystem / VNWeatherDef / VNFoliageTextures | 落樱/落叶三层景深系统（Alpha 混合实体粒子 + 图集翻转 + **每粒子独立相位横摆** + 自动阵风 + 尺寸↔速度伪透视 + 地面堆积）/ 全部参数的 ScriptableObject（五套内置预设，不建资产也能用）/ 五种叶型的程序化图集（列=12 翻转帧、行=4 形态变体，RGB 存明暗、A 存形状） |
-| VNMoodGrading | 八种情绪色调（双 Volume 权重交叉过渡，含 Dream 梦境） |
+| VNMoodGrading / VNGrade | 八种情绪色调（含 Dream 梦境）**分层调色版**：色彩不走全屏后处理（单相机单 Canvas 下 Volume 物理上没法只染一部分，会把对话框和 HUD 一起染橙），改按 `backgroundStrength(1.0)`／`midStrength(0.8)`／`characterStrength(0.3)` 逐层写进各自材质实例，UI 不在目标列表所以完全不受影响；**Volume 只留 FilmGrain + Vignette**（不改色相，压四角反而有电影感），仍是 A/B 双 Volume 交叉过渡。立绘目标由 VNStage 在角色进出场时自动维护 / 调色值类型 + 来源通道枚举 `VNGradeLayer`（Mood·Weather·Focus·Emote·Manual），合并规则 滤镜相乘·色相相加·其余相乘 |
 | VNScreenTransition | 全屏转场×8：噪声溶解/百叶窗/瓦片/圆扩散/水墨/爆闪/光斑/眨眼 |
 | VNCamera / VNScreenShake / VNDutchAngle / VNHeartbeat | 运镜×5 / 三级震动 / 荷兰角 / 心跳脉动 |
 | VNGodRays / VNEdgeGlow / VNCloudShadows / VNHeatHaze / VNFakeDoF | 光束/情绪泛光/云影/热浪+雾/伪景深 |

@@ -222,6 +222,8 @@ namespace VNEffects
             }
             if (backgroundFx == null && backgroundImage != null)
                 backgroundFx = backgroundImage.GetComponent<VNImageEffectController>();
+            // 情绪色调的分层调色主目标（老场景自愈：Inspector 没连也能工作）
+            if (mood != null && backgroundFx != null) mood.RegisterBackground(backgroundFx);
             if (kenBurns == null) kenBurns = FindFirstObjectByType<VNKenBurns>();
             if (kenBurns == null && backgroundImage != null) // 旧场景自愈：自动补挂
                 kenBurns = backgroundImage.gameObject.AddComponent<VNKenBurns>();
@@ -902,14 +904,18 @@ namespace VNEffects
             if (speakerHighlight != null)
                 speakerHighlight.characters.RemoveAll(f => f == null);
 
+            var characterFx = new List<VNImageEffectController>();
+            foreach (var kv in _active) characterFx.Add(kv.Value.fx);
+
             if (toneMatch != null)
             {
-                var list = new List<VNImageEffectController>();
-                foreach (var kv in _active) list.Add(kv.Value.fx);
-                toneMatch.characters = list.ToArray();
+                toneMatch.characters = characterFx.ToArray();
                 if (backgroundImage != null && backgroundImage.sprite != null)
                     toneMatch.MatchTo(backgroundImage.sprite);
             }
+
+            // 情绪色调的分层目标：中途出场的角色也要立刻带上当前情绪的颜色
+            if (mood != null) mood.SetCharacterTargets(characterFx);
         }
 
         // ------------------------------------------------------------------

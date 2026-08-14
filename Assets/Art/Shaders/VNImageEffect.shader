@@ -52,6 +52,9 @@ Shader "VN/ImageEffect"
         _HueShift ("Hue Shift", Range(-0.5,0.5)) = 0
         _Saturation ("Saturation", Range(0,2)) = 1
         _Brightness ("Brightness", Range(0,2)) = 1
+        // 色滤镜与对比度：情绪色调（mood）分层调色用，替代原来的全屏后处理调色
+        _ColorFilter ("Color Filter (RGB multiply)", Color) = (1,1,1,1)
+        _Contrast ("Contrast", Range(0,2)) = 1
 
         [Header(Blur Fake DoF)]
         _BlurAmount ("Blur Radius (uv)", Range(0, 0.02)) = 0
@@ -163,6 +166,8 @@ Shader "VN/ImageEffect"
             float _HueShift;
             float _Saturation;
             float _Brightness;
+            half4 _ColorFilter;
+            float _Contrast;
 
             float _WaveAmount;
             float _WaveSpeed;
@@ -256,11 +261,17 @@ Shader "VN/ImageEffect"
                 }
                 half4 color = (texCol + _TextureSampleAdd) * IN.color;
 
-                // 2. HSV 调色
+                // 2. 调色：HSV → 色滤镜 → 对比度
+                //    色滤镜/对比度是 mood 分层调色的主力（见 VNMoodGrading）：
+                //    情绪色调不再走全屏后处理，改由每层图片各自按强度系数上色，
+                //    对话框与 HUD 因此完全不被染色。
                 float3 hsv = rgb2hsv(color.rgb);
                 hsv.x = frac(hsv.x + _HueShift + 1.0);
                 hsv.y = saturate(hsv.y * _Saturation);
                 color.rgb = hsv2rgb(hsv) * _Brightness;
+                color.rgb *= _ColorFilter.rgb;
+                // 对比度绕 0.5 中灰缩放，负值会让 uGUI 混合出脏边，钳到 0
+                color.rgb = max(0.0, (color.rgb - 0.5) * _Contrast + 0.5);
 
                 // 3. 斜向扫光
                 float ang = radians(_ShineAngle);

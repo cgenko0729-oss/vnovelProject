@@ -237,19 +237,89 @@ namespace VNEffects
         // HSV 调色 / 波浪
         // ------------------------------------------------------------------
 
-        public void SetHSV(float hueShift = 0f, float saturation = 1f, float brightness = 1f)
-        {
-            Mat.SetFloat(IdHueShift, hueShift);
-            Mat.SetFloat(IdSaturation, saturation);
-            Mat.SetFloat(IdBrightness, brightness);
-        }
+        public void SetHSV(float hueShift = 0f, float saturation = 1f, float brightness = 1f) =>
+            SetGrade(VNGradeLayer.Manual,
+                new VNGrade(Color.white, hueShift, saturation, brightness, 1f), 0f);
 
         /// <summary>补间亮度（如夜晚变暗、回忆场景降饱和等）</summary>
         public Tween DOBrightness(float to, float duration) =>
-            Mat.DOFloat(to, IdBrightness, duration).SetTarget(this).SetLink(gameObject);
+            DOGradeField(VNGradeLayer.Manual, g => { g.brightness = to; return g; }, duration);
 
         public Tween DOSaturation(float to, float duration) =>
-            Mat.DOFloat(to, IdSaturation, duration).SetTarget(this).SetLink(gameObject);
+            DOGradeField(VNGradeLayer.Manual, g => { g.saturation = to; return g; }, duration);
+
+        // ------------------------------------------------------------------
+        // 分层调色合并（多来源互不覆盖）
+        //
+        // 背景：brightness / saturation 这两个参数历史上被六个系统直接抢写——
+        // 说话者高亮（每句台词都改）、伪景深、情绪动作、退场动画、天气联动、
+        // 以及情绪色调 mood。谁最后写谁赢，于是「说一句话立绘就跳回原色」。
+        // 现在每个来源占一个通道，各写各的目标值，本层负责合并后统一补间：
+        // 色滤镜相乘、色相相加、饱和/亮度/对比度相乘。
+        // ------------------------------------------------------------------
+
+        static readonly int IdColorFilter = Shader.PropertyToID("_ColorFilter");
+        static readonly int IdContrast = Shader.PropertyToID("_Contrast");
+
+        readonly VNGrade[] _gradeLayers = VNGrade.NewLayerSet();
+        VNGrade _appliedGrade = VNGrade.Identity;
+        Tween _gradeTween;
+
+        /// <summary>读取某个通道当前的调色目标值</summary>
+        public VNGrade GetGrade(VNGradeLayer layer) => _gradeLayers[(int)layer];
+
+        /// <summary>
+        /// 设置某个通道的调色目标并补间到合并结果（duration &lt;= 0 立即生效）。
+        /// 其它通道的贡献原样保留。
+        /// </summary>
+        public Tween SetGrade(VNGradeLayer layer, VNGrade grade, float duration)
+        {
+            _gradeLayers[(int)layer] = grade;
+
+            var target = VNGrade.Identity;
+            foreach (var g in _gradeLayers) target = VNGrade.Combine(target, g);
+
+            _gradeTween?.Kill();
+            _gradeTween = null;
+
+            if (duration <= 0f)
+            {
+                _appliedGrade = target;
+                WriteGrade(target);
+                return null;
+            }
+
+            var from = _appliedGrade;
+            // 不挂 SetTarget(this)：OnDestroy 的 DOTween.Kill(this) 与情绪动作
+            // 的批量 Kill 都以 this 为 target，调色补间不该被它们连坐。
+            _gradeTween = DOTween.To(() => 0f, v =>
+                {
+                    _appliedGrade = VNGrade.Lerp(from, target, v);
+                    WriteGrade(_appliedGrade);
+                }, 1f, duration)
+                .SetEase(Ease.InOutSine).SetLink(gameObject);
+            return _gradeTween;
+        }
+
+        /// <summary>只改某个通道的部分字段，其余字段沿用该通道现值</summary>
+        public Tween DOGradeField(VNGradeLayer layer,
+            System.Func<VNGrade, VNGrade> edit, float duration) =>
+            SetGrade(layer, edit(_gradeLayers[(int)layer]), duration);
+
+        /// <summary>把某个通道恢复成无影响</summary>
+        public Tween ClearGrade(VNGradeLayer layer, float duration = 0f) =>
+            SetGrade(layer, VNGrade.Identity, duration);
+
+        void WriteGrade(VNGrade g)
+        {
+            var m = Mat;
+            if (m == null) return;
+            m.SetFloat(IdHueShift, g.hueShift);
+            m.SetFloat(IdSaturation, g.saturation);
+            m.SetFloat(IdBrightness, g.brightness);
+            m.SetColor(IdColorFilter, g.filter);
+            m.SetFloat(IdContrast, g.contrast);
+        }
 
         public void SetWave(float amount, float speed = 2f, float freq = 8f)
         {

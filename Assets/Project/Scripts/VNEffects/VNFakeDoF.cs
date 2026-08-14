@@ -42,8 +42,9 @@ namespace VNEffects
             if (backgroundFx != null)
             {
                 backgroundFx.DOBlur(on ? blurRadius : 0f, duration);
-                backgroundFx.DOBrightness(on ? dimBrightness : 1f, duration);
-                backgroundFx.DOSaturation(on ? saturation : 1f, duration);
+                // Focus 通道：虚化压暗与 mood 的情绪色在合并层叠加，互不覆盖
+                backgroundFx.SetGrade(VNGradeLayer.Focus,
+                    on ? VNGrade.Dim(dimBrightness, saturation) : VNGrade.Identity, duration);
             }
             if (backLayer != null)
             {

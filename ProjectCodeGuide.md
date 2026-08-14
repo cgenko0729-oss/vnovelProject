@@ -548,6 +548,16 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
   + 悬浮/呼吸循环动作。几乎所有角色/背景效果最终都落到它的 `Mat` 上。
   **扩展特效参数时**：shader（VNImageEffect.shader）加参数 → 这里加包装
   属性/Tween 方法。
+  - **分层调色合并层**（`SetGrade` / `DOGradeField` / `ClearGrade` / `GetGrade`）：
+    `_Brightness` / `_Saturation` 被六方共用 —— 说话者高亮（**每句台词都改**）、
+    伪景深、情绪动作、退场动画、天气联动、情绪色调。直接写是谁最后写谁赢，
+    症状是「说一句话立绘颜色就跳回去」。现在每个来源占一个 `VNGradeLayer`
+    通道（Mood / Weather / Focus / Emote / Manual），本层合并后统一补间：
+    **滤镜相乘、色相相加、饱和/亮度/对比度相乘**。值类型见 `VNGrade.cs`。
+    老 API（`SetHSV` / `DOBrightness` / `DOSaturation`）保留并改走 `Manual`
+    兜底通道 —— 没改到的调用点自动降级到独立通道，不会冲掉 mood，但**新代码
+    别再用它们**。调色补间刻意不挂 `SetTarget(this)`，免得被
+    `OnDestroy` 与情绪动作的批量 `DOTween.Kill(this)` 连坐。
 - **VNEntranceAnimator**：出场预设×10 + 退场×4 + `StartIdleEffects`
   （出场完自动开呼吸/悬浮）。组合 ImageEffectController + CanvasGroup + RectTransform。
   - 日常向 `Crossfade`(默认)/`SlideIn`/`StepIn`/`WalkIn` —— 无粒子无光环，
@@ -609,7 +619,15 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
   入口 `SetWeatherId(id, …)` 三级解析：自定义资产 id → 内置叶型别名（含中文）→
   `VNWeather` 枚举名，所以旧存档里的 `"Petals"`/`"Rain"` 不需要迁移。
   存档取 `CurrentId`（字符串）而不是 `Current`（枚举）—— 新叶型在枚举里统统算 Petals。
-- **VNMoodGrading**：七种情绪色调，双 Volume 权重交叉过渡（URP 后处理）。
+- **VNMoodGrading**：八种情绪色调，**分层调色**（不是全屏后处理）。
+  单相机 + 单个 Screen Space - Camera 的 Canvas 下，Volume 调色作用于整个
+  color target，物理上没法只染背景 —— 从前 `mood Sunset` 会把对话框和 HUD
+  一起染橙。现在色彩逐层写进各自的 `VNImageEffectController` 材质实例
+  （背景 1.0 / 中景 0.8 / 立绘 0.3，UI 不在目标列表所以完全不受影响），
+  Volume 只留 `FilmGrain + Vignette`（不改色相，压四角反而有电影感），
+  仍是 A/B 双 Volume 交叉过渡。立绘目标由 `VNStage.RefreshRegistries()`
+  在角色进出场时自动维护，背景在 `AutoWire()` 里注册。
+  **加新图层想让它被 mood 染色 → 注册进目标列表；想躲开 → 别注册。**
 - **VNGodRays / VNCloudShadows / VNHeatHaze / VNFakeDoF / VNEdgeGlow /
   VNVignetteFocus**：光束/云影/热浪扭曲+雾/伪景深(UI 不写深度所以是"伪")/
   屏幕边缘情绪泛光/聚焦晕影。都是 `fx <name> on|off` 路由的终点。
@@ -751,8 +769,11 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
    `VNFontAssetBuilder.EnsureFontAsset()`）；禁止 legacy Text / LegacyRuntime.ttf
 4. 每张图独立材质实例（VNImageEffectController 管理），别共享材质改参数
 5. 发光走材质 HDR 颜色（>1）+ Bloom，不走顶点色
+   （**推论**：任何"让某层躲开后处理"的方案都会连 Bloom 一起躲开，见下方坑清单）
 6. 事件模块三铁律（见第六节）
 7. 新功能开 `agent/<名>` 分支，合并回 main，**永不删分支**
+8. 调色一律走 `VNImageEffectController.SetGrade(通道, …)`，禁止直接写
+   `_Brightness` / `_Saturation`（六方共用会互相覆盖，详见 8.1 节）
 
 **容易踩的坑**
 - kwargs 值不能含空格；`if` 条件串不能含空格
@@ -763,6 +784,12 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
 - 合并分支报 `unable to unlink ... .unity`：Unity 占用场景文件，
   `git clean -f -- <残留文件>` 后重试
 - UI 不写深度缓冲：别指望真 DoF/深度后处理，模糊走 VNImageEffect 的 9-tap
+- **想让某一层躲开全屏后处理（一一〇章）**：单相机 + 单 Canvas 下，Volume 作用于
+  整个 color target，没有"只染背景"这回事。而且两条看似可行的相机路都是死路——
+  URP Camera Stack **做不到**「Base 吃调色、Overlay 不吃」（整个 stack 共用一个
+  color target，后处理在最后一个相机之后统一跑一次）；`Screen Space - Overlay`
+  确实能 100% 躲开后处理，但**连 Bloom 一起躲开**，对话框流光边框、名牌发光、
+  选项扫光全变死板纯色。正解是别用后处理做这件事，改成 per-image 材质分层调色
 - **永远不信任大模型的输出**（一〇六章）：结构化输出只约束**形状**不约束**取值范围**
   ——Gemini 的 schema 子集不支持 `minimum`/`maximum`，实测让它给 -2~+2 的好感变化
   它会给 +5。凡是模型输出的数值一律代码内 `Clamp`、枚举一律白名单校验后降级、
