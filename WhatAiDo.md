@@ -6706,3 +6706,105 @@ Sunset 红通道从 1.27 降到 1.09，立绘再乘 0.3 强度只剩 1.027 —�
   不走 `VN/ImageEffect`，接不进分层调色。要染中景得先给它换材质。
 - 演示场景 `VNEffectsDemo` 需重跑 Tools → VN Effects → Create Demo Scene
   才会带上新接线。
+
+---
+
+## 一一一、剧本编辑器打字搜索：右键搜命令 + Ctrl+E 命令面板 + 参数下拉可搜（2026-08-14，分支 `agent/scenario-command-search`）
+
+### 需求 / 背景
+
+加一行命令只能从行首下拉一层层点（Scene → bg），命令有 41 条、参数格候选更多，
+点起来慢且要记得某条命令归在哪个分类下。要的是「保留现在这套分类菜单，
+另外多一条打字就出候选的路」，像 VSCode 写函数那样。
+
+### 为什么不用 Unity 原生 AdvancedDropdown
+
+它自带搜索框、层级、键盘导航，看起来正好。放弃的原因有三条：
+
+1. 它是**替换**关系——用了它，现在这套带分类配色的层级菜单就没了，与「两条路并存」的需求冲突。
+2. 候选行只有一行文字 + 图标，**放不下 hint 副标题**（`liquid` 那种九个参数的命令，
+   光看名字选不出来，hint 才是关键信息）。
+3. 搜索匹配逻辑在 internal 的 `AdvancedDropdownDataSource` 里，改不了。
+
+而 Ctrl+E 命令面板无论如何都要自写一个带输入框的窗口，与其「原生 + 自写」两套外观两套键位，
+不如共用一套匹配引擎。**匹配刻意只做子串包含**（大小写无关，中英都能打），
+不做模糊子序列/拼音——够用且行为可预期。
+
+### 文件改动清单
+
+**新增**
+
+- `Editor/VNCommandSearch.cs` —— 四个共用件：
+  - `VNSearchItem`：一条候选（`value` = 真正写进剧本的值，title/subtitle/accent 只管显示，
+    `searchExtra` 放分类名等额外可搜文本）
+  - `VNSearchListView`：搜索框 + 候选列表。子串匹配、↑↓/PageUp/PageDown、Enter/Esc/Tab、
+    命中片段染色加粗、选中项自动滚进视野
+  - `VNSearchPopup`：通用搜索弹窗（换命令 / 加行 / 参数格三处共用）
+  - `VNCommandPalette`：Ctrl+E 向导面板（选命令 → 逐个问位置参数 → 可选参数菜单循环 → 插行）
+
+**修改** `Editor/VNScenarioEditorWindow.cs`
+
+- 行首命令按钮**右键** = 打字换命令（`ConsumeRightClick` + `ShowRowTypeSearch`），
+  左键那套分类菜单原样保留。
+- 底部 `[+]` 从 `GenericMenu` 换成搜索弹窗（`ShowAddSearch`），
+  注释 `#` 与空行也变成可搜条目；原 `ShowAddMenu` 删除。
+- `PopupString` 的 `EditorGUI.Popup` 换成「按钮 + 搜索弹窗」，
+  一处改动覆盖全部枚举/bgm/se/voice/event/quest/weather/label/flag 参数格。
+- `Ctrl+E` 走 ShortcutManager（`VN/Scenario Editor/Command Palette`）。
+- 新增 `ApplyPendingNewRow()`：搜索弹窗/面板攒好的行留到下一个 Layout 事件再插。
+- 抽出 `DisplayOptionsFor()`（原本内联在 `DrawParamField` 里的中英对照 if 链），
+  给参数格与命令面板共用。
+- 底部提示条补两行新键位说明。
+
+### 技术决策与取舍
+
+- **`PopupString` 的同步契约不能破**，这是本次最大的坑。它被三处用着，
+  而其中两处的值**不在 `VNRow.values` 里**：camseq 路径点（值在 `camLines` 文本）、
+  choice 选项行（值在 `VNChoiceOptionRow` 字段）。若照 `SpritePopup` 那样让弹窗回调直写
+  `values`，这两处会「选了不生效，还顺手往文档里塞个野参数」——正是 vn-editor-extend
+  铁律警告的症状。做法：**弹窗回调只把选中值放进 `_popupResults[key]`，
+  下一帧由 `PopupString` 同步 return 给调用方**，调用方仍然自己写回，签名与语义零变化。
+- **键盘必须抢在 `EditorGUI.TextField` 之前处理**：IMGUI 里文本框会把 ↑↓ 拿去移光标、
+  把 Enter 当「结束编辑」吃掉，得先 `Event.current.Use()` 才轮得到候选列表。
+- **右键要自己收**：`GUI.Button` 只响应左键。但 `ConsumeRightClick` 之后**按钮照画不误**——
+  IMGUI 控件 id 按调用顺序分配，少画一个控件会让同一帧后面的控件全部错位。
+  `ReorderableList` 的选中/拖动也只认左键，`Use()` 掉右键不会抢它的事件。
+- **改行数一律留到 Layout 事件**：弹窗回调跑在另一个窗口的 GUI 里，
+  直接 `_doc.rows.Insert` 会让 `ReorderableList` 当帧的布局对不上，
+  所以复用了 Enter 插行那套 pending 机制。
+- **不做行内内联补全**（按钮原地变输入框、下方浮出候选）：候选浮层要盖在下面几行上，
+  但行画在 `ReorderableList` + `ScrollView` 里会被裁掉，得推迟到 `EndScrollView` 之后手动补画；
+  加上焦点转移与方向键冲突，三个坑叠一起性价比最低。弹窗方案焦点天然在搜索框里，手感几乎一样。
+- **命令面板的可选参数用「菜单循环」而不是逐个问**：`show` 有 5 个 kwarg、`liquid` 有 9 个，
+  逐个 Tab 过去很烦。改成必填问完 → 列出所有 `key:` 供打字筛 → 选一个给个值 → 回菜单，
+  空查询直接 Enter 结束。只填要的那几个。
+- **say 行的说话者写 `VNRow.speaker` 专用字段**，不进 `values`（编辑器铁律）。
+  面板里对它用了一个合成的 `VNParamDef`（id = `say.speaker`），赋值时特判分流。
+- **快捷键选 Ctrl+E 不选 Ctrl+K**：Ctrl+K 是 Unity Search 的默认绑定，
+  虽然窗口作用域优先，但 Shortcuts 面板里会标冲突。
+- **命令候选表从 `VNScenarioSchema.Commands` 现场生成**，`VNScenarioSchema.cs` 一行没改——
+  以后加新命令自动出现在搜索里，不用回来登记第二遍。
+
+### 验证方法
+
+1. `Tools → VN Effects → Scenario Editor` 打开剧本。
+2. **右键**点任意行首的彩色命令按钮 → 弹出搜索窗；打 `bg` / `背景` / `场景` 都能命中 `bg`
+   （分类名也参与匹配）；↑↓ 选、Enter 换命令、Esc 关。
+3. 底部 `[+]` → 同一套搜索窗，能搜到 `# 注释` 和 `（空行）`。
+4. 点任意参数格下拉（如 `show` 的 `with:`）→ 变成可搜列表，中英对照名照常显示；
+   打一个候选里没有的值 → 顶部出现「使用自定义值」，Enter 直接写进去；
+   右上角 `custom…` 仍可切成常驻文本框。
+5. **camseq 路径点行的角色下拉、choice 选项行的 flag/jump 下拉必须照常生效**
+   （这两处是同步契约的回归点，选完应立刻写回、且不产生多余参数）。
+6. `Ctrl+E` → 面板居中弹出；打 `show` → Enter → 问角色 → Enter → 进可选参数菜单 →
+   选 `at:` → 选 `left` → 回菜单 → 空查询 Enter → 在选中行下方插入 `show <角色> at:left`；
+   Shift+Enter 则插在上方，Tab 跳过当前参数，Esc 全程可取消。
+7. 编译验证：`assets-refresh` 后 console 无 error（本次实测只剩既存的 CS0618 警告）。
+
+### 已知遗留
+
+- 匹配是子串包含，打 `sw` 命不中 `show`（要模糊子序列匹配得换打分排序），
+  也没有拼音与「最近使用置顶」。当前是刻意选择，要加的话只改 `VNSearchItem.Matches`
+  与 `VNSearchListView.Filter` 两处。
+- `Go to label` 下拉仍是 `GenericMenu`，未接入搜索。
+- 角色/背景/CG 参数格走的是另一条 `SpritePopup`（本来就有搜索框），本次未动。
