@@ -72,12 +72,22 @@ namespace VNEffects.EditorTools
         static GUIStyle _subStyle;
         static GUIStyle _emptyStyle;
 
+        /// <summary>
+        /// 换阶段时清空搜索框（命令面板逐步问参数时每步都要清）。
+        ///
+        /// 【必须放掉键盘焦点】IMGUI 的文本框只要还持有 keyboardControl，就用它内部
+        /// TextEditor 的缓冲，程序里把 query 改成 "" 不生效——下一帧那个控件会把旧文本
+        /// 原样 return 回来，等于又把 query 写回去。先 keyboardControl = 0 让它重新
+        /// 从源字符串同步，再靠 _focusPending 把焦点抢回来。
+        /// </summary>
         public void Reset()
         {
             query = "";
             _index = 0;
             _scroll = Vector2.zero;
             _focusPending = true;
+            GUIUtility.keyboardControl = 0;
+            EditorGUIUtility.editingTextField = false;
         }
 
         /// <summary>
