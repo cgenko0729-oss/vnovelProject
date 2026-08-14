@@ -88,9 +88,16 @@ namespace VNEffects
         public long httpCode;
         public float elapsedSeconds;
 
-        /// <summary>估算本次花费（美元）。Flash Lite: $0.30 / $2.50 每百万 token。</summary>
+        /// <summary>这次用的是哪个模型。**算钱要靠它**，由 Send 回填。</summary>
+        public string model;
+
+        /// <summary>
+        /// 估算本次花费（美元）。单价按 model 查 VNAiPricing 表——
+        /// 曾经这里写死 Flash Lite 的 0.30/2.50，换个模型全部数字就静默偏低。
+        /// 思考 token 按输出价计费（thinking 开到 High 时它是大头）。
+        /// </summary>
         public double EstimatedCostUsd =>
-            promptTokens * 0.30 / 1e6 + (outputTokens + thoughtsTokens) * 2.50 / 1e6;
+            VNAiPricing.Cost(model, promptTokens, outputTokens, thoughtsTokens);
     }
 
     /// <summary>
@@ -125,6 +132,9 @@ namespace VNEffects
         {
             var result = new VNAiResult();
             float t0 = Time.realtimeSinceStartup;
+
+            // 算钱要按模型查单价，所以模型名要跟着结果一路带回去
+            result.model = req != null ? req.model : null;
 
             if (req == null)
             {

@@ -124,6 +124,32 @@ namespace VNEffects
             return t;
         }
 
+        /// <summary>
+        /// 记一次**收场总结请求**的开销（记忆 + 日记那一次）。
+        ///
+        /// 它不是一轮对话，所以不进 turns 列表，但**必须计入总计**——
+        /// 曾经这里完全没记，一场的成本因此凭空少了一整次请求
+        /// （约 $0.001，占一场 $0.006~0.013 的 10~15%）。
+        ///
+        /// 失败也要记：耗时是真花掉的，被拦或超时前产生的 token 也可能已经计费。
+        /// </summary>
+        public void RecordSummary(VNAiResult res)
+        {
+            if (!Enabled || res == null) return;
+
+            _s.summaryRequests++;
+            _s.summarySeconds += res.elapsedSeconds;
+            _s.summaryPromptTokens += res.promptTokens;
+            _s.summaryOutputTokens += res.outputTokens + res.thoughtsTokens;
+            _s.summaryCostUsd += res.EstimatedCostUsd;
+            if (!res.ok) _s.summaryFailure = res.failure.ToString();
+
+            _s.totalSeconds += res.elapsedSeconds;
+            _s.totalPromptTokens += res.promptTokens;
+            _s.totalOutputTokens += res.outputTokens + res.thoughtsTokens;
+            _s.totalCostUsd += res.EstimatedCostUsd;
+        }
+
         /// <summary>玩家选完之后回填。index &lt; 0 = 没给选项（最后一轮 / 提前收尾）。</summary>
         public void RecordPick(int index)
         {
@@ -255,14 +281,30 @@ namespace VNEffects
             sb.AppendLine("|---|---|");
             sb.AppendLine($"| 总耗时 | {_s.totalSeconds:0.0}s |");
             sb.AppendLine($"| 输入 token | {_s.totalPromptTokens} |");
-            sb.AppendLine($"| 输出 token（含思考） | {_s.totalOutputTokens} |");
+            sb.AppendLine($"| 输出 token（**含思考**） | {_s.totalOutputTokens} |");
             sb.AppendLine($"| 合计 token | {_s.totalPromptTokens + _s.totalOutputTokens} |");
-            sb.AppendLine($"| 估算成本 | ${_s.totalCostUsd:0.000000} |");
+            sb.AppendLine($"| **估算成本** | **${_s.totalCostUsd:0.000000}** |");
+
+            // 收场总结是一次独立请求，不摊进「每轮」——它按场发生，不按轮。
+            // 单列出来是因为它曾经完全没被统计过，总数因此偏低了一整次请求。
+            if (_s.summaryRequests > 0)
+            {
+                double talkCost = _s.totalCostUsd - _s.summaryCostUsd;
+                sb.AppendLine($"| ├ 对话 {CountRealTurns()} 轮 | ${talkCost:0.000000} |");
+                sb.AppendLine($"| └ 收场总结（记忆/日记） | ${_s.summaryCostUsd:0.000000}　" +
+                              $"{_s.summarySeconds:0.0}s　" +
+                              $"{_s.summaryPromptTokens}+{_s.summaryOutputTokens} tok" +
+                              (string.IsNullOrEmpty(_s.summaryFailure)
+                                  ? "" : $"　⚠ {_s.summaryFailure}") + " |");
+            }
             if (CountRealTurns() > 0)
-                sb.AppendLine($"| 平均每轮 | {_s.totalSeconds / CountRealTurns():0.0}s　" +
-                              $"${_s.totalCostUsd / CountRealTurns():0.000000} |");
+                sb.AppendLine($"| 平均每轮（不含总结） | " +
+                              $"{(_s.totalSeconds - _s.summarySeconds) / CountRealTurns():0.0}s　" +
+                              $"${(_s.totalCostUsd - _s.summaryCostUsd) / CountRealTurns():0.000000} |");
             sb.AppendLine();
-            sb.AppendLine("> 按 Gemini Flash Lite 的公开价（输入 $0.30 / 输出 $2.50 每百万 token）估算，仅供参考。");
+            sb.AppendLine($"> 单价：{VNAiPricing.Describe(_s.model)}。");
+            sb.AppendLine("> 逐轮那一列的 `tok` 是「输入+输出」**不含思考**，" +
+                          "上表的合计含思考——两者对不上是正常的。");
             sb.AppendLine();
 
             sb.AppendLine("## 对话");
@@ -362,6 +404,13 @@ namespace VNEffects
             public float totalSeconds;
             public int totalPromptTokens, totalOutputTokens;
             public double totalCostUsd;
+
+            // 收场总结那一次独立请求的开销（已包含在上面的 total* 里，这里是拆出来看构成）
+            public int summaryRequests;
+            public float summarySeconds;
+            public int summaryPromptTokens, summaryOutputTokens;
+            public double summaryCostUsd;
+            public string summaryFailure;
             public List<Turn> turns = new List<Turn>();
             public string systemInstruction;
         }

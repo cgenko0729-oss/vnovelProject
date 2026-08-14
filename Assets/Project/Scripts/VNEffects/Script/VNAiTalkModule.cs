@@ -297,6 +297,12 @@ namespace VNEffects
 
             SetThinking(false);
 
+            // ★ 开销必须记进日志：这是一次独立的请求（约 $0.001），
+            //   曾经完全没记，导致每场日志的成本都少算了一整次请求。
+            //   放在成功判断**之前**——失败的那次耗时也是真花掉的。
+            //   时序上安全：本协程在 FinishWith 之前跑完，_log.Save() 还没发生。
+            _log.RecordSummary(res);
+
             if (!res.ok)
             {
                 Debug.LogWarning($"[VNAiTalk] 收场总结失败（{res.failure}）：{res.errorMessage}" +

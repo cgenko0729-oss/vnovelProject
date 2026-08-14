@@ -930,16 +930,14 @@ namespace VNEffectsEditor
             _session.Begin(_draft.Draft, BuildContext);
         }
 
+        /// <summary>
+        /// 收场。**要做总结时，日志等总结回来再写**——总结是一次独立请求（约 $0.001），
+        /// 先写日志就会漏掉它，日志里的成本便少算一整次。
+        /// 不做总结时没什么可等的，立刻写。
+        /// </summary>
         void EndSession()
         {
             if (_session.turns.Count == 0) return;
-
-            if (_writeLog)
-            {
-                string path = VNAiStudioLog.Export(_session, _draft.Draft, DescribeKwargs(),
-                                                   _maxTurns, "（试聊）");
-                if (!string.IsNullOrEmpty(path)) Debug.Log($"[VNAiStudio] 试聊日志：{path}");
-            }
 
             if (_writeMemory)
             {
@@ -949,9 +947,22 @@ namespace VNEffectsEditor
                     {
                         _pendingSummary = summary;
                         _summaryError = err;
+                        if (_writeLog) ExportLog();   // 此时 LastSummaryResult 已就位
                         Repaint();
                     });
             }
+            else if (_writeLog)
+            {
+                ExportLog();
+            }
+        }
+
+        void ExportLog()
+        {
+            string path = VNAiStudioLog.Export(_session, _draft.Draft, DescribeKwargs(),
+                                               _maxTurns, "（试聊）",
+                                               _writeMemory ? _session.LastSummaryResult : null);
+            if (!string.IsNullOrEmpty(path)) Debug.Log($"[VNAiStudio] 试聊日志：{path}");
         }
 
         void AcceptSummary()

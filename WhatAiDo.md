@@ -6939,3 +6939,104 @@ Instantiate(persona) → 内存副本（HideFlags.DontSave）
 - 记忆条目的 `topics` / `facts` 用「、」分隔的单行文本框编辑，条目多了不好使。
 - `VNAiStudioMemory.BuildContext` 与 `VNAiMemory.BuildContext` 是两份实现，
   改一边要记得改另一边（不能复用的原因见决策②）。
+
+---
+
+## 一一三、AI 成本核算修正：总结请求漏记 + 单价写死 + 累计报表（2026-08-14，分支 `agent/ai-cost-accounting`）
+
+### 需求 / 背景
+
+用户发现「总结对话并写记忆」那一次请求没有成本统计，算账时对不上。查下来实际有**三处漏记 + 两个隐患**：
+
+| # | 问题 | 后果 |
+|---|---|---|
+| 1 | 游戏内 `SummarizeCo` 拿到 `res` 后**完全没碰 `_log`** | 每场日志少算一整次请求（约 $0.001，占一场 6~15%） |
+| 2 | 试聊台 `EndSession` 先导出日志、后发总结请求 | 顶栏统计是对的，但日志里同样缺 |
+| 3 | 试聊台「从日志导入记忆」的请求 | 成本无处可见 |
+| 4 | **单价写死 Flash Lite 的 0.30/2.50** | 人格 `model` 一换成 flash/pro，全部金额静默偏低（pro 差 6.9 倍） |
+| 5 | `totalOutputTokens` 含思考、逐轮那列不含 | 手工核对必然对不上，看着像 bug |
+
+实测确认问题 1 的规模：现有 30 份日志的 `summaryRequests` **全是 0**，
+即历史上每一场都漏了一次总结请求的钱。
+
+### 文件改动
+
+**新增**
+
+| 文件 | 职责 |
+|---|---|
+| `Script/VNAiPricing.cs` | `VNAiPricingDef` 单价表资产（Create → VN → AI Pricing）+ `VNAiPricing` 查表静态类 |
+| `Editor/VNAiCostReport.cs` | 花费累计报表窗口（Tools → VN Effects → AI → Cost Report） |
+
+**修改**
+
+| 文件 | 改了什么 |
+|---|---|
+| `VNAiClient.cs` | `VNAiResult` 加 `model` 字段并在 `Send` 回填；`EstimatedCostUsd` 改走 `VNAiPricing` |
+| `VNAiTalkLog.cs` | `Session` 加 `summary*` 六个字段；新增 `RecordSummary(res)`；开销段拆出「对话 N 轮 / 收场总结」两行，平均每轮改为不含总结；单价说明改为动态、并补一句解释思考 token 口径 |
+| `VNAiTalkModule.cs` | `SummarizeCo` 调 `_log.RecordSummary(res)` |
+| `VNGameConfig.cs` | 加 `aiPricing` 引用 |
+| `VNAiStudioSession.cs` | 暴露 `LastSummaryResult` |
+| `VNAiStudioLog.cs` | `Export` 加 `summaryRes` 参数 |
+| `VNAiStudioWindow.cs` | 收场改为**总结回来再写日志**；抽出 `ExportLog()` |
+| `VNAiStudioMemory.cs` | 导入日志时把那次请求的开销打进 Console |
+
+### 技术决策与取舍
+
+**① 单价做成资产而不是常量**
+
+价格属于配置（会随供应商调价变动），不该躺在代码里。没建资产时用内置默认表
+（flash-lite / flash / pro），**零配置也能用**——同 `VNWeatherDef` 的惯例。
+
+**查表按「key 最长优先」**：`gemini-3.5-flash-lite` 同时含 `flash` 和 `flash-lite`，
+不按长度排序就会被贵一档的 `flash` 抢走。这条写进了排序注释，改动时别删。
+
+**认不出的模型取表里最贵的一档**（并标注「单价存疑」）。方向是有讲究的：
+低估会让人以为「才这么点钱」然后放心用下去，高估最多让人多留意一眼。
+——第一版这里写的是「取最便宜」，而实现依赖排序副作用实际取到了最贵的，
+注释与代码不符，冒烟测试时发现并改成显式取最贵。
+
+**② `RecordSummary` 放在成功判断之前**
+
+失败的那次请求耗时是真花掉的，被拦或超时前产生的 token 也可能已计费。
+时序上安全：`SummarizeCo` 在 `FinishWith` 之前跑完，`_log.Save()` 还没发生，
+所以游戏内**不用调整任何顺序**，加一行就够。
+
+**③ 总结开销并入总计 + 单列一行**
+
+并入是必须的（否则总数就是错的）；单列是因为它按**场**发生而不是按轮，
+摊进「平均每轮」会让那个数字失真，所以平均每轮明确改成「不含总结」。
+
+**④ 试聊台改为总结回来才写日志**
+
+代价是点完「结束并总结」要多等 1~2 秒才看到日志路径（不写记忆时仍立即写）。
+换来的是日志一次写对，不用同一个文件写两遍。
+
+**⑤ 报表默认「按当前单价重算」**
+
+日志里同时存了 token 数与模型名，所以能拿当前单价表重算，
+**修正历史上按写死单价算出的错误金额**。关掉则显示存储原值
+（想复现「当时以为花了多少」时才需要）。
+
+### 验证
+
+- 单价查表：`flash-lite` 命中 0.3/2.5、`flash` 命中 0.6/3.5（**长 key 优先生效**，
+  lite 没被 flash 抢走）、`pro` 2.5/15、未知模型标记 `found=false` 并取最贵档
+- 同样 1000+200 tok：lite $0.000800 vs pro $0.005500（6.9 倍）——
+  这正是写死单价时被吃掉的差异
+- thinking 1470 tok 让单轮从 $0.000800 变成 $0.004475（5.6 倍），与文档实测的
+  「贵约 6 倍」吻合
+- 造两轮 + 一次总结写日志再回读：`total = 对话 + 总结` 精确相符，
+  `summaryRequests=1`，Markdown 开销段拆分渲染正确
+- 扫现有 30 份真实日志：183 轮、343.1k token、$0.4743；
+  存储金额与重算金额**差异 $0**（全是 flash-lite，验证重算逻辑与旧逻辑等价）；
+  `summaryRequests` 全为 0，证实历史每场都漏记
+- 报表窗口打开无异常
+
+### 已知遗留
+
+- **历史日志的总结开销补不回来**：那几次请求的 token 数当时就没记下来，
+  报表里的历史金额仍然偏低约 6%（30 场约 $0.03）。新产生的日志才是准的。
+- 单价表是**每百万 token 的平铺价**，不支持分档计价（超过 N token 后涨价）
+  与缓存命中折扣。当前用量下不值得做。
+- 报表按会话聚合，看不到「哪一轮特别贵」——那个信息在单份日志的逐轮表里。

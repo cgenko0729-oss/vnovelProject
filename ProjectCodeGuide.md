@@ -446,6 +446,7 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 |---|---|
 | `VNAiKey.cs` | Key 三级回退读取（环境变量 → 仓库外 → 仓库内），只在内存缓存、永不打印 |
 | `VNAiClient.cs` | **全项目唯一碰 HTTP 的文件**。换模型 / 换供应商 / 改走自建中转只动它 |
+| `VNAiPricing.cs` | **全项目唯一算钱的文件**（一一三章）。单价按模型查表、可用资产覆盖。`VNAiResult.model` 由 `Send` 回填——没有它就无从按模型计价 |
 | `VNAiPersonaDef.cs` | 人格资产：性格、边界、白名单、模型参数、兜底台词 |
 | `VNAiConversation.cs` | **纯逻辑（无 MonoBehaviour，可单测）**：提示词组装 / schema 生成 / 历史裁剪 / 解析钳制 |
 | `VNAiTalkModule.cs` | 表现层：只负责「拿 BuildRequest 的结果去发、把 TryParseTurn 的结果去演」 |
@@ -687,6 +688,7 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNAiStudioMemory.cs | （记忆层） | 可命名记忆预设 + 从日志 / 从存档两个导入器。**完全独立于运行时 `VNAiMemory`**（那是存档态）；读存档**自己读 JSON，绝不调 `VNSaveSystem.Load()`**——那个会 `VNFlags.Clear()` |
 | VNAiStudioLog.cs | （导出） | 试聊会话按游戏内**同格式**写到 `AiTalkLogs/Editor/`，两边日志可互相对比 |
 | VNAiEditorCoroutine.cs | （基础设施） | Play Mode 外的协程泵，试聊台与自检菜单共用。**坑**：子协程跑完弹栈后父协程的 `Current` 仍指着那个已耗尽的对象，不记 `_started` 会无限重新压栈，表现为「点了没反应也不报错」 |
+| VNAiCostReport.cs | Tools → VN Effects → AI → **Cost Report** | 花费累计报表：扫全部日志 json 聚合。**改成本相关代码时的回归入口**——存储金额与重算金额在同模型下必须相等 |
 
 **编辑器铁律**：文本是唯一真相（编辑器状态不落存档）；`say` 的角色/表情走
 `VNRow.speaker/expression` 专用字段，`show` 才用普通参数——两条路径不能混。

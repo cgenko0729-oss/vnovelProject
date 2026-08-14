@@ -71,6 +71,12 @@ namespace VNEffectsEditor
         public VNAiConversation Conversation => _convo;
         public VNAiPersonaDef Persona => _persona;
 
+        /// <summary>
+        /// 最近一次收场总结请求的结果。导出日志时要把它的开销一起记进去——
+        /// 那是一次独立的请求，不记的话日志成本会少算一整次。
+        /// </summary>
+        public VNAiResult LastSummaryResult { get; private set; }
+
         /// <summary>每次收到回复 / 出错后回调，窗口用来 Repaint</summary>
         public Action onChanged;
 
@@ -322,6 +328,7 @@ namespace VNEffectsEditor
             TotalOutputTokens += res.outputTokens;
             TotalCostUsd += res.EstimatedCostUsd;
 
+            LastSummaryResult = res;   // 导出日志时要记这一次的开销
             _running = null;
 
             if (!res.ok)

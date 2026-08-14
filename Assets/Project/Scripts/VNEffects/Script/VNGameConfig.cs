@@ -194,6 +194,10 @@ namespace VNEffects
                 "留空 = 生成器扫全工程 VNAiPersonaDef 自动登记")]
         public List<VNAiPersonaDef> aiPersonas = new List<VNAiPersonaDef>();
 
+        [Header("AI 模型单价表（算成本用）。留空 = 用内置默认表\n" +
+                "换了模型却不改这里的话，日志里的成本数字会静默偏低")]
+        public VNAiPricingDef aiPricing;
+
         /// <summary>按 id 查 AI 人格；找不到返回 null（调用方负责告警）</summary>
         public VNAiPersonaDef FindAiPersona(string personaId)
         {

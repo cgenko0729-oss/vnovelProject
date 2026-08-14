@@ -16,8 +16,14 @@ namespace VNEffectsEditor
         public const string SubFolder = "Editor";
 
         /// <summary>返回 .md 路径；没东西可写或失败返回 null。</summary>
+        /// <param name="summaryRes">
+        /// 收场总结那一次请求的结果（没做总结就传 null）。**必须一起传进来**——
+        /// 它是一次独立请求，不记的话日志成本会少算一整次
+        /// （这正是窗口要等总结回来才导出日志的原因）。
+        /// </param>
         public static string Export(VNAiStudioSession session, VNAiPersonaDef persona,
-                                    string kwargs, int maxTurns, string outcome)
+                                    string kwargs, int maxTurns, string outcome,
+                                    VNAiResult summaryRes = null)
         {
             if (session == null || persona == null || session.turns.Count == 0) return null;
 
@@ -66,6 +72,8 @@ namespace VNEffectsEditor
                 if (t.pickedIndex >= 0 && t.pickedIndex < t.optionTones.Count)
                     pickedTones.Add(t.optionTones[t.pickedIndex]);
             }
+
+            if (summaryRes != null) log.RecordSummary(summaryRes);
 
             log.End(outcome, session.AffectionTotal, pickedTones, null, false);
             return log.Save(SubFolder);

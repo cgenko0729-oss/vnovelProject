@@ -323,6 +323,12 @@ namespace VNEffectsEditor
             yield return VNAiClient.Send(req, r => res = r);
             while (res == null) yield return null;
 
+            // 这一次请求不属于任何一场对话，进不了会话日志，所以至少让它在 Console 留痕——
+            // 否则「导入记忆」就成了一笔查不到的开销
+            Debug.Log($"[VNAiStudio] 从日志总结记忆：{res.elapsedSeconds:0.0}s　" +
+                      $"{res.promptTokens}+{res.outputTokens + res.thoughtsTokens} tok　" +
+                      $"≈${res.EstimatedCostUsd:0.000000}（{persona.ResolveModel()}）");
+
             if (!res.ok)
             {
                 onDone?.Invoke(null, $"{res.failure}：{res.errorMessage}");
