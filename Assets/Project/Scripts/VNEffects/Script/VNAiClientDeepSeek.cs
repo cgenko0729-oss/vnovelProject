@@ -165,8 +165,15 @@ namespace VNEffects
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                error = $"回复正文为空（finish_reason={choice.finish_reason}）" +
-                        "。JSON 模式下偶发会返回空内容，重试即可";
+                // 「空」通常不是真的空，而是**一串空白字符**——这是 json_object 模式的
+                // 一个具体退化：历史里 assistant 的消息不是 JSON 时，模型会照着纯文本的
+                // 样子继续，但 JSON 模式又不准它出纯文本，于是吐空白。
+                // 已由 VNAiConversation.AppendHistory 把历史包成 JSON 解决；
+                // 再遇到就先去看请求体里 assistant 那几条长什么样。
+                error = $"回复正文为空（finish_reason={choice.finish_reason}，" +
+                        $"content 长度 {(text == null ? 0 : text.Length)}）。" +
+                        "JSON 模式下这通常意味着历史里的 assistant 消息不是 JSON，" +
+                        "少数情况是官方说的偶发空内容（重试即可）";
                 return VNAiFailure.BadResponse;
             }
 

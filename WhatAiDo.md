@@ -7122,6 +7122,17 @@ config 的清缓存入口上。
 - **单价表的 key 撞车**：`deepseek-v4-flash` 里含 `flash`，会被 Gemini 的
   flash 档（$0.60/$3.50）抢走。原有的「按 key 最长优先」排序刚好挡住了这一枪——
   当初为 `flash-lite` 写的那条规则，这次白捡。
+- **第 2 轮起「回复正文为空」——不是偶发，是必现**（上线后当天实测到，已修）：
+  `json_object` 模式下，历史里 assistant 的消息是纯文本时，模型会照着
+  「我上一条说的是纯文本」继续，而 JSON 模式又只准它出 JSON，于是退化成
+  **吐一串空白字符**（`finish_reason=stop`，content = 20 个空格）。
+  第 1 轮没有 assistant 历史所以永远正常，**第 2 轮起必挂**，看起来却像随机失败。
+  用 A/B/C/D 四组对照请求钉死：纯文本历史 2/2 失败、完整 JSON 历史 2/2 成功、
+  **只包 `{"reply":"…"}` 3/3 成功**，且与 `thinking` 开关无关。
+  修法取最省 token 的那个（`VNAiConversation.AppendHistory`，每条历史多约 12 token），
+  `_history` 仍只存纯台词，总结拍平与试聊台重建历史继续共用同一份数据。
+  **教训**：换供应商时「历史消息的格式」和「请求参数」一样是契约的一部分——
+  第一轮能跑通不代表接对了，多轮才是真正的验收点。
 - **思考 token 别算两遍**：DeepSeek 的 `completion_tokens` **已经含**
   `reasoning_tokens`，而 Gemini 的 `candidatesTokenCount` 不含 `thoughtsTokenCount`。
   解析时先把 reasoning 从 completion 里减掉，上层「输出+思考」的公式才两家通用。

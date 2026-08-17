@@ -170,8 +170,49 @@ namespace VNEffects
                 temperature = persona.temperature,
                 maxOutputTokens = persona.maxOutputTokens,
             };
-            req.history.AddRange(_history);
+            AppendHistory(req);
             return req;
+        }
+
+        /// <summary>
+        /// 把历史塞进请求。**她说过的话要不要包成 JSON，取决于供应商**。
+        ///
+        /// 【为什么要包】实测（deepseek-v4-flash，2026-08-17，A/B/C/D 四组对照）：
+        ///   json_object 模式下，如果历史里 assistant 的消息是**纯文本**，
+        ///   模型会照着「我上一条说的是纯文本」继续，可 JSON 模式又只准它出 JSON，
+        ///   于是退化成吐一串**空白字符**（finish_reason=stop，content 是 20 个空格）。
+        ///   第 1 轮没有 assistant 历史所以正常，**第 2 轮起必挂**——
+        ///   表现出来就是「时好时坏的 BadResponse：回复正文为空」，其实是必现的。
+        ///   把历史包成 JSON 后 4/4 全部正常返回完整对象。
+        ///
+        /// 【为什么只包 reply 一个字段】
+        ///   完整还原（含 5 个选项）每条历史要多几十个 token，历史留 12 轮就是几百 token/轮；
+        ///   实测只包 `{"reply":"…"}` 一样能纠正格式（E1~E3 三次全对），
+        ///   而且 `_history` 仍只存台词纯文本——总结请求要拍平成对话记录、
+        ///   试聊台域重载后要靠 reply 重建历史，都还是用同一份数据，不用多存一套。
+        ///
+        /// Gemini 那边有硬 schema，不存在这个问题，保持原样（也省这点 token）。
+        /// </summary>
+        void AppendHistory(VNAiRequest req)
+        {
+            if (VNAiProviders.SupportsResponseSchema(req.provider))
+            {
+                req.history.AddRange(_history);
+                return;
+            }
+
+            foreach (var m in _history)
+                req.history.Add(m.fromPlayer ? m : VNAiMessage.Model(WrapReplyAsJson(m.text)));
+        }
+
+        /// <summary>把一句台词包成 `{"reply":"…"}`（转义走客户端那套，中文不转 \u）。</summary>
+        static string WrapReplyAsJson(string reply)
+        {
+            var sb = new StringBuilder(64);
+            sb.Append("{\"reply\":");
+            VNAiClient.Esc(sb, reply ?? "");
+            sb.Append('}');
+            return sb.ToString();
         }
 
         /// <summary>把她这轮的回复记进历史（下一轮请求要带上）。</summary>
