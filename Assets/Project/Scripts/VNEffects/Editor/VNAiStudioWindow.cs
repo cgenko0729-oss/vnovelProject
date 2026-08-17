@@ -179,6 +179,8 @@ namespace VNEffectsEditor
                     _persona, typeof(VNAiPersonaDef), false, GUILayout.Width(200));
                 if (EditorGUI.EndChangeCheck()) BindPersona(picked);
 
+                DrawProviderPicker();
+
                 if (_draft != null && _draft.IsDirty)
                 {
                     var c = GUI.color;
@@ -222,6 +224,46 @@ namespace VNEffectsEditor
                 }
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        /// 工具栏上的供应商 / 模型下拉。**改的是草稿**，所以不写回资产就能
+        /// 「同一句话用 Gemini 和 DeepSeek 各跑一遍」对比效果和成本——
+        /// 这正是试聊台存在的意义（不进 Play Mode 调参）。
+        /// 想固化到人格资产，点旁边的「写回资产」。
+        /// </summary>
+        void DrawProviderPicker()
+        {
+            if (_draft == null || !_draft.IsValid) return;
+
+            var d = _draft.Draft;
+
+            EditorGUI.BeginChangeCheck();
+            var choice = (VNAiProviderChoice)EditorGUILayout.EnumPopup(
+                d.provider, EditorStyles.toolbarPopup, GUILayout.Width(150));
+            if (EditorGUI.EndChangeCheck())
+            {
+                d.provider = choice;
+                // 换家之后旧模型名一定不属于新那家，留着必 400。留空 = 用新家的默认模型
+                if (!string.IsNullOrWhiteSpace(d.model) &&
+                    VNAiProviders.TryFromModelName(d.model, out VNAiProvider owner) &&
+                    owner != d.ResolveProvider())
+                    d.model = "";
+                _draft.NotifyExternalEdit();
+            }
+
+            // 模型名直接可填，方便临时换 flash ⇄ pro 对比
+            EditorGUI.BeginChangeCheck();
+            string model = EditorGUILayout.TextField(
+                d.model, EditorStyles.toolbarTextField, GUILayout.Width(150));
+            if (EditorGUI.EndChangeCheck())
+            {
+                d.model = model;
+                _draft.NotifyExternalEdit();
+            }
+            if (string.IsNullOrWhiteSpace(d.model))
+                GUILayout.Label($"（{d.ResolveModel()}）", EditorStyles.miniLabel,
+                                GUILayout.Width(150));
         }
 
         void Splitter(int id)
@@ -875,15 +917,27 @@ namespace VNEffectsEditor
             _foldDiag = EditorGUILayout.Foldout(_foldDiag, "诊断", true, EditorStyles.foldoutHeader);
             if (!_foldDiag) return;
 
-            if (VNAiKey.TryGet(out _, out string source))
+            // key 要查**草稿当前选的那家**——试聊台随时可以切供应商
+            var provider = _draft.IsValid ? _draft.Draft.ResolveProvider() : VNAiProviders.GlobalDefault;
+            if (VNAiKey.TryGet(provider, out _, out string source))
                 EditorGUILayout.LabelField("key", "✔ " + source, EditorStyles.miniLabel);
             else
-                EditorGUILayout.HelpBox("没找到 API key。环境变量 GEMINI_API_KEY，" +
-                                        "或项目根放 GeminiAiApiKey.txt。", MessageType.Error);
+                EditorGUILayout.HelpBox(
+                    $"没找到 {VNAiProviders.DisplayName(provider)} 的 API key。" +
+                    $"环境变量 {VNAiProviders.EnvVarFor(provider)}，" +
+                    $"或项目根放 {VNAiProviders.KeyFileFor(provider)}。", MessageType.Error);
 
             if (_draft.IsValid)
             {
+                EditorGUILayout.LabelField("供应商", VNAiProviders.DisplayName(provider),
+                                           EditorStyles.miniLabel);
                 EditorGUILayout.LabelField("模型", _draft.Draft.ResolveModel(), EditorStyles.miniLabel);
+                if (!VNAiProviders.SupportsResponseSchema(provider))
+                    EditorGUILayout.HelpBox(
+                        "这家不支持硬 schema（responseSchema），格式改用提示词约束 —— " +
+                        "右栏 system prompt 末尾多出的「输出格式」段就是它。\n" +
+                        "偶发的格式错误由解析层降级兜底，右栏「原始 JSON」能看到实际返回。",
+                        MessageType.Info);
                 EditorGUILayout.LabelField("记忆",
                     _injectMemory && _preset != null
                         ? $"注入 {VNAiStudioMemory.For(_preset, CharacterId(), _draft.Draft.memoryCapacity).Count} 条"
@@ -917,9 +971,10 @@ namespace VNEffectsEditor
                     "先修好这些再试聊：\n\n• " + string.Join("\n• ", errors), "好");
                 return;
             }
-            if (!VNAiKey.TryGet(out _, out _))
+            var provider = _draft.Draft.ResolveProvider();
+            if (!VNAiKey.TryGet(provider, out _, out _))
             {
-                EditorUtility.DisplayDialog("没有 API key", VNAiKey.MissingKeyMessage(), "好");
+                EditorUtility.DisplayDialog("没有 API key", VNAiKey.MissingKeyMessage(provider), "好");
                 return;
             }
 

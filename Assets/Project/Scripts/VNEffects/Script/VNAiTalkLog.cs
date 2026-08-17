@@ -69,6 +69,8 @@ namespace VNEffects
                 ? persona.character.id : "";
             _s.displayName = persona != null ? persona.DisplayName : "";
             _s.model = persona != null ? persona.ResolveModel() : VNAiClient.DefaultModel;
+            _s.provider = VNAiProviders.DisplayName(
+                persona != null ? persona.ResolveProvider() : VNAiProviders.GlobalDefault);
             _s.temperature = persona != null ? persona.temperature : 0f;
             _s.maxReplyChars = persona != null ? persona.maxReplyChars : 0;
             _s.historyTurns = persona != null ? persona.historyTurns : 0;
@@ -109,11 +111,13 @@ namespace VNEffects
                 t.promptTokens = res.promptTokens;
                 t.outputTokens = res.outputTokens;
                 t.thoughtsTokens = res.thoughtsTokens;
+                t.cachedTokens = res.cachedPromptTokens;
                 t.costUsd = res.EstimatedCostUsd;
                 t.failure = res.ok ? "" : res.failure.ToString();
                 t.errorMessage = res.ok ? "" : res.errorMessage;
 
                 _s.totalSeconds += res.elapsedSeconds;
+                _s.totalCachedTokens += res.cachedPromptTokens;
                 _s.totalPromptTokens += res.promptTokens;
                 _s.totalOutputTokens += res.outputTokens + res.thoughtsTokens;
                 _s.totalCostUsd += res.EstimatedCostUsd;
@@ -145,6 +149,7 @@ namespace VNEffects
             if (!res.ok) _s.summaryFailure = res.failure.ToString();
 
             _s.totalSeconds += res.elapsedSeconds;
+            _s.totalCachedTokens += res.cachedPromptTokens;
             _s.totalPromptTokens += res.promptTokens;
             _s.totalOutputTokens += res.outputTokens + res.thoughtsTokens;
             _s.totalCostUsd += res.EstimatedCostUsd;
@@ -252,7 +257,8 @@ namespace VNEffects
             sb.AppendLine();
             sb.AppendLine($"- **时间**：{_s.startedAt} → {_s.endedAt}");
             sb.AppendLine($"- **人格**：`{_s.personaId}`　**角色**：`{_s.characterId}`");
-            sb.AppendLine($"- **模型**：`{_s.model}`　temperature `{_s.temperature}`");
+            sb.AppendLine($"- **供应商**：{(string.IsNullOrEmpty(_s.provider) ? "(未记录)" : _s.provider)}" +
+                          $"　**模型**：`{_s.model}`　temperature `{_s.temperature}`");
             sb.AppendLine($"- **剧本行**：第 {_s.scriptLine} 行　`event aitalk {_s.kwargs}`");
             sb.AppendLine($"- **轮数上限**：{_s.maxTurns}　**历史保留**：{_s.historyTurns} 轮" +
                           $"　**台词字数上限**：{_s.maxReplyChars}");
@@ -281,6 +287,10 @@ namespace VNEffects
             sb.AppendLine("|---|---|");
             sb.AppendLine($"| 总耗时 | {_s.totalSeconds:0.0}s |");
             sb.AppendLine($"| 输入 token | {_s.totalPromptTokens} |");
+            if (_s.totalCachedTokens > 0)
+                // 命中缓存的输入便宜约 30 倍，命中率低说明 system prompt 或历史一直在变
+                sb.AppendLine($"| ├ 其中命中提示缓存 | {_s.totalCachedTokens}" +
+                              $"（{100f * _s.totalCachedTokens / Mathf.Max(1, _s.totalPromptTokens):0.#}%，单价便宜约 30 倍） |");
             sb.AppendLine($"| 输出 token（**含思考**） | {_s.totalOutputTokens} |");
             sb.AppendLine($"| 合计 token | {_s.totalPromptTokens + _s.totalOutputTokens} |");
             sb.AppendLine($"| **估算成本** | **${_s.totalCostUsd:0.000000}** |");
@@ -383,6 +393,7 @@ namespace VNEffects
             public int pickedIndex;        // -1 = 本轮没让玩家选
             public float seconds;
             public int promptTokens, outputTokens, thoughtsTokens;
+            public int cachedTokens;       // 输入里命中提示缓存的部分（已含在 promptTokens 里）
             public double costUsd;
             public string failure;         // 空 = 正常
             public string errorMessage;
@@ -392,6 +403,8 @@ namespace VNEffects
         {
             public string startedAt, endedAt;
             public string personaId, characterId, displayName, model;
+            public string provider;        // "Gemini" / "DeepSeek"，事后重算单价要用
+            public int totalCachedTokens;  // 命中提示缓存的输入 token 合计
             public float temperature;
             public int maxReplyChars, historyTurns, maxTurns;
             public int scriptLine;

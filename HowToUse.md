@@ -1218,8 +1218,14 @@ if 闲聊_好感变化 >= 3 jump 聊得非常好
 **第一次用要先装模块**：**Tools → VN Effects → Install AI Talk Module To Scene**
 ——补一个禁用的 AiTalkTemplate 并登记人格库，顺带体检 key / 人格 / 表情三样。装完记得 Ctrl+S。
 
-**API Key**：环境变量 `GEMINI_API_KEY`，或仓库外 / 仓库根目录的 `GeminiAiApiKey.txt`。
-用 **Tools → VN Effects → AI → Show Key Status** 看当前读到的是哪个来源。
+**供应商**：默认 DeepSeek（`deepseek-v4-flash`），在 `VNGameConfig` 的「AI 默认供应商」
+一处切换 Gemini ⇄ DeepSeek；单个人格要用别家就在人格资产里选（默认「跟随全局」）。
+两家的差异与价格见 `AiTalkGuide.md` 第十七节。
+
+**API Key**：按用的那家配——
+DeepSeek 用环境变量 `DEEPSEEK_API_KEY` 或 `DeepSeekAiApiKey.txt`，
+Gemini 用 `GEMINI_API_KEY` 或 `GeminiAiApiKey.txt`（都可放仓库外 / 仓库根目录）。
+用 **Tools → VN Effects → AI → Show Key Status** 看两家分别读到了没有。
 没配 key 也能跑——每轮走人格资产里的兜底台词，结果返回「失败」。
 
 > 🔒 **key 只用于本地开发。** 它不打包进 Build（代码里 `#if` 挡住了）、不进仓库

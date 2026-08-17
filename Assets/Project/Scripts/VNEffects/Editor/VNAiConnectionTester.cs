@@ -24,14 +24,32 @@ namespace VNEffectsEditor
     {
         // ──────────────── 一级：连通性 ────────────────
 
-        [MenuItem("Tools/VN Effects/AI/Test Gemini Connection", false, 400)]
-        public static void TestConnection()
+        /// <summary>当前全局默认那家。日常自检用这个就够。</summary>
+        [MenuItem("Tools/VN Effects/AI/Test Connection (当前默认供应商)", false, 400)]
+        public static void TestConnection() => TestConnection(VNAiProviders.GlobalDefault);
+
+        [MenuItem("Tools/VN Effects/AI/Test Connection · Gemini", false, 401)]
+        public static void TestGemini() => TestConnection(VNAiProvider.Gemini);
+
+        [MenuItem("Tools/VN Effects/AI/Test Connection · DeepSeek", false, 402)]
+        public static void TestDeepSeek() => TestConnection(VNAiProvider.DeepSeek);
+
+        /// <summary>
+        /// 只发一句纯文本，验 key / 网络 / 模型名。指定供应商是为了换家之后
+        /// 能先单独确认「新那家通不通」，再去查逻辑层。
+        /// </summary>
+        static void TestConnection(VNAiProvider provider)
         {
-            if (!RequireKey(out string source)) return;
-            Debug.Log($"[VNAi] key 来源：{source}\n[VNAi] 正在请求 {VNAiClient.DefaultModel} …");
+            if (!RequireKey(provider, out string source)) return;
+
+            string model = VNAiProviders.DefaultModelFor(provider);
+            Debug.Log($"[VNAi] {VNAiProviders.DisplayName(provider)}　key 来源：{source}\n" +
+                      $"[VNAi] 正在请求 {model} …");
 
             var req = new VNAiRequest
             {
+                provider = provider,
+                model = model,
                 systemInstruction = "只回答问题本身，不要多余的话。",
                 maxOutputTokens = 64,
             };
@@ -40,20 +58,38 @@ namespace VNEffectsEditor
             RunCoroutine(VNAiClient.Send(req, r =>
             {
                 if (!r.ok) { LogFailure(r); return; }
-                Debug.Log($"[VNAi] ✔ 网络通  {r.elapsedSeconds:0.00}s  " +
-                          $"{r.totalTokens} tokens  ≈ ${r.EstimatedCostUsd:0.000000}\n  {r.text}");
+                Debug.Log($"[VNAi] ✔ {VNAiProviders.DisplayName(r.provider)} 网络通  " +
+                          $"{r.elapsedSeconds:0.00}s  {r.totalTokens} tokens  " +
+                          $"≈ ${r.EstimatedCostUsd:0.000000}\n  {r.text}");
             }));
         }
 
-        [MenuItem("Tools/VN Effects/AI/Show Key Status", false, 401)]
+        [MenuItem("Tools/VN Effects/AI/Show Key Status", false, 403)]
         public static void ShowKeyStatus()
         {
             VNAiKey.Invalidate();   // 改过环境变量/文件后强制重查
-            if (VNAiKey.TryGet(out _, out string source))
-                Debug.Log($"[VNAi] ✔ 已找到 key，来源：{source}\n" +
-                          "（key 不会被打印、不会进仓库、不会进 Build）");
-            else
-                Debug.LogWarning(VNAiKey.MissingKeyMessage());
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"[VNAi] 全局默认供应商：{VNAiProviders.DisplayName(VNAiProviders.GlobalDefault)}" +
+                          $"　默认模型：{VNAiProviders.GlobalDefaultModel}");
+            bool any = false;
+            foreach (VNAiProvider p in Enum.GetValues(typeof(VNAiProvider)))
+            {
+                if (VNAiKey.TryGet(p, out _, out string src))
+                {
+                    any = true;
+                    sb.AppendLine($"  ✔ {VNAiProviders.DisplayName(p)}　来源：{src}");
+                }
+                else
+                {
+                    sb.AppendLine($"  ✘ {VNAiProviders.DisplayName(p)}　没找到 key" +
+                                  $"（环境变量 {VNAiProviders.EnvVarFor(p)} 或 {VNAiProviders.KeyFileFor(p)}）");
+                }
+            }
+            sb.Append("（key 不会被打印、不会进仓库、不会进 Build）");
+
+            if (any) Debug.Log(sb.ToString());
+            else Debug.LogWarning(sb + "\n\n" + VNAiKey.MissingKeyMessage());
         }
 
         // ──────────────── 二级：人格 + 多轮对话 ────────────────
@@ -61,8 +97,6 @@ namespace VNEffectsEditor
         [MenuItem("Tools/VN Effects/AI/Test Persona Talk (3 turns)", false, 420)]
         public static void TestPersonaTalk()
         {
-            if (!RequireKey(out _)) return;
-
             var persona = ResolvePersona();
             if (persona == null)
             {
@@ -79,8 +113,12 @@ namespace VNEffectsEditor
                 return;
             }
 
+            // key 要查**这套人格实际用的那家**，不是全局默认那家
+            if (!RequireKey(persona.ResolveProvider(), out _)) return;
+
             Debug.Log($"[VNAi] 人格「{persona.id}」→ 角色「{persona.character.id}」" +
-                      $"，模型 {persona.ResolveModel()}，开始 3 轮对话自检 …");
+                      $"，{VNAiProviders.DisplayName(persona.ResolveProvider())} " +
+                      $"{persona.ResolveModel()}，开始 3 轮对话自检 …");
             RunCoroutine(TalkCo(persona, 3));
         }
 
@@ -167,10 +205,13 @@ namespace VNEffectsEditor
 
         // ──────────────── 辅助 ────────────────
 
-        static bool RequireKey(out string source)
+        static bool RequireKey(out string source) =>
+            RequireKey(VNAiProviders.GlobalDefault, out source);
+
+        static bool RequireKey(VNAiProvider provider, out string source)
         {
-            if (VNAiKey.TryGet(out _, out source)) return true;
-            Debug.LogError(VNAiKey.MissingKeyMessage());
+            if (VNAiKey.TryGet(provider, out _, out source)) return true;
+            Debug.LogError(VNAiKey.MissingKeyMessage(provider));
             return false;
         }
 

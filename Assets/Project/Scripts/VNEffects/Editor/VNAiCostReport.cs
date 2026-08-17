@@ -56,6 +56,7 @@ namespace VNEffectsEditor
             public int turns;
             public int summaryRequests;
             public int promptTokens;
+            public int cachedTokens;         // 其中命中提示缓存的（老日志没这个字段 = 0）
             public int outputTokens;         // 含思考
             public float seconds;
             public double storedCost;        // 日志里存的
@@ -112,16 +113,27 @@ namespace VNEffectsEditor
                         summaryRequests = s.summaryRequests,
                         promptTokens = s.totalPromptTokens,
                         outputTokens = s.totalOutputTokens,
+                        cachedTokens = s.totalCachedTokens,
                         seconds = s.totalSeconds,
                         storedCost = s.totalCostUsd,
                     };
 
                     // 重算：totalOutputTokens 已经含思考，所以直接按输出价乘，
-                    // 不能再走 VNAiPricing.Cost(…, thoughtsTokens) 那条（会重复计一次思考）
+                    // 不能再走 VNAiPricing.Cost(…, thoughtsTokens) 那条（会重复计一次思考）。
+                    // 缓存命中的输入走便宜价；高峰倍率按**这场对话当时**的时间判，
+                    // 不是按现在——同一份日志今天看和明天看必须是同一个数字。
                     var price = VNAiPricing.For(s.model, out bool found);
                     e.unknownModel = !found;
-                    e.recalcCost = e.promptTokens * price.inputPerMillion / 1e6
+
+                    int cached = Mathf.Clamp(e.cachedTokens, 0, Mathf.Max(0, e.promptTokens));
+                    double cachedRate = price.cachedInputPerMillion > 0
+                        ? price.cachedInputPerMillion : price.inputPerMillion;
+                    e.recalcCost = (e.promptTokens - cached) * price.inputPerMillion / 1e6
+                                 + cached * cachedRate / 1e6
                                  + e.outputTokens * price.outputPerMillion / 1e6;
+                    if (price.peakMultiplier > 1 && StartedAtUtc(e.startedAt, out DateTime utc)
+                        && VNAiPricing.IsPeak(utc))
+                        e.recalcCost *= price.peakMultiplier;
 
                     _entries.Add(e);
                 }
@@ -132,6 +144,21 @@ namespace VNEffectsEditor
             {
                 _scanError = ex.Message;
             }
+        }
+
+        /// <summary>
+        /// 日志里的 startedAt 是**本地时间**，而高峰时段是按 UTC 定的，要换算。
+        /// 解析不了（老日志格式不同/字段空）就返回 false，那种情况按非高峰算。
+        /// </summary>
+        static bool StartedAtUtc(string startedAt, out DateTime utc)
+        {
+            utc = default;
+            if (string.IsNullOrEmpty(startedAt)) return false;
+            if (!DateTime.TryParse(startedAt, System.Globalization.CultureInfo.InvariantCulture,
+                                   System.Globalization.DateTimeStyles.AssumeLocal, out DateTime local))
+                return false;
+            utc = local.ToUniversalTime();
+            return true;
         }
 
         // ──────────────── 聚合 ────────────────

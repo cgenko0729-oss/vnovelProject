@@ -7040,3 +7040,116 @@ Instantiate(persona) → 内存副本（HideFlags.DontSave）
 - 单价表是**每百万 token 的平铺价**，不支持分档计价（超过 N token 后涨价）
   与缓存命中折扣。当前用量下不值得做。
 - 报表按会话聚合，看不到「哪一轮特别贵」——那个信息在单份日志的逐轮表里。
+
+---
+
+## 一一四、AI 供应商可切换：接入 DeepSeek V4（2026-08-17，分支 `agent/ai-deepseek`）
+
+### 为什么做
+
+只接了 Gemini 一家，换模型要改代码，而且没法对比。DeepSeek V4 Flash 的价格
+（非高峰 $0.22 / $0.66 每百万）比 Gemini 3.7 Flash（$0.75 / $3.75）**输出便宜 5.7 倍**，
+自由聊天这种「每轮都重发整段历史」的用法差价很实在。
+需求是**两家都能用、随时切、切了成本还算得准**。
+
+### 做了什么
+
+**新增供应商抽象层 `VNAiProvider.cs`**
+
+- `VNAiProvider`（Gemini / DeepSeek）+ `VNAiProviderChoice`（多一个「跟随全局」，
+  **默认值 0 就是跟随**，所以存量人格资产一个字都不用改）
+- `VNAiProviders` 集中登记各家的：默认模型、key 的环境变量与文件名、
+  **能力差异**（`SupportsResponseSchema` / `SupportsSafetySettings`）
+- 上层判断能力一律问它，而不是到处写 `if (provider == Gemini)`
+
+**三层切换入口**（越下越优先）
+
+| 层 | 在哪 |
+|---|---|
+| 全局默认 | `VNGameConfig.aiProvider` / `aiModel`（**默认已设为 DeepSeek**）|
+| 人格资产 | `VNAiPersonaDef.provider` / `model`，默认「跟随全局」|
+| 试聊台 | 工具栏两个格子，改的是**草稿**，用于 A/B 对比 |
+
+**`VNAiClient` 拆三份，但「唯一碰 HTTP 的文件」这条不变**
+
+传输、重试、错误分类仍全在 `VNAiClient.Send`；各家只差「拼请求体」和「解响应」，
+拆进 `VNAiClientGemini` / `VNAiClientDeepSeek` 两个**纯静态、不碰网络**的类。
+加第三家就是再加一个文件 + `VNAiProviders` 里加一项。
+
+**`VNAiKey` 改成按供应商各一套**：`DEEPSEEK_API_KEY` / `DeepSeekAiApiKey.txt` 与
+Gemini 那套并存，**分开缓存**——只配了一家时另一家要能正确报「没找到 key」，
+不能因为缓存了一个空值就把两家都判死。
+
+**`VNAiPricing` 支持三个价 + 一个时段倍率**：未命中输入 / 命中缓存输入 / 输出，
+再乘高峰倍率。DeepSeek 高峰（UTC 01–04、06–10）翻倍，时段列表也放进资产。
+
+### 三个关键决策
+
+**1. DeepSeek 没有硬 schema —— 约束从「硬」降级成「软」+ 兜底**
+
+Gemini 的 `responseSchema` 里 `emotion` 是 enum、`options` 有 minItems/maxItems，
+是**服务端强制**的；DeepSeek 只有 `response_format:{"type":"json_object"}`，
+不认 json_schema。做法：
+
+- `VNAiConversation.BuildJsonFormatPrompt()` 把 schema 翻译成一段「输出格式」——
+  键名、类型、**一个把 tone 全填好的示例 JSON**（光用文字描述实测会漏 tone），
+  插在【绝对边界】之前（靠后＝权重高）
+- 真正的保险仍是原有的 `TryParseTurn`：表情越界降级、选项不足补齐、好感 Clamp。
+  以前那套「永远不信任模型输出」的代码是双保险，现在成了**唯一**的那道保险
+
+结论写进指南第十七节：**换到 DeepSeek 之后，演出偶尔打折是设计内的**，
+排错先看试聊台右栏的「原始 JSON」。
+
+**2. 全局默认写成 DeepSeek，靠 Unity 的反序列化行为生效**
+
+`VNGameConfig` 是已存在的资产，YAML 里没有新字段。Unity 反序列化时会先跑字段初始化器
+再覆盖已有字段，所以 `public VNAiProvider aiProvider = VNAiProvider.DeepSeek;`
+对存量资产也生效——不用手点 Inspector 就已经是 DeepSeek。
+
+**3. 缓存缓存缓存：`VNGameConfig.ClearCache()` 里补上两个 Invalidate**
+
+`VNAiProviders`（默认供应商）和 `VNAiPricing`（单价表）都从 config 读并缓存。
+不一起清的话，在 Inspector 里把供应商改成 DeepSeek 之后还会继续发给 Gemini，
+直到下次域重载。**「改了没反应」是这类缓存最典型也最难查的症状**，所以直接挂在
+config 的清缓存入口上。
+
+### 踩到的坑
+
+- **`VNAiClient.DefaultModel` 从 const 变成属性**（要按当前供应商算），
+  于是 `VNAiPersonaDef` 上 `[Header("模型名（留空 = " + VNAiClient.DefaultModel + "）")]`
+  这种**特性里的编译期常量拼接**必须一起改掉，否则编不过。特性参数只能是编译期常量——
+  凡是想把某个值「升级成可配置」，先搜一遍它有没有被写进 Attribute。
+- **单价表的 key 撞车**：`deepseek-v4-flash` 里含 `flash`，会被 Gemini 的
+  flash 档（$0.60/$3.50）抢走。原有的「按 key 最长优先」排序刚好挡住了这一枪——
+  当初为 `flash-lite` 写的那条规则，这次白捡。
+- **思考 token 别算两遍**：DeepSeek 的 `completion_tokens` **已经含**
+  `reasoning_tokens`，而 Gemini 的 `candidatesTokenCount` 不含 `thoughtsTokenCount`。
+  解析时先把 reasoning 从 completion 里减掉，上层「输出+思考」的公式才两家通用。
+
+### 验证
+
+- 用 Unity 的 Roslyn + Bee 的 rsp 离线编译 `Assembly-CSharp` 与
+  `Assembly-CSharp-Editor`，两个都 exit 0、无新增警告
+- 自检菜单拆成 `Test Connection · Gemini` / `· DeepSeek`，`Show Key Status`
+  一次列出两家 key 找没找到
+
+### 改了哪些文件
+
+```
+新增  Script/VNAiProvider.cs           供应商枚举 + 能力/默认值登记
+新增  Script/VNAiClientGemini.cs       Gemini 拼包解包（从 VNAiClient 搬出）
+新增  Script/VNAiClientDeepSeek.cs     DeepSeek 拼包解包
+改    Script/VNAiClient.cs             只剩传输/重试/错误分类 + 按家分派
+改    Script/VNAiKey.cs                按供应商各一套 key，分开缓存
+改    Script/VNAiPricing.cs            缓存命中价 + 高峰倍率 + DeepSeek 两档
+改    Script/VNAiPersonaDef.cs         provider 字段 + 模型/供应商不匹配的自检
+改    Script/VNAiConversation.cs       请求带 provider；没有硬 schema 的家补格式提示词
+改    Script/VNGameConfig.cs           全局默认供应商/模型；ClearCache 连带清 AI 缓存
+改    Script/VNAiTalkLog.cs            日志记供应商与缓存命中数
+改    Editor/VNAiConnectionTester.cs   分家自检 + 两家 key 状态
+改    Editor/VNAiStudioWindow.cs       工具栏供应商/模型下拉（A/B 对比）
+改    Editor/VNAiStudioDraft.cs        NotifyExternalEdit（绕过 SerializedObject 改草稿后刷新 diff）
+改    Editor/VNAiCostReport.cs         重算带缓存命中价与当时的高峰判定
+改    Editor/VNAiTalkInstaller.cs      按人格实际用的那家查 key
+文档  AiTalkGuide.md 第十七节、CLAUDE.md 组件表
+```

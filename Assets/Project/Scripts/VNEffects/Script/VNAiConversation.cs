@@ -161,6 +161,7 @@ namespace VNEffects
 
             var req = new VNAiRequest
             {
+                provider = persona.ResolveProvider(),
                 model = persona.ResolveModel(),
                 systemInstruction = BuildSystemInstruction(persona, ctx, _emotions, _marks, _tones),
                 responseSchemaJson = _schema,
@@ -291,6 +292,17 @@ namespace VNEffects
             sb.AppendLine("6. should_end：这个话题自然聊完了就填 true，否则 false。");
             sb.AppendLine();
 
+            // ── 输出格式：只有「没有硬 schema」的家才需要 ──
+            //   Gemini 走 responseSchema，键名/类型/enum/选项条数都是服务端强制的，
+            //   再用提示词说一遍纯属浪费 token；
+            //   DeepSeek 只有 json_object 模式（不认 json_schema），
+            //   键名、类型、选项条数全靠这一段说清楚，实测不写就会漏 tone 字段。
+            if (!VNAiProviders.SupportsResponseSchema(p.ResolveProvider()))
+            {
+                sb.AppendLine(BuildJsonFormatPrompt(emotions, marks, tones, p));
+                sb.AppendLine();
+            }
+
             sb.AppendLine("【绝对边界】");
             sb.AppendLine(string.IsNullOrWhiteSpace(p.boundaries) ? "（无）" : p.boundaries.Trim());
             // 语言约束放在**最后一行**：越靠后权重越高。
@@ -320,6 +332,53 @@ namespace VNEffects
                     return $"台词与 {optionCount} 个候选回复全部使用简体中文，" +
                            "禁止出现繁体字或其他语言。";
             }
+        }
+
+        /// <summary>
+        /// 把 responseSchema 翻译成人话 + 一个填好的示例，给不支持硬 schema 的家用。
+        ///
+        /// 【为什么要给示例而不只是描述】
+        ///   options 里每项是 {"text","tone"} 这种嵌套结构，光用文字描述实测会漏 tone；
+        ///   给一个把 tone 全部填好的示例，模型照抄结构的成功率高得多，
+        ///   顺带又把「第 N 个选项必须是第 N 种语气」这条规则重复了一遍。
+        ///
+        /// 【"json" 这个词必须出现】
+        ///   DeepSeek 的 json_object 模式要求提示词里出现 json 字样，否则可能不生效。
+        ///
+        /// 注意：这段只是**软**约束。模型仍可能编出不存在的表情名或少给一个选项——
+        /// 那是 TryParseTurn 的降级/补齐/钳制负责兜底的，两道防线缺一不可。
+        /// </summary>
+        public static string BuildJsonFormatPrompt(
+            List<string> emotions, List<string> marks, List<string> tones, VNAiPersonaDef p)
+        {
+            int n = tones != null && tones.Count > 0 ? tones.Count : 3;
+            string firstEmotion = emotions != null && emotions.Count > 0 ? emotions[0] : "平静";
+            int clamp = p != null ? p.affectionClamp : 2;
+
+            var sb = new StringBuilder(512);
+            sb.AppendLine("【输出格式】");
+            sb.AppendLine("只输出一个 json 对象，不要代码块围栏，不要任何解释文字。");
+            sb.AppendLine("键名、类型、层级严格照下面这个例子（值换成你自己的内容）：");
+            sb.Append("{\"reply\":\"你的台词\",\"emotion\":\"").Append(firstEmotion)
+              .Append("\",\"mark\":\"").Append(VNAiPersonaDef.NoMark)
+              .Append("\",\"affection_delta\":0,\"options\":[");
+            for (int i = 0; i < n; i++)
+            {
+                if (i > 0) sb.Append(',');
+                string tone = tones != null && i < tones.Count ? tones[i] : "普通";
+                sb.Append("{\"text\":\"第").Append(i + 1).Append("个候选回复\",\"tone\":\"")
+                  .Append(tone).Append("\"}");
+            }
+            sb.AppendLine("],\"should_end\":false}");
+            sb.AppendLine("硬性要求：");
+            sb.Append("  - emotion 只能是这几个之一：").AppendLine(string.Join(" / ", emotions));
+            sb.Append("  - mark 只能是这几个之一：").AppendLine(string.Join(" / ", marks));
+            sb.Append("  - affection_delta 是整数，范围 -").Append(clamp)
+              .Append(" ~ +").Append(clamp).AppendLine("，多数时候是 0");
+            sb.Append("  - options 必须正好 ").Append(n)
+              .AppendLine(" 项，每项都要有 text 和 tone 两个键，tone 按上面例子里的顺序原样填");
+            sb.Append("  - should_end 是布尔值 true / false，不要写成字符串");
+            return sb.ToString();
         }
 
         static void Section(StringBuilder sb, string title, string body)
@@ -554,8 +613,20 @@ namespace VNEffects
             sb.AppendLine();
             sb.AppendLine("全部使用简体中文，禁止繁体字。只输出 JSON。");
 
+            // 没有硬 schema 的家（DeepSeek）：键名和类型只能靠提示词说清楚
+            var provider = persona.ResolveProvider();
+            if (!VNAiProviders.SupportsResponseSchema(provider))
+            {
+                sb.AppendLine();
+                sb.AppendLine("【输出格式】只输出一个 json 对象，不要代码块围栏、不要解释文字。");
+                sb.AppendLine("键名与类型严格如下（不能多、不能少、不能改名）：");
+                sb.AppendLine("{\"summary\":\"字符串\",\"topics\":[\"字符串\",\"…最多6个\"]," +
+                              "\"facts\":[\"字符串\",\"…最多4条，没有就给 []\"],\"diary\":\"字符串\"}");
+            }
+
             var req = new VNAiRequest
             {
+                provider = provider,
                 model = persona.ResolveModel(),
                 systemInstruction = sb.ToString(),
                 responseSchemaJson = SummarySchema,
