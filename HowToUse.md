@@ -1632,6 +1632,37 @@ CG 大图放 `Assets/CG/`，**文件名就是剧本里的 id**（如 `天台告�
 新素材放进 `Assets/Assets`（或任意位置），确保 Texture Type = **Sprite (2D and UI)**。
 用生成器生成过场景的图都已自动设置好。
 
+### 对话框皮肤（`ui dialogue` / `ui choice`）
+
+```
+ui dialogue <id|default>     换对话框外观
+ui choice   <id|default>     换选项面板外观
+```
+
+`default` = 回程序化默认样式（经典款）。id 在 `VNGameConfig` 的 UI 皮肤区登记，
+**皮肤状态进存档**（读档会回到存档时那套）。
+
+内置可用的对话框 id：
+
+| id | 长什么样 |
+|---|---|
+| （不写 / `default`） | 经典款：深蓝圆角面板 + 金色流光边框 |
+| `白渐变` | 无框：整屏底部白色渐变带 + 居中深墨字（亮背景、日常场景） |
+| `粉渐变` | 无框：粉色渐变带 + 居中深粉字（告白、暧昧场面） |
+| `黑渐变` | 无框：黑色渐变带（80% 浓）+ 居中白字，等于经典款去掉金边、改整屏铺满 |
+
+三套无框皮肤由 **Tools → VN Effects → UI Skins → Export Soft Gradient Skins** 生成，
+资产在 `Assets/VNEffects/UISkins/`。想微调：正文颜色改 prefab 里 Body 的 TextMeshPro Color，
+描边/柔光改 `Materials/VN_SoftText_*.mat`，渐变浓淡改 Panel/Gradient 那个 Image 的 Color 的 alpha。
+改完直接生效，不要再跑「(覆盖重建)」那一项——它会用出厂参数冲掉你的调整。
+
+```
+# 用法示例
+ui dialogue 粉渐变
+星野结衣：这种事……你还是自己说比较好吧。
+ui dialogue default          # 换回经典款
+```
+
 ---
 
 ## 九、玩家操作

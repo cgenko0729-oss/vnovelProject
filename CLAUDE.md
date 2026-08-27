@@ -129,7 +129,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮（TMP textInfo 顶点动画）；支持皮肤 prefab（VNDialogueSkin 槽位绑定，程序化默认兜底） |
 | VNNameplateStyle | 名牌装饰样式（粗黑体+描边+渐变+投影）：四套内置预设 Plain(老外观)/Bold(渐变+白描边+下划线,无底板)/Plate(底板+白内描边+深外描边)/Outline(白字+角色色粗描边)，`VNDialogueBox.nameplateStyle` 或 `SetNameplateStyle()` 切换；配色每角色一套（VNCharacterDef 没勾自定义就由 nameColor 自动推算渐变，存量资产零改动）。**三条硬约定**：材质必须走 `text.fontMaterial` 实例（改 sharedMaterial 会污染所有同字体文字）／underlay 通道只有一条所以「第二层外描边」与「投影」二选一／改 underlay 前必须 `EnableKeyword("UNDERLAY_ON")`。名牌宽度自适应只动程序化默认皮肤 |
-| VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI Skins → Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；皮肤状态进存档 |
+| VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI Skins → Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；另有 **Export Soft Gradient Skins** 一键出三套**无框渐变**皮肤（白渐变/粉渐变/黑渐变：整屏底部渐变带+居中台词，shineFrame 留空即无边框）；皮肤状态进存档 |
 | VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页/背包/排程面板/结算弹窗分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章）；只重导排程/结算两项用 Export Event Panel Prefabs（详见八十六章） |
 | VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器；另有**装饰字体**入口 `DisplayAsset`（思源黑体 Black，名牌等少量大字专用，正文别用）——单开一套资产是因为 **padding 必须与采样点等比例**：描边厚度 ≈ outlineWidth×(padding+1)×(字号/采样点)，padding 是描边粗细天花板，但 padding 占采样点过大（如 64pt 配 24）反而挤掉字形分辨率、把描边糊成淡影，故装饰字体用 120pt/padding 22（~18%）。语言切换时正文与装饰字体**分开替换**，换 font 会丢材质实例故有 `DisplayFontChanged` 事件通知重新上样式 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
@@ -206,7 +206,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 装备 | I 键背包 7 部位装备栏；VNShopDef.Item 加装备/使用字段；状态全在 flags（装备_/装备实增_/装备效果_），特殊效果由剧本 if 判断生效 | 八十五 |
 | 周日程排程 | `event plan` 排格/派发 + `flag rand:` + `event result` 结算；概率表写剧本 | 七十 |
 | 本地化 | 剧本只写中文，翻译旁路表 + Extract/Validate → 技能 vn-localize | 五十七 |
-| UI 皮肤 | `ui dialogue\|choice <id>`（进存档）+ 系统菜单全局主题（不进存档）→ 技能 vn-ui-skin | 八十二、八十三 |
+| UI 皮肤 | `ui dialogue\|choice <id>`（进存档）+ 系统菜单全局主题（不进存档）→ 技能 vn-ui-skin；无框渐变三套 id = 白渐变/粉渐变/黑渐变 | 八十二、八十三、一一五 |
 | 标题菜单 | VNTitleMenu 同场景覆盖层，配置在 VNGameConfig「标题画面」区 | 八十 |
 | 静态校验器 | Tools → VN Effects → Lint Scenarios（Ctrl+Shift+L），检查项全表见 HowToUse 十二·五 | 七十九 |
 

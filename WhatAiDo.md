@@ -7164,3 +7164,84 @@ config 的清缓存入口上。
 改    Editor/VNAiTalkInstaller.cs      按人格实际用的那家查 key
 文档  AiTalkGuide.md 第十七节、CLAUDE.md 组件表
 ```
+
+---
+
+## 一一五、无框渐变对话框皮肤：白渐变 / 粉渐变 / 黑渐变（2026-08-28，分支 `agent/ai-deepseek`）
+
+### 需求
+
+参考商业 Galgame 的「无框式」对话表现：**没有面板、没有边框、没有圆角**，
+底只有一条从屏幕底部向上淡出的整屏渐变带，台词居中压在画面上。
+用户给了两张参考图（白色通透渐变 / 粉色渐变），过程中追加第三种
+「现在这种黑黑的，但没有金黄边框、也是整屏铺满」。
+
+**经典款（程序化默认）完全不动**，随时 `ui dialogue default` 切回——
+这次是往皮肤库里加三套，不是替换。
+
+### 改了哪些文件
+
+```
+新增  Editor/VNSoftSkinExporter.cs   三套皮肤的一键导出器（贴图/材质/prefab/登记）
+改    Editor/VNUiSkinExporter.cs     把 BakeSprite / CreateImage / CreateText / Stretch /
+                                     EnsureFolder / SavePrefab / SkinDir 等改成 internal 供复用
+资产  Assets/VNEffects/UISkins/DialogueSkin_SoftWhite|SoftPink|SoftDark.prefab
+资产  Assets/VNEffects/UISkins/Materials/VN_SoftText_*.mat        正文 TMP 材质（描边+柔光）
+资产  Assets/VNEffects/UISkins/Textures/VN_BottomGradient.png     底部渐变带（白+alpha 曲线）
+资产  Assets/VNEffects/UISkins/Textures/VN_RoundedRect.png        名牌底板（与经典款同一张）
+改    Resources/VNGameConfig.asset   dialogueSkins 登记 白渐变 / 粉渐变 / 黑渐变
+文档  HowToUse.md 八章新增「对话框皮肤（ui dialogue）」、CLAUDE.md 组件表与子系统表
+```
+
+菜单：**Tools → VN Effects → UI Skins → Export Soft Gradient Skins**
+（另有「(覆盖重建)」一项，带二次确认，会用出厂参数冲掉 Inspector 里的手工调整）。
+
+### 规格
+
+| | 白渐变 | 粉渐变 | 黑渐变 |
+|---|---|---|---|
+| 渐变带色 | 白 55% | 粉 (1,0.70,0.78) 55% | 近黑 (0.04,0.05,0.09) **80%** |
+| 正文字色 | 深墨 | 深粉红 | 白 |
+| 描边 | 白 0.10 | 白 0.12 | 黑 0.10 |
+| 柔光/投影 | 白柔光 | 白柔光 | 黑投影（偏移 0.5） |
+
+共通：渐变带 = 整屏宽 × 378px（35% 屏高）贴底；正文**居中顶对齐**、36pt；
+名牌沿用经典款紫底圆角块（装饰样式仍由 `VNDialogueBox.nameplateStyle` 全局接管）；
+头像窗与继续箭头都保留；`shineFrame` 槽位**留空 = 无边框无流光**。
+
+### 技术决策与取舍
+
+- **渐变贴图只有 alpha，RGB 全白**：三套共用同一张 PNG，换色 = 在 Inspector 里拉
+  Image 的 Color。加新配色不用重烘贴图。
+- **曲线是「下半段满浓 + 上半段 SmoothStep 淡出」，不是从底一路衰减**。
+  一路衰减的版本实测过：屏幕底部亮度 0.696 → 0.358（暗了一半），
+  但**台词所在的那一带（+160px）只从 0.673 → 0.526**——白字压在亮背景上会发虚。
+  台词落在渐变带的 40%~63% 高度处，那一带必须是满浓区。
+  顶边用 SmoothStep 是因为线性淡出会在收尾处留一条肉眼可见的硬边。
+- **正文顶对齐（水平仍居中）**：垂直居中的话，一行台词会沉到渐变带中段，
+  名牌孤零零飘在上面，两者隔开一大截。
+- **描边宽度压到 0.10~0.12**：一开始给 0.16~0.18，白描边把中文笔画从外侧吃细，
+  字看着发灰发虚。中文字形笔画密，描边宽度的上限比拉丁字母低。
+- **头像避让设为 0**：正文左右各留 300px，头像窗（宽 230）落在正文左侧的空白里，
+  不需要把正文推开——推了反而破坏居中。
+- **每套一份独立 TMP 材质资产**：绝不能改字体的 sharedMaterial（会污染全项目
+  所有用同字体的文字，项目硬约定）。underlay 通道照例要先 `EnableKeyword("UNDERLAY_ON")`。
+- **登记进 VNGameConfig 用 upsert 而不是「有同名就跳过」**：覆盖重建会换掉 prefab 资产，
+  只跳过的话配置里会留一个指向已删除资产的空引用，剧本切皮肤时报「未登记」。
+- **toolbarAnchor 单独放一个空 RectTransform**，锚在经典款面板的位置。
+  否则快捷功能条会停靠到 378px 高的渐变带右上角，飘到半空。
+
+### 踩过的坑
+
+- **同一帧内重烘贴图 + 立刻截图 = 拍到旧贴图**。`AssetDatabase.ImportAsset` 之后，
+  内存里那张 Texture 要到下一帧才更新，导致连着两轮以为「参数没生效」。
+  验证外观改动时，重烘和截图必须分两次 `script-execute` 调用。
+- **Linear 色彩空间下，80% 的近黑覆盖在中亮背景上得到的是中灰（0.70 → 0.36），不是黑**。
+  这是混合的正常结果，不是 alpha 没生效——肉眼看图容易误判成「没效果」，
+  该用 ReadPixels 取亮度数值比对。
+
+### 验证方法
+
+编辑模式下把 prefab 实例化到场景 Canvas（`HideFlags.DontSave`，不写进场景文件），
+填上示例台词，用 `cam.Render()` + `ReadPixels` 出图逐套核对，
+并对「开/关渐变」两次渲染的同一像素取亮度差，确认遮盖强度。
