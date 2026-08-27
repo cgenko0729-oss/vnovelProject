@@ -453,6 +453,20 @@ namespace VNEffects.EditorTools
             }
             _ctx.weatherIds = weatherIds.ToArray();
 
+            // UI 皮肤候选：VNGameConfig 登记的 id（default 由 OptionsFor 统一补在最前）
+            var dialogueSkins = new List<string>();
+            var choiceSkins = new List<string>();
+            var uiCfg = VNGameConfig.Active;
+            if (uiCfg != null)
+            {
+                foreach (var e in uiCfg.dialogueSkins)
+                    if (e != null && !string.IsNullOrEmpty(e.id)) dialogueSkins.Add(e.id);
+                foreach (var e in uiCfg.choiceSkins)
+                    if (e != null && !string.IsNullOrEmpty(e.id)) choiceSkins.Add(e.id);
+            }
+            _ctx.dialogueSkinIds = dialogueSkins.ToArray();
+            _ctx.choiceSkinIds = choiceSkins.ToArray();
+
             _ctx.scenarioLabels.Clear();
             _ctx.scenarioPaths.Clear();
             var qualifiedLabels = new List<string>();
@@ -2405,10 +2419,33 @@ namespace VNEffects.EditorTools
                 case VNParamSource.EventId: return _ctx.eventIds;
                 case VNParamSource.QuestId: return _ctx.questIds;
                 case VNParamSource.WeatherId: return _ctx.weatherIds;
+                case VNParamSource.UiSkinId: return UiSkinOptions(r.Get(p.dependsOn));
                 case VNParamSource.Label: return LabelAddressOptions();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框
             }
+        }
+
+        /// <summary>
+        /// ui 命令第二参数的候选。kind=name 时列的是**内置名字样式预设**
+        /// （不在 VNGameConfig 登记，与 dialogue/choice 的皮肤 id 是两套东西）。
+        /// </summary>
+        string[] UiSkinOptions(string kind)
+        {
+            var options = new List<string> { "default" };
+            if (kind == "name")
+            {
+                foreach (var a in VNNameplateStyle.Aliases) options.Add(a.name);
+            }
+            else if (kind == "choice")
+            {
+                options.AddRange(_ctx.choiceSkinIds);
+            }
+            else
+            {
+                options.AddRange(_ctx.dialogueSkinIds);
+            }
+            return options.ToArray();
         }
 
         string[] LabelAddressOptions()

@@ -625,6 +625,14 @@ namespace VNEffects.EditorTools
                                 Err(i, $"{r.keyword}: unknown weather \"{v}\" " +
                                        "(not a builtin leaf type, a VNWeatherDef id, or a VNWeather value)");
                             break;
+                        case VNParamSource.UiSkinId:
+                            // 只校验 kind=name：名字样式是内置预设，拼错必然静默无效果。
+                            // dialogue/choice 的皮肤 id 交给 Lint——那些可以「先写剧本、稍后登记」，
+                            // 编辑期就报错会一直红着，反而变成噪音
+                            if (r.Get(p.dependsOn) == "name" && v != "default" &&
+                                !VNNameplateStyle.TryParseId(v, out _))
+                                Err(i, $"{r.keyword} name: unknown nameplate style \"{v}\"");
+                            break;
                     }
                 }
 
@@ -859,6 +867,8 @@ namespace VNEffects.EditorTools
         public string[] eventIds = System.Array.Empty<string>();
         public string[] questIds = System.Array.Empty<string>();
         public string[] weatherIds = System.Array.Empty<string>();
+        public string[] dialogueSkinIds = System.Array.Empty<string>();
+        public string[] choiceSkinIds = System.Array.Empty<string>();
         public readonly Dictionary<string, string[]> scenarioLabels =
             new Dictionary<string, string[]>();
         public readonly Dictionary<string, string> scenarioPaths =

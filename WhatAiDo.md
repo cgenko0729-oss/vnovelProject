@@ -7307,3 +7307,22 @@ ui name <双描边|金边|银边|霓虹|墨影|糖果|粗体|描边|底板|朴�
 编辑期把十套预设走真实的 `Preset().ApplyTo()` 路径渲染到同一张图，
 左半深底、右半浅底——**同一套参数必须两种底都成立才算可用**，
 这个双底对照是这次能定位「白色最外层」问题的关键手段。
+
+### 补充：编辑器下拉（同日追加）
+
+用户反馈剧本编辑器里 `ui` 的第二个参数是纯文本框、每次都得手打样式名。
+补成**跟着同行 kind 变的下拉**：
+
+```
+改  Editor/VNScenarioSchema.cs        +VNParamSource.UiSkinId；ui 的 id 参数改用它并 dependsOn:"kind"
+改  Editor/VNScenarioDoc.cs           +dialogueSkinIds/choiceSkinIds 上下文字段；Validate 加 UiSkinId 分支
+改  Editor/VNScenarioEditorWindow.cs  RefreshSources 收集 VNGameConfig 的皮肤 id；
+                                      OptionsFor 加 UiSkinId → UiSkinOptions(kind)
+```
+
+- kind=`dialogue`/`choice` → default + VNGameConfig 里登记的皮肤 id
+- kind=`name` → default + 十套内置样式名
+
+**编辑期校验只管 kind=name**：名字样式是内置预设，拼错必然静默无效果；
+而 dialogue/choice 的皮肤 id 允许「先写剧本、稍后登记」，编辑期就标红会一直红着变成噪音，
+那一层交给 Lint。这跟 `Expression` 依赖角色参数是同一个 `dependsOn` 模式。

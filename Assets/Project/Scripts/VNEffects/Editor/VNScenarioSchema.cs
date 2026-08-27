@@ -21,6 +21,7 @@ namespace VNEffects.EditorTools
         EventId,     // 事件模块 id（场景 VNEventRegistry.modules）
         QuestId,     // 任务 id（项目中的 VNQuestDef 资产）
         WeatherId,   // 天气 id（内置叶型 + VNWeatherDef 资产 + 雨雪萤火虫枚举）
+        UiSkinId,    // ui 命令的第二参数：候选跟着同行的 kind 变（见 dependsOn）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -204,7 +205,9 @@ namespace VNEffects.EditorTools
                 "name = 名字样式切换（内置预设，不用登记）：双描边 金边 银边 霓虹 墨影 糖果 粗体 描边 底板 朴素",
                 Pos("kind", "kind", VNParamSource.Options,
                     new[] { "dialogue", "choice", "name" }, "dialogue"),
-                Pos("id", "skin", VNParamSource.Text, def: "default"));
+                // 候选跟着 kind 走：dialogue/choice 列 VNGameConfig 里登记的皮肤，
+                // name 列内置的名字样式预设
+                Pos("id", "skin", VNParamSource.UiSkinId, def: "default", dependsOn: "kind"));
 
             // ---- Camera ----
             Add("camera", "Camera", "camera <move> [a] [b] [focus:char]\n" +
