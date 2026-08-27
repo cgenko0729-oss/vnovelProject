@@ -432,6 +432,7 @@ namespace VNEffects
                         if (skinId == "default") skinId = null;
                         if (cmd.Arg(0) == "dialogue") snapshot.dialogueSkin = skinId;
                         else if (cmd.Arg(0) == "choice") snapshot.choiceSkin = skinId;
+                        else if (cmd.Arg(0) == "name") snapshot.nameplateStyle = skinId;
                         break;
                     }
                     case "show":
@@ -2000,6 +2001,7 @@ namespace VNEffects
 
                 case "ui":
                     // ui dialogue|choice <皮肤id|default>：切换对话框/选项面板皮肤
+                    // ui name <样式|default>：切换名字（说话人）的装饰样式
                     stage.SetUiSkin(cmd.Arg(0), cmd.Arg(1, "default"), cmd.line);
                     return null;
 

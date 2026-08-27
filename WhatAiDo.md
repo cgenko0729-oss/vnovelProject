@@ -7245,3 +7245,65 @@ config 的清缓存入口上。
 编辑模式下把 prefab 实例化到场景 Canvas（`HideFlags.DontSave`，不写进场景文件），
 填上示例台词，用 `cam.Render()` + `ReadPixels` 出图逐套核对，
 并对「开/关渐变」两次渲染的同一像素取亮度差，确认遮盖强度。
+
+---
+
+## 一一六、名字样式六套新预设 + `ui name` 剧本命令（2026-08-28，分支 `agent/ai-deepseek`）
+
+### 需求
+
+用户对比商业 galgame 后问「为什么人家的名字那么有设计感，我的这么朴素，是字形问题吗」。
+诊断结论不是字体：**是叠层数不够，以及最外层颜色选错**。
+TMP 一个文字能叠五层（面/描边/underlay/浮雕光照/发光），项目原来只用了三层，
+且 Bold 与 Outline 两套预设的**最外层都是白色**——遇到白背景或亮立绘时整个名字消失。
+实测：同一套 Bold 参数在深底上清晰，在浅紫背景上糊到几乎读不出。
+
+用户要求：多做几套供挑选，不加装饰件（只改字本身），并且要能用剧本命令随时切换。
+
+### 改了哪些文件
+
+```
+改  Script/VNNameplateStyle.cs   +浮雕/光照/HDR 增益/固定渐变下端色 四组参数；
+                                 +六套预设 Duo/Gold/Silver/Neon/Ink/Candy；
+                                 +Aliases/TryParseId/NameOf（剧本名 ↔ 枚举，中英双写）
+改  Script/VNStage.cs            SetUiSkin 加 case "name"；+CurrentNameplateStyleId；存档存取
+改  Script/VNSaveSystem.cs       +nameplateStyle 字段（空 = 出厂样式，旧存档兼容）
+改  Script/VNScriptRunner.cs     RebuildStateBefore 的 ui case 认 name（从选中行播放要能重建）
+改  Editor/VNScenarioSchema.cs   ui 的 kind 枚举加 name + 说明列出全部预设名
+改  Editor/VNScenarioLinter.cs   ui name 的样式名校验（Error 级）
+文档 HowToUse.md 八章、CLAUDE.md 组件表与子系统表
+```
+
+### 语法
+
+```
+ui name <双描边|金边|银边|霓虹|墨影|糖果|粗体|描边|底板|朴素|default>
+```
+
+英文枚举名等价（`ui name Gold`）。样式进存档；颜色仍跟角色资产的 `nameColor` 走，
+所以同一样式下每个角色的名字颜色不同。
+
+### 技术决策与取舍
+
+- **「三层字」系列的硬规则：最外圈必须是深色**。这是新六套与老四套的根本差别，
+  也是「为什么人家的字在任何背景上都好看」的真正答案。白色最外层只在深背景成立。
+- **镶金边 = Bevel 浮雕 + Lighting 打光**，不是颜色问题。金色渐变只提供色相，
+  金属感来自 `_LightAngle` 打出的高光与暗面。Mobile 版 TMP shader 没有这组属性，
+  所以 `ApplyBevel` 先 `HasProperty(_Bevel)`——直接 SetFloat 不报错也不生效，
+  静默失效最难查，故缺了就退化成普通描边并**警告一次**（每句台词都会重新上妆，不能每次都警告）。
+- **HDR 发光与上下渐变二选一**。uGUI 顶点色被钳到 1，渐变只能由顶点色表达；
+  而 Bloom 阈值是 1.0，要发光就必须把带增益的颜色写进材质 `_FaceColor`。
+  两条路互斥，所以 Neon 预设是纯色面而非渐变面。
+- **Duo 与 Silver 的浅底补强**：白面/银面本身就接近浅背景，初版在浅底偏弱，
+  把深外圈 dilate 提到 0.58、描边加厚一档解决。银边是固有的浅色，
+  文档里直接写明「别在白天户外用」而不是继续硬调参数。
+- **`ui name` 复用 ui 命令而不是新起关键字**：语义同族（都是外观切换、都进存档），
+  Parser 关键字表不用动，Schema 只是 kind 多一个枚举值。
+- **Lint 按 Error 而不是 Warning**：名字样式是内置预设，拼错必然静默无效果，
+  没有皮肤 id 那种「稍后再登记」的中间状态。
+
+### 验证方法
+
+编辑期把十套预设走真实的 `Preset().ApplyTo()` 路径渲染到同一张图，
+左半深底、右半浅底——**同一套参数必须两种底都成立才算可用**，
+这个双底对照是这次能定位「白色最外层」问题的关键手段。

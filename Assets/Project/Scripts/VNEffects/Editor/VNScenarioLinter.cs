@@ -497,11 +497,29 @@ namespace VNEffects.EditorTools
                         // ui dialogue|choice <id|default>；default 永远合法
                         string kind = c.Arg(0);
                         string skinId = c.Arg(1, "default");
-                        if (kind != "dialogue" && kind != "choice")
+                        if (kind != "dialogue" && kind != "choice" && kind != "name")
                         {
                             Add(issues, VNLintSeverity.Error, "bad-ui-kind", f, c.line,
                                 $"ui 命令的对象「{kind}」不认识",
-                                "用法：ui dialogue|choice <皮肤id|default>。");
+                                "用法：ui dialogue|choice|name <id|default>。");
+                        }
+                        else if (kind == "name")
+                        {
+                            // 名字样式是内置预设（不在 VNGameConfig 登记），拼错必然静默无效果，
+                            // 所以按 Error 报——它跟皮肤 id 不同，没有「稍后再登记」这种中间状态
+                            if (skinId != "default" && !Dynamic(skinId) &&
+                                !VNNameplateStyle.TryParseId(skinId, out _))
+                            {
+                                var names = new System.Text.StringBuilder();
+                                foreach (var a in VNNameplateStyle.Aliases)
+                                {
+                                    if (names.Length > 0) names.Append(' ');
+                                    names.Append(a.name);
+                                }
+                                Add(issues, VNLintSeverity.Error, "unknown-nameplate-style", f, c.line,
+                                    $"名字样式「{skinId}」不认识",
+                                    $"可用：{names} default。");
+                            }
                         }
                         else if (skinId != "default" && !Dynamic(skinId))
                         {

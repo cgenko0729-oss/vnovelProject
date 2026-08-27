@@ -653,6 +653,8 @@ namespace VNEffects
         public string CurrentDialogueSkinId { get; private set; }
         /// <summary>当前选项面板皮肤 id（null = 程序化默认，进存档快照）</summary>
         public string CurrentChoiceSkinId { get; private set; }
+        /// <summary>当前名字样式名（null = 出厂样式，进存档快照）</summary>
+        public string CurrentNameplateStyleId { get; private set; }
 
         /// <summary>
         /// 剧本 ui 命令入口：ui dialogue|choice &lt;id|default&gt;。
@@ -704,9 +706,31 @@ namespace VNEffects
                     CurrentChoiceSkinId = toDefault ? null : id;
                     break;
                 }
+                case "name":
+                {
+                    // ui name <样式|default>：名字（说话人）的装饰样式。
+                    // 与 dialogue/choice 不同——这里的 id 不是 VNGameConfig 里登记的 prefab，
+                    // 而是 VNNameplateStyle 的内置预设名（中英双写，见 Aliases）。
+                    var styleId = VNNameplateStyleId.Bold; // default = 出厂样式
+                    if (!toDefault && !VNNameplateStyle.TryParseId(id, out styleId))
+                    {
+                        var names = new System.Text.StringBuilder();
+                        foreach (var a in VNNameplateStyle.Aliases)
+                        {
+                            if (names.Length > 0) names.Append(' ');
+                            names.Append(a.name);
+                        }
+                        Debug.LogError($"[VNScript] 第 {line} 行：名字样式「{id}」不认识。" +
+                                       $"可用：{names} default");
+                        return;
+                    }
+                    dialogue?.SetNameplateStyle(styleId);
+                    CurrentNameplateStyleId = toDefault ? null : VNNameplateStyle.NameOf(styleId);
+                    break;
+                }
                 default:
                     Debug.LogWarning($"[VNScript] 第 {line} 行：ui 命令用法为" +
-                                     "「ui dialogue|choice <皮肤id|default>」");
+                                     "「ui dialogue|choice|name <id|default>」");
                     break;
             }
         }
@@ -737,6 +761,7 @@ namespace VNEffects
             data.cgKeepFx = _cgKeepFx;
             data.dialogueSkin = CurrentDialogueSkinId;
             data.choiceSkin = CurrentChoiceSkinId;
+            data.nameplateStyle = CurrentNameplateStyleId;
 
             CaptureLiquid(data);
 
@@ -781,6 +806,9 @@ namespace VNEffects
             if (data.choiceSkin != CurrentChoiceSkinId)
                 SetUiSkin("choice", string.IsNullOrEmpty(data.choiceSkin)
                     ? "default" : data.choiceSkin);
+            if (data.nameplateStyle != CurrentNameplateStyleId)
+                SetUiSkin("name", string.IsNullOrEmpty(data.nameplateStyle)
+                    ? "default" : data.nameplateStyle);
 
             if (!string.IsNullOrEmpty(data.backgroundId))
                 SetBackground(data.backgroundId, null);

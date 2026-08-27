@@ -199,10 +199,11 @@ namespace VNEffects.EditorTools
                 Pos("seconds", "sec", VNParamSource.Number, def: "0.6", weight: 0.5f));
             Add("portrait", "Character", "portrait on|off  (dialogue portrait)",
                 Pos("value", "", VNParamSource.Options, new[] { "on", "off" }, "on"));
-            Add("ui", "Scene", "ui dialogue|choice <skinId|default>\n" +
-                "对话框/选项面板皮肤切换（皮肤在 VNGameConfig 的 UI 皮肤区登记）",
+            Add("ui", "Scene", "ui dialogue|choice|name <id|default>\n" +
+                "dialogue/choice = 皮肤切换（皮肤在 VNGameConfig 的 UI 皮肤区登记）\n" +
+                "name = 名字样式切换（内置预设，不用登记）：双描边 金边 银边 霓虹 墨影 糖果 粗体 描边 底板 朴素",
                 Pos("kind", "kind", VNParamSource.Options,
-                    new[] { "dialogue", "choice" }, "dialogue"),
+                    new[] { "dialogue", "choice", "name" }, "dialogue"),
                 Pos("id", "skin", VNParamSource.Text, def: "default"));
 
             // ---- Camera ----
