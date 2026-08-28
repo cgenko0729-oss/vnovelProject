@@ -1,6 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 
 namespace VNEffects.EditorTools
@@ -34,7 +35,8 @@ namespace VNEffects.EditorTools
     /// 校验全都不用动；任何解析不了的写法也能原样留在文件里（UI 退回纯文本行显示）。
     ///
     /// 语法与运行时 <c>VNScriptParser.ParseCamWaypoint</c> 同构：
-    /// <c>&gt; 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]</c>，改那边这里必须跟着改。
+    /// <c>&gt; 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]</c>，
+    /// 改那边这里必须跟着改。
     /// </summary>
     public class VNCamWaypoint
     {
@@ -54,6 +56,7 @@ namespace VNEffects.EditorTools
         public string ease = "";
         public float fade;
         public float hold;      // >0 = 到达本点后停留的秒数
+        public string shake = ""; // 到达本点时震一下：light/medium/heavy 或 "强度,秒数"；空 = 不震
 
         // 原文没写 zoom / 时长时置位：只要值还是默认就继续省略，避免打开编辑器就把
         // 手写的 "> middle" 撑成 "> middle 1 0.8" 这种无意义的 diff
@@ -143,6 +146,15 @@ namespace VNEffects.EditorTools
                     if (result.hold > 0f) return false;                     // 重复
                     result.hold = h;
                 }
+                else if (tok.StartsWith("shake:"))
+                {
+                    // 与运行时同一个 TryParse：认不出就整行退回纯文本，
+                    // 免得下拉框把一个写错的值悄悄改成"不震"（写错了要看得见）
+                    string val = tok.Substring(6);
+                    if (!VNShakeSpec.TryParse(val, out _)) return false;
+                    if (!string.IsNullOrEmpty(result.shake)) return false;   // 重复
+                    result.shake = val;
+                }
                 else if (TryFloat(tok, out float v))
                 {
                     if (numIndex == 0) { result.zoom = v; result.omitZoom = false; }
@@ -176,6 +188,7 @@ namespace VNEffects.EditorTools
             if (!string.IsNullOrEmpty(ease)) sb.Append(" ease:").Append(ease);
             if (fade > 0.0001f) sb.Append(" xfade:").Append(Num(fade));
             if (hold > 0.0001f) sb.Append(" hold:").Append(Num(hold));
+            if (!string.IsNullOrEmpty(shake)) sb.Append(" shake:").Append(shake);
             return sb.ToString();
         }
 
@@ -312,6 +325,64 @@ namespace VNEffects.EditorTools
             foreach (var part in VNCamWaypoint.CharacterParts)
                 text = text.Replace(CharToken + ":" + part, "middle");
             return text.Replace(CharToken, "middle");
+        }
+    }
+
+    /// <summary>
+    /// 路径点 <c>shake:</c> 的下拉控件。剧本编辑器和镜头编排窗口共用一份——
+    /// 两边各画一次的话，「自定义值怎么显示」这种细节迟早会走样。
+    /// </summary>
+    public static class VNCamShakeUi
+    {
+        /// <summary>下拉项（最后一项 = 自定义，选中时右边出数值输入框）</summary>
+        static readonly string[] Options = { "(不震)", "light", "medium", "heavy", "自定义…" };
+
+        const string CustomDefault = "20,0.5";
+        const float PopupWidth = 62f;
+
+        public static readonly string Tooltip =
+            "到达本点的瞬间震一下屏幕（震完才走下一段）。\n" +
+            "light/medium/heavy 三档，或选「自定义…」填「强度,秒数」（强度单位是像素）。\n" +
+            "注意：震的是 SceneRoot（背景+立绘），对话框等 UI 不会跟着抖。";
+
+        static int IndexOf(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+            int i = System.Array.IndexOf(Options, value.Trim().ToLower());
+            return i > 0 ? i : Options.Length - 1;   // 认不出的一律当自定义显示原值
+        }
+
+        /// <summary>画一格「下拉 + （自定义时）数值框」，返回新的 shake 值（空 = 不震）</summary>
+        public static string Draw(Rect rect, string value)
+        {
+            var popupRect = new Rect(rect.x, rect.y, Mathf.Min(PopupWidth, rect.width), rect.height);
+            int cur = IndexOf(value);
+            int next = EditorGUI.Popup(popupRect, cur, Options);
+            if (next != cur)
+            {
+                if (next == 0) return "";
+                if (next < Options.Length - 1) return Options[next];
+                // 切到自定义：从当前档位的实际数值起步，比丢个空框好用
+                return VNShakeSpec.TryParse(value, out VNShakeSpec spec) && spec.Valid
+                    ? spec.Format() == value ? CustomDefault
+                        : string.Format(CultureInfo.InvariantCulture, "{0:0.##},{1:0.##}",
+                                        spec.strength, spec.duration)
+                    : CustomDefault;
+            }
+
+            if (next != Options.Length - 1) return value;
+
+            // 自定义：原样文本框，留给用户直接敲 "20,0.5"
+            float fx = popupRect.xMax + 2f;
+            float fw = rect.xMax - fx;
+            if (fw < 24f) return value;
+            var fieldRect = new Rect(fx, rect.y, fw, rect.height);
+            bool bad = !VNShakeSpec.TryParse(value, out _);
+            var prev = GUI.color;
+            if (bad) GUI.color = new Color(1f, 0.65f, 0.3f);   // 写错了要看得见
+            string edited = EditorGUI.TextField(fieldRect, value ?? "");
+            GUI.color = prev;
+            return edited;
         }
     }
 }

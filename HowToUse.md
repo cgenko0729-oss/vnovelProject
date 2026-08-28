@@ -323,7 +323,7 @@ camera reset
 > 💡 **不想手写数值？两条路都不用碰剪贴板了：**
 >
 > 1. **剧本编辑器里直接改**：camseq 的路径点行是字段化的——点位类型（锚点/角色/坐标）、
->    目标、zoom、秒、ease、xfade 全是下拉和数字框。header 行右边还有
+>    目标、zoom、秒、ease、xfade、hold、震 全是下拉和数字框。header 行右边还有
 >    `预设▾`（11 条内置运镜模板 + 你自己存的预设 + 把本行存为预设）。
 > 2. **要看着画面调**：点 header 行的 `编排` 按钮 → 打开 **Camera Sequence Editor**
 >    并**绑定这一行**：迷你画布上点选/拖动路径点、拖角改 zoom、拖进度条预览整条运镜、
@@ -373,6 +373,10 @@ camseq                          # hold：到点后停一会儿再走下一段
 > 亚里沙:head 1.9 1.2 hold:1    # 1.2 秒推到脸上，停 1 秒（这一秒镜头纹丝不动）
 > middle 1 0.8                  # 再 0.8 秒拉回全景
 
+camseq                          # shake：到点的瞬间震一下（震完才走下一段）
+> 亚里沙:head 1.9 0.25 shake:heavy   # 急推到脸上 + 强震 = 挨了一击
+> middle 1 0.6 shake:20,0.5          # 自定义：20px / 0.5 秒
+
 camto 亚里沙:head 1.6 0.8       # 单段直达：目标点 [zoom] [秒] [ease:名]
 camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里"）
 ```
@@ -393,6 +397,14 @@ camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里
   想「推到脸上停一秒再拉回」写 `hold:1` 就够了，不用再补一个同点位、时长 0 的路径点。
   hold 计入 camseq 总时长（异步 `@` 时不阻塞台词），Skip 快进对它同样生效；
   `xfade:` 叠化点也能带 hold（叠化完成后再停）
+- **震屏**：`shake:light|medium|heavy` 或 `shake:强度,秒数`（如 `shake:20,0.5`，强度单位是像素）
+  = 到达该点的**瞬间**震一下。三档等级与 `shake` 命令完全同参（轻 6px/0.25s、中 16px/0.4s、
+  强 34px/0.6s+旋转抖动）。
+  **震完才走下一段**：该点的停顿 = `max(hold, 震动时长)`，不是相加——写 `hold:1 shake:heavy`
+  就老老实实停 1 秒（震动 0.6 秒跑在这一秒里）。`xfade:` 叠化点同样适用。
+  震的是 SceneRoot（背景+立绘），对话框等 UI 不会跟着抖；运镜作用在其子级 ZoomRoot，
+  两者互不干扰，所以「一边推镜一边震」是叠加而不是打架。
+  值写错（如 `shake:20` 少了秒数）运行时会告警并忽略，Lint 也会点名、编辑器退回纯文本
 - **防露边**：高倍 zoom 对准边角时自动钳制偏移，不会把画布边缘露出来
 - 路径点在**执行时**才解析角色位置（角色刚 move 过也能对准）
 - camseq 整块可加 `@` 异步（台词与运镜同时进行）
@@ -1886,7 +1898,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
 | | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
 | | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
-| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒]`（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
+| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级\|强度,秒数]`（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
 | **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
 
 ### 两条设计取舍
@@ -1962,7 +1974,8 @@ mark <角色> <符号|clear> [keep|off] [pos:x,y] [size:] [dur:]  立绘漫符
 move <角色> <位置> [秒]                          滑步换位
 wait <秒>                                        停顿
 camera <pushin|snapzoom|pan|dolly|reset> [...]   预设运镜
-camseq + > 目标点 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒]  多段镜头路径（hold = 到点后停留）
+camseq + > 目标点 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]
+                                          多段镜头路径（hold = 到点后停留，shake = 到点震屏）
 camto <目标点> [zoom] [秒] / camcut <目标点> [zoom]  单段直达/瞬切
 shake <light|medium|heavy>                       震动
 weather <id> [density:] [wind:] [speed:] [size:]  天气

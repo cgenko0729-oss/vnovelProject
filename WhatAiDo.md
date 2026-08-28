@@ -7326,3 +7326,81 @@ ui name <双描边|金边|银边|霓虹|墨影|糖果|粗体|描边|底板|朴�
 **编辑期校验只管 kind=name**：名字样式是内置预设，拼错必然静默无效果；
 而 dialogue/choice 的皮肤 id 允许「先写剧本、稍后登记」，编辑期就标红会一直红着变成噪音，
 那一层交给 Lint。这跟 `Expression` 依赖角色参数是同一个 `dependsOn` 模式。
+
+
+## 一一七、camseq 路径点震屏：`shake:` 参数（2026-08-28，分支 `agent/ai-deepseek`）
+
+### 起因
+
+运镜到位的那一刻想震一下（推到脸上 = 挨了一击、瞬切到废墟 = 爆炸余波），
+原来只能在 camseq **整块之前**写 `shake heavy@` 让它并行跑——**震不到中间那个点**。
+因为 `>` 路径点行之间插不进别的命令（parser 里 `>` 行只会往上一条 camseq 上挂），
+「走到第 3 个点才震」这件事在旧语法里无法表达。
+
+### 做法
+
+给路径点加一个参数：`> 目标点 [zoom] [秒] [ease:] [xfade:] [hold:] [shake:等级|强度,秒数]`。
+
+**为什么没有技术冲突**：震动作用在 `SceneRoot`（`VNScreenShake.target`），
+运镜作用在它的子级 `ZoomRoot`（`VNCamera.target`）——这两层本来就是设计成可叠加的
+（`VNCamera.SnapZoom()` 早就有个 `VNScreenShake shake` 形参，在到位瞬间轻震，先例就在那儿）。
+所以「一边推镜一边震」是叠加而不是打架。
+
+**三档 → 数值只有一张表**（`VNShakeSpec`，新增在 `VNScreenShake.cs`）：
+原来 `Shake(VNShakeLevel)` 里那个 switch 就是唯一的数值来源，现在抽成
+`VNShakeSpec.Of(level)`，因为**编辑器预览也要知道震动时长**（要把停顿算进时间轴）——
+再抄一份迟早对不上。`TryParse` 同时认三档别名和 `强度,秒数`，运行时与编辑器共用它，
+判定不可能分叉。`Format()` 反过来把数值折回别名（命中三档就写 `heavy` 而不是 `34,0.6`）。
+
+### 「等震完再走」怎么实现的
+
+触发点编进**同一条 DOTween Sequence**（`BuildSegment` 里 `AppendCallback`），
+而不是在协程里 `yield`：这样它和 hold、和后续段共用一条时间轴，
+**Skip 快进（`DOTween.timeScale`）时不会错位**——协程里 yield 一个独立 tween 就会变成快进中唯一的卡点。
+
+停顿取 **`max(hold, 震动时长)` 而不是相加**：写 `hold:1 shake:heavy` 就该老老实实停 1 秒
+（0.6 秒的震动跑在这一秒里面），不然 hold 的语义「到点后停留的秒数」就被震动偷偷改掉了。
+
+`xfade:` 叠化点不在 Sequence 里（它是「截屏→瞬切→淡出」的协程），
+所以另走 `ShakeHoldCo()`，但用的是同一条 `max` 规则。
+
+### 编辑器
+
+- **控件共用一份**：`VNCamShakeUi.Draw()`（放在 `VNCamWaypoint.cs`，与解析层同源），
+  剧本编辑器的路径点行和镜头编排窗口的第二行各调一次。
+  下拉 `(不震)/light/medium/heavy/自定义…`，选自定义才在右边出文本框；
+  框里的值非法时**染橙**——写错了要看得见，不能让下拉悄悄把它改成「不震」。
+- **`VNCamWaypoint.TryParse` 仍然严格**：`shake:20`（少了秒数）、重复的 `shake:` 都直接
+  返回 false → 整行退回纯文本并标黄。Lint 那条 `unrecognized-waypoint` 走的就是这个
+  TryParse，所以**没写一行新的校验代码**，非法 shake 自动被点名。
+- **预览时间轴要算上这段停顿**（`AddHoldSegment` 改成 `max(hold, 震动时长)`）：
+  时长算短了，拖进度条就和实机对不上。**震动本身不在预览里模拟**——
+  编辑器画布上抖几像素既看不出效果又干扰点选。
+
+### 踩到的
+
+`VNScriptRunner.CloneWithParams()` 里 camPoints 的深拷贝是**逐字段手写**的，
+加了新字段不补进去，`call` 带参数调用的子程序里 camseq 的 shake 会静默丢失
+（本次已补 `shake = point.shake`）。这一处每加一个路径点字段就要跟着改，
+和 `VNCamWaypoint.TryParse/Format`、`VNCamseqEditorWindow` 的 `Waypoint` 类是同一批。
+
+### 用法
+
+```
+camseq
+> 亚里沙:head 1.9 0.25 shake:heavy   # 急推到脸上 + 强震
+> middle 1 0.6 shake:20,0.5          # 自定义 20px / 0.5 秒
+```
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `VNScreenShake.cs` | 新增 `VNShakeSpec`（三档数值表 + TryParse + Format）；`Shake(level)` 改走它 |
+| `Script/VNScriptParser.cs` | `VNCamWaypointDef.shake` 字段 + `ParseCamWaypoint` 认 `shake:` token（非法告警并忽略） |
+| `Script/VNScriptRunner.cs` | `CamseqCo` 填 `Waypoint.shake` 并把 `stage.screenShake` 传进 `PlayPathCo`；补 `CloneWithParams` 深拷贝 |
+| `VNCamera.cs` | `Waypoint.shake` 字段；`BuildSegment`/`PlayPathCo` 收 shaker 参数；新增 `ShakeHoldCo()` |
+| `Editor/VNCamWaypoint.cs` | `shake` 字段 + 严格 TryParse/Format；新增共用控件 `VNCamShakeUi` |
+| `Editor/VNScenarioEditorWindow.cs` | 路径点行尾加「震」控件 + 语法提示 |
+| `Editor/VNCamseqEditorWindow.cs` | `Waypoint.shake` + 行 UI + 文本生成/解析 + `AddHoldSegment` 算进震动时长 + 帮助文字 |
+| `Editor/VNScenarioDoc.cs` | Lint 提示语法补上 `hold:`/`shake:`（校验本身复用 TryParse，无需新代码） |

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -129,6 +129,7 @@ namespace VNEffects
             public bool easeSet;
             public float fade;      // >0 = 交叉淡化到本点（秒），代替平移/瞬切
             public float hold;      // >0 = 到达本点后停留的秒数（停在原地再走下一段）
+            public VNShakeSpec shake; // Valid = 到达本点的瞬间震一下（震完才走下一段）
         }
 
         /// <summary>
@@ -189,7 +190,8 @@ namespace VNEffects
         }
 
         /// <summary>把 [from, to) 区间的普通点编成一条 Sequence（缓动分配同 PlayPath）</summary>
-        Sequence BuildSegment(System.Collections.Generic.List<Waypoint> points, int from, int to)
+        Sequence BuildSegment(System.Collections.Generic.List<Waypoint> points, int from, int to,
+            VNScreenShake shaker = null)
         {
             // 找出第一个/最后一个"移动段"（时长>0），用于默认缓动分配
             int firstMove = -1, lastMove = -1, moveCount = 0;
@@ -231,9 +233,21 @@ namespace VNEffects
                     seq.Join(target.DOAnchorPos(pos, wp.duration).SetEase(ease));
                 }
 
+                // 到点即震。触发也编进 Sequence（而不是协程里 yield），
+                // 这样它和 hold、和后续段共用同一条时间轴，Skip 快进时不会错位
+                float stall = wp.hold;
+                if (shaker != null && wp.shake.Valid)
+                {
+                    var spec = wp.shake;
+                    seq.AppendCallback(() => shaker.Shake(spec));
+                    // 「震完再走下一段」：把该点的停顿撑到至少一次震动那么长。
+                    // 与 hold 取较大值而不是相加——hold:1 就该老老实实停 1 秒
+                    stall = Mathf.Max(stall, spec.duration);
+                }
+
                 // hold：到点后停在原地。编进同一条 Sequence，Skip 的 DOTween.timeScale
                 // 加速对它同样生效（用 WaitForSeconds 就会在快进时变成唯一的卡点）
-                if (wp.hold > 0.001f) seq.AppendInterval(wp.hold);
+                if (stall > 0.001f) seq.AppendInterval(stall);
             }
             return seq;
         }
@@ -246,7 +260,7 @@ namespace VNEffects
         /// 连续的普通点仍合成一条 Sequence，保持与 PlayPath 相同的连贯缓动手感。
         /// </summary>
         public IEnumerator PlayPathCo(System.Collections.Generic.List<Waypoint> points,
-            float startFade = 0f, float endFade = 0f)
+            float startFade = 0f, float endFade = 0f, VNScreenShake shaker = null)
         {
             Cache();
             if (target == null || points == null) yield break;
@@ -256,7 +270,7 @@ namespace VNEffects
             if (startFade > 0.001f && points.Count > 0)
             {
                 yield return CrossfadeTo(points[0].point, points[0].zoom, startFade);
-                yield return HoldCo(points[0].hold);
+                yield return ShakeHoldCo(points[0], shaker);
                 i = 1;
             }
 
@@ -265,13 +279,13 @@ namespace VNEffects
                 if (points[i].fade > 0.001f)
                 {
                     yield return CrossfadeTo(points[i].point, points[i].zoom, points[i].fade);
-                    yield return HoldCo(points[i].hold);
+                    yield return ShakeHoldCo(points[i], shaker);
                     i++;
                     continue;
                 }
                 int j = i + 1;
                 while (j < points.Count && points[j].fade <= 0.001f) j++;
-                var seq = BuildSegment(points, i, j);
+                var seq = BuildSegment(points, i, j, shaker);
                 if (seq != null) yield return seq.WaitForCompletion();
                 i = j;
             }
@@ -292,6 +306,22 @@ namespace VNEffects
                     if (t != null) yield return t.WaitForCompletion();
                 }
             }
+        }
+
+        /// <summary>
+        /// 叠化段到点后的「震一下 + 停留」。补间段走 Sequence 里的 AppendCallback，
+        /// 叠化段不在 Sequence 里所以在这儿触发，两条路径的时长规则保持一致：
+        /// 停顿 = max(hold, 震动时长)。
+        /// </summary>
+        IEnumerator ShakeHoldCo(Waypoint wp, VNScreenShake shaker)
+        {
+            float stall = wp.hold;
+            if (shaker != null && wp.shake.Valid)
+            {
+                shaker.Shake(wp.shake);
+                stall = Mathf.Max(stall, wp.shake.duration);
+            }
+            yield return HoldCo(stall);
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 
 namespace VNEffects.EditorTools
@@ -716,7 +716,8 @@ namespace VNEffects.EditorTools
                                 // 这里提前点名，免得写错了还以为编辑器坏了
                                 if (!VNCamWaypoint.TryParse(l, out _))
                                     Warn(i, $"waypoint \"{l.Trim()}\" is not recognized " +
-                                            "(> point [zoom] [sec] [ease:Name] [xfade:sec]); " +
+                                            "(> point [zoom] [sec] [ease:Name] [xfade:sec] " +
+                                            "[hold:sec] [shake:level|strength,sec]); " +
                                             "the scenario editor will keep it as raw text");
                             }
                             if (r.Get("start") == "cut" && !FirstWaypointIsCut(r))

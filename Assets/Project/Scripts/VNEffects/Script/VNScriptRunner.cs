@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -1296,6 +1296,7 @@ namespace VNEffects
                         ease = Replace(point.ease),
                         fade = point.fade,
                         hold = point.hold,
+                        shake = point.shake,
                         line = point.line,
                     });
             }
@@ -2681,6 +2682,8 @@ namespace VNEffects
                 var p = stage.ResolveCamPoint(def.point, def.line);
                 if (!p.HasValue) continue; // 已告警，跳过该点
                 bool easeSet = System.Enum.TryParse(def.ease, true, out Ease easeVal);
+                // 认不出的 shake 值 parser 已经告警过并置空，这里拿到的一定是合法的
+                VNShakeSpec.TryParse(def.shake, out VNShakeSpec shakeSpec);
                 list.Add(new VNCamera.Waypoint
                 {
                     point = p.Value,
@@ -2690,6 +2693,7 @@ namespace VNEffects
                     easeSet = easeSet,
                     fade = def.fade,
                     hold = def.hold,
+                    shake = shakeSpec,
                 });
             }
 
@@ -2698,7 +2702,7 @@ namespace VNEffects
             float endFade = cmd.Kw("end") == "fade" ? cmd.KwF("endfade", 0.6f) : 0f;
 
             if (list.Count == 0 && endFade <= 0f) yield break;
-            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade);
+            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade, stage.screenShake);
         }
 
         /// <summary>camera 命令的 focus:角色id 参数 → 该角色的画布坐标</summary>

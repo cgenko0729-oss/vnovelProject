@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace VNEffects
@@ -27,6 +27,7 @@ namespace VNEffects
         public string ease;     // 可选缓动名
         public float fade;      // >0 = 交叉淡化到本点（xfade:秒），代替平移/瞬切
         public float hold;      // >0 = 到达本点后停留的秒数（hold:秒）
+        public string shake;    // 到达本点时震一下（shake:light|medium|heavy 或 shake:强度,秒数）
         public int line;
     }
 
@@ -176,7 +177,10 @@ namespace VNEffects
             return result;
         }
 
-        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]</summary>
+        /// <summary>
+        /// 解析镜头路径点行：
+        /// &gt; 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]
+        /// </summary>
         static void ParseCamWaypoint(VNScriptCommand camseqCmd, string raw, int line)
         {
             var tokens = raw.Substring(1).Trim()
@@ -209,6 +213,16 @@ namespace VNEffects
                         wp.hold = h;
                     else
                         Debug.LogWarning($"[VNScript] 第 {line} 行：hold 时长「{tokens[t]}」应为正数");
+                }
+                else if (tokens[t].StartsWith("shake:"))
+                {
+                    // 到达本点的瞬间震一下；三档别名或「强度,秒数」，认不出就整个忽略
+                    string val = tokens[t].Substring(6);
+                    if (VNShakeSpec.TryParse(val, out _))
+                        wp.shake = val;
+                    else
+                        Debug.LogWarning($"[VNScript] 第 {line} 行：shake「{val}」认不出，" +
+                                         "应为 light/medium/heavy 或「强度,秒数」（如 20,0.5）");
                 }
                 else if (float.TryParse(tokens[t], out float v))
                 {

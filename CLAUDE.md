@@ -116,7 +116,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNFoliageSystem / VNWeatherDef / VNFoliageTextures | 落樱/落叶三层景深系统（Alpha 混合实体粒子 + 图集翻转 + **每粒子独立相位横摆** + 自动阵风 + 尺寸↔速度伪透视 + 地面堆积）/ 全部参数的 ScriptableObject（五套内置预设，不建资产也能用）/ 五种叶型的程序化图集（列=12 翻转帧、行=4 形态变体，RGB 存明暗、A 存形状） |
 | VNMoodGrading / VNGrade | 八种情绪色调（含 Dream 梦境）**分层调色版**：色彩不走全屏后处理（单相机单 Canvas 下 Volume 物理上没法只染一部分，会把对话框和 HUD 一起染橙），改按 `backgroundStrength(1.0)`／`midStrength(0.8)`／`characterStrength(0.3)` 逐层写进各自材质实例，UI 不在目标列表所以完全不受影响；**Volume 只留 FilmGrain + Vignette**（不改色相，压四角反而有电影感），仍是 A/B 双 Volume 交叉过渡。立绘目标由 VNStage 在角色进出场时自动维护 / 调色值类型 + 来源通道枚举 `VNGradeLayer`（Mood·Weather·Focus·Emote·Manual），合并规则 滤镜相乘·色相相加·其余相乘 |
 | VNScreenTransition | 全屏转场×8：噪声溶解/百叶窗/瓦片/圆扩散/水墨/爆闪/光斑/眨眼 |
-| VNCamera / VNScreenShake / VNDutchAngle / VNHeartbeat | 运镜×5 / 三级震动 / 荷兰角 / 心跳脉动 |
+| VNCamera / VNScreenShake / VNDutchAngle / VNHeartbeat | 运镜×5 + 路径镜头（camseq 路径点可带 `shake:` 到点震屏，震完才走下一段，停顿取 max(hold,震动时长)）/ 三级震动（「等级→数值」唯一一张表在 `VNShakeSpec`，运行时与编辑器预览共用）/ 荷兰角 / 心跳脉动 |
 | VNGodRays / VNEdgeGlow / VNCloudShadows / VNHeatHaze / VNFakeDoF | 光束/情绪泛光/云影/热浪+雾/伪景深 |
 | VNSpeedLines | 漫画速度线/集中线 overlay（3 变体贴图闪帧，fx speedlines on/off/burst） |
 | VNScreenShockwave | 全屏情绪水波（fx shockwave [light\|heavy]：波峰环 overlay + 背景波浪脉冲 + 轻震动） |
@@ -141,7 +141,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNBattleModule | 回合制小战斗（event battle，结果 胜利/失败/逃跑；patkstat/phpstat/pdefstat 从 flag 读属性=养成联动，结束写 flag 战斗剩余HP 供车轮战） |
 | VNLiquidInstaller (Editor) | 把液体喷溅**增量装进当前场景**（Tools → VN Effects → Install Liquid Splash To Scene）：Canvas 下补 WetScreen + 场外补 LiquidSplash + 两层互连并回填 VNStage，不重建场景、可重复执行。老场景不跑它的话 `liquid` 命令会静默无效果 |
 | VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → Install Quiz Module To Scene）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
-| VNCamWaypoint / VNCamseqText / VNCamseqTemplates (Editor) | camseq 路径点行的结构化视图（严格 TryParse/Format，语法与运行时 ParseCamWaypoint 同构）/ 一整段 camseq 文本的 TrySplit·Join / 11 条内置运镜模板（`{char}` 占位按当前角色替换）。**存储仍是 VNRow.camLines 字符串**，本层只做每帧现解析、改完写回的中转 |
+| VNCamWaypoint / VNCamseqText / VNCamseqTemplates (Editor) | camseq 路径点行的结构化视图（严格 TryParse/Format，语法与运行时 ParseCamWaypoint 同构；震屏下拉 VNCamShakeUi 也在这儿，两个编辑器窗口共用）/ 一整段 camseq 文本的 TrySplit·Join / 11 条内置运镜模板（`{char}` 占位按当前角色替换）。**存储仍是 VNRow.camLines 字符串**，本层只做每帧现解析、改完写回的中转 |
 | VNBadmintonModule / VNBadmintonDef | 羽毛球对战事件模块（`event badminton vs: id: target: first: mode: powerstat:/speedstat:/jumpstat: flag:`，结果 胜利/失败/结束）/ 对手+难度+台词+立绘+音效定义资产（登记进 VNGameConfig）；战绩写 flag `<前缀>_我方得分/_对方得分/_精准数/_最长回合`；装机走 Tools → VN Effects → **Install Badminton Module To Scene** |
 | VNBadmintonBallistics / VNBadmintonCourt / VNBadmintonActor / VNBadmintonSfx / VNBadmintonUi | 羽球的四层拆分：**纯静态弹道数学**（三点定抛物线/落点抽样/精准判定，无 MonoBehaviour 依赖可单测）/ 程序化球场与 HUD / 角色表现层（六态假动画，**换真动画只改这一个文件**）/ 五个代码合成音效 / 共用 UI 辅助 + 画梯形的 `VNBadmintonQuad` |
 | VNPhotoBoothModule / VNPhotoFrameDef / VNPhotoStickerDef / VNPhotoBackdropDef / VNPhotoThemeDef | 拍大头照事件模块（`event photo vs: me: theme: mode: frame: bg: time: stat:/rate: flag:`，写了 theme: 才评分＝完美/普通/失败，不写＝自由拍照只返回完成）/ 边框（程序化样式+开窗形状+水印+自带装饰）/ 贴纸 / 背景（8 种程序化样式，画在人身后被开窗裁切、按 cover 铺满）/ 主题＋**清单制**评分表（表情·边框·背景·贴纸四张加分清单＋命中评语）；左栏四标签页 边框｜背景｜贴纸｜涂鸦，人物与贴纸同一套手势（拖动·滚轮缩放·Shift+滚轮旋转·双击换前后），背景加 Ctrl（Ctrl+拖动移位·Ctrl+滚轮缩放，缩不到比 cover 更小所以永不露边）；开窗内层序 背景→拖动板→人后贴纸→我→她，**拖动板必须压最底**否则吃掉人后贴纸的射线；操作说明在右上角「?」钮里点击开合（卡片底色必须不透明，且要进拍照的 hide 列表）；结算时左右栏与取景框一起收起（分数栏与右栏横向重叠，不收就读不清）；布局尺寸全部常数化在文件头（机身 1860×1020／取景框 1040×780／侧栏 340×900／相纸 860×770）；成绩写 flag `<前缀>_分数/_档位/_次数`；装机走 Tools → VN Effects → **Install Photo Booth Module To Scene**（缺资产会自动铺一套默认的） |
@@ -227,7 +227,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   **加新窗口状态必须同时改 `OnBeforeSerialize` 和 `OnEnable`**。详见 WhatAiDo 九十六章。
 - 工具栏「隐注释/空行」：把空行与 `#` 注释折成零高度（`RowHeight` 返回 0，索引不变，
   所有编辑操作零影响）。**只隐空行与 `#`**——孤儿 `*` / `>` 行也是 Raw，藏了就找不回来。
-- **camseq 路径点行是字段化的**（类型/目标/zoom/秒/ease/xfade/hold），解析不了的**退回纯文本并标黄**；
+- **camseq 路径点行是字段化的**（类型/目标/zoom/秒/ease/xfade/hold/震），解析不了的**退回纯文本并标黄**；
   header 行右侧三个按钮：`编排`（打开镜头编排窗口并**双向绑定**这一行）/ `预设▾`（内置模板·我的预设·存为预设）/ `+ wp`。
   绑定后镜头窗口可「跟随选中」自动切行、支持实时或手动回写；存储仍是 `camLines` 字符串。
   镜头窗口画布的**底图三级回退**（手动指定 → 绑定行推算出的背景/CG → 场景当前那张），

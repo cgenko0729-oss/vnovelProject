@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using DG.Tweening;
@@ -37,6 +37,7 @@ namespace VNEffects.EditorTools
             public int easeIndex = 0;     // 0 = (默认)
             public float fade;            // >0 = 交叉叠化到本点（xfade:秒），代替平移/瞬切
             public float hold;            // >0 = 到达本点后停留的秒数（hold:秒）
+            public string shake = "";     // 到达本点时震一下（shake:等级 或 shake:强度,秒数）
         }
 
         /// <summary>camseq 开场衔接方式（对应 start: 选项）</summary>
@@ -479,7 +480,8 @@ namespace VNEffects.EditorTools
             _list = new ReorderableList(_points, typeof(Waypoint), true, true, true, true)
             {
                 drawHeaderCallback = r => GUI.Label(r,
-                    "路径点（拖手柄排序 | 时长 0 = 瞬切 | xfade>0 = 叠化到该点 | hold = 到点后停留）"),
+                    "路径点（拖手柄排序 | 时长 0 = 瞬切 | xfade>0 = 叠化到该点 | " +
+                    "hold = 到点后停留 | 震 = 到点震屏）"),
                 elementHeightCallback = _ => EditorGUIUtility.singleLineHeight * 2f + 10f,
                 drawElementCallback = DrawElement,
                 onAddCallback = l => _points.Add(new Waypoint()),
@@ -642,6 +644,9 @@ namespace VNEffects.EditorTools
                 "「跟随选中」时在剧本里点另一个 camseq 行会自动切过来。\n" +
                 "hold：到达该点后停留的秒数（0 = 不停）。要「推到脸上停一秒再拉回」写 hold 就够了，" +
                 "不用再补一个同点位、时长 0 的路径点。\n" +
+                "震：到达该点的瞬间震一下屏幕（light/medium/heavy 或自定义「强度,秒数」）。" +
+                "震完才走下一段——停顿取 max(hold, 震动时长)，不是相加。" +
+                "预览时间轴会把这段停顿算进去，但不模拟抖动本身。\n" +
                 "辅助线：整图模式画在选中路径点的取景框里，镜头视角模式铺满画布。" +
                 "对话框遮挡区按场景里真实对话框的尺寸换算——特写时脸有没有被挡住看这条。\n" +
                 "撤销：Ctrl+Z / Ctrl+Y（Ctrl+Shift+Z 也行），只作用于本窗口，不动 Unity 全局撤销；" +
@@ -800,7 +805,8 @@ namespace VNEffects.EditorTools
             GUI.Label(new Rect(x, r2.y, 42f, line), "zoom"); x += 44f;
 
             // 右边几个数字框宽度固定，zoom 滑条吃掉剩下的宽度（窗口拉窄时先压滑条）
-            const float tail = 6f + 22f + 48f + 32f + 86f + 38f + 44f + 34f + 40f;
+            const float tail = 6f + 22f + 48f + 32f + 86f + 38f + 44f + 34f + 40f
+                               + 6f + 24f + 118f;
             float sliderW = Mathf.Max(60f, r2.xMax - x - tail);
             w.zoom = EditorGUI.Slider(new Rect(x, r2.y, sliderW, line), w.zoom, 0.5f, 3f);
             x += sliderW + 6f;
@@ -817,6 +823,11 @@ namespace VNEffects.EditorTools
             GUI.Label(new Rect(x, r2.y, 34f, line),
                 new GUIContent("hold", "到达本点后停留的秒数（0 = 不停，直接走下一段）")); x += 34f;
             w.hold = Mathf.Max(0f, EditorGUI.FloatField(new Rect(x, r2.y, 40f, line), w.hold));
+            x += 46f;
+
+            GUI.Label(new Rect(x, r2.y, 24f, line),
+                new GUIContent("震", VNCamShakeUi.Tooltip)); x += 24f;
+            w.shake = VNCamShakeUi.Draw(new Rect(x, r2.y, 118f, line), w.shake);
         }
 
         // ==================================================================
@@ -1664,13 +1675,21 @@ namespace VNEffects.EditorTools
             return segs;
         }
 
-        /// <summary>该点带 hold 就补一段「停在原地」的时间轴段（运行时是 Sequence 里的 Interval）</summary>
+        /// <summary>
+        /// 该点带 hold（或 shake）就补一段「停在原地」的时间轴段
+        /// （运行时是 Sequence 里的 Interval）。
+        /// 停顿 = max(hold, 震动时长)，与运行时 VNCamera.BuildSegment 同一条规则——
+        /// 这里算短了，预览进度条就会和实机对不上。震动本身不在预览里模拟。
+        /// </summary>
         void AddHoldSegment(List<Segment> segs, List<int> pointOf, int index)
         {
             var w = _points[index];
-            if (w.hold <= 0.001f) return;
+            float stall = w.hold;
+            if (VNShakeSpec.TryParse(w.shake, out VNShakeSpec spec) && spec.Valid)
+                stall = Mathf.Max(stall, spec.duration);
+            if (stall <= 0.001f) return;
             segs.Add(new Segment
-                { target = TargetState(w), duration = w.hold, isHold = true });
+                { target = TargetState(w), duration = stall, isHold = true });
             pointOf.Add(index);
         }
 
@@ -1789,6 +1808,7 @@ namespace VNEffects.EditorTools
                     sb.Append(" xfade:").Append(w.fade.ToString("0.##", CultureInfo.InvariantCulture));
                 if (w.hold > 0.001f)
                     sb.Append(" hold:").Append(w.hold.ToString("0.##", CultureInfo.InvariantCulture));
+                if (!string.IsNullOrEmpty(w.shake)) sb.Append(" shake:").Append(w.shake);
                 sb.Append('\n');
             }
             return sb.ToString();
@@ -1829,7 +1849,7 @@ namespace VNEffects.EditorTools
                 var w = new Waypoint
                 {
                     zoom = def.zoom, duration = def.duration,
-                    fade = def.fade, hold = def.hold,
+                    fade = def.fade, hold = def.hold, shake = def.shake ?? "",
                 };
 
                 int anchor = System.Array.IndexOf(AnchorTokens, def.point.ToLower());
