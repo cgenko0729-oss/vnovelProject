@@ -7836,3 +7836,70 @@ meta 存在却不含完整 importer 设置块时它同样返回 true ——
 - 圆角贴图自检：`fill` 四角 alpha=0.00、中心 alpha=1.00；`outline` 中心 alpha=0.00
   （描边中间必须透明，否则会糊住卡片内容）。
 - 切到樱花主题后窗口持续绘制无异常；切回「默认」外观与改动前一致。
+
+---
+
+## 一二二、剧本编辑器改读 VNGameConfig：新登记的素材立刻能搜到（2026-08-29，分支 `agent/asset-manager`）
+
+### 问题
+
+在素材浏览器里登记了新背景（`scroll1~5` / `test1` / `test2`），
+**剧本编辑器的 `bg` 下拉里搜不到**，点工具栏的 `Refresh Sources` 也没用。
+
+### 根因：写的和读的是两份不同的数据
+
+- 素材浏览器 / VNGameConfig Inspector 写 → **`VNGameConfig` 资产**
+- 剧本编辑器的 bg / cg / bgm 下拉读 → **场景里的 `VNStage` / `VNAudio` 组件**
+  （`VNScenarioEditorWindow.RefreshSources()` 里 `FindFirstObjectByType<VNStage>()`
+  然后遍历 `stage.backgrounds`）
+
+实测对得上：`VNGameConfig.backgrounds = 20`、`场景 VNStage.backgrounds = 13`，
+差的正好是新加的那 7 个。
+
+这是**既有的架构不一致**，不是素材浏览器引入的 —— 以前直接在 VNGameConfig Inspector
+里加图也一样搜不到。而且它和项目自己的规定互相矛盾：CLAUDE.md 与 `VNGameConfig` 的注释
+都写着「配置进资产，不进场景」「不建议再往场景组件里填」，编辑器却只读场景组件。
+`Refresh Sources` 之所以没用，是因为它重读的还是场景组件。
+
+### 做了什么
+
+**① 取数源改成与运行时同一套覆盖语义**：`VNGameConfig` 里填了就用它的，留空才回退场景组件
+（与 `VNGameConfig.ApplyList` 的规则一致）。抽了两个小工具：
+`LoadGameConfig()`（编辑期直接走 `AssetDatabase`，不用 `VNGameConfig.Active` 的运行时缓存，
+免得受 Play Mode 进出清缓存的时机影响）和 `PickLibrary<T>(fromConfig, fromScene)`。
+覆盖 backgrounds / cgLibrary / bgm / se / voice 五个库。
+
+**② 加「改完自动刷新」**：新增 `Editor/VNAssetLibraryEvents.cs`，一个静态 `Changed` 事件。
+素材浏览器与 VNGameConfig Inspector 的**所有写入点**统一走
+`Apply()` / `ApplyAndNotify()`——`SerializedObject.ApplyModifiedProperties()`
+**返回 true 时才广播**，所以只有真改了东西才触发重建，不会每帧空转。
+剧本编辑器在 `OnEnable` 订阅、`OnDisable` 退订，收到就 `RefreshSources() + Repaint()`。
+
+### 技术决策与取舍
+
+- **让写方发信号、读方自己重建，而不是让写方去认识读方。** 素材浏览器不需要知道
+  剧本编辑器的存在，以后再多几个消费方也只是各自订阅。
+- **静态事件必须成对订阅/退订。** 订阅者是 EditorWindow 实例，窗口关闭与域重载都会重建窗口；
+  不在 `OnDisable` 退订的话，事件会一直攥着已销毁窗口的引用，下次广播时对着
+  「假 null」的窗口调方法 —— 典型的编辑器内存泄漏 + 幽灵异常。
+- **广播条件挂在 `ApplyModifiedProperties()` 的返回值上**，而不是无脑每帧发：
+  浏览器的 `OnGUI` 每帧都会 Apply 一次，无条件广播等于每帧重建一次全部候选源。
+- 没有反过来让素材浏览器同时写场景组件 —— 那违背「配置进资产」的第一铁律，
+  而且场景一重建就白写。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Editor/VNAssetLibraryEvents.cs`（新） | 「素材库改了」的静态广播（含订阅方必须退订的说明） |
+| `Editor/VNScenarioEditorWindow.cs` | `RefreshSources()` 改按覆盖语义取数 + `LoadGameConfig()` / `PickLibrary<T>()` + `OnEnable/OnDisable` 订阅退订 + `OnAssetLibraryChanged()` |
+| `Editor/VNAssetBrowserWindow.cs` | 所有写入点收敛到 `Apply()`，改动时广播 |
+| `Editor/VNGameConfigEditor.cs` | 所有写入点收敛到 `ApplyAndNotify()` |
+
+### 验证方法
+
+- Unity 重编译零 Error / 零 Exception。
+- 修复前：`VNGameConfig.backgrounds = 20`，剧本编辑器候选 = 13，
+  缺 `scroll1 scroll2 scroll3 scroll4 scroll5 test1 test2`。
+- 修复后：候选 = 20，上述 7 个全部出现，`test1` / `scroll5` 命中检查为 True。
+- 手动 `RaiseChanged()` 广播一次，订阅方重建候选无异常。

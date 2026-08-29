@@ -174,6 +174,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNAssetUi / VNConfigEntryDrawers (Editor) | 素材界面共用层（缩略图·试听·波形·拖拽·搜索）/ 背景·CG·音频·UI皮肤四个条目的**紧凑单行 drawer**。**Sprite 缩略图不用 `AssetPreview`**——它是异步的，几十张一起等会闪空白；Sprite 自己知道在哪张 texture 的哪个 UV，`DrawTextureWithTexCoords` 同步画即可（texture 不必可读）。音频没这捷径只能异步 + 占位，但**不能无限等**（有些资产永远没预览图），自己给 3 秒窗口到点放弃——`IsLoadingAssetPreview(int)` / `GetInstanceID()` 在 Unity 6.5 是 **error 级弃用**不能用。试听走 `UnityEditor.AudioUtil` 反射（`PlayPreviewClip` / 老版 `PlayClip` 逐个探测，探不到就灰掉按钮）。**drawer 挂在类型上**，所以 VNStage / VNAudio 组件的同名列表也一并变紧凑 |
 | VNGameConfigEditor (Editor) | VNGameConfig 的**九页分页 Inspector**（剧本｜标题｜UI皮肤｜舞台｜音频｜玩法｜AI｜大头贴｜全部，选中页进 EditorPrefs）+ 智能列表（搜索·分页 50/页·▲▼✕·id 重复与空值告警·批量拖入自动填文件名当 id）。**页签只登记字段名**，绘制仍走 PropertyField，所以没被认领的新字段会自动落到「其他」页而不是静默消失。用分页而非虚拟化，是因为 Inspector 里拿不到宿主 ScrollView 的可见区域 |
 | VNTextureImportDefaults (Editor) | 素材目录里**首次导入**的图自动设 `Sprite (2D and UI)` + `Single`（`OnPreprocessTexture` 在导入前跑，拖进来一次就对，不用二次 reimport）。**白名单目录**（`Roots`，新开素材目录补一行）——**绝不能全项目一刀切**，`Art/Models/**` 下 60+ 张法线/粗糙度贴图按 sRGB 的 Sprite 导入会让光照全错且极难联想到导入设置。只在 `importSettingsMissing` 时设，所以手调过的 Pivot/MaxSize/Multiple 切图永不被打回。**坑**：`importSettingsMissing` ≠「没有 .meta」——meta 存在却缺完整设置块时也为 true（老图中招过 5 张）；而想用「.meta 不存在」卡死新文件**也不行**，Unity 调 preprocessor 前就已写盘。存量补登走 Tools → VN Effects → Textures → Apply Sprite Settings To Selection |
+| VNAssetLibraryEvents (Editor) | 「素材库改了」的静态广播：素材浏览器 / VNGameConfig Inspector 登记完新素材后 `RaiseChanged()`，剧本编辑器收到就重建 bg/cg/bgm 下拉候选。**只在 `ApplyModifiedProperties()` 返回 true 时发**（OnGUI 每帧都 Apply，无条件广播 = 每帧重建全部候选）；订阅方 **`OnDisable` 必须退订**，否则静态事件会攥着已销毁窗口的引用 |
 | VNAssetTheme (Editor) | 素材浏览器的配色主题（默认 / 樱花粉白，顶栏 🌸 切换，进 EditorPrefs）。**Unity 编辑器整体只有 Light/Dark 改不了**（USS 打包在编辑器资源里不开放覆盖，第三方替换 skin 的做法升级即坏，不采用）；但自己 IMGUI 画的窗口每一像素归自己管。圆角靠**程序化生成一张白色圆角贴图 + GUI.color 染色**（零美术依赖，static 贴图域重载会丢所以 lazy 重建 + `HideFlags.DontSave`）。**换浅色底后必须显式覆盖每个 GUIStyle 的文字色**——Dark 主题下 EditorStyles 文字是浅色的，直接用就是白底白字字消失，且要覆盖 normal/hover/active/focused 及 on* 共八个状态，只改 normal 的话鼠标一悬停字又没了。主题是**叠加不是替换**：`Enabled==false` 时所有绘制原样退回 Unity 原生 |
 | VNAssetBrowserWindow (Editor) | 素材浏览器（Tools → VN Effects → **Asset Browser**）：左栏九类带条数，图片走大缩略图网格、音频走波形列表（**都做了虚拟化**，只画可见行），底部详情栏改 id/换素材/试听/定位/移除，右键还有「用文件名填 id」。**以缩略图为主、id 为标签**——本项目文件名是 AI 生成的原始 prompt 或纯数字（`1.png`、`masterpiece, very aesthetic… s-1095962266.png`），看名字根本认不出图。「只看未登记」的扫描目录**从已登记条目反推**，不写死（`Assets/CG` 与 `Assets/Art/Images/CG` 并存过） |
 
@@ -225,6 +226,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 菜单：**Tools → VN Effects → Scenario Editor**；核心文件：
   `Editor/VNScenarioEditorWindow.cs`、`VNScenarioDoc.cs`、`VNScenarioSchema.cs`。
 - 文本是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`，保存时重新生成文本，注释/空行保留。
+- **素材候选（bg/cg/bgm/se/voice）按覆盖语义取数**：`VNGameConfig` 里填了就用它的，
+  留空才回退场景 `VNStage`/`VNAudio` 组件（`RefreshSources()` 里的 `PickLibrary`）。
+  以前只读场景组件，导致在配置资产里新登记的素材**在下拉里根本搜不到**，
+  而项目铁律恰恰是「配置进资产，不进场景」。登记完由 `VNAssetLibraryEvents` 广播自动重建，
+  不用手点 `Refresh Sources`。
 - 支持「▶ 从选中行播放」（默认重建前置状态）调试；入口
   `VNScriptRunner.PlayFromSourceLine(source, line, rebuildState)`。
 - **热重载调试**：Play Mode 中播放按钮不禁用，直接用内存文本原地重跑，

@@ -83,8 +83,20 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
 
 ## 新行类型 / 新参数
 - 走 [vn-new-command] 清单第 5~6 步（Schema + CommandTranslations + VNParamSource 三处）。
-- 背景预览来源 = 当前场景 `VNStage.backgrounds`；角色/表情来源 = VNCharacterDef 资产；
-  改了来源记得 `Refresh Sources` 重建缓存逻辑仍然成立。
+- **素材候选来源走覆盖语义**（一二二章）：背景 / CG / 音频三类在 `RefreshSources()` 里
+  经 `PickLibrary(config侧, 场景组件侧)` 取数 —— **`VNGameConfig` 里填了就用它的，
+  留空才回退 `VNStage` / `VNAudio` 组件**，与运行时 `ApplyList` 规则一致。
+  （以前只读场景组件，导致在 VNGameConfig 里新登记的素材在下拉里根本搜不到，
+  而项目铁律恰恰是「配置进资产，不进场景」。）
+  编辑期取配置用 `LoadGameConfig()` 走 `AssetDatabase`，**不要用 `VNGameConfig.Active`**
+  ——那是运行时缓存，受 Play Mode 进出清缓存的时机影响。
+  角色 / 表情 / 任务等来源仍是扫资产。改了来源记得 `Refresh Sources` 重建缓存逻辑仍然成立。
+- **素材库改动要广播** `VNAssetLibraryEvents.RaiseChanged()`，写入点统一收敛
+  （浏览器 `Apply()` / Inspector `ApplyAndNotify()`），且**只在
+  `ApplyModifiedProperties()` 返回 true 时发**——OnGUI 每帧都 Apply，无条件广播
+  等于每帧重建全部候选源。订阅方 `OnEnable` 订阅、**`OnDisable` 必须退订**：
+  订阅者是 EditorWindow 实例，窗口关闭与域重载都会重建它，不退订就会攥着
+  已销毁窗口的引用，下次广播对着「假 null」调方法。
 
 ## 权威参考
 - CLAUDE.md「剧本可视化编辑器」节；WhatAiDo.md 三十一/三十二（主体）、

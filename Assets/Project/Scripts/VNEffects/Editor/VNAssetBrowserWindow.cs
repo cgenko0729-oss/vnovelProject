@@ -102,6 +102,17 @@ namespace VNEffects.EditorTools
             VNAssetUi.StopPreview();        // 关窗口还在放歌就见鬼了
         }
 
+        /// <summary>
+        /// 写回改动，并在**确实改了东西**时广播给剧本编辑器重建下拉候选。
+        /// 所有写入点统一走这里，别再直接调 _so.ApplyModifiedProperties()，
+        /// 否则新登记的素材在剧本编辑器里搜不到。
+        /// </summary>
+        void Apply()
+        {
+            if (_so != null && _so.ApplyModifiedProperties())
+                VNAssetLibraryEvents.RaiseChanged();
+        }
+
         void Acquire()
         {
             if (_config == null)
@@ -145,7 +156,7 @@ namespace VNEffects.EditorTools
 
             DrawDetail(detail, arr);
 
-            _so.ApplyModifiedProperties();
+            Apply();
         }
 
         void DrawNoConfig()
@@ -697,7 +708,7 @@ namespace VNEffects.EditorTools
             {
                 RemoveAt(arr, _selected);
                 _selected = -1;
-                _so.ApplyModifiedProperties();
+                Apply();
                 GUIUtility.ExitGUI();
             }
         }
@@ -721,7 +732,7 @@ namespace VNEffects.EditorTools
                     if (id != null)
                     {
                         id.stringValue = VNAssetUi.AssetName(asset);
-                        _so.ApplyModifiedProperties();
+                        Apply();
                     }
                 });
             }
@@ -730,16 +741,16 @@ namespace VNEffects.EditorTools
             m.AddSeparator(string.Empty);
             m.AddItem(new GUIContent("上移"), false, () =>
             {
-                if (index > 0) { arr.MoveArrayElement(index, index - 1); _so.ApplyModifiedProperties(); _selected = index - 1; }
+                if (index > 0) { arr.MoveArrayElement(index, index - 1); Apply(); _selected = index - 1; }
             });
             m.AddItem(new GUIContent("下移"), false, () =>
             {
-                if (index < arr.arraySize - 1) { arr.MoveArrayElement(index, index + 1); _so.ApplyModifiedProperties(); _selected = index + 1; }
+                if (index < arr.arraySize - 1) { arr.MoveArrayElement(index, index + 1); Apply(); _selected = index + 1; }
             });
             m.AddSeparator(string.Empty);
             m.AddItem(new GUIContent("从库中移除"), false, () =>
             {
-                RemoveAt(arr, index); _selected = -1; _so.ApplyModifiedProperties(); Repaint();
+                RemoveAt(arr, index); _selected = -1; Apply(); Repaint();
             });
             m.ShowAsContext();
         }
@@ -853,7 +864,7 @@ namespace VNEffects.EditorTools
                 }
                 added++;
             }
-            _so.ApplyModifiedProperties();
+            Apply();
             if (added > 0)
             {
                 _selected = arr.arraySize - 1;

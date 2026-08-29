@@ -229,6 +229,8 @@ namespace VNEffects.EditorTools
             _stagePreview = EditorPrefs.GetBool(StagePreviewPref, true);
             _followPlayback = EditorPrefs.GetBool(FollowPlaybackPref, true);
             _hideRawRows = EditorPrefs.GetBool(HideRawPref, false);
+            // 素材库改动后自动重建下拉候选（必须在 OnDisable 里退订，见 VNAssetLibraryEvents）
+            VNAssetLibraryEvents.Changed += OnAssetLibraryChanged;
             RestoreAfterDomainReload();
             BuildList();
             if (_restoredListIndex >= 0 && _restoredListIndex < _doc.rows.Count)
@@ -279,7 +281,15 @@ namespace VNEffects.EditorTools
 
         void OnDisable()
         {
+            VNAssetLibraryEvents.Changed -= OnAssetLibraryChanged;
             StopAudioPreview();
+        }
+
+        /// <summary>素材浏览器 / VNGameConfig 登记了新素材 → 重建下拉候选并重绘。</summary>
+        void OnAssetLibraryChanged()
+        {
+            RefreshSources();
+            Repaint();
         }
 
         /// <summary>10Hz 轮询 Runner 的当前行，驱动播放跟随高亮（不用给运行时加事件）</summary>
@@ -374,22 +384,38 @@ namespace VNEffects.EditorTools
             }
             _ctx.characterIds = ids.ToArray();
 
+            // ★ 素材库按**与运行时同一套覆盖语义**取数：VNGameConfig 里填了就用它的，
+            //   留空才回退场景组件。以前这里只读场景上的 VNStage / VNAudio，于是
+            //   在 VNGameConfig（或素材浏览器）里新登记的素材**在下拉里根本搜不到** ——
+            //   而项目的铁律恰恰是「配置进资产，不进场景」，两边对不上。
             var stage = FindFirstObjectByType<VNStage>();
+            var audio = FindFirstObjectByType<VNAudio>();
+            var config = LoadGameConfig();
+
             _backgroundPreviews.Clear();
             _cgPreviews.Clear();
-            if (stage != null)
+
+            var bgSrc = PickLibrary(config != null ? config.backgrounds : null,
+                                    stage != null ? stage.backgrounds : null);
+            if (bgSrc != null)
             {
                 var bgs = new List<string>();
-                foreach (var b in stage.backgrounds)
+                foreach (var b in bgSrc)
                 {
                     if (b == null || string.IsNullOrEmpty(b.id)) continue;
                     bgs.Add(b.id);
                     _backgroundPreviews.Add(new SpritePreviewItem(b.id, b.sprite));
                 }
                 _ctx.backgroundIds = bgs.ToArray();
+            }
+            else _ctx.backgroundIds = System.Array.Empty<string>();
 
+            var cgSrc = PickLibrary(config != null ? config.cgLibrary : null,
+                                    stage != null ? stage.cgLibrary : null);
+            if (cgSrc != null)
+            {
                 var cgs = new List<string>();
-                foreach (var c in stage.cgLibrary)
+                foreach (var c in cgSrc)
                 {
                     if (c == null || string.IsNullOrEmpty(c.id)) continue;
                     cgs.Add(c.id);
@@ -397,19 +423,21 @@ namespace VNEffects.EditorTools
                 }
                 _ctx.cgIds = cgs.ToArray();
             }
-            else
-            {
-                _ctx.backgroundIds = System.Array.Empty<string>();
-                _ctx.cgIds = System.Array.Empty<string>();
-            }
+            else _ctx.cgIds = System.Array.Empty<string>();
 
-            var audio = FindFirstObjectByType<VNAudio>();
-            if (audio != null)
+            var bgmSrc = PickLibrary(config != null ? config.bgmLibrary : null,
+                                     audio != null ? audio.bgmLibrary : null);
+            var seSrc = PickLibrary(config != null ? config.seLibrary : null,
+                                    audio != null ? audio.seLibrary : null);
+            var voiceSrc = PickLibrary(config != null ? config.voiceLibrary : null,
+                                       audio != null ? audio.voiceLibrary : null);
+            if (bgmSrc != null || seSrc != null || voiceSrc != null)
             {
                 // 旧混合库的条目三个通道都能用，因此并入每个候选列表
-                _ctx.bgmIds = CollectAudioIds(audio.bgmLibrary, audio.library, _bgmClips);
-                _ctx.seIds = CollectAudioIds(audio.seLibrary, audio.library, _seClips);
-                _ctx.voiceIds = CollectAudioIds(audio.voiceLibrary, audio.library, _voiceClips);
+                var legacy = audio != null ? audio.library : null;
+                _ctx.bgmIds = CollectAudioIds(bgmSrc, legacy, _bgmClips);
+                _ctx.seIds = CollectAudioIds(seSrc, legacy, _seClips);
+                _ctx.voiceIds = CollectAudioIds(voiceSrc, legacy, _voiceClips);
             }
             else
             {
@@ -495,6 +523,26 @@ namespace VNEffects.EditorTools
 
         /// <summary>通道专属库 + 旧混合库合并去重后的 id 列表（保持登记顺序）。
         /// clips 非空时同步填充 id → AudioClip 映射（行内试听用）。</summary>
+        /// <summary>
+        /// 编辑期取 VNGameConfig 资产（不走 VNGameConfig.Active 的运行时缓存，
+        /// 免得受 Play Mode 进出清缓存的时机影响）。
+        /// </summary>
+        static VNGameConfig LoadGameConfig()
+        {
+            var cfg = AssetDatabase.LoadAssetAtPath<VNGameConfig>(VNGameConfig.AssetPath);
+            return cfg != null ? cfg : Resources.Load<VNGameConfig>(VNGameConfig.ResourcesName);
+        }
+
+        /// <summary>
+        /// 覆盖语义的取数：config 侧非空就用它，否则回退场景组件侧。
+        /// 与 VNGameConfig.ApplyList 的运行时规则保持一致（填了才覆盖，留空不动）。
+        /// </summary>
+        static List<T> PickLibrary<T>(List<T> fromConfig, List<T> fromScene)
+        {
+            if (fromConfig != null && fromConfig.Count > 0) return fromConfig;
+            return fromScene;
+        }
+
         static string[] CollectAudioIds(List<VNAudio.AudioEntry> channelLib,
             List<VNAudio.AudioEntry> legacyLib, Dictionary<string, AudioClip> clips = null)
         {

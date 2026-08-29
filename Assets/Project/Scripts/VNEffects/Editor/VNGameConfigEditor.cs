@@ -106,7 +106,7 @@ namespace VNEffects.EditorTools
             }
             else DrawAll();
 
-            serializedObject.ApplyModifiedProperties();
+            ApplyAndNotify(serializedObject);
         }
 
         void DrawToolbar()
@@ -184,6 +184,16 @@ namespace VNEffects.EditorTools
         {
             if (IsDrawableArray(prop)) DrawSmartList(prop);
             else EditorGUILayout.PropertyField(prop, true);
+        }
+
+        /// <summary>
+        /// 写回改动，并在**确实改了东西**时广播，让打开着的剧本编辑器重建下拉候选。
+        /// 所有写入点统一走这里，否则在这儿新登记的素材在剧本编辑器里搜不到。
+        /// </summary>
+        static void ApplyAndNotify(SerializedObject so)
+        {
+            if (so != null && so.ApplyModifiedProperties())
+                VNAssetLibraryEvents.RaiseChanged();
         }
 
         /// <summary>数组（但不含 string —— string 在序列化里也算 isArray）</summary>
@@ -335,14 +345,14 @@ namespace VNEffects.EditorTools
                     if (GUI.Button(SquashV(up), new GUIContent("▲", "上移"), VNAssetUi.TinyButton))
                     {
                         arrayProp.MoveArrayElement(index, index - 1);
-                        arrayProp.serializedObject.ApplyModifiedProperties();
+                        ApplyAndNotify(arrayProp.serializedObject);
                         return true;
                     }
                 using (new EditorGUI.DisabledScope(index >= arrayProp.arraySize - 1))
                     if (GUI.Button(SquashV(down), new GUIContent("▼", "下移"), VNAssetUi.TinyButton))
                     {
                         arrayProp.MoveArrayElement(index, index + 1);
-                        arrayProp.serializedObject.ApplyModifiedProperties();
+                        ApplyAndNotify(arrayProp.serializedObject);
                         return true;
                     }
             }
@@ -350,7 +360,7 @@ namespace VNEffects.EditorTools
             if (GUI.Button(SquashV(del), new GUIContent("✕", "删除这一条"), VNAssetUi.TinyButton))
             {
                 DeleteAt(arrayProp, index);
-                arrayProp.serializedObject.ApplyModifiedProperties();
+                ApplyAndNotify(arrayProp.serializedObject);
                 return true;
             }
             return false;
@@ -446,7 +456,7 @@ namespace VNEffects.EditorTools
             int i = arrayProp.arraySize;
             arrayProp.arraySize = i + 1;
             ClearElement(arrayProp.GetArrayElementAtIndex(i));
-            arrayProp.serializedObject.ApplyModifiedProperties();
+            ApplyAndNotify(arrayProp.serializedObject);
         }
 
         /// <summary>Unity 复制上一条的值当新元素，这里清干净，免得出现两条一模一样的 id。</summary>
@@ -544,7 +554,7 @@ namespace VNEffects.EditorTools
                 }
                 added++;
             }
-            arrayProp.serializedObject.ApplyModifiedProperties();
+            ApplyAndNotify(arrayProp.serializedObject);
             if (added > 0) Debug.Log("[VNGameConfig] 批量添加 " + added + " 条到 " + DisplayName(arrayProp));
         }
 
