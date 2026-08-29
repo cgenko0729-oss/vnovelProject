@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace VNEffects.EditorTools
@@ -158,6 +158,20 @@ namespace VNEffects.EditorTools
                 Kw("wind", "风力", VNParamSource.Number, weight: 0.6f),
                 Kw("speed", "速度×", VNParamSource.Number, weight: 0.6f),
                 Kw("size", "大小×", VNParamSource.Number, weight: 0.6f));
+            Add("bgscroll", "Scene",
+                "bgscroll on|off [speed:] [dir:] [mode:] [time:]\n" +
+                "背景无限滚动：一张背景图永远往一个方向流（走路/坐车/云飘）。\n" +
+                "speed 是画布像素/秒（走路≈120，环境氛围≈6，默认 80）；\n" +
+                "dir 可写 left/right/up/down 或角度（0=往右流 90=往上 180=往左，默认 left）；\n" +
+                "mode：mirror（镜像平铺，任何图都不出接缝，默认）/ repeat（要求图本身无缝）；\n" +
+                "time 是开关时速度缓入缓出的秒数（默认 0.6）。换背景不停滚动，状态进存档",
+                Pos("state", "", VNParamSource.Options, new[] { "on", "off" }, "on"),
+                Kw("speed", "速度", VNParamSource.Number, def: "80", weight: 0.8f),
+                Kw("dir", "方向", VNParamSource.Options,
+                    new[] { "left", "right", "up", "down" }, weight: 0.7f),
+                Kw("mode", "平铺", VNParamSource.Options,
+                    new[] { "mirror", "repeat" }, weight: 0.6f),
+                Kw("time", "缓入秒", VNParamSource.Number, def: "0.6", weight: 0.4f));
             Add("mood", "Scene", "mood <type>",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNMood>(), "Neutral"));
             Add("reset", "Scene", "reset effects  (weather + mood + persistent VFX)",

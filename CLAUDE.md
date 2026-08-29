@@ -122,6 +122,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNScreenShockwave | 全屏情绪水波（fx shockwave [light\|heavy]：波峰环 overlay + 背景波浪脉冲 + 轻震动） |
 | VNLiquidSplash / VNWetScreen / VNLiquidPreset | 液体喷溅**两层**（缺一层就不成立）：舞台层空中水珠（拉伸公告板 Body + HDR Glow + 碎珠三发射器，`Burst` 爆溅 / `StartSpray` 间歇噗噗喷 / `SetClickMode` 点击喷水）/ 屏幕层镜头水渍（uGUI 对象池；尺寸与空中水珠同量级 4~8px，分小水点/大滴两档，只有大滴走撞击形变→挂住→下滑拖痕→蒸发四段状态机；小水点用 WaterSpeck 细长图，大滴才用 WaterDrop 假折射剖面——那套剖面缩到几像素会糊成灰环变肥皂泡）/ 四套内置液体预设（water·blood·ink·slime，黏度=重力+拉伸+下滑速度+干涸时间四参数合谋） |
 | VNRetroFilter | 胶片/CRT 复古滤镜（fx filmgrain/crt；mood Memory 自动胶片、Dream 自动 CRT） |
+| VNBackgroundScroll | 背景无限滚动（`bgscroll on|off [speed:] [dir:] [mode:] [time:]`）：**滚 UV 不是拼两张图**——一个 Image 就够，bg 转场/运镜/视差全不用动，**且能和 Ken Burns 叠加**（那个动 transform、这个动 UV）。平铺在 shader 里自己折不靠纹理导入设置：`repeat` 需无缝图、`mirror` 镜像折返任何图都不穿帮（但强透视的走廊/街道会变成「两条走廊对着开」）。speed 是画布像素/秒（走路≈120、云飘≈6），dir 说的是画面往哪边流。**背景图别开 Generate Mip Maps**，否则接缝糊一行。状态进存档，换图不停滚只归零偏移 |
 | VNKenBurns | 背景 Ken Burns 漂移（60~90s 随机航点缓慢缩放+平移，默认开启永不静止，fx kenburns on/off） |
 | VNLetterbox | 电影黑边上下滑入（letterbox on/off [height:][time:]，mood Memory 回忆自动联动） |
 | VNShootingStars / VNDriftingClouds | 夜晚偶发流星（fx meteor）/ 云本体缓移（fx skycloud，与云影互补） |
@@ -199,6 +200,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | AI 自由聊天 | `event aitalk vs:角色 [persona:人格] [turns:] [topic:] [place:] [me:] [stat:属性 rate:换算率] [flag:前缀]`；接 DeepSeek / Gemini（`VNGameConfig` 一处切换）实时生成台词，一次请求同时拿到 台词+表情+漫符+好感变化+三个候选回复（各带隐藏语气标签），结果 好感提升/普通/冷场/**失败**。**`* 失败` 必须接住**否则玩家断网会静默跳过（Lint 有检查）。event 前要先 `show` 角色，模块只换表情不负责出场。**定位：仅番外/自由时间，主线不依赖**——AI 内容不进翻译表、无配音、玩家可能断网。key 仅本地开发用，发行须改玩家自填或自建中转 | 一〇六 |
 | SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
 | 液体喷溅 | `liquid splash\|spray\|click\|wet\|dry\|cover [on\|off] [x:] [y:] [type:] [power:] [dir:] [spread:] [rate:] [screen:] [amount:]`，type = water/blood/ink/slime（+中文别名）；x/y 是屏幕比例 0~1；**dir 留空=朝镜头扑面而来（默认，正交相机下走伪透视：放射+加速+放大），填了才侧喷**；screen 是溅上镜头的概率倍率；click 模式下左键归喷水、Enter/空格仍推进 | 九十四 |
+| 背景无限滚动 | `bgscroll on\|off [speed:] [dir:] [mode:repeat\|mirror] [time:]`，speed = 画布像素/秒，dir 是画面流向（默认 left），mirror 不挑图但看得出对称 | 一一八 |
 | 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → **Weather Preview** | 九十二 |
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |

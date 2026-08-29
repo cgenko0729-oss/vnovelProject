@@ -274,6 +274,9 @@ namespace VNEffects
             {
                 weather = VNWeather.None.ToString(),
                 mood = VNMood.Neutral.ToString(),
+                scrollSpeed = VNBackgroundScroll.DefaultSpeed,
+                scrollDir = VNBackgroundScroll.DefaultDirection,
+                scrollMode = VNScrollMode.Mirror.ToString(),
             };
             // Ken Burns 默认开启：先种入再按剧本重放，重建结果才与真实运行一致
             snapshot.fxOn.Add("kenburns");
@@ -351,6 +354,20 @@ namespace VNEffects
                         float w = cmd.KwF("wind", float.NaN);
                         snapshot.weatherWindSet = !float.IsNaN(w);
                         snapshot.weatherWind = snapshot.weatherWindSet ? w : 0f;
+                        break;
+                    }
+                    case "bgscroll":
+                    {
+                        // 参数留空 = 沿用上一次的设定，重建时也要照这个语义累积，
+                        // 不能每条都重置成默认值（否则 bgscroll on speed:120 后面
+                        // 一句 bgscroll off / on 就把速度打回 80）
+                        snapshot.scrollOn = cmd.Arg(0, "on") != "off";
+                        if (cmd.kwargs.ContainsKey("speed"))
+                            snapshot.scrollSpeed = cmd.KwF("speed", VNBackgroundScroll.DefaultSpeed);
+                        var rDir = VNBackgroundScroll.ParseDirection(cmd.Kw("dir"));
+                        if (rDir.HasValue) snapshot.scrollDir = rDir.Value;
+                        var rMode = VNBackgroundScroll.ParseMode(cmd.Kw("mode"));
+                        if (rMode.HasValue) snapshot.scrollMode = rMode.Value.ToString();
                         break;
                     }
                     case "mood":
@@ -1984,6 +2001,26 @@ namespace VNEffects
                     else
                         Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：reset 用法为「reset effects」");
                     return null;
+
+                case "bgscroll":
+                {
+                    // bgscroll on|off [speed:] [dir:] [mode:repeat|mirror] [time:]
+                    bool on = cmd.Arg(0, "on") != "off";
+                    float? speed = cmd.kwargs.ContainsKey("speed")
+                        ? cmd.KwF("speed", VNBackgroundScroll.DefaultSpeed) : (float?)null;
+                    float? dir = VNBackgroundScroll.ParseDirection(cmd.Kw("dir"));
+                    if (dir == null && !string.IsNullOrEmpty(cmd.Kw("dir")))
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：bgscroll dir" +
+                                         $"「{cmd.Kw("dir")}」认不出，应为 left/right/up/down 或角度");
+                    var mode = VNBackgroundScroll.ParseMode(cmd.Kw("mode"));
+                    if (mode == null && !string.IsNullOrEmpty(cmd.Kw("mode")))
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：bgscroll mode" +
+                                         $"「{cmd.Kw("mode")}」认不出，应为 repeat 或 mirror");
+                    float? fade = cmd.kwargs.ContainsKey("time")
+                        ? cmd.KwF("time", VNBackgroundScroll.DefaultFade) : (float?)null;
+                    stage.SetBackgroundScroll(on, speed, dir, mode, fade, cmd.line);
+                    return null;
+                }
 
                 case "shake":
                 {

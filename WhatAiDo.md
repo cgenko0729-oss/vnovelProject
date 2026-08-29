@@ -7448,3 +7448,73 @@ camseq
 | `Editor/VNScenarioEditorWindow.cs`（stay） | 类型下拉加「原地」、目标格换成说明文字、zoom 格禁用占位 |
 | `Editor/VNCamseqEditorWindow.cs`（stay） | `PointType.Stay`、`TargetState(int)` 往前找真点位、画布不画/不可拖、生成文本不写 zoom |
 | `Editor/VNScenarioDoc.cs`（stay） | 新增「首点不能是 stay」的 Err |
+
+## 一一八、背景无限滚动 `bgscroll`（2026-08-29，分支 `agent/ai-deepseek`）
+
+### 需求
+
+一张背景图永远往一个方向流，营造"在走 / 在开车 / 云在飘"的持续动感。
+
+### 选型：滚 UV，不是拼两张图
+
+「首尾拼接两张图」是最直觉的做法，但在这个项目里代价很大：要复制第二个 Image +
+材质实例 + mood 注册，还要改 `bg` 转场逻辑，而且它和 `VNKenBurns` 抢同一个 RectTransform。
+
+改成**在 shader 里滚 UV**之后：背景仍是一个 Image，`bg` 转场 / `camseq` 运镜 / 视差
+全都不用动，**而且能和 Ken Burns 叠加**——那个动 transform、这个动 UV，各走各的，
+叠起来是"一边缓慢呼吸一边流动"，比只有滚动更有生命力（所以刻意没做成互斥）。
+
+### 接缝：自己在 shader 里折，不依赖纹理导入设置
+
+硬件 wrap mode 靠不住（图集、导入设置都可能不是 Repeat），所以平铺在 `vnWrapUV()` 里自己算：
+`repeat` 直接 `frac`，`mirror` 走 ping-pong。**前提是纹理没开 mipmap**——
+UI Sprite 默认就是关的，开了的话 `frac` 的跳变会让接缝糊掉一行。
+
+**这里踩了一个必须靠眼睛才能发现的坑**：ping-pong 一开始写成
+`abs(frac(s*0.5)*2-1)`，看着对，实际上它在 `s∈[0,1]` 是 **1→0 递减**——
+偏移为 0 时整张图就是翻的。截图里桌椅倒挂在天花板上才发现，正确写法是
+`1.0 - abs(frac(s*0.5)*2-1)`。**这种 bug 单元测试和 Console 都看不出来，只有真截一张图才知道。**
+
+另外模糊（伪景深 9-tap）和轮廓光那些"在主 uv 附近再采一次"的地方也必须过一遍 `vnWrapUV`，
+否则采样点会越过接缝跑到 [0,1] 外面被 clamp 成边缘色 → 接缝处一条亮线。
+
+### 速度单位
+
+`speed` 是**画布像素/秒**（1920 宽为基准），不是 UV/秒——写剧本的人对像素有直觉，
+对 UV 没有。走路≈120，跑步≈250，坐车≈400，环境氛围≈6。
+
+`dir` 说的是**画面内容往哪边流**（不是人物前进方向），所以采样坐标要反着走，代码里取负。
+默认 180（往左流 = 人物在往右走）。
+
+### mirror 挑图
+
+天空/云/树林/水面/抽象材质效果很好；**强透视的图（走廊、街道）会变成"两条走廊对着开"**——
+实机截图里非常明显。那种图请准备无缝素材配 `repeat`。
+
+### 存档
+
+开关/速度/方向/平铺方式进存档，读档直接就位不缓入（缓入会让读档后画面先"起步"一下）。
+**累计偏移刻意不存**：从哪一帧接着滚玩家看不出来，存了反而多一个要维护的数。
+`bg` 换图不停滚动（还在车上就该继续滚），只把偏移归零让新图从头开始流。
+
+### 一个顺带的发现（没动）
+
+`VNScriptDemo` 场景的背景 Image 上**原本没有 `VNImageEffectController`**，
+所以 `VNStage.backgroundFx` 一直是 null，`mood` 的分层调色也没注册到背景上。
+本次由 `VNBackgroundScroll` 的 `[RequireComponent]` 在运行时补上了 controller，
+滚动因此能工作，但 `backgroundFx` 的赋值发生在补挂之前，所以仍是 null——
+**没有改动这个顺序**，因为让背景突然开始被 mood 染色会改变现有演出。要不要修由你定。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Assets/Art/Shaders/VNImageEffect.shader` | `_ScrollMode`/`_ScrollOffset` 两个属性 + `vnWrapUV`/`vnScrollUV`；模糊 8 抽与轮廓光 2 抽包上 wrap |
+| `VNBackgroundScroll.cs`（新） | 滚动组件：速度缓入缓出、像素/秒→UV 换算、偏移折回 [0,2) 防精度掉光、方向/模式词解析 |
+| `VNImageEffectController.cs` | 加 `HasMaterial`（销毁流程里不能用 `Mat`，那会顺手新建一个） |
+| `Script/VNStage.cs` | `bgScroll` 引用 + 自愈补挂 + `SetBackgroundScroll()` + 换图归零偏移 + 存档读写 |
+| `Script/VNScriptParser.cs` | `bgscroll` 关键字 |
+| `Script/VNScriptRunner.cs` | 命令派发（含 dir/mode 认不出时的告警）+ 调试重建重放（参数留空 = 沿用，重建也要照这个语义累积）|
+| `Script/VNSaveSystem.cs` | `scrollOn/scrollSpeed/scrollDir/scrollMode` 四个字段 |
+| `Editor/VNScenarioSchema.cs` | `bgscroll` 命令登记（5 个参数，剧本编辑器/Ctrl+E 面板自动出现）|
+| `Editor/VNEffectsDemoSetup.cs` | 场景生成器给背景挂上滚动组件并回填 VNStage |

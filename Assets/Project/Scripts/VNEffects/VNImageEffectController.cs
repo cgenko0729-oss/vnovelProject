@@ -1,4 +1,4 @@
-using DG.Tweening;
+﻿using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -54,6 +54,9 @@ namespace VNEffects
 
         /// <summary>当前是否在悬浮飘动（情绪动作库用来暂停/恢复）</summary>
         public bool IsFloating => _floatTween != null;
+
+        /// <summary>材质实例是否已经建出来（销毁流程里别用 Mat，那会顺手新建一个）</summary>
+        public bool HasMaterial => _mat != null;
 
         /// <summary>材质实例（懒初始化，可在 Awake 前被外部访问）</summary>
         public Material Mat

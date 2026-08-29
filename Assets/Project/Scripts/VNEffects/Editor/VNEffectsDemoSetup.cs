@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TMPro;
@@ -41,6 +41,7 @@ namespace VNEffects.EditorTools
             public VNImageEffectController bgFx;
             public Image bgImage;
             public VNKenBurns kenBurns;
+            public VNBackgroundScroll bgScroll;
             public VNGodRays godRays;
             public VNEdgeGlow edgeGlow;
             public VNVignetteFocus vignetteFocus;
@@ -159,6 +160,9 @@ namespace VNEffects.EditorTools
                 rig.bgFx = bgGo.AddComponent<VNImageEffectController>();
                 AssignSourceMaterial(rig.bgFx, rig.imageMat);
                 rig.kenBurns = bgGo.AddComponent<VNKenBurns>(); // 背景永不静止
+                // 无限滚动（默认不开，剧本 bgscroll on 才启动）：
+                // 它动的是 UV、Ken Burns 动的是 transform，两个可以同时开着
+                rig.bgScroll = bgGo.AddComponent<VNBackgroundScroll>();
             }
 
             // ---------- 6.5 God Rays（背景之后、立绘之前）----------
@@ -532,6 +536,7 @@ namespace VNEffects.EditorTools
             stage.shockwave = rig.shockwave;
             stage.retroFilter = rig.retroFilter;
             stage.kenBurns = rig.kenBurns;
+            stage.bgScroll = rig.bgScroll;
             stage.letterbox = rig.letterbox;
             stage.shootingStars = rig.shootingStars;
             stage.driftingClouds = rig.driftingClouds;
