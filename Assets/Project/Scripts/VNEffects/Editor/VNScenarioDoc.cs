@@ -26,6 +26,14 @@ namespace VNEffects.EditorTools
         public string raw = "";      // Raw 行原文
         public bool isAsync;
 
+        /// <summary>
+        /// 临时禁用（文本里写成 "#! 原来那行"）。运行时 Parser 见 # 就跳过，
+        /// 所以这一行等于不存在；但编辑器照常解析成命令/台词行，
+        /// 参数格还能改、切回来无损——这正是它不用普通 # 注释的原因
+        /// （普通 # 会退化成 Raw 纯文本，一注释掉就没有下拉框了）。
+        /// </summary>
+        public bool disabled;
+
         // Say
         public string speaker = "";
         public string expression = "";
@@ -51,7 +59,7 @@ namespace VNEffects.EditorTools
         {
             var r = new VNRow
             {
-                kind = kind, raw = raw, isAsync = isAsync,
+                kind = kind, raw = raw, isAsync = isAsync, disabled = disabled,
                 speaker = speaker, expression = expression, text = text,
                 keyword = keyword,
             };
@@ -108,25 +116,42 @@ namespace VNEffects.EditorTools
             {
                 string line = lineRaw.Trim();
 
+                // "#! xxx" = 被临时禁用的一行：剥掉标记后照常解析，只是打上 disabled。
+                // 普通 "# xxx" 仍是注释（Raw），两者互不干扰。
+                bool disabled = false;
+                if (line.StartsWith("#!"))
+                {
+                    string enabled = line.Substring(2).Trim();
+                    if (enabled.Length > 0)
+                    {
+                        disabled = true;
+                        line = enabled;
+                    }
+                }
+
                 if (line.Length == 0 || line.StartsWith("#"))
                 {
-                    doc.rows.Add(new VNRow { kind = VNRowKind.Raw, raw = line });
+                    doc.rows.Add(new VNRow { kind = VNRowKind.Raw, raw = lineRaw.Trim() });
                     continue;
                 }
                 if (line.StartsWith("*"))
                 {
-                    if (lastChoice != null) lastChoice.options.Add(ParseChoiceOption(line));
-                    else doc.rows.Add(new VNRow { kind = VNRowKind.Raw, raw = line });
+                    // 子行的禁用标记必须与主行一致：主行没禁用却单独注释掉一个选项时，
+                    // 并进 options 会让 "#!" 在保存时丢失（往返不无损），所以退回 Raw 原样留着。
+                    if (lastChoice != null && lastChoice.disabled == disabled)
+                        lastChoice.options.Add(ParseChoiceOption(line));
+                    else doc.rows.Add(new VNRow { kind = VNRowKind.Raw, raw = lineRaw.Trim() });
                     continue;
                 }
                 if (line.StartsWith(">"))
                 {
-                    if (lastCamseq != null) lastCamseq.camLines.Add(line);
-                    else doc.rows.Add(new VNRow { kind = VNRowKind.Raw, raw = line });
+                    if (lastCamseq != null && lastCamseq.disabled == disabled)
+                        lastCamseq.camLines.Add(line);
+                    else doc.rows.Add(new VNRow { kind = VNRowKind.Raw, raw = lineRaw.Trim() });
                     continue;
                 }
 
-                var row = new VNRow();
+                var row = new VNRow { disabled = disabled };
                 string body = line;
                 if (body.EndsWith("@"))
                 {
@@ -306,7 +331,24 @@ namespace VNEffects.EditorTools
         public string GenerateText()
         {
             var sb = new StringBuilder();
-            foreach (var row in rows) AppendRow(sb, row);
+            var buffer = new StringBuilder();
+            foreach (var row in rows)
+            {
+                if (!row.disabled)
+                {
+                    AppendRow(sb, row);
+                    continue;
+                }
+                // 禁用行：照常生成再逐行加 "#! "。必须逐行——choice 的 * 子行与
+                // camseq 的 > 子行也得一起注释掉，否则主行没了它们就成了孤儿行。
+                buffer.Length = 0;
+                AppendRow(buffer, row);
+                foreach (var line in buffer.ToString().Split('\n'))
+                {
+                    if (line.Length == 0) continue;   // 末尾换行切出来的空串
+                    sb.Append("#! ").Append(line).Append('\n');
+                }
+            }
             return sb.ToString();
         }
 

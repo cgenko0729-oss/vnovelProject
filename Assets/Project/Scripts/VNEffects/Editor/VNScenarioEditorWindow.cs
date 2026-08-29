@@ -46,6 +46,10 @@ namespace VNEffects.EditorTools
         [SerializeField] List<string> _redoStackSerialized = new List<string>();
         [SerializeField] Vector2 _scroll;
         [SerializeField] int _lastPlayedLine = -1;   // Ctrl+Shift+Enter「重播上次那一行」
+        // 搜索过滤词。跨域重载存活（进出 Play Mode 回来还在筛着，不然每次都要重打）
+        [SerializeField] string _search = "";
+        bool _focusSearchPending;   // Ctrl+F：下一帧把键盘焦点丢给搜索框
+        const string SearchFieldName = "VNScenarioEditor.Search";
 
         System.DateTime _fileTime;
         bool _stagePreview = true;
@@ -753,6 +757,30 @@ namespace VNEffects.EditorTools
             w.Repaint();
         }
 
+        /// <summary>
+        /// Ctrl+/ = 把选中行临时禁用/恢复（VS 的注释键位）。
+        /// 正在文本框里打字时不抢——那时的 "/" 应该老老实实变成一个斜杠。
+        /// </summary>
+        [Shortcut("VN/Scenario Editor/Toggle Disable Rows", typeof(VNScenarioEditorWindow),
+            KeyCode.Slash, ShortcutModifiers.Action)]
+        static void ShortcutToggleDisable(ShortcutArguments args)
+        {
+            if (!(args.context is VNScenarioEditorWindow w)) return;
+            if (w._tab != Tab.Edit || EditorGUIUtility.editingTextField) return;
+            w.ToggleDisableSelection();
+        }
+
+        /// <summary>Ctrl+F = 焦点丢给工具栏的搜索框（真正的聚焦要在 OnGUI 里做，这里只置旗标）</summary>
+        [Shortcut("VN/Scenario Editor/Focus Search", typeof(VNScenarioEditorWindow),
+            KeyCode.F, ShortcutModifiers.Action)]
+        static void ShortcutFocusSearch(ShortcutArguments args)
+        {
+            if (!(args.context is VNScenarioEditorWindow w)) return;
+            w._tab = Tab.Edit;
+            w._focusSearchPending = true;
+            w.Repaint();
+        }
+
         [Shortcut("VN/Scenario Editor/Toggle Debug Pause", typeof(VNScenarioEditorWindow),
             KeyCode.F8)]
         static void ShortcutTogglePause(ShortcutArguments args)
@@ -1015,11 +1043,11 @@ namespace VNEffects.EditorTools
         {
             int index = _list.index;
             if (index < 0 || index >= _doc.rows.Count) return;
-            if (!IsHiddenRow(_doc.rows[index])) return;
+            if (!IsRowCollapsed(_doc.rows[index])) return;
 
             for (int i = index; i < _doc.rows.Count; i++)
             {
-                if (IsHiddenRow(_doc.rows[i])) continue;
+                if (IsRowCollapsed(_doc.rows[i])) continue;
                 _list.ClearSelection();
                 _list.index = i;
                 _list.Select(i, true);
@@ -1028,7 +1056,7 @@ namespace VNEffects.EditorTools
             // 后面全是隐藏行，往前找
             for (int i = index - 1; i >= 0; i--)
             {
-                if (IsHiddenRow(_doc.rows[i])) continue;
+                if (IsRowCollapsed(_doc.rows[i])) continue;
                 _list.ClearSelection();
                 _list.index = i;
                 _list.Select(i, true);
@@ -1191,8 +1219,47 @@ namespace VNEffects.EditorTools
 
                 DrawPlaybackControls();
 
+                using (new EditorGUI.DisabledScope(
+                    _list.index < 0 || _list.index >= _doc.rows.Count))
+                {
+                    if (GUILayout.Button(new GUIContent("禁用/恢复",
+                            "把选中行注释掉（文本里写成 \"#! 原来那行\"）临时失效，再按一次恢复。\n" +
+                            "禁用后参数格照样能改，不像手写 # 注释会退化成纯文本。Ctrl+/"),
+                            GUILayout.Width(72f)))
+                        ToggleDisableSelection();
+                }
+
                 GUILayout.FlexibleSpace();
-                GUILayout.Label($"{_doc.rows.Count} rows", EditorStyles.miniLabel);
+
+                // 搜索过滤：不匹配的行折成零高度（同「隐注释/空行」那套）
+                GUI.SetNextControlName(SearchFieldName);
+                string search = GUILayout.TextField(_search, EditorStyles.toolbarSearchField,
+                    GUILayout.Width(190f));
+                if (search != _search)
+                {
+                    _search = search;
+                    MoveSelectionOffHiddenRow();
+                }
+                if (_focusSearchPending && Event.current.type == EventType.Repaint)
+                {
+                    _focusSearchPending = false;
+                    EditorGUI.FocusTextInControl(SearchFieldName);
+                }
+                if (!string.IsNullOrEmpty(_search))
+                {
+                    if (GUILayout.Button("✕", EditorStyles.miniLabel, GUILayout.Width(16f)))
+                    {
+                        _search = "";
+                        GUIUtility.keyboardControl = 0;
+                        MoveSelectionOffHiddenRow();
+                    }
+                    GUILayout.Label($"{CountVisibleRows()}/{_doc.rows.Count} 行",
+                        EditorStyles.miniLabel);
+                }
+                else
+                {
+                    GUILayout.Label($"{_doc.rows.Count} rows", EditorStyles.miniLabel);
+                }
             }
 
             if (_stagePreview) RebuildStageStatesIfNeeded();
@@ -1217,6 +1284,10 @@ namespace VNEffects.EditorTools
                 "Enter 插入，Shift+Enter 插到上方，Tab 跳过参数，Esc 取消）；" +
                 "右键点行首的命令按钮 = 打字换这一行的命令（左键仍是原来的分类菜单）；" +
                 "底部 [+] 与各参数下拉也都能打字筛选。\n" +
+                "Ctrl+/ = 把选中行临时禁用/恢复（文本里写成 #! 那行，运行时当注释跳过，" +
+                "但参数格照样能改）；Ctrl+F = 跳到搜索框，只留匹配的行，" +
+                "支持 cmd:say（只要台词行）/ cmd:bg / who:星野（只要她说的话），" +
+                "空格分开的多个词是「都要满足」，清空搜索框即全部显示。\n" +
                 "Shift+click = select range, Ctrl+click = toggle select; " +
                 "drag moves all selected rows, [-] / Duplicate act on the whole selection. " +
                 "Drag handle to reorder. [+] adds after selection. \"@\" = async (do not wait). " +
@@ -1276,6 +1347,10 @@ namespace VNEffects.EditorTools
         void PlayFromSelectedRow()
         {
             if (_list.index < 0 || _list.index >= _doc.rows.Count) return;
+            // 禁用行在文本里就是注释，Runner 会从它后面的第一条有效命令开始——
+            // 说一声，免得以为播放位置串了
+            if (_doc.rows[_list.index].disabled)
+                Debug.LogWarning("[VNScript] 选中的是被禁用的行（#!），播放会从它之后的第一条有效命令开始");
             PlayFromSourceLine(SourceLineForRow(_list.index));
         }
 
@@ -1452,7 +1527,7 @@ namespace VNEffects.EditorTools
 
         float RowHeight(VNRow r)
         {
-            if (IsHiddenRow(r)) return 0f;
+            if (IsRowCollapsed(r)) return 0f;
             int lines = 1;
             if (r.options != null) lines += r.options.Count;
             if (r.camLines != null) lines += r.camLines.Count;
@@ -1474,6 +1549,120 @@ namespace VNEffects.EditorTools
             return text.Length == 0 || text.StartsWith("#");
         }
 
+        /// <summary>
+        /// 这一行现在是不是折成了零高度——「隐注释/空行」或搜索过滤任一命中即是。
+        ///
+        /// 【为什么不做过滤视图】列表绑的是 _doc.rows 本体，高度归零就够了：
+        /// 索引不变，行号换算 / 多选 / 拖动排序 / 删除全部零改动。
+        /// 换成过滤后的子列表，「拖到被过滤掉的行之间算什么」这种问题会没完没了。
+        /// </summary>
+        bool IsRowCollapsed(VNRow r) => IsHiddenRow(r) || IsFilteredOut(r);
+
+        bool IsFilteredOut(VNRow r) =>
+            !string.IsNullOrEmpty(_search) && !RowMatchesSearch(r, _search);
+
+        /// <summary>
+        /// 搜索匹配：空格分开的多个词是 AND（都命中才留下），大小写无关的子串包含。
+        /// 词可以带前缀限定范围：cmd:（命令名，台词行算 say）、say:（台词正文）、who:（说话者）。
+        /// 不带前缀就什么都比：命令名、命令中文名、台词、说话者、所有参数值、
+        /// choice 选项文本、camseq 路径点原文。
+        /// </summary>
+        public static bool RowMatchesSearch(VNRow r, string query)
+        {
+            foreach (var term in query.Split(new[] { ' ', '\t' },
+                         System.StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (!RowMatchesTerm(r, term)) return false;
+            }
+            return true;
+        }
+
+        static bool RowMatchesTerm(VNRow r, string term)
+        {
+            string keyword = r.kind == VNRowKind.Say ? "say"
+                : r.kind == VNRowKind.Command ? r.keyword : "";
+
+            int colon = term.IndexOf(':');
+            if (colon > 0)
+            {
+                string scope = term.Substring(0, colon).ToLowerInvariant();
+                string value = term.Substring(colon + 1);
+                if (value.Length == 0) return true;    // 只打了 "cmd:"，还没输值
+                switch (scope)
+                {
+                    case "cmd":
+                    case "命令":
+                        return Contains(keyword, value);
+                    case "say":
+                    case "台词":
+                        return r.kind == VNRowKind.Say && Contains(r.text, value);
+                    case "who":
+                    case "谁":
+                        return r.kind == VNRowKind.Say && Contains(r.speaker, value);
+                }
+                // 不是已知前缀（比如剧本里本来就有的 "transition:Eyelid"）：整段当普通词比
+            }
+
+            if (Contains(keyword, term)) return true;
+            if (CommandTranslations.TryGetValue(keyword, out string zh) && Contains(zh, term))
+                return true;
+            if (Contains(r.raw, term) || Contains(r.text, term) ||
+                Contains(r.speaker, term) || Contains(r.expression, term)) return true;
+            foreach (var kv in r.values)
+                if (Contains(kv.Value, term) || Contains(kv.Key, term)) return true;
+            foreach (var extra in r.extraTokens)
+                if (Contains(extra, term)) return true;
+            if (r.options != null)
+                foreach (var o in r.options)
+                    if (Contains(o.text, term) || Contains(o.condition, term) ||
+                        Contains(o.costOp, term) || Contains(o.flagOp, term) ||
+                        Contains(o.jump, term)) return true;
+            if (r.camLines != null)
+                foreach (var l in r.camLines)
+                    if (Contains(l, term)) return true;
+            return false;
+        }
+
+        static bool Contains(string text, string term) =>
+            !string.IsNullOrEmpty(text) &&
+            text.IndexOf(term, System.StringComparison.OrdinalIgnoreCase) >= 0;
+
+        int CountVisibleRows()
+        {
+            int n = 0;
+            foreach (var r in _doc.rows)
+                if (!IsRowCollapsed(r)) n++;
+            return n;
+        }
+
+        /// <summary>
+        /// 选中行「临时禁用 / 恢复」（文本里加/去掉 "#!" 前缀）。
+        /// 语义照抄 VS：选区里只要还有没禁用的行，就整块禁用；全禁用了才整块恢复。
+        /// Raw 行（注释/空行）跳过——它本来就不执行，加个标记只会让文本更乱。
+        /// </summary>
+        void ToggleDisableSelection()
+        {
+            var selected = SelectedRowIndices();
+            if (selected.Count == 0) return;
+
+            bool anyEnabled = false;
+            foreach (int i in selected)
+            {
+                var r = _doc.rows[i];
+                if (r.kind != VNRowKind.Raw && !r.disabled) { anyEnabled = true; break; }
+            }
+
+            MarkStructural();
+            foreach (int i in selected)
+            {
+                var r = _doc.rows[i];
+                if (r.kind == VNRowKind.Raw) continue;
+                r.disabled = anyEnabled;
+            }
+            Bump();
+            Repaint();
+        }
+
         Rect SubLine(Rect rect, int line) => new Rect(
             rect.x + 14f, rect.y + 3f + line * LineH2, rect.width - 16f, LineH2 - 3f);
 
@@ -1481,7 +1670,7 @@ namespace VNEffects.EditorTools
         {
             if (index < 0 || index >= _doc.rows.Count) return;
             var r = _doc.rows[index];
-            if (IsHiddenRow(r)) return;   // 零高度，什么都别画
+            if (IsRowCollapsed(r)) return;   // 零高度，什么都别画
 
             // 播放跟随：正在执行的这一行铺一层淡蓝底 + 左侧竖条
             if (index == _playingRow)
@@ -1508,12 +1697,27 @@ namespace VNEffects.EditorTools
             }
 
             var line0 = SubLine(rect, 0);
+
+            // 临时禁用的行：整行压暗 + 左侧一条橙杠。字段照样能点能改——
+            // 这正是 "#!" 相对手写 # 注释的意义（后者会退化成 Raw 纯文本）。
+            var previousColor = GUI.color;
+            if (r.disabled)
+            {
+                EditorGUI.DrawRect(new Rect(rect.x, rect.y - 1f, rect.width, rect.height + 2f),
+                    new Color(0.55f, 0.35f, 0.12f, 0.13f));
+                EditorGUI.DrawRect(new Rect(rect.x - 3f, rect.y - 1f, 3f, rect.height + 2f),
+                    new Color(0.90f, 0.55f, 0.15f, 0.95f));
+                GUI.color = new Color(1f, 1f, 1f, 0.45f);
+            }
+
             switch (r.kind)
             {
                 case VNRowKind.Raw: DrawRawRow(line0, r); break;
                 case VNRowKind.Say: DrawSayRow(line0, r, index); break;
                 case VNRowKind.Command: DrawCommandRow(rect, line0, r, index); break;
             }
+
+            GUI.color = previousColor;
         }
 
         void DrawRawRow(Rect rect, VNRow r)
