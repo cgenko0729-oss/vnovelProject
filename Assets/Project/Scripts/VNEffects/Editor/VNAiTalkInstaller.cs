@@ -116,9 +116,12 @@ namespace VNEffects.EditorTools
             }
 
             // ④ 体检：这三样缺一个运行时就当场翻车
-            if (!VNAiKey.HasKey)
-                warnings.Add("找不到 Gemini API Key —— 运行时每轮都会走兜底台词。\n" +
-                             "  配置方式见 Tools → VN Effects → AI → Show Key Status");
+            // key 要查**人格实际用的那家**：全局默认一改，要查的就是另一家的 key
+            foreach (var provider in PersonaProviders(personas))
+                if (!VNAiKey.HasKeyFor(provider))
+                    warnings.Add($"找不到 {VNAiProviders.DisplayName(provider)} API Key" +
+                                 " —— 用到它的人格每轮都会走兜底台词。\n" +
+                                 "  配置方式见 Tools → VN Effects → AI → Show Key Status");
             foreach (var p in personas)
             {
                 var errors = p.Validate();
@@ -146,6 +149,23 @@ namespace VNEffects.EditorTools
                 EditorGUIUtility.PingObject(module.gameObject);
             }
             return true;
+        }
+
+        /// <summary>
+        /// 这批人格一共用到哪几家（去重）。没有人格时至少查一下全局默认那家。
+        /// </summary>
+        static List<VNAiProvider> PersonaProviders(List<VNAiPersonaDef> personas)
+        {
+            var list = new List<VNAiProvider>();
+            if (personas != null)
+                foreach (var p in personas)
+                {
+                    if (p == null) continue;
+                    var provider = p.ResolveProvider();
+                    if (!list.Contains(provider)) list.Add(provider);
+                }
+            if (list.Count == 0) list.Add(VNAiProviders.GlobalDefault);
+            return list;
         }
     }
 }

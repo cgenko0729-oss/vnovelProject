@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -452,6 +452,20 @@ namespace VNEffects.EditorTools
                     weatherIds.Add(wd.id);
             }
             _ctx.weatherIds = weatherIds.ToArray();
+
+            // UI 皮肤候选：VNGameConfig 登记的 id（default 由 OptionsFor 统一补在最前）
+            var dialogueSkins = new List<string>();
+            var choiceSkins = new List<string>();
+            var uiCfg = VNGameConfig.Active;
+            if (uiCfg != null)
+            {
+                foreach (var e in uiCfg.dialogueSkins)
+                    if (e != null && !string.IsNullOrEmpty(e.id)) dialogueSkins.Add(e.id);
+                foreach (var e in uiCfg.choiceSkins)
+                    if (e != null && !string.IsNullOrEmpty(e.id)) choiceSkins.Add(e.id);
+            }
+            _ctx.dialogueSkinIds = dialogueSkins.ToArray();
+            _ctx.choiceSkinIds = choiceSkins.ToArray();
 
             _ctx.scenarioLabels.Clear();
             _ctx.scenarioPaths.Clear();
@@ -1624,7 +1638,8 @@ namespace VNEffects.EditorTools
                 string nv = EditorGUI.TextField(body, r.camLines[i], style);
                 if (nv != r.camLines[i]) r.camLines[i] = nv;
                 GUI.Label(body, new GUIContent("", "这一行认不出来，暂按纯文本保留。\n" +
-                    "语法：> 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]\n" +
+                    "语法：> 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒] " +
+                    "[shake:等级|强度,秒数]\n" +
                     "改成合法写法后会自动变回字段化控件。"));
             }
 
@@ -1653,13 +1668,17 @@ namespace VNEffects.EditorTools
             {
                 wp.point = newKind == VNCamPointKind.Anchor ? "middle"
                     : newKind == VNCamPointKind.Coords ? "0,0"
+                    : newKind == VNCamPointKind.Stay ? VNCamWaypointDef.StayToken
                     : (_ctx.characterIds.Length > 0 ? _ctx.characterIds[0] : "");
+                // 切到「原地」默认时长 0（画面纹丝不动）；切出去时给回常用默认值
+                if (newKind == VNCamPointKind.Stay) wp.duration = 0f;
+                else if (kind == VNCamPointKind.Stay) wp.duration = VNCamWaypoint.DefaultDuration;
                 kind = newKind;
             }
 
-            // 尾部固定宽度：zoom / 秒 / ease / xfade / hold
+            // 尾部固定宽度：zoom / 秒 / ease / xfade / hold / 震
             const float tailW = 34f + 48f + 4f + 20f + 42f + 4f + 76f + 4f + 34f + 40f
-                                + 4f + 32f + 40f;
+                                + 4f + 32f + 40f + 4f + 24f + 118f;
             float targetW = Mathf.Max(90f, rect.xMax - x - tailW - 4f);
             DrawCamPointTarget(new Rect(x, rect.y, targetW, rect.height), r, i, wp, kind);
             x = rect.xMax - tailW;
@@ -1667,7 +1686,16 @@ namespace VNEffects.EditorTools
             GUI.Label(new Rect(x, rect.y, 34f, rect.height),
                 new GUIContent("zoom", "取景倍率：1 = 全图，越大越推近"), EditorStyles.miniLabel);
             x += 34f;
-            wp.zoom = EditorGUI.FloatField(new Rect(x, rect.y, 48f, rect.height), wp.zoom);
+            if (kind == VNCamPointKind.Stay)
+            {
+                // 原地点的 zoom 沿用上一个点，这里给个禁用占位——留个能敲的框只会误导
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUI.TextField(new Rect(x, rect.y, 48f, rect.height), "沿用");
+            }
+            else
+            {
+                wp.zoom = EditorGUI.FloatField(new Rect(x, rect.y, 48f, rect.height), wp.zoom);
+            }
             x += 52f;
 
             GUI.Label(new Rect(x, rect.y, 20f, rect.height),
@@ -1696,6 +1724,12 @@ namespace VNEffects.EditorTools
             x += 32f;
             wp.hold = Mathf.Max(0f,
                 EditorGUI.FloatField(new Rect(x, rect.y, 40f, rect.height), wp.hold));
+            x += 44f;
+
+            GUI.Label(new Rect(x, rect.y, 24f, rect.height),
+                new GUIContent("震", VNCamShakeUi.Tooltip), EditorStyles.miniLabel);
+            x += 24f;
+            wp.shake = VNCamShakeUi.Draw(new Rect(x, rect.y, 118f, rect.height), wp.shake);
 
             return EditorGUI.EndChangeCheck();
         }
@@ -1704,6 +1738,14 @@ namespace VNEffects.EditorTools
         {
             switch (kind)
             {
+                case VNCamPointKind.Stay:
+                    // 沿用上一个点，没有可编辑的目标——写句人话比留个空框强
+                    GUI.Label(rect, new GUIContent("沿用上一个点（位置与 zoom 都不变）",
+                        "原地：镜头一动不动，专门用来在序列中间插一段震动或停顿。\n" +
+                        "时长写 0 就是完全静止；不能当第一个路径点（没有上一个点可沿用）。"),
+                        EditorStyles.miniLabel);
+                    break;
+
                 case VNCamPointKind.Anchor:
                 {
                     int at = Mathf.Max(0,
@@ -1759,7 +1801,7 @@ namespace VNEffects.EditorTools
             return picked <= 0 ? "" : options[picked - 1];
         }
 
-        static readonly string[] CamPointKindNames = { "锚点", "角色", "坐标" };
+        static readonly string[] CamPointKindNames = { "锚点", "角色", "坐标", "原地" };
 
         static readonly string[] CamAnchorDisplayNames =
         {
@@ -2405,10 +2447,33 @@ namespace VNEffects.EditorTools
                 case VNParamSource.EventId: return _ctx.eventIds;
                 case VNParamSource.QuestId: return _ctx.questIds;
                 case VNParamSource.WeatherId: return _ctx.weatherIds;
+                case VNParamSource.UiSkinId: return UiSkinOptions(r.Get(p.dependsOn));
                 case VNParamSource.Label: return LabelAddressOptions();
                 case VNParamSource.Flag: return _flags.ToArray();
                 default: return null; // Text / Number → 文本框
             }
+        }
+
+        /// <summary>
+        /// ui 命令第二参数的候选。kind=name 时列的是**内置名字样式预设**
+        /// （不在 VNGameConfig 登记，与 dialogue/choice 的皮肤 id 是两套东西）。
+        /// </summary>
+        string[] UiSkinOptions(string kind)
+        {
+            var options = new List<string> { "default" };
+            if (kind == "name")
+            {
+                foreach (var a in VNNameplateStyle.Aliases) options.Add(a.name);
+            }
+            else if (kind == "choice")
+            {
+                options.AddRange(_ctx.choiceSkinIds);
+            }
+            else
+            {
+                options.AddRange(_ctx.dialogueSkinIds);
+            }
+            return options.ToArray();
         }
 
         string[] LabelAddressOptions()

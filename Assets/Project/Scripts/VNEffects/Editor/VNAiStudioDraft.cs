@@ -104,6 +104,18 @@ namespace VNEffectsEditor
 
         static readonly Color DirtyColor = new Color(1f, 0.85f, 0.4f);
 
+        /// <summary>
+        /// 绕过 SerializedObject **直接改了草稿字段**之后调一次（工具栏的供应商/模型下拉就是）。
+        /// 不调的话左栏还画着旧值、● 标记也不会亮——diff 是靠 RecomputeDiff 算出来的，
+        /// 不会自己发现有人动了对象。
+        /// </summary>
+        public void NotifyExternalEdit()
+        {
+            if (!IsValid) return;
+            _so.Update();
+            RecomputeDiff();
+        }
+
         // ──────────────── 写回 / 还原 ────────────────
 
         /// <summary>草稿写回磁盘资产（带 Undo，Ctrl+Z 能撤销）。</summary>

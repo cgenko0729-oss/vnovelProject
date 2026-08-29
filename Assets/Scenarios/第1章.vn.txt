@@ -25,8 +25,11 @@ letterbox off time:1.2
 bg 教室 transition:Eyelid
 bg 教室_黄昏 transition:WhiteFlash
 mood Neutral
+bg scroll
+bgscroll on speed:70 dir:left mode:mirror
 fx godrays on
 fx clouds on
+ui dialogue 黑渐变
 bgm play 日常 fade:2
 
 : 四月。樱花落尽的第二周，我升上了高二。
@@ -44,11 +47,13 @@ se se1
 # 于是"镜头猛地推过去"和"人出现"是同时发生的。
 camera snapzoom 1.12 @
 show 星野结衣 at:center expr:默认 with:StepIn
+camseq
+> left 1.3 0
+> right 1.3 2 ease:InOutSine shake:medium
+> -690,145 1 0.8 ease:OutSine
 hide 星野结衣 with:RunOut
-show 星野结衣 at:center expr:默认 with:WalkIn
-hide 星野结衣 with:Sink
-show 星野结衣2 at:center with:Crossfade
-mark 星野结衣 exclaim @ # 漫符：惊！弹一下就消失
+show 星野结衣 at:left expr:默认 with:WalkIn
+mark 星野结衣 heart @ # 漫符：惊！弹一下就消失
 
 se se1
 fx speedlines burst
@@ -63,15 +68,19 @@ fx speedlines burst
 camseq start:fade end:fade @
 > 星野结衣:head 1.6 0
 > 星野结衣:waist 1.6 1.4
-> middle 1.0 1.0
+> stay 3 shake:heavy
+> 0,0 1.4 0.8
 
 
+voice 结衣_L073
 星野结衣 默认: 唔——哪个是我的座位来着……
 wait 0.5
 mark 星野结衣 sweat @ # 冒冷汗（一次性）
 # 她走到我旁边：move 是"滑步换位"，配 @ 可边走边说
 move 星野结衣 left 0.9 @
+voice 结衣_L078
 星野结衣 默认: 啊，找到了。窗边诶，赚到。
+mark 星野结衣 question @ # 冒冷汗（一次性）
 
 camera reset @
 : （……等等。）
@@ -83,7 +92,9 @@ camera reset @
 #   而 `星野结衣 惊讶: 台词` 里的"惊讶"是**角色资产里的表情名**（中文，可自定义）。
 #   两者是不同的东西，别混用——写成 `emote 星野结衣 惊讶` 会报错。
 emote 星野结衣 Surprise
+voice 结衣_L090
 星野结衣 惊讶: 诶，你就是坐我旁边的人？
+voice 结衣_L091
 星野结衣 微笑: 我叫星野结衣。一年请多指教啦！
 
 # ---------- 第一个选择：定下男主的"性格底色" ----------
@@ -98,11 +109,13 @@ choice
 label 反应_点头
 emote 星野结衣 Nod
 : （喉咙像被堵住了。我只能拼命点头。）
+voice 结衣_L105
 星野结衣 坏笑: 哈哈，你好紧张诶。放轻松啦，我又不咬人。
 jump 反应汇合
 
 label 反应_正常
 我: ……我叫佐野。请、请多指教。
+voice 结衣_L110
 星野结衣 微笑: 佐野同学是吧，记住了！
 : （只是报了个名字，手心却全是汗。）
 jump 反应汇合
@@ -111,8 +124,13 @@ label 反应_装死
 # 装死路线加"宅度"：把书举高本身就是宅的自我防卫
 stat 宅度 +5
 emote 星野结衣 HeadShake
+ui name 双描边
+volume bgm 0.07
+volume se 0.9
 : （我把书举高，挡住了脸。）
+voice 结衣_L119
 星野结衣 默认: ……喂—— 我在跟你说话诶？
+voice 结衣_L120
 星野结衣 坏笑: 算了，你这种人我见多了。慢慢来吧～
 jump 反应汇合
 
@@ -134,6 +152,7 @@ bgm play 青春 fade:2
 # fx dof：伪景深，背景糊掉、立绘"浮"出来——特写对话的标配
 fx dof on
 camera pushin 1.06 5 focus:星野结衣 @
+voice 结衣_L141
 星野结衣 默认: 佐野同学，你一直在看什么书啊？
 
 choice
@@ -165,6 +184,7 @@ camera reset @
 
 # ---------- 名场面：CG + 心跳 + 樱吹雪 ----------
 wait 0.4
+voice 结衣_L172
 星野结衣 微笑: 一起走到校门口吧？反正顺路。
 : （——顺路？她家在哪我都不知道。）
 : （但我还是点了头。）
@@ -173,6 +193,7 @@ cg CG_初次并肩 transition:WhiteFlash
 fx heartbeat on
 : 并肩走在洒满夕阳的走廊上。
 : （我和她之间隔着半米。这半米，好像有一整个宇宙那么宽。）
+voice 结衣_L180
 星野结衣 微笑: 明天见啦，佐野同学！
 fx heartbeat off
 cg off transition:NoiseDissolve
@@ -201,6 +222,65 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

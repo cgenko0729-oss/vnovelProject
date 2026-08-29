@@ -24,8 +24,11 @@ event aitalk vs:星野结衣 turns:8 topic:恋爱话题 place:放学后的空教
 跑之前要做两件事（各一次）：
 
 1. **装模块**：Tools → VN Effects → Install AI Talk Module To Scene，然后 Ctrl+S 存场景
-2. **配 Key**：环境变量 `GEMINI_API_KEY`，或项目根放 `GeminiAiApiKey.txt`
-   （用 Tools → VN Effects → AI → Show Key Status 确认读到了）
+2. **配 Key**：按当前用的那家配（用 Tools → VN Effects → AI → Show Key Status 确认读到了）
+   - DeepSeek（**默认**）：环境变量 `DEEPSEEK_API_KEY`，或项目根放 `DeepSeekAiApiKey.txt`
+   - Gemini：环境变量 `GEMINI_API_KEY`，或项目根放 `GeminiAiApiKey.txt`
+
+> 换供应商 = 改 `VNGameConfig` 的「AI 默认供应商」一处，详见 **十七、两家供应商**。
 
 ---
 
@@ -46,7 +49,7 @@ event aitalk vs:星野结衣 turns:8 topic:恋爱话题 place:放学后的空教
 
 ### 关键认知：API 是无状态的
 
-Gemini 服务器**不记得**你上一轮说了什么。所谓「她记得你三轮前提过猫」，
+两家的服务器都**不记得**你上一轮说了什么。所谓「她记得你三轮前提过猫」，
 实际是我们**每一轮都把整段对话重新发过去一遍**。
 
 这解释了几乎所有性价比问题：
@@ -196,7 +199,9 @@ event aitalk vs:星野结衣 memory:她昨天在走廊上哭过，但没说原�
 
 ## 五、输出：AI 必须返回的六个字段
 
-模型被 JSON Schema 强制返回这六项，一个都不能少：
+模型必须返回这六项，一个都不能少。
+**Gemini 是 JSON Schema 服务端强制；DeepSeek 只能靠提示词约束**（软的，见第十七节），
+所以下面「越界了怎么办」那一列在 DeepSeek 上会真的用上。
 
 | 字段 | 类型 | 驱动什么 | 越界了怎么办 |
 |---|---|---|---|
@@ -217,7 +222,8 @@ VNCharacterDef.expressions → ["默认","微笑","害羞","惊讶","生气","�
                 模型物理上不可能输出这七个之外的值
 ```
 
-所以换个角色自动适配，加一个表情立刻可用，**永远不会出现「AI 编了个不存在的表情名」**。
+所以换个角色自动适配，加一个表情立刻可用，在 Gemini 上**永远不会出现「AI 编了个不存在的表情名」**。
+（DeepSeek 没有 enum 硬约束，编得出来——所以才有下面那道代码校验，见第十七节。）
 
 `mark` 同理，外加一个固定的 `none`（必须给它一个「这轮不出符号」的合法选项，
 否则它每轮都会硬塞一个）。
@@ -251,9 +257,10 @@ VNCharacterDef.expressions → ["默认","微笑","害羞","惊讶","生气","�
 | `historyTurns` | 聊久了她忘事 / 想省钱 | 见第三节。**和剧本的 `turns:` 配套调** |
 | `optionTones` | 想换选择维度 | 见第八节。改这里等于改整个玩法的选择轴 |
 | `temperature` | 回答太套路 / 太跳脱 | 0.9 稳、1.0~1.2 活泼、>1.3 开始失控。辣妹用 1.15 |
-| `model` | 质量不够 / 太贵 | 留空 = `gemini-3.5-flash-lite` |
+| `provider` | 想换供应商 | 「跟随全局」= 用 `VNGameConfig` 里设的那家。见第十七节 |
+| `model` | 质量不够 / 太贵 | 留空 = 当前供应商的默认模型（DeepSeek `deepseek-v4-flash` / Gemini `gemini-3.5-flash-lite`） |
 | `maxOutputTokens` | 日志出现「输出超长被截断」 | 512 够用；调大要连带看成本 |
-| `safety` | 暧昧台词被拦 | `BlockOnlyHigh` 抬高阈值，**不是关掉审核** |
+| `safety` | 暧昧台词被拦 | `BlockOnlyHigh` 抬高阈值，**不是关掉审核**。**DeepSeek 没有这个参数**，调了没用 |
 | `allowedEmotions` | AI 选了会穿帮的表情 | 留空 = 全部。只在素材构图不统一时才列白名单 |
 | `fallbackLines` | 断网时说什么 | 断网/被拦/解析失败都用这个，随机挑一句 |
 
@@ -705,3 +712,89 @@ Ctrl+Z 能撤销），不满意点「还原」。
 - **没有演出预览**：立绘表情、漫符、打字机都看不到，纯文本。表情穿帮要实际跑剧本才发现
 - **域重载会打断在飞的请求**（改代码 / 进 Play Mode）。对话历史会自动重建，
   提示「已中断」，重跑一轮即可
+
+---
+
+## 十七、两家供应商：Gemini ⇄ DeepSeek
+
+（2026-08-17 加。**默认已换成 DeepSeek `deepseek-v4-flash`**。）
+
+### 怎么切
+
+三层，越下面越优先：
+
+| 层 | 在哪 | 用途 |
+|---|---|---|
+| **全局默认** | `VNGameConfig` →「AI 默认供应商 / 默认模型」 | **一处改，全部人格跟着换**。日常换家改这里 |
+| **人格资产** | `VNAiPersonaDef` →「供应商 / 模型名」 | 默认是「跟随全局」。某个角色要单独用贵模型时才填 |
+| **试聊台** | 顶栏的供应商 + 模型两个格子 | 改的是**草稿**，同一句话用两家各跑一遍对比效果和成本，不写回资产就不影响游戏 |
+
+模型名留空 = 那家的默认模型（Gemini `gemini-3.5-flash-lite` / DeepSeek `deepseek-v4-flash`）。
+**填错家的模型名会 400**，人格资产的自检（Validate）会先拦下来。
+试聊台切供应商时会自动清掉不属于新那家的模型名。
+
+自检：**Tools → VN Effects → AI → Test Connection · Gemini / · DeepSeek**
+分别验两家的 key 与网络；`Show Key Status` 一次列出两家 key 找没找到。
+
+### 两家的差异（会影响你怎么调参）
+
+| | Gemini | DeepSeek |
+|---|---|---|
+| 端点 / 鉴权 | `generativelanguage…:generateContent`，`x-goog-api-key` 头 | `api.deepseek.com/chat/completions`，`Authorization: Bearer` |
+| 角色名 | `user` / `model` + 独立 `systemInstruction` | `system` / `user` / `assistant`（system 是 messages 第一条） |
+| **结构化输出** | `responseSchema`：enum、条数都是**服务端硬约束** | 只有 `json_object` 模式，**没有硬约束** |
+| 内容安全 | `safetySettings` 可放宽到 BLOCK_ONLY_HIGH | **没有这个参数**，人格资产的 `safety` 对它无效 |
+| 思考 | `thinkingLevel` 四档 | 开关 + `reasoning_effort` 三档（映射：Minimal→关，Low→low，Medium→high，High→max） |
+| 计费 | 全天同价 | 分**缓存命中/未命中**、分**高峰/非高峰**（高峰翻倍） |
+
+### ⚠ 最重要的一条：DeepSeek 的格式约束是「软」的
+
+Gemini 那边 `emotion` 是 enum，模型**物理上编不出**不存在的表情名，
+`options` 也必然正好 N 条。DeepSeek 只能靠提示词说，所以：
+
+- system prompt 末尾会**多出一段「输出格式」**（键名、类型、带 tone 的示例 JSON）。
+  在试聊台右栏看得到——切到 Gemini 它就消失了，那是正常的
+- 兜底靠 `VNAiConversation.TryParseTurn`：表情越界降级成第一个合法表情、
+  选项不足自动补齐、好感强制 Clamp。**演出会打折，但不会崩**
+- 排错顺序：右栏「原始 JSON」看模型实际返回了什么 → 是漏字段还是编了个新表情
+
+#### 已修复的一个必现坑：第 2 轮起「回复正文为空」
+
+`json_object` 模式下，如果历史里 **assistant 的消息是纯文本**，模型会照着
+「我上一条说的是纯文本」继续，可 JSON 模式又只准它出 JSON —— 于是退化成
+**吐一串空白字符**（`finish_reason=stop`，content 是 20 个空格）。
+第 1 轮没有 assistant 历史所以正常，**第 2 轮起必挂**，
+表现出来却像是「时好时坏的失败」。
+
+对照实验（deepseek-v4-flash，2026-08-17）：
+
+| 历史里的助手消息 | 思考 | 结果 |
+|---|---|---|
+| 纯文本 | 开 / 关 | ❌ 两次都返回 20 个空格 |
+| 完整 JSON | 开 / 关 | ✅ 两次都正常 |
+| 只包 `{"reply":"…"}` | 开 / 关 | ✅ 三次都正常 |
+
+**和 `thinking` 无关**。修法取最省 token 的那个：
+`VNAiConversation.AppendHistory()` 在没有硬 schema 的家上，把历史里她说过的话
+包成 `{"reply":"…"}` 再发（每条多约 12 token）。`_history` 本身仍只存纯台词——
+收场总结要把对话拍平成记录、试聊台域重载要靠 reply 重建历史，共用同一份数据。
+
+### 价格对比（每百万 token，2026-08）
+
+| 模型 | 输入 | 输出 | 缓存命中输入 |
+|---|---|---|---|
+| Gemini 3.5 Flash Lite | $0.30 | $2.50 | —— |
+| **DeepSeek V4 Flash（默认）** | **$0.22** | **$0.66** | **$0.007** |
+| DeepSeek V4 Pro | $0.66 | $1.98 | $0.022 |
+
+DeepSeek 标的是**非高峰价**，高峰时段（UTC 01–04、06–10）翻倍——
+`VNAiPricingDef` 的 `peakMultiplier` 与「高峰时段」列表就是干这个的，
+官方改时段时改资产即可，不用动代码。
+
+**缓存命中价便宜约 30 倍**，而我们每轮都重发整段 system prompt + 历史，
+正好是命中率最高的场景。日志的「开销」表里会单列一行命中率：
+命中率低说明 system prompt 或历史前缀一直在变（比如每轮都改情境参数）。
+
+> 换家之后旧日志照样能看：日志里存了模型名与供应商，
+> Cost Report 的「按当前单价重算」会用对应那家的单价，
+> 高峰倍率按**那场对话当时**的时间判，同一份日志今天看和明天看是同一个数字。

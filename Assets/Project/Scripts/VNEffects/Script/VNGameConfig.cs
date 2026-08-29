@@ -70,6 +70,11 @@ namespace VNEffects
         {
             _active = null;
             _lookedUp = false;
+            // AI 那两处也各缓存了一份从 config 里读出来的东西（默认供应商 / 单价表）。
+            // 不一起清的话，在 Inspector 里把供应商从 Gemini 改成 DeepSeek 之后
+            // 还会继续发给 Gemini，直到下次域重载——这种「改了没反应」最难查。
+            VNAiProviders.Invalidate();
+            VNAiPricing.Invalidate();
         }
 
         // ==============================================================
@@ -193,6 +198,14 @@ namespace VNEffects
         [Header("AI 自由聊天人格（event aitalk persona: 引用）\n" +
                 "留空 = 生成器扫全工程 VNAiPersonaDef 自动登记")]
         public List<VNAiPersonaDef> aiPersonas = new List<VNAiPersonaDef>();
+
+        [Header("AI 默认供应商。人格资产的「供应商」选「跟随全局」时用这个\n" +
+                "→ 一处改，全部人格跟着换（Gemini ⇄ DeepSeek）")]
+        public VNAiProvider aiProvider = VNAiProvider.DeepSeek;
+
+        [Header("默认模型名。留空 = 该供应商的默认模型\n" +
+                "Gemini：gemini-3.5-flash-lite　DeepSeek：deepseek-v4-flash / deepseek-v4-pro")]
+        public string aiModel;
 
         [Header("AI 模型单价表（算成本用）。留空 = 用内置默认表\n" +
                 "换了模型却不改这里的话，日志里的成本数字会静默偏低")]

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text;
 
 namespace VNEffects.EditorTools
@@ -625,6 +625,14 @@ namespace VNEffects.EditorTools
                                 Err(i, $"{r.keyword}: unknown weather \"{v}\" " +
                                        "(not a builtin leaf type, a VNWeatherDef id, or a VNWeather value)");
                             break;
+                        case VNParamSource.UiSkinId:
+                            // 只校验 kind=name：名字样式是内置预设，拼错必然静默无效果。
+                            // dialogue/choice 的皮肤 id 交给 Lint——那些可以「先写剧本、稍后登记」，
+                            // 编辑期就报错会一直红着，反而变成噪音
+                            if (r.Get(p.dependsOn) == "name" && v != "default" &&
+                                !VNNameplateStyle.TryParseId(v, out _))
+                                Err(i, $"{r.keyword} name: unknown nameplate style \"{v}\"");
+                            break;
                     }
                 }
 
@@ -697,6 +705,16 @@ namespace VNEffects.EditorTools
                             Warn(i, "camseq has no \"> waypoint\" lines");
                         else
                         {
+                            // stay 沿用「上一个点」——当第一行就没得沿用，运行时会跳过它
+                            var firstWp = r.camLines[0].TrimStart();
+                            if (firstWp.StartsWith(">"))
+                            {
+                                var firstTok = firstWp.Substring(1).Trim().Split(
+                                    new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+                                if (firstTok.Length > 0 && VNCamWaypointDef.IsStay(firstTok[0]))
+                                    Err(i, "the first waypoint cannot be \"stay\" " +
+                                           "(there is no previous point to reuse)");
+                            }
                             foreach (var l in r.camLines)
                             {
                                 foreach (var tok in l.Substring(1).Split(new[] { ' ', '\t' },
@@ -708,7 +726,8 @@ namespace VNEffects.EditorTools
                                 // 这里提前点名，免得写错了还以为编辑器坏了
                                 if (!VNCamWaypoint.TryParse(l, out _))
                                     Warn(i, $"waypoint \"{l.Trim()}\" is not recognized " +
-                                            "(> point [zoom] [sec] [ease:Name] [xfade:sec]); " +
+                                            "(> point|stay [zoom] [sec] [ease:Name] [xfade:sec] " +
+                                            "[hold:sec] [shake:level|strength,sec]); " +
                                             "the scenario editor will keep it as raw text");
                             }
                             if (r.Get("start") == "cut" && !FirstWaypointIsCut(r))
@@ -859,6 +878,8 @@ namespace VNEffects.EditorTools
         public string[] eventIds = System.Array.Empty<string>();
         public string[] questIds = System.Array.Empty<string>();
         public string[] weatherIds = System.Array.Empty<string>();
+        public string[] dialogueSkinIds = System.Array.Empty<string>();
+        public string[] choiceSkinIds = System.Array.Empty<string>();
         public readonly Dictionary<string, string[]> scenarioLabels =
             new Dictionary<string, string[]>();
         public readonly Dictionary<string, string> scenarioPaths =

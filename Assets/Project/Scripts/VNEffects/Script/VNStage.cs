@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -82,6 +82,8 @@ namespace VNEffects
         public VNRetroFilter retroFilter;
         [Header("背景 Ken Burns 漂移")]
         public VNKenBurns kenBurns;
+        [Header("背景无限滚动")]
+        public VNBackgroundScroll bgScroll;
         [Header("电影黑边")]
         public VNLetterbox letterbox;
         [Header("夜晚流星")]
@@ -229,6 +231,9 @@ namespace VNEffects
                 kenBurns = backgroundImage.gameObject.AddComponent<VNKenBurns>();
             // Ken Burns 默认开启：种入 fx 状态表，存档才能正确记录"仍开着"
             _fxStates["kenburns"] = kenBurns != null && kenBurns.playOnAwake;
+            if (bgScroll == null) bgScroll = FindFirstObjectByType<VNBackgroundScroll>();
+            if (bgScroll == null && backgroundImage != null) // 旧场景自愈：自动补挂
+                bgScroll = backgroundImage.gameObject.AddComponent<VNBackgroundScroll>();
         }
 
         // ------------------------------------------------------------------
@@ -653,6 +658,8 @@ namespace VNEffects
         public string CurrentDialogueSkinId { get; private set; }
         /// <summary>当前选项面板皮肤 id（null = 程序化默认，进存档快照）</summary>
         public string CurrentChoiceSkinId { get; private set; }
+        /// <summary>当前名字样式名（null = 出厂样式，进存档快照）</summary>
+        public string CurrentNameplateStyleId { get; private set; }
 
         /// <summary>
         /// 剧本 ui 命令入口：ui dialogue|choice &lt;id|default&gt;。
@@ -704,9 +711,31 @@ namespace VNEffects
                     CurrentChoiceSkinId = toDefault ? null : id;
                     break;
                 }
+                case "name":
+                {
+                    // ui name <样式|default>：名字（说话人）的装饰样式。
+                    // 与 dialogue/choice 不同——这里的 id 不是 VNGameConfig 里登记的 prefab，
+                    // 而是 VNNameplateStyle 的内置预设名（中英双写，见 Aliases）。
+                    var styleId = VNNameplateStyleId.Bold; // default = 出厂样式
+                    if (!toDefault && !VNNameplateStyle.TryParseId(id, out styleId))
+                    {
+                        var names = new System.Text.StringBuilder();
+                        foreach (var a in VNNameplateStyle.Aliases)
+                        {
+                            if (names.Length > 0) names.Append(' ');
+                            names.Append(a.name);
+                        }
+                        Debug.LogError($"[VNScript] 第 {line} 行：名字样式「{id}」不认识。" +
+                                       $"可用：{names} default");
+                        return;
+                    }
+                    dialogue?.SetNameplateStyle(styleId);
+                    CurrentNameplateStyleId = toDefault ? null : VNNameplateStyle.NameOf(styleId);
+                    break;
+                }
                 default:
                     Debug.LogWarning($"[VNScript] 第 {line} 行：ui 命令用法为" +
-                                     "「ui dialogue|choice <皮肤id|default>」");
+                                     "「ui dialogue|choice|name <id|default>」");
                     break;
             }
         }
@@ -728,6 +757,13 @@ namespace VNEffects
             data.weatherSize = _weatherSize;
             data.weatherWindSet = _weatherWindSet;
             data.weatherWind = _weatherWind;
+            if (bgScroll != null)
+            {
+                data.scrollOn = bgScroll.IsScrolling;
+                data.scrollSpeed = bgScroll.Speed;
+                data.scrollDir = bgScroll.DirectionDeg;
+                data.scrollMode = bgScroll.Mode.ToString();
+            }
             data.mood = mood != null ? mood.Current.ToString() : null;
             data.bgm = vnAudio != null ? vnAudio.CurrentBgm : null;
             data.bgmVol = vnAudio != null ? vnAudio.CurrentBgmVol : 1f;
@@ -737,6 +773,7 @@ namespace VNEffects
             data.cgKeepFx = _cgKeepFx;
             data.dialogueSkin = CurrentDialogueSkinId;
             data.choiceSkin = CurrentChoiceSkinId;
+            data.nameplateStyle = CurrentNameplateStyleId;
 
             CaptureLiquid(data);
 
@@ -781,6 +818,9 @@ namespace VNEffects
             if (data.choiceSkin != CurrentChoiceSkinId)
                 SetUiSkin("choice", string.IsNullOrEmpty(data.choiceSkin)
                     ? "default" : data.choiceSkin);
+            if (data.nameplateStyle != CurrentNameplateStyleId)
+                SetUiSkin("name", string.IsNullOrEmpty(data.nameplateStyle)
+                    ? "default" : data.nameplateStyle);
 
             if (!string.IsNullOrEmpty(data.backgroundId))
                 SetBackground(data.backgroundId, null);
@@ -795,6 +835,13 @@ namespace VNEffects
             SetWeather(data.weather, data.weatherDensity, data.weatherWind,
                 data.weatherWindSet, data.weatherSpeed, data.weatherSize,
                 instant ? 0.01f : 0.1f);
+            // 背景滚动：读档直接就位，不缓入（缓入会让读档后画面先"起步"一下）
+            if (bgScroll != null)
+                bgScroll.RestoreState(data.scrollOn,
+                    data.scrollSpeed > 0f ? data.scrollSpeed : VNBackgroundScroll.DefaultSpeed,
+                    data.scrollDir,
+                    VNScriptParser.ParseEnum(data.scrollMode, VNScrollMode.Mirror, 0));
+
             var restoredMood = VNScriptParser.ParseEnum(data.mood, VNMood.Neutral, 0);
             if (mood != null)
                 mood.SetMood(restoredMood, instant ? 0.01f : 0.3f);
@@ -1026,6 +1073,23 @@ namespace VNEffects
         {
             if (backgroundImage != null) backgroundImage.sprite = sprite;
             if (toneMatch != null && sprite != null) toneMatch.MatchTo(sprite);
+            // 换图不停滚动（还在车上就该继续滚），但偏移归零：
+            // 新图从头开始流，不会莫名其妙从半张图的位置接上
+            if (bgScroll != null) bgScroll.ResetOffset();
+        }
+
+        /// <summary>bgscroll 命令入口。on = false 时其余参数忽略（只管缓停）</summary>
+        public void SetBackgroundScroll(bool on, float? speed, float? dirDeg,
+            VNScrollMode? mode, float? fade, int line = 0)
+        {
+            if (bgScroll == null)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：场景里没有背景滚动组件" +
+                                 "（VNBackgroundScroll），bgscroll 无效果");
+                return;
+            }
+            if (on) bgScroll.StartScroll(speed, dirDeg, mode, fade);
+            else bgScroll.StopScroll(fade);
         }
 
         // ------------------------------------------------------------------

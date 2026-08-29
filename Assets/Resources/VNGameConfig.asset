@@ -32,6 +32,12 @@ MonoBehaviour:
     prefab: {fileID: 6093085639625304626, guid: f62a4121092f2704ea1e857dd47c889d, type: 3}
   - id: "\u9876\u90E8"
     prefab: {fileID: 8003070586189573604, guid: 2cd67e7c06fd8284eab7e9e2eadce8f8, type: 3}
+  - id: "\u767D\u6E10\u53D8"
+    prefab: {fileID: 873785519168665426, guid: 3b40112d6d97ab747894862431beddb3, type: 3}
+  - id: "\u7C89\u6E10\u53D8"
+    prefab: {fileID: 277913123748257913, guid: 719a2af2c35255842a5b4ae404e7cd24, type: 3}
+  - id: "\u9ED1\u6E10\u53D8"
+    prefab: {fileID: 3621501975627951096, guid: f93263fd83e7021479a162ee05f7cb8a, type: 3}
   choiceSkins:
   - id: "\u7ECF\u5178"
     prefab: {fileID: 2849680794329722818, guid: 83d52225b861bd94f9c227eb488019c3, type: 3}
@@ -89,6 +95,9 @@ MonoBehaviour:
   - id: "CG_\u7ED3\u5C40_\u604B\u4EBA"
     sprite: {fileID: 21300000, guid: 01d81aec1362f044f9e618dfe32de960, type: 3}
     group: 
+  - id: CG_test
+    sprite: {fileID: 21300000, guid: 01d81aec1362f044f9e618dfe32de960, type: 3}
+    group: 
   weatherDefs: []
   bgmLibrary:
   - id: "\u65E5\u5E38"
@@ -119,7 +128,40 @@ MonoBehaviour:
   - id: se1
     clip: {fileID: 8300000, guid: 5a5e611553e163c4da7f6b8b945722e4, type: 3}
     volume: 1
-  voiceLibrary: []
+  voiceLibrary:
+  - id: "\u7ED3\u8863_L073"
+    clip: {fileID: 8300000, guid: 9d31d85a2e091804395d210be0fbd49f, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L078"
+    clip: {fileID: 8300000, guid: 658179d1107dea84ea2ae6ecf7d41d4b, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L090"
+    clip: {fileID: 8300000, guid: 343a712235b72c24ba45fe2624d16701, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L091"
+    clip: {fileID: 8300000, guid: 6ae0462ab1193944c903e861d37a039b, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L105"
+    clip: {fileID: 8300000, guid: 7f64a4aa1bc459347a1a31da6d236c2e, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L110"
+    clip: {fileID: 8300000, guid: 12f1a5c8f6fea9c48bbe1f520b77565b, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L119"
+    clip: {fileID: 8300000, guid: 2e543666e9405a34aa2e3341dc4e6d0d, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L120"
+    clip: {fileID: 8300000, guid: eb194ac9b991d0d49867d5125f6d9cd5, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L141"
+    clip: {fileID: 8300000, guid: 84ab2a8b66650a04bbe8f5b9de44ff01, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L172"
+    clip: {fileID: 8300000, guid: c7a9b8f26cf02a6469f2c7a876bc6da9, type: 3}
+    volume: 1
+  - id: "\u7ED3\u8863_L180"
+    clip: {fileID: 8300000, guid: 7386d1e742b11d743a9bcea879abe308, type: 3}
+    volume: 1
   typingTick: {fileID: 0}
   overrideChannelVolumes: 0
   bgmVolume: 0.75
@@ -144,3 +186,43 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3ff1279f32fd18946832bf209e25e71b, type: 2}
   quizzes:
   - {fileID: 11400000, guid: 6771f02b60c0ce148b69582a7d9a30d0, type: 2}
+  badmintons:
+  - {fileID: 11400000, guid: 3ec7e3a806c30dd47a1178c9d6372f9b, type: 2}
+  - {fileID: 11400000, guid: 545268dfbe5cf4a4592502f2a7768881, type: 2}
+  - {fileID: 11400000, guid: 98759b40365f90241bd0b82b0dfce2a0, type: 2}
+  aiPersonas:
+  - {fileID: 11400000, guid: 7cd44f387a86f87488b978bc5e9a67f5, type: 2}
+  aiProvider: 1
+  aiModel: 
+  aiPricing: {fileID: 0}
+  photoFrames:
+  - {fileID: 11400000, guid: e367323284fe56f4b977e1f09582b329, type: 2}
+  - {fileID: 11400000, guid: 5dc2122dddeb0354db571f847e53d0eb, type: 2}
+  - {fileID: 11400000, guid: c2a497dd7080113408d5ab0dadaf5929, type: 2}
+  - {fileID: 11400000, guid: 6eabf52b82660794ca559566f88e901f, type: 2}
+  - {fileID: 11400000, guid: 1fad2df8aff5cf74f90f7e28dfb9decb, type: 2}
+  photoStickers:
+  - {fileID: 11400000, guid: 97bba8fbd0e4b5f4a8a82dc0a506e891, type: 2}
+  - {fileID: 11400000, guid: 83ac0b52dd8814d4bb1fec53b61ec1b7, type: 2}
+  - {fileID: 11400000, guid: 657c0a87f3c4f8742ae6a2d714c274d5, type: 2}
+  - {fileID: 11400000, guid: 0572638956839dc4ebefc46ac5604a4a, type: 2}
+  - {fileID: 11400000, guid: 58bf1642f2da1ff409d2be7d5070e455, type: 2}
+  - {fileID: 11400000, guid: b9d29c5a75342ad4597acf07a73ab856, type: 2}
+  - {fileID: 11400000, guid: 9f408c017f625dc478c739df1c4f7724, type: 2}
+  - {fileID: 11400000, guid: f2bb2b03c16fda8429b84c6a1ff403ec, type: 2}
+  - {fileID: 11400000, guid: 98915aa9142eb4043bacb46ca3f1cbc4, type: 2}
+  - {fileID: 11400000, guid: 3c6ac50d2bc994a4fa724b2f6eb9b22c, type: 2}
+  photoBackdrops:
+  - {fileID: 11400000, guid: 749c74a108b868e44a939a10d36f05c9, type: 2}
+  - {fileID: 11400000, guid: fbc62f5b678d8b047b200d66f82f05cf, type: 2}
+  - {fileID: 11400000, guid: e8f63d8f5908f1a49a4f5f589e561a18, type: 2}
+  - {fileID: 11400000, guid: 0662be458c45a964e9e177ba29c8f729, type: 2}
+  - {fileID: 11400000, guid: 13d3da3450d556e4fb4e951aaa1982e8, type: 2}
+  - {fileID: 11400000, guid: 8263d8ac082583f438614032ecf938be, type: 2}
+  - {fileID: 11400000, guid: 047e8b157fdc8b84e8872e887d968d3c, type: 2}
+  - {fileID: 11400000, guid: 93fc4a46e31cfa944b4e25e9329e5dbb, type: 2}
+  photoThemes:
+  - {fileID: 11400000, guid: fe4a663e07630f24ab018c23c6ddaa5a, type: 2}
+  - {fileID: 11400000, guid: 75ad181cd536a554bbafb46171535524, type: 2}
+  - {fileID: 11400000, guid: 54a552009c7e46e47a702fb2b9f40dac, type: 2}
+  photoMeCharacterId: 

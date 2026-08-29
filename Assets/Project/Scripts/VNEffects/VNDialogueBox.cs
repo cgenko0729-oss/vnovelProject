@@ -36,6 +36,8 @@ namespace VNEffects
 
         [Header("名牌装饰样式（粗黑体+描边+渐变，Plain = 老外观）")]
         public VNNameplateStyleId nameplateStyle = VNNameplateStyleId.Bold;
+        [Header("强制隐藏名牌下划线（不改动预设本身，只在这个对话框上关掉）")]
+        public bool hideNameplateUnderline;
         [Header("名牌宽度随名字长度自适应（仅程序化默认皮肤）")]
         public bool autoResizeNameTag = true;
 
@@ -133,6 +135,17 @@ namespace VNEffects
         /// </summary>
         void BuildDefaultSkin()
         {
+            // 已经有一套就复用，别再造第二套。
+            // 这套 UI 本来只在运行时生成，但只要有谁在编辑期碰了 Build()（工具、反射调用），
+            // 生成物就会变成真实场景物体、跟着场景存盘；下次进 Play 再造一套就会两层叠在一起，
+            // 底下那层是死的、颜色永远停在生成那一刻。认名字捡回来，从根上堵掉这种叠加。
+            var existing = transform.Find("DefaultSkin");
+            if (existing != null && existing.GetComponent<VNDialogueSkin>() != null)
+            {
+                _defaultRoot = existing.gameObject;
+                return;
+            }
+
             _defaultRoot = new GameObject("DefaultSkin", typeof(RectTransform));
             var defaultRect = (RectTransform)_defaultRoot.transform;
             defaultRect.SetParent(transform, false);
@@ -333,7 +346,8 @@ namespace VNEffects
         public void SetSpeakerStyle(VNCharacterDef def)
         {
             Build();
-            if (_speakerDef == def) return;
+            // 不做 def 引用相等就跳过的缓存：编辑期改角色资产的名牌颜色时，
+            // 同一说话人连续说话也要能立刻看到最新配色，不用先切走再切回来。
             _speakerDef = def;
             ApplyNameplateStyle();
         }
@@ -380,7 +394,7 @@ namespace VNEffects
             }
 
             // ---- 底部横线 ----
-            if (_style.showUnderline)
+            if (_style.showUnderline && !hideNameplateUnderline)
             {
                 EnsureUnderline();
                 if (_nameTagUnderline != null)

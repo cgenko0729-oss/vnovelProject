@@ -7040,3 +7040,481 @@ Instantiate(persona) → 内存副本（HideFlags.DontSave）
 - 单价表是**每百万 token 的平铺价**，不支持分档计价（超过 N token 后涨价）
   与缓存命中折扣。当前用量下不值得做。
 - 报表按会话聚合，看不到「哪一轮特别贵」——那个信息在单份日志的逐轮表里。
+
+---
+
+## 一一四、AI 供应商可切换：接入 DeepSeek V4（2026-08-17，分支 `agent/ai-deepseek`）
+
+### 为什么做
+
+只接了 Gemini 一家，换模型要改代码，而且没法对比。DeepSeek V4 Flash 的价格
+（非高峰 $0.22 / $0.66 每百万）比 Gemini 3.7 Flash（$0.75 / $3.75）**输出便宜 5.7 倍**，
+自由聊天这种「每轮都重发整段历史」的用法差价很实在。
+需求是**两家都能用、随时切、切了成本还算得准**。
+
+### 做了什么
+
+**新增供应商抽象层 `VNAiProvider.cs`**
+
+- `VNAiProvider`（Gemini / DeepSeek）+ `VNAiProviderChoice`（多一个「跟随全局」，
+  **默认值 0 就是跟随**，所以存量人格资产一个字都不用改）
+- `VNAiProviders` 集中登记各家的：默认模型、key 的环境变量与文件名、
+  **能力差异**（`SupportsResponseSchema` / `SupportsSafetySettings`）
+- 上层判断能力一律问它，而不是到处写 `if (provider == Gemini)`
+
+**三层切换入口**（越下越优先）
+
+| 层 | 在哪 |
+|---|---|
+| 全局默认 | `VNGameConfig.aiProvider` / `aiModel`（**默认已设为 DeepSeek**）|
+| 人格资产 | `VNAiPersonaDef.provider` / `model`，默认「跟随全局」|
+| 试聊台 | 工具栏两个格子，改的是**草稿**，用于 A/B 对比 |
+
+**`VNAiClient` 拆三份，但「唯一碰 HTTP 的文件」这条不变**
+
+传输、重试、错误分类仍全在 `VNAiClient.Send`；各家只差「拼请求体」和「解响应」，
+拆进 `VNAiClientGemini` / `VNAiClientDeepSeek` 两个**纯静态、不碰网络**的类。
+加第三家就是再加一个文件 + `VNAiProviders` 里加一项。
+
+**`VNAiKey` 改成按供应商各一套**：`DEEPSEEK_API_KEY` / `DeepSeekAiApiKey.txt` 与
+Gemini 那套并存，**分开缓存**——只配了一家时另一家要能正确报「没找到 key」，
+不能因为缓存了一个空值就把两家都判死。
+
+**`VNAiPricing` 支持三个价 + 一个时段倍率**：未命中输入 / 命中缓存输入 / 输出，
+再乘高峰倍率。DeepSeek 高峰（UTC 01–04、06–10）翻倍，时段列表也放进资产。
+
+### 三个关键决策
+
+**1. DeepSeek 没有硬 schema —— 约束从「硬」降级成「软」+ 兜底**
+
+Gemini 的 `responseSchema` 里 `emotion` 是 enum、`options` 有 minItems/maxItems，
+是**服务端强制**的；DeepSeek 只有 `response_format:{"type":"json_object"}`，
+不认 json_schema。做法：
+
+- `VNAiConversation.BuildJsonFormatPrompt()` 把 schema 翻译成一段「输出格式」——
+  键名、类型、**一个把 tone 全填好的示例 JSON**（光用文字描述实测会漏 tone），
+  插在【绝对边界】之前（靠后＝权重高）
+- 真正的保险仍是原有的 `TryParseTurn`：表情越界降级、选项不足补齐、好感 Clamp。
+  以前那套「永远不信任模型输出」的代码是双保险，现在成了**唯一**的那道保险
+
+结论写进指南第十七节：**换到 DeepSeek 之后，演出偶尔打折是设计内的**，
+排错先看试聊台右栏的「原始 JSON」。
+
+**2. 全局默认写成 DeepSeek，靠 Unity 的反序列化行为生效**
+
+`VNGameConfig` 是已存在的资产，YAML 里没有新字段。Unity 反序列化时会先跑字段初始化器
+再覆盖已有字段，所以 `public VNAiProvider aiProvider = VNAiProvider.DeepSeek;`
+对存量资产也生效——不用手点 Inspector 就已经是 DeepSeek。
+
+**3. 缓存缓存缓存：`VNGameConfig.ClearCache()` 里补上两个 Invalidate**
+
+`VNAiProviders`（默认供应商）和 `VNAiPricing`（单价表）都从 config 读并缓存。
+不一起清的话，在 Inspector 里把供应商改成 DeepSeek 之后还会继续发给 Gemini，
+直到下次域重载。**「改了没反应」是这类缓存最典型也最难查的症状**，所以直接挂在
+config 的清缓存入口上。
+
+### 踩到的坑
+
+- **`VNAiClient.DefaultModel` 从 const 变成属性**（要按当前供应商算），
+  于是 `VNAiPersonaDef` 上 `[Header("模型名（留空 = " + VNAiClient.DefaultModel + "）")]`
+  这种**特性里的编译期常量拼接**必须一起改掉，否则编不过。特性参数只能是编译期常量——
+  凡是想把某个值「升级成可配置」，先搜一遍它有没有被写进 Attribute。
+- **单价表的 key 撞车**：`deepseek-v4-flash` 里含 `flash`，会被 Gemini 的
+  flash 档（$0.60/$3.50）抢走。原有的「按 key 最长优先」排序刚好挡住了这一枪——
+  当初为 `flash-lite` 写的那条规则，这次白捡。
+- **第 2 轮起「回复正文为空」——不是偶发，是必现**（上线后当天实测到，已修）：
+  `json_object` 模式下，历史里 assistant 的消息是纯文本时，模型会照着
+  「我上一条说的是纯文本」继续，而 JSON 模式又只准它出 JSON，于是退化成
+  **吐一串空白字符**（`finish_reason=stop`，content = 20 个空格）。
+  第 1 轮没有 assistant 历史所以永远正常，**第 2 轮起必挂**，看起来却像随机失败。
+  用 A/B/C/D 四组对照请求钉死：纯文本历史 2/2 失败、完整 JSON 历史 2/2 成功、
+  **只包 `{"reply":"…"}` 3/3 成功**，且与 `thinking` 开关无关。
+  修法取最省 token 的那个（`VNAiConversation.AppendHistory`，每条历史多约 12 token），
+  `_history` 仍只存纯台词，总结拍平与试聊台重建历史继续共用同一份数据。
+  **教训**：换供应商时「历史消息的格式」和「请求参数」一样是契约的一部分——
+  第一轮能跑通不代表接对了，多轮才是真正的验收点。
+- **思考 token 别算两遍**：DeepSeek 的 `completion_tokens` **已经含**
+  `reasoning_tokens`，而 Gemini 的 `candidatesTokenCount` 不含 `thoughtsTokenCount`。
+  解析时先把 reasoning 从 completion 里减掉，上层「输出+思考」的公式才两家通用。
+
+### 验证
+
+- 用 Unity 的 Roslyn + Bee 的 rsp 离线编译 `Assembly-CSharp` 与
+  `Assembly-CSharp-Editor`，两个都 exit 0、无新增警告
+- 自检菜单拆成 `Test Connection · Gemini` / `· DeepSeek`，`Show Key Status`
+  一次列出两家 key 找没找到
+
+### 改了哪些文件
+
+```
+新增  Script/VNAiProvider.cs           供应商枚举 + 能力/默认值登记
+新增  Script/VNAiClientGemini.cs       Gemini 拼包解包（从 VNAiClient 搬出）
+新增  Script/VNAiClientDeepSeek.cs     DeepSeek 拼包解包
+改    Script/VNAiClient.cs             只剩传输/重试/错误分类 + 按家分派
+改    Script/VNAiKey.cs                按供应商各一套 key，分开缓存
+改    Script/VNAiPricing.cs            缓存命中价 + 高峰倍率 + DeepSeek 两档
+改    Script/VNAiPersonaDef.cs         provider 字段 + 模型/供应商不匹配的自检
+改    Script/VNAiConversation.cs       请求带 provider；没有硬 schema 的家补格式提示词
+改    Script/VNGameConfig.cs           全局默认供应商/模型；ClearCache 连带清 AI 缓存
+改    Script/VNAiTalkLog.cs            日志记供应商与缓存命中数
+改    Editor/VNAiConnectionTester.cs   分家自检 + 两家 key 状态
+改    Editor/VNAiStudioWindow.cs       工具栏供应商/模型下拉（A/B 对比）
+改    Editor/VNAiStudioDraft.cs        NotifyExternalEdit（绕过 SerializedObject 改草稿后刷新 diff）
+改    Editor/VNAiCostReport.cs         重算带缓存命中价与当时的高峰判定
+改    Editor/VNAiTalkInstaller.cs      按人格实际用的那家查 key
+文档  AiTalkGuide.md 第十七节、CLAUDE.md 组件表
+```
+
+---
+
+## 一一五、无框渐变对话框皮肤：白渐变 / 粉渐变 / 黑渐变（2026-08-28，分支 `agent/ai-deepseek`）
+
+### 需求
+
+参考商业 Galgame 的「无框式」对话表现：**没有面板、没有边框、没有圆角**，
+底只有一条从屏幕底部向上淡出的整屏渐变带，台词居中压在画面上。
+用户给了两张参考图（白色通透渐变 / 粉色渐变），过程中追加第三种
+「现在这种黑黑的，但没有金黄边框、也是整屏铺满」。
+
+**经典款（程序化默认）完全不动**，随时 `ui dialogue default` 切回——
+这次是往皮肤库里加三套，不是替换。
+
+### 改了哪些文件
+
+```
+新增  Editor/VNSoftSkinExporter.cs   三套皮肤的一键导出器（贴图/材质/prefab/登记）
+改    Editor/VNUiSkinExporter.cs     把 BakeSprite / CreateImage / CreateText / Stretch /
+                                     EnsureFolder / SavePrefab / SkinDir 等改成 internal 供复用
+资产  Assets/VNEffects/UISkins/DialogueSkin_SoftWhite|SoftPink|SoftDark.prefab
+资产  Assets/VNEffects/UISkins/Materials/VN_SoftText_*.mat        正文 TMP 材质（描边+柔光）
+资产  Assets/VNEffects/UISkins/Textures/VN_BottomGradient.png     底部渐变带（白+alpha 曲线）
+资产  Assets/VNEffects/UISkins/Textures/VN_RoundedRect.png        名牌底板（与经典款同一张）
+改    Resources/VNGameConfig.asset   dialogueSkins 登记 白渐变 / 粉渐变 / 黑渐变
+文档  HowToUse.md 八章新增「对话框皮肤（ui dialogue）」、CLAUDE.md 组件表与子系统表
+```
+
+菜单：**Tools → VN Effects → UI Skins → Export Soft Gradient Skins**
+（另有「(覆盖重建)」一项，带二次确认，会用出厂参数冲掉 Inspector 里的手工调整）。
+
+### 规格
+
+| | 白渐变 | 粉渐变 | 黑渐变 |
+|---|---|---|---|
+| 渐变带色 | 白 55% | 粉 (1,0.70,0.78) 55% | 近黑 (0.04,0.05,0.09) **80%** |
+| 正文字色 | 深墨 | 深粉红 | 白 |
+| 描边 | 白 0.10 | 白 0.12 | 黑 0.10 |
+| 柔光/投影 | 白柔光 | 白柔光 | 黑投影（偏移 0.5） |
+
+共通：渐变带 = 整屏宽 × 378px（35% 屏高）贴底；正文**居中顶对齐**、36pt；
+名牌沿用经典款紫底圆角块（装饰样式仍由 `VNDialogueBox.nameplateStyle` 全局接管）；
+头像窗与继续箭头都保留；`shineFrame` 槽位**留空 = 无边框无流光**。
+
+### 技术决策与取舍
+
+- **渐变贴图只有 alpha，RGB 全白**：三套共用同一张 PNG，换色 = 在 Inspector 里拉
+  Image 的 Color。加新配色不用重烘贴图。
+- **曲线是「下半段满浓 + 上半段 SmoothStep 淡出」，不是从底一路衰减**。
+  一路衰减的版本实测过：屏幕底部亮度 0.696 → 0.358（暗了一半），
+  但**台词所在的那一带（+160px）只从 0.673 → 0.526**——白字压在亮背景上会发虚。
+  台词落在渐变带的 40%~63% 高度处，那一带必须是满浓区。
+  顶边用 SmoothStep 是因为线性淡出会在收尾处留一条肉眼可见的硬边。
+- **正文顶对齐（水平仍居中）**：垂直居中的话，一行台词会沉到渐变带中段，
+  名牌孤零零飘在上面，两者隔开一大截。
+- **描边宽度压到 0.10~0.12**：一开始给 0.16~0.18，白描边把中文笔画从外侧吃细，
+  字看着发灰发虚。中文字形笔画密，描边宽度的上限比拉丁字母低。
+- **头像避让设为 0**：正文左右各留 300px，头像窗（宽 230）落在正文左侧的空白里，
+  不需要把正文推开——推了反而破坏居中。
+- **每套一份独立 TMP 材质资产**：绝不能改字体的 sharedMaterial（会污染全项目
+  所有用同字体的文字，项目硬约定）。underlay 通道照例要先 `EnableKeyword("UNDERLAY_ON")`。
+- **登记进 VNGameConfig 用 upsert 而不是「有同名就跳过」**：覆盖重建会换掉 prefab 资产，
+  只跳过的话配置里会留一个指向已删除资产的空引用，剧本切皮肤时报「未登记」。
+- **toolbarAnchor 单独放一个空 RectTransform**，锚在经典款面板的位置。
+  否则快捷功能条会停靠到 378px 高的渐变带右上角，飘到半空。
+
+### 踩过的坑
+
+- **同一帧内重烘贴图 + 立刻截图 = 拍到旧贴图**。`AssetDatabase.ImportAsset` 之后，
+  内存里那张 Texture 要到下一帧才更新，导致连着两轮以为「参数没生效」。
+  验证外观改动时，重烘和截图必须分两次 `script-execute` 调用。
+- **Linear 色彩空间下，80% 的近黑覆盖在中亮背景上得到的是中灰（0.70 → 0.36），不是黑**。
+  这是混合的正常结果，不是 alpha 没生效——肉眼看图容易误判成「没效果」，
+  该用 ReadPixels 取亮度数值比对。
+
+### 验证方法
+
+编辑模式下把 prefab 实例化到场景 Canvas（`HideFlags.DontSave`，不写进场景文件），
+填上示例台词，用 `cam.Render()` + `ReadPixels` 出图逐套核对，
+并对「开/关渐变」两次渲染的同一像素取亮度差，确认遮盖强度。
+
+---
+
+## 一一六、名字样式六套新预设 + `ui name` 剧本命令（2026-08-28，分支 `agent/ai-deepseek`）
+
+### 需求
+
+用户对比商业 galgame 后问「为什么人家的名字那么有设计感，我的这么朴素，是字形问题吗」。
+诊断结论不是字体：**是叠层数不够，以及最外层颜色选错**。
+TMP 一个文字能叠五层（面/描边/underlay/浮雕光照/发光），项目原来只用了三层，
+且 Bold 与 Outline 两套预设的**最外层都是白色**——遇到白背景或亮立绘时整个名字消失。
+实测：同一套 Bold 参数在深底上清晰，在浅紫背景上糊到几乎读不出。
+
+用户要求：多做几套供挑选，不加装饰件（只改字本身），并且要能用剧本命令随时切换。
+
+### 改了哪些文件
+
+```
+改  Script/VNNameplateStyle.cs   +浮雕/光照/HDR 增益/固定渐变下端色 四组参数；
+                                 +六套预设 Duo/Gold/Silver/Neon/Ink/Candy；
+                                 +Aliases/TryParseId/NameOf（剧本名 ↔ 枚举，中英双写）
+改  Script/VNStage.cs            SetUiSkin 加 case "name"；+CurrentNameplateStyleId；存档存取
+改  Script/VNSaveSystem.cs       +nameplateStyle 字段（空 = 出厂样式，旧存档兼容）
+改  Script/VNScriptRunner.cs     RebuildStateBefore 的 ui case 认 name（从选中行播放要能重建）
+改  Editor/VNScenarioSchema.cs   ui 的 kind 枚举加 name + 说明列出全部预设名
+改  Editor/VNScenarioLinter.cs   ui name 的样式名校验（Error 级）
+文档 HowToUse.md 八章、CLAUDE.md 组件表与子系统表
+```
+
+### 语法
+
+```
+ui name <双描边|金边|银边|霓虹|墨影|糖果|粗体|描边|底板|朴素|default>
+```
+
+英文枚举名等价（`ui name Gold`）。样式进存档；颜色仍跟角色资产的 `nameColor` 走，
+所以同一样式下每个角色的名字颜色不同。
+
+### 技术决策与取舍
+
+- **「三层字」系列的硬规则：最外圈必须是深色**。这是新六套与老四套的根本差别，
+  也是「为什么人家的字在任何背景上都好看」的真正答案。白色最外层只在深背景成立。
+- **镶金边 = Bevel 浮雕 + Lighting 打光**，不是颜色问题。金色渐变只提供色相，
+  金属感来自 `_LightAngle` 打出的高光与暗面。Mobile 版 TMP shader 没有这组属性，
+  所以 `ApplyBevel` 先 `HasProperty(_Bevel)`——直接 SetFloat 不报错也不生效，
+  静默失效最难查，故缺了就退化成普通描边并**警告一次**（每句台词都会重新上妆，不能每次都警告）。
+- **HDR 发光与上下渐变二选一**。uGUI 顶点色被钳到 1，渐变只能由顶点色表达；
+  而 Bloom 阈值是 1.0，要发光就必须把带增益的颜色写进材质 `_FaceColor`。
+  两条路互斥，所以 Neon 预设是纯色面而非渐变面。
+- **Duo 与 Silver 的浅底补强**：白面/银面本身就接近浅背景，初版在浅底偏弱，
+  把深外圈 dilate 提到 0.58、描边加厚一档解决。银边是固有的浅色，
+  文档里直接写明「别在白天户外用」而不是继续硬调参数。
+- **`ui name` 复用 ui 命令而不是新起关键字**：语义同族（都是外观切换、都进存档），
+  Parser 关键字表不用动，Schema 只是 kind 多一个枚举值。
+- **Lint 按 Error 而不是 Warning**：名字样式是内置预设，拼错必然静默无效果，
+  没有皮肤 id 那种「稍后再登记」的中间状态。
+
+### 验证方法
+
+编辑期把十套预设走真实的 `Preset().ApplyTo()` 路径渲染到同一张图，
+左半深底、右半浅底——**同一套参数必须两种底都成立才算可用**，
+这个双底对照是这次能定位「白色最外层」问题的关键手段。
+
+### 补充：编辑器下拉（同日追加）
+
+用户反馈剧本编辑器里 `ui` 的第二个参数是纯文本框、每次都得手打样式名。
+补成**跟着同行 kind 变的下拉**：
+
+```
+改  Editor/VNScenarioSchema.cs        +VNParamSource.UiSkinId；ui 的 id 参数改用它并 dependsOn:"kind"
+改  Editor/VNScenarioDoc.cs           +dialogueSkinIds/choiceSkinIds 上下文字段；Validate 加 UiSkinId 分支
+改  Editor/VNScenarioEditorWindow.cs  RefreshSources 收集 VNGameConfig 的皮肤 id；
+                                      OptionsFor 加 UiSkinId → UiSkinOptions(kind)
+```
+
+- kind=`dialogue`/`choice` → default + VNGameConfig 里登记的皮肤 id
+- kind=`name` → default + 十套内置样式名
+
+**编辑期校验只管 kind=name**：名字样式是内置预设，拼错必然静默无效果；
+而 dialogue/choice 的皮肤 id 允许「先写剧本、稍后登记」，编辑期就标红会一直红着变成噪音，
+那一层交给 Lint。这跟 `Expression` 依赖角色参数是同一个 `dependsOn` 模式。
+
+
+## 一一七、camseq 路径点震屏：`shake:` 参数（2026-08-28，分支 `agent/ai-deepseek`）
+
+### 起因
+
+运镜到位的那一刻想震一下（推到脸上 = 挨了一击、瞬切到废墟 = 爆炸余波），
+原来只能在 camseq **整块之前**写 `shake heavy@` 让它并行跑——**震不到中间那个点**。
+因为 `>` 路径点行之间插不进别的命令（parser 里 `>` 行只会往上一条 camseq 上挂），
+「走到第 3 个点才震」这件事在旧语法里无法表达。
+
+### 做法
+
+给路径点加一个参数：`> 目标点 [zoom] [秒] [ease:] [xfade:] [hold:] [shake:等级|强度,秒数]`。
+
+**为什么没有技术冲突**：震动作用在 `SceneRoot`（`VNScreenShake.target`），
+运镜作用在它的子级 `ZoomRoot`（`VNCamera.target`）——这两层本来就是设计成可叠加的
+（`VNCamera.SnapZoom()` 早就有个 `VNScreenShake shake` 形参，在到位瞬间轻震，先例就在那儿）。
+所以「一边推镜一边震」是叠加而不是打架。
+
+**三档 → 数值只有一张表**（`VNShakeSpec`，新增在 `VNScreenShake.cs`）：
+原来 `Shake(VNShakeLevel)` 里那个 switch 就是唯一的数值来源，现在抽成
+`VNShakeSpec.Of(level)`，因为**编辑器预览也要知道震动时长**（要把停顿算进时间轴）——
+再抄一份迟早对不上。`TryParse` 同时认三档别名和 `强度,秒数`，运行时与编辑器共用它，
+判定不可能分叉。`Format()` 反过来把数值折回别名（命中三档就写 `heavy` 而不是 `34,0.6`）。
+
+### 「等震完再走」怎么实现的
+
+触发点编进**同一条 DOTween Sequence**（`BuildSegment` 里 `AppendCallback`），
+而不是在协程里 `yield`：这样它和 hold、和后续段共用一条时间轴，
+**Skip 快进（`DOTween.timeScale`）时不会错位**——协程里 yield 一个独立 tween 就会变成快进中唯一的卡点。
+
+停顿取 **`max(hold, 震动时长)` 而不是相加**：写 `hold:1 shake:heavy` 就该老老实实停 1 秒
+（0.6 秒的震动跑在这一秒里面），不然 hold 的语义「到点后停留的秒数」就被震动偷偷改掉了。
+
+`xfade:` 叠化点不在 Sequence 里（它是「截屏→瞬切→淡出」的协程），
+所以另走 `ShakeHoldCo()`，但用的是同一条 `max` 规则。
+
+### 编辑器
+
+- **控件共用一份**：`VNCamShakeUi.Draw()`（放在 `VNCamWaypoint.cs`，与解析层同源），
+  剧本编辑器的路径点行和镜头编排窗口的第二行各调一次。
+  下拉 `(不震)/light/medium/heavy/自定义…`，选自定义才在右边出文本框；
+  框里的值非法时**染橙**——写错了要看得见，不能让下拉悄悄把它改成「不震」。
+- **`VNCamWaypoint.TryParse` 仍然严格**：`shake:20`（少了秒数）、重复的 `shake:` 都直接
+  返回 false → 整行退回纯文本并标黄。Lint 那条 `unrecognized-waypoint` 走的就是这个
+  TryParse，所以**没写一行新的校验代码**，非法 shake 自动被点名。
+- **预览时间轴要算上这段停顿**（`AddHoldSegment` 改成 `max(hold, 震动时长)`）：
+  时长算短了，拖进度条就和实机对不上。**震动本身不在预览里模拟**——
+  编辑器画布上抖几像素既看不出效果又干扰点选。
+
+### 踩到的
+
+`VNScriptRunner.CloneWithParams()` 里 camPoints 的深拷贝是**逐字段手写**的，
+加了新字段不补进去，`call` 带参数调用的子程序里 camseq 的 shake 会静默丢失
+（本次已补 `shake = point.shake`）。这一处每加一个路径点字段就要跟着改，
+和 `VNCamWaypoint.TryParse/Format`、`VNCamseqEditorWindow` 的 `Waypoint` 类是同一批。
+
+### 用法
+
+```
+camseq
+> 亚里沙:head 1.9 0.25 shake:heavy   # 急推到脸上 + 强震
+> middle 1 0.6 shake:20,0.5          # 自定义 20px / 0.5 秒
+```
+
+
+### 追加：`stay` 原地点（同日）
+
+`shake:` 做完后发现「镜头不动、只在原地震一下」得这么写：
+
+```
+> 亚里沙:head 1.9 1.2
+> 亚里沙:head 1.9 0 shake:heavy   ← 点位和 zoom 手抄一遍
+```
+
+能用，但**改了上一行忘了改这行，镜头会在震之前先跳一下**，而且这种 bug 很难一眼看出来。
+于是加了点位词 `stay`：位置与 zoom 都沿用**前面最近一个真点位**。
+
+```
+> 亚里沙:head 1.9 1.2
+> stay 0 shake:heavy      # 原地强震
+> stay 0 hold:0.8         # 再静静停 0.8 秒
+```
+
+**唯一的坑：数字位前移**。普通行「第 1 个数字 = zoom、第 2 个 = 时长」，
+但 stay 没有 zoom 可填，所以**第一个数字就是时长**（默认 0）。
+不这么设计的话 `> stay 0` 会被读成 zoom=0、时长取默认 0.8 秒——一个看不见的 0.8 秒空档。
+代价是语法不完全一致，所以 **stay 行出现第二个数字一律判错**（运行时告警、
+`VNCamWaypoint.TryParse` 返回 false 退回纯文本标黄、Lint 点名），让照旧习惯写的人立刻看见。
+编辑器里 stay 行的 zoom 格是禁用的「沿用上一个点」占位，视觉上也不会诱导你去填。
+
+**运行时**：`CamseqCo` 里维护 `lastPoint/lastZoom`。注意循环必须从 0 开始遍历**所有**点，
+`skipFirst`（start:cut 已由 bg 转场应用过首点）只跳过「加进 list」这一步而不是跳过解析——
+否则 `start:cut` 后面第一个 stay 就没有基准可沿用。
+
+**编辑器**：新增 `VNCamPointKind.Stay` / `PointType.Stay`（两套枚举各一个，本来就是两份）。
+`TargetState` 加了按下标的重载，遇到 Stay 就往前找最近一个真点位——与运行时同一条规则。
+画布上**不画 stay 的取景框**：它与上一个点完全重合，画出来只会互相遮住，
+而且点选/拖角/拖中心都会拖错点，所以那几处（画框、命中检测、拖动、空白处点击设坐标）
+全部跳过 Stay。**但预览时间轴照常把它的时长算进去**，拖进度条才和实机对得上。
+
+**Lint 新增一条**：`stay` 当第一个路径点报 Err（没有「上一个点」可沿用，运行时会跳过它）。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `VNScreenShake.cs` | 新增 `VNShakeSpec`（三档数值表 + TryParse + Format）；`Shake(level)` 改走它 |
+| `Script/VNScriptParser.cs` | `VNCamWaypointDef.shake` 字段 + `ParseCamWaypoint` 认 `shake:` token（非法告警并忽略） |
+| `Script/VNScriptRunner.cs` | `CamseqCo` 填 `Waypoint.shake` 并把 `stage.screenShake` 传进 `PlayPathCo`；补 `CloneWithParams` 深拷贝 |
+| `VNCamera.cs` | `Waypoint.shake` 字段；`BuildSegment`/`PlayPathCo` 收 shaker 参数；新增 `ShakeHoldCo()` |
+| `Editor/VNCamWaypoint.cs` | `shake` 字段 + 严格 TryParse/Format；新增共用控件 `VNCamShakeUi` |
+| `Editor/VNScenarioEditorWindow.cs` | 路径点行尾加「震」控件 + 语法提示 |
+| `Editor/VNCamseqEditorWindow.cs` | `Waypoint.shake` + 行 UI + 文本生成/解析 + `AddHoldSegment` 算进震动时长 + 帮助文字 |
+| `Editor/VNScenarioDoc.cs` | Lint 提示语法补上 `hold:`/`shake:`（校验本身复用 TryParse，无需新代码） |
+| `Script/VNScriptParser.cs`（stay） | `VNCamWaypointDef.StayToken`/`IsStay`；stay 行数字位前移、多余数字告警 |
+| `Script/VNScriptRunner.cs`（stay） | `CamseqCo` 维护 lastPoint/lastZoom；skipFirst 只跳过入列不跳过解析 |
+| `Editor/VNCamWaypoint.cs`（stay） | `VNCamPointKind.Stay` + 严格 TryParse/Format |
+| `Editor/VNScenarioEditorWindow.cs`（stay） | 类型下拉加「原地」、目标格换成说明文字、zoom 格禁用占位 |
+| `Editor/VNCamseqEditorWindow.cs`（stay） | `PointType.Stay`、`TargetState(int)` 往前找真点位、画布不画/不可拖、生成文本不写 zoom |
+| `Editor/VNScenarioDoc.cs`（stay） | 新增「首点不能是 stay」的 Err |
+
+## 一一八、背景无限滚动 `bgscroll`（2026-08-29，分支 `agent/ai-deepseek`）
+
+### 需求
+
+一张背景图永远往一个方向流，营造"在走 / 在开车 / 云在飘"的持续动感。
+
+### 选型：滚 UV，不是拼两张图
+
+「首尾拼接两张图」是最直觉的做法，但在这个项目里代价很大：要复制第二个 Image +
+材质实例 + mood 注册，还要改 `bg` 转场逻辑，而且它和 `VNKenBurns` 抢同一个 RectTransform。
+
+改成**在 shader 里滚 UV**之后：背景仍是一个 Image，`bg` 转场 / `camseq` 运镜 / 视差
+全都不用动，**而且能和 Ken Burns 叠加**——那个动 transform、这个动 UV，各走各的，
+叠起来是"一边缓慢呼吸一边流动"，比只有滚动更有生命力（所以刻意没做成互斥）。
+
+### 接缝：自己在 shader 里折，不依赖纹理导入设置
+
+硬件 wrap mode 靠不住（图集、导入设置都可能不是 Repeat），所以平铺在 `vnWrapUV()` 里自己算：
+`repeat` 直接 `frac`，`mirror` 走 ping-pong。**前提是纹理没开 mipmap**——
+UI Sprite 默认就是关的，开了的话 `frac` 的跳变会让接缝糊掉一行。
+
+**这里踩了一个必须靠眼睛才能发现的坑**：ping-pong 一开始写成
+`abs(frac(s*0.5)*2-1)`，看着对，实际上它在 `s∈[0,1]` 是 **1→0 递减**——
+偏移为 0 时整张图就是翻的。截图里桌椅倒挂在天花板上才发现，正确写法是
+`1.0 - abs(frac(s*0.5)*2-1)`。**这种 bug 单元测试和 Console 都看不出来，只有真截一张图才知道。**
+
+另外模糊（伪景深 9-tap）和轮廓光那些"在主 uv 附近再采一次"的地方也必须过一遍 `vnWrapUV`，
+否则采样点会越过接缝跑到 [0,1] 外面被 clamp 成边缘色 → 接缝处一条亮线。
+
+### 速度单位
+
+`speed` 是**画布像素/秒**（1920 宽为基准），不是 UV/秒——写剧本的人对像素有直觉，
+对 UV 没有。走路≈120，跑步≈250，坐车≈400，环境氛围≈6。
+
+`dir` 说的是**画面内容往哪边流**（不是人物前进方向），所以采样坐标要反着走，代码里取负。
+默认 180（往左流 = 人物在往右走）。
+
+### mirror 挑图
+
+天空/云/树林/水面/抽象材质效果很好；**强透视的图（走廊、街道）会变成"两条走廊对着开"**——
+实机截图里非常明显。那种图请准备无缝素材配 `repeat`。
+
+### 存档
+
+开关/速度/方向/平铺方式进存档，读档直接就位不缓入（缓入会让读档后画面先"起步"一下）。
+**累计偏移刻意不存**：从哪一帧接着滚玩家看不出来，存了反而多一个要维护的数。
+`bg` 换图不停滚动（还在车上就该继续滚），只把偏移归零让新图从头开始流。
+
+### 一个顺带的发现（没动）
+
+`VNScriptDemo` 场景的背景 Image 上**原本没有 `VNImageEffectController`**，
+所以 `VNStage.backgroundFx` 一直是 null，`mood` 的分层调色也没注册到背景上。
+本次由 `VNBackgroundScroll` 的 `[RequireComponent]` 在运行时补上了 controller，
+滚动因此能工作，但 `backgroundFx` 的赋值发生在补挂之前，所以仍是 null——
+**没有改动这个顺序**，因为让背景突然开始被 mood 染色会改变现有演出。要不要修由你定。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Assets/Art/Shaders/VNImageEffect.shader` | `_ScrollMode`/`_ScrollOffset` 两个属性 + `vnWrapUV`/`vnScrollUV`；模糊 8 抽与轮廓光 2 抽包上 wrap |
+| `VNBackgroundScroll.cs`（新） | 滚动组件：速度缓入缓出、像素/秒→UV 换算、偏移折回 [0,2) 防精度掉光、方向/模式词解析 |
+| `VNImageEffectController.cs` | 加 `HasMaterial`（销毁流程里不能用 `Mat`，那会顺手新建一个） |
+| `Script/VNStage.cs` | `bgScroll` 引用 + 自愈补挂 + `SetBackgroundScroll()` + 换图归零偏移 + 存档读写 |
+| `Script/VNScriptParser.cs` | `bgscroll` 关键字 |
+| `Script/VNScriptRunner.cs` | 命令派发（含 dir/mode 认不出时的告警）+ 调试重建重放（参数留空 = 沿用，重建也要照这个语义累积）|
+| `Script/VNSaveSystem.cs` | `scrollOn/scrollSpeed/scrollDir/scrollMode` 四个字段 |
+| `Editor/VNScenarioSchema.cs` | `bgscroll` 命令登记（5 个参数，剧本编辑器/Ctrl+E 面板自动出现）|
+| `Editor/VNEffectsDemoSetup.cs` | 场景生成器给背景挂上滚动组件并回填 VNStage |

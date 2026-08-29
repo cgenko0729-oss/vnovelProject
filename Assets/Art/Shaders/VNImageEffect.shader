@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // VN/ImageEffect
 // 视觉小说 2D 图片特效 Shader（uGUI Image / RawImage 通用）
 // 功能：
@@ -63,6 +63,11 @@ Shader "VN/ImageEffect"
         _WaveAmount ("Wave Amount", Range(0,0.05)) = 0
         _WaveSpeed ("Wave Speed", Float) = 2
         _WaveFreq ("Wave Frequency", Float) = 8
+
+        [Header(Infinite Scroll)]
+        // 0 = off, 1 = repeat (needs a seamless texture), 2 = mirror (ping-pong, never seams)
+        _ScrollMode ("Scroll Mode (0 off 1 repeat 2 mirror)", Float) = 0
+        _ScrollOffset ("Scroll Offset (uv)", Vector) = (0,0,0,0)
 
         // ---- uGUI 必需的模板/裁剪属性 ----
         _StencilComp ("Stencil Comparison", Float) = 8
@@ -174,6 +179,30 @@ Shader "VN/ImageEffect"
             float _WaveFreq;
             float _BlurAmount;
 
+            float _ScrollMode;
+            float4 _ScrollOffset;
+
+            // 无限滚动的 UV 平铺。硬件 wrap mode 靠不住（图集/导入设置都可能不是 Repeat），
+            // 所以在这儿自己折：repeat 直接 frac；mirror 走 ping-pong，
+            // 任何一张图都不会在接缝处穿帮（代价是每隔一张左右翻转）。
+            // 前提是纹理没开 mipmap——UI Sprite 默认就是关的，否则 frac 的跳变会让接缝糊一行。
+            // 只折叠、不加偏移：模糊/轮廓光那些「在主 uv 附近再采一次」的地方用它，
+            // 否则采样点会越过接缝跑到 [0,1] 外面，被 clamp 成边缘色 → 接缝处一条亮线
+            float2 vnWrapUV(float2 s)
+            {
+                if (_ScrollMode < 0.5) return s;
+                if (_ScrollMode < 1.5) return frac(s);
+                // ping-pong：周期 2，[0,1] 原样、[1,2] 翻转。
+                // 少了外面这个 1.0- 的话 [0,1] 变成 1→0 递减，偏移为 0 时整张图就是翻的
+                return 1.0 - abs(frac(s * 0.5) * 2.0 - 1.0);
+            }
+
+            float2 vnScrollUV(float2 uv)
+            {
+                if (_ScrollMode < 0.5) return uv;
+                return vnWrapUV(uv + _ScrollOffset.xy);
+            }
+
             // ---- 程序化值噪声（免噪声贴图）----
             float hash21(float2 p)
             {
@@ -239,9 +268,10 @@ Shader "VN/ImageEffect"
 
             half4 frag(v2f IN) : SV_Target
             {
-                // 1. 微波浪 UV 扭曲
+                // 1. 微波浪 UV 扭曲（波浪先加，再一起交给滚动平铺，两者可叠加）
                 float2 uv = IN.texcoord;
                 uv.x += sin(uv.y * _WaveFreq + _Time.y * _WaveSpeed) * _WaveAmount;
+                uv = vnScrollUV(uv);
 
                 // 1.5 可选 9-tap 微模糊（伪景深：背景虚化用；UI 不写深度，真 DoF 会糊掉全屏）
                 half4 texCol = tex2D(_MainTex, uv);
@@ -249,14 +279,14 @@ Shader "VN/ImageEffect"
                 {
                     float r = _BlurAmount;
                     float d = r * 0.7071; // 对角
-                    texCol += tex2D(_MainTex, uv + float2( r, 0));
-                    texCol += tex2D(_MainTex, uv + float2(-r, 0));
-                    texCol += tex2D(_MainTex, uv + float2(0,  r));
-                    texCol += tex2D(_MainTex, uv + float2(0, -r));
-                    texCol += tex2D(_MainTex, uv + float2( d,  d));
-                    texCol += tex2D(_MainTex, uv + float2(-d,  d));
-                    texCol += tex2D(_MainTex, uv + float2( d, -d));
-                    texCol += tex2D(_MainTex, uv + float2(-d, -d));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2( r, 0)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2(-r, 0)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2(0,  r)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2(0, -r)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2( d,  d)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2(-d,  d)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2( d, -d)));
+                    texCol += tex2D(_MainTex, vnWrapUV(uv + float2(-d, -d)));
                     texCol /= 9.0;
                 }
                 half4 color = (texCol + _TextureSampleAdd) * IN.color;
@@ -290,8 +320,8 @@ Shader "VN/ImageEffect"
                 {
                     float rimRad = radians(_RimAngle);
                     float2 rdir = float2(cos(rimRad), sin(rimRad));
-                    float a1 = tex2D(_MainTex, uv + rdir * _RimWidth).a;
-                    float a2 = tex2D(_MainTex, uv + rdir * _RimWidth * 2.0).a;
+                    float a1 = tex2D(_MainTex, vnWrapUV(uv + rdir * _RimWidth)).a;
+                    float a2 = tex2D(_MainTex, vnWrapUV(uv + rdir * _RimWidth * 2.0)).a;
                     float litEdge = saturate(1.0 - (a1 * 0.6 + a2 * 0.4));
                     color.rgb += _RimColor.rgb * (litEdge * color.a * _RimAmount);
                 }

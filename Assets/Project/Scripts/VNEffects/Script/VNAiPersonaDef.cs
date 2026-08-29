@@ -108,7 +108,12 @@ namespace VNEffects
         // ──────────────── 模型参数 ────────────────
 
         [Header("──────── 模型 ────────")]
-        [Header("模型名（留空 = " + VNAiClient.DefaultModel + "）")]
+        [Header("供应商。「跟随全局」= 用 VNGameConfig 里设的那家（改一处全部人格跟着换）")]
+        public VNAiProviderChoice provider = VNAiProviderChoice.Inherit;
+
+        [Header("模型名。留空 = 跟随全局设置 / 该供应商的默认模型\n" +
+                "Gemini：gemini-3.5-flash-lite　DeepSeek：deepseek-v4-flash / deepseek-v4-pro\n" +
+                "★ 填的模型必须属于上面选的那家，否则请求会 400")]
         public string model;
 
         public VNAiThinking thinking = VNAiThinking.Minimal;
@@ -214,8 +219,21 @@ namespace VNEffects
             return all.GetRange(0, want);
         }
 
-        public string ResolveModel() =>
-            string.IsNullOrWhiteSpace(model) ? VNAiClient.DefaultModel : model.Trim();
+        /// <summary>这套人格实际发给哪一家（「跟随全局」时取 VNGameConfig 的设置）。</summary>
+        public VNAiProvider ResolveProvider() => VNAiProviders.Resolve(provider);
+
+        /// <summary>
+        /// 实际用哪个模型。留空时：
+        ///   跟随全局 → 全局模型（config 里可以直接指定 deepseek-v4-pro）
+        ///   指定了家 → 那家的默认模型
+        /// </summary>
+        public string ResolveModel()
+        {
+            if (!string.IsNullOrWhiteSpace(model)) return model.Trim();
+            return provider == VNAiProviderChoice.Inherit
+                ? VNAiProviders.GlobalDefaultModel
+                : VNAiProviders.DefaultModelFor(ResolveProvider());
+        }
 
         /// <summary>对话框名牌上的显示名（走角色资产的本地化名）</summary>
         public string DisplayName =>
@@ -228,6 +246,17 @@ namespace VNEffects
             if (string.IsNullOrWhiteSpace(id)) errors.Add("id 为空（剧本没法引用这套人格）");
             if (character == null) errors.Add("没绑定角色定义（拿不到立绘和表情）");
             if (string.IsNullOrWhiteSpace(persona)) errors.Add("persona 为空（她会变成通用助手口吻）");
+
+            // 填错家的模型名会直接 400，而报错要等到真发请求才看得到，所以在这里先拦
+            if (!string.IsNullOrWhiteSpace(model))
+            {
+                var want = ResolveProvider();
+                if (VNAiProviders.TryFromModelName(model, out VNAiProvider guess) && guess != want)
+                    errors.Add($"模型「{model.Trim()}」看起来是 {VNAiProviders.DisplayName(guess)} 的，" +
+                               $"但供应商选的是 {VNAiProviders.DisplayName(want)}（请求会 400）。" +
+                               "想跟着全局走就把模型名留空");
+            }
+
             int tones = optionTones?.Count ?? 0;
             if (tones < MinOptions || tones > MaxOptions)
                 errors.Add($"optionTones 要 {MinOptions}~{MaxOptions} 条（当前 {tones} 条）" +

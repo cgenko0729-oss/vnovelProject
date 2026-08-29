@@ -23,8 +23,8 @@ namespace VNEffects
     /// </summary>
     public static class VNUiSkinExporter
     {
-        const string SkinDir = "Assets/VNEffects/UISkins";
-        const string TextureDir = SkinDir + "/Textures";
+        internal const string SkinDir = "Assets/VNEffects/UISkins";
+        internal const string TextureDir = SkinDir + "/Textures";
 
         [MenuItem("Tools/VN Effects/UI Skins/Export Skin Prefabs (Default + Samples)")]
         public static void ExportAll()
@@ -58,7 +58,7 @@ namespace VNEffects
         // ==============================================================
 
         /// <summary>程序化贴图 → PNG 资产（9-slice 边距在导入设置里配好）</summary>
-        static Sprite BakeSprite(string name, Texture2D texture, Vector4 border)
+        internal static Sprite BakeSprite(string name, Texture2D texture, Vector4 border)
         {
             string path = $"{TextureDir}/{name}.png";
             // 程序化贴图 Apply(false, true) 释放了 CPU 拷贝（不可读），
@@ -290,7 +290,7 @@ namespace VNEffects
             }
         }
 
-        static bool AddEntry(List<VNGameConfig.UiSkinEntry> list, string id, GameObject prefab)
+        internal static bool AddEntry(List<VNGameConfig.UiSkinEntry> list, string id, GameObject prefab)
         {
             foreach (var e in list)
                 if (e != null && e.id == id) return false; // 已登记：不动用户数据
@@ -302,7 +302,7 @@ namespace VNEffects
         // 小工具
         // ==============================================================
 
-        static GameObject SavePrefab(GameObject temp, string name)
+        internal static GameObject SavePrefab(GameObject temp, string name)
         {
             string path = $"{SkinDir}/{name}.prefab";
             var prefab = PrefabUtility.SaveAsPrefabAsset(temp, path);
@@ -310,7 +310,7 @@ namespace VNEffects
             return prefab;
         }
 
-        static Image CreateImage(RectTransform parent, string name, Sprite sprite,
+        internal static Image CreateImage(RectTransform parent, string name, Sprite sprite,
             Color color, Image.Type type)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
@@ -323,7 +323,7 @@ namespace VNEffects
             return image;
         }
 
-        static TextMeshProUGUI CreateText(RectTransform parent, string name,
+        internal static TextMeshProUGUI CreateText(RectTransform parent, string name,
             TMP_FontAsset font, int size, TextAlignmentOptions anchor)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer),
@@ -338,7 +338,7 @@ namespace VNEffects
             return text;
         }
 
-        static void Stretch(RectTransform rect)
+        internal static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
@@ -346,7 +346,7 @@ namespace VNEffects
             rect.offsetMax = Vector2.zero;
         }
 
-        static void EnsureFolder(string path)
+        internal static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
             string parent = Path.GetDirectoryName(path)?.Replace('\\', '/');

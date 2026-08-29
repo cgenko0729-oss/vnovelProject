@@ -318,12 +318,46 @@ camera reset
 
 `focus:角色id` = 镜头朝那个角色推近。运镜通常配 `@` 异步使用（边推边说话）。
 
+### bgscroll — 背景无限滚动 🔁
+
+一张背景图永远往一个方向流，营造"在走 / 在开车 / 云在飘"的持续动感。
+
+```
+bg 商店街
+bgscroll on speed:120           # 开始滚（默认向左流 = 人物在往右走）
+亚里沙: 走吧，趁天还没黑。
+bgscroll off                    # 缓停（默认 0.6 秒收速）
+
+bgscroll on speed:6 mode:mirror # 云飘：极慢，玩家几乎意识不到，但画面"活着"
+bgscroll on speed:200 dir:up    # 纵向：往上流（下坠感）
+bgscroll on                     # 不带参数 = 沿用上一次的速度/方向/平铺方式
+```
+
+| 参数 | 说明 |
+|---|---|
+| `speed:` | **画布像素/秒**。走路≈120，跑步≈250，坐车≈400，环境氛围≈6。默认 80 |
+| `dir:` | `left`（默认）/`right`/`up`/`down`，或直接写角度（`0`=往右流 `90`=往上 `180`=往左）。说的是**画面内容往哪边流**，人往右走时背景是往左流 |
+| `mode:` | `mirror`（默认，镜像平铺，**任何图都不会有接缝**，代价是看得出左右对称）/ `repeat`（直接平铺，**要求图本身左右无缝**，否则接缝处穿帮）。中文别名 `镜像`/`无缝` |
+| `time:` | 开/关时速度缓入缓出的秒数，默认 0.6。写 `0` = 立刻起步/急停 |
+
+规则与技巧：
+
+- **和 Ken Burns 可以同时开着**：滚动动的是 UV、Ken Burns 动的是 transform，两者不在同一个东西上，
+  叠起来是"一边缓慢呼吸一边流动"，比只有滚动更有生命力（所以没有做成互斥）
+- **`bg` 换图不会停止滚动**（还在车上就该继续滚），只是把偏移归零让新图从头开始流
+- **`mirror` 挑图**：天空/云/树林/水面/抽象材质效果很好；**强透视的图（走廊、街道）会变成
+  "两条走廊对着开"**，那种图请准备无缝素材配 `repeat`
+- **背景图不要开 Generate Mip Maps**（Sprite 导入默认就是关的）：开了的话平铺接缝处会糊掉一行
+- `camseq` 运镜、`fx focus` 伪景深、mood 调色都能和滚动叠加，互不干扰
+- 状态**进存档**（开关/速度/方向/平铺方式）；读档时直接就位不缓入。累计偏移不进存档——
+  从哪一帧接着滚玩家看不出来
+
 ### camseq / camto / camcut — 自由镜头路径 🎬
 
 > 💡 **不想手写数值？两条路都不用碰剪贴板了：**
 >
 > 1. **剧本编辑器里直接改**：camseq 的路径点行是字段化的——点位类型（锚点/角色/坐标）、
->    目标、zoom、秒、ease、xfade 全是下拉和数字框。header 行右边还有
+>    目标、zoom、秒、ease、xfade、hold、震 全是下拉和数字框。header 行右边还有
 >    `预设▾`（11 条内置运镜模板 + 你自己存的预设 + 把本行存为预设）。
 > 2. **要看着画面调**：点 header 行的 `编排` 按钮 → 打开 **Camera Sequence Editor**
 >    并**绑定这一行**：迷你画布上点选/拖动路径点、拖角改 zoom、拖进度条预览整条运镜、
@@ -373,6 +407,16 @@ camseq                          # hold：到点后停一会儿再走下一段
 > 亚里沙:head 1.9 1.2 hold:1    # 1.2 秒推到脸上，停 1 秒（这一秒镜头纹丝不动）
 > middle 1 0.8                  # 再 0.8 秒拉回全景
 
+camseq                          # shake：到点的瞬间震一下（震完才走下一段）
+> 亚里沙:head 1.9 0.25 shake:heavy   # 急推到脸上 + 强震 = 挨了一击
+> middle 1 0.6 shake:20,0.5          # 自定义：20px / 0.5 秒
+
+camseq                          # stay：原地不动的点（专门插震动/停顿用）
+> 亚里沙:head 1.9 1.2           # 1.2 秒推到脸上
+> stay 0 shake:heavy            # 镜头纹丝不动，只震（沿用上一行的点位与 zoom）
+> stay 0 hold:0.8               # 再静静停 0.8 秒
+> middle 1 0.8                  # 拉回全景
+
 camto 亚里沙:head 1.6 0.8       # 单段直达：目标点 [zoom] [秒] [ease:名]
 camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里"）
 ```
@@ -393,6 +437,22 @@ camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里
   想「推到脸上停一秒再拉回」写 `hold:1` 就够了，不用再补一个同点位、时长 0 的路径点。
   hold 计入 camseq 总时长（异步 `@` 时不阻塞台词），Skip 快进对它同样生效；
   `xfade:` 叠化点也能带 hold（叠化完成后再停）
+- **震屏**：`shake:light|medium|heavy` 或 `shake:强度,秒数`（如 `shake:20,0.5`，强度单位是像素）
+  = 到达该点的**瞬间**震一下。三档等级与 `shake` 命令完全同参（轻 6px/0.25s、中 16px/0.4s、
+  强 34px/0.6s+旋转抖动）。
+  **震完才走下一段**：该点的停顿 = `max(hold, 震动时长)`，不是相加——写 `hold:1 shake:heavy`
+  就老老实实停 1 秒（震动 0.6 秒跑在这一秒里）。`xfade:` 叠化点同样适用。
+  震的是 SceneRoot（背景+立绘），对话框等 UI 不会跟着抖；运镜作用在其子级 ZoomRoot，
+  两者互不干扰，所以「一边推镜一边震」是叠加而不是打架。
+  值写错（如 `shake:20` 少了秒数）运行时会告警并忽略，Lint 也会点名、编辑器退回纯文本
+- **原地点 `stay`**：点位写 `stay` = **位置与 zoom 都沿用上一个路径点**，镜头一动不动。
+  专门用来在序列中间插一段震动或停顿，不用把上一行的点位和 zoom 手抄一遍
+  （手抄的坏处是：哪天改了上一行忘了改这行，镜头会在震之前先跳一下，而且很难看出来）。
+  **`stay` 行的数字位前移**：没有 zoom 可填，所以**第一个数字就是时长**（默认 0 = 完全静止）。
+  照普通行的习惯写成 `> stay 1.9 0` 会被判为写错——Lint 点名、编辑器退回纯文本标黄。
+  `stay` **不能当第一个路径点**（没有「上一个点」可沿用），Lint 会报错。
+  镜头编排窗口里它的类型显示为「原地」，**画布上不画取景框**（与上一个点完全重合，
+  画出来只会互相遮住、还会拖错），但预览时间轴的长度照常把它算进去
 - **防露边**：高倍 zoom 对准边角时自动钳制偏移，不会把画布边缘露出来
 - 路径点在**执行时**才解析角色位置（角色刚 move 过也能对准）
 - camseq 整块可加 `@` 异步（台词与运镜同时进行）
@@ -1218,8 +1278,14 @@ if 闲聊_好感变化 >= 3 jump 聊得非常好
 **第一次用要先装模块**：**Tools → VN Effects → Install AI Talk Module To Scene**
 ——补一个禁用的 AiTalkTemplate 并登记人格库，顺带体检 key / 人格 / 表情三样。装完记得 Ctrl+S。
 
-**API Key**：环境变量 `GEMINI_API_KEY`，或仓库外 / 仓库根目录的 `GeminiAiApiKey.txt`。
-用 **Tools → VN Effects → AI → Show Key Status** 看当前读到的是哪个来源。
+**供应商**：默认 DeepSeek（`deepseek-v4-flash`），在 `VNGameConfig` 的「AI 默认供应商」
+一处切换 Gemini ⇄ DeepSeek；单个人格要用别家就在人格资产里选（默认「跟随全局」）。
+两家的差异与价格见 `AiTalkGuide.md` 第十七节。
+
+**API Key**：按用的那家配——
+DeepSeek 用环境变量 `DEEPSEEK_API_KEY` 或 `DeepSeekAiApiKey.txt`，
+Gemini 用 `GEMINI_API_KEY` 或 `GeminiAiApiKey.txt`（都可放仓库外 / 仓库根目录）。
+用 **Tools → VN Effects → AI → Show Key Status** 看两家分别读到了没有。
 没配 key 也能跑——每轮走人格资产里的兜底台词，结果返回「失败」。
 
 > 🔒 **key 只用于本地开发。** 它不打包进 Build（代码里 `#if` 挡住了）、不进仓库
@@ -1626,6 +1692,71 @@ CG 大图放 `Assets/CG/`，**文件名就是剧本里的 id**（如 `天台告�
 新素材放进 `Assets/Assets`（或任意位置），确保 Texture Type = **Sprite (2D and UI)**。
 用生成器生成过场景的图都已自动设置好。
 
+### 对话框皮肤（`ui dialogue` / `ui choice` / `ui name`）
+
+```
+ui dialogue <id|default>     换对话框外观
+ui choice   <id|default>     换选项面板外观
+ui name     <样式|default>   换名字（说话人）的字体装饰样式
+```
+
+`default` = 回程序化默认样式（经典款）。id 在 `VNGameConfig` 的 UI 皮肤区登记，
+**皮肤状态进存档**（读档会回到存档时那套）。
+
+内置可用的对话框 id：
+
+| id | 长什么样 |
+|---|---|
+| （不写 / `default`） | 经典款：深蓝圆角面板 + 金色流光边框 |
+| `白渐变` | 无框：整屏底部白色渐变带 + 居中深墨字（亮背景、日常场景） |
+| `粉渐变` | 无框：粉色渐变带 + 居中深粉字（告白、暧昧场面） |
+| `黑渐变` | 无框：黑色渐变带（80% 浓）+ 居中白字，等于经典款去掉金边、改整屏铺满 |
+
+三套无框皮肤由 **Tools → VN Effects → UI Skins → Export Soft Gradient Skins** 生成，
+资产在 `Assets/VNEffects/UISkins/`。想微调：正文颜色改 prefab 里 Body 的 TextMeshPro Color，
+描边/柔光改 `Materials/VN_SoftText_*.mat`，渐变浓淡改 Panel/Gradient 那个 Image 的 Color 的 alpha。
+改完直接生效，不要再跑「(覆盖重建)」那一项——它会用出厂参数冲掉你的调整。
+
+```
+# 用法示例
+ui dialogue 粉渐变
+星野结衣：这种事……你还是自己说比较好吧。
+ui dialogue default          # 换回经典款
+```
+
+### 名字样式（`ui name`）
+
+与对话框皮肤不同，名字样式是**内置预设，不用在 VNGameConfig 登记**，写名字即可。
+颜色跟着角色资产的 `nameColor` 走，所以同一个样式下每个角色的名字颜色仍然不同。
+
+| 写法 | 长什么样 | 适合 |
+|---|---|---|
+| `ui name 双描边` | 白字 + 角色色描边 + 深色最外圈 | **日常首选**，深浅背景都清楚 |
+| `ui name 金边` | 金色渐变 + 浮雕高光 + 深棕描边 | 告白、章名、结局等重要场面 |
+| `ui name 银边` | 冷银渐变 + 浮雕高光 | 夜景、雪景（**浅背景下偏弱**，别在白天户外用）|
+| `ui name 霓虹` | 角色色 HDR 面色 + 辉光（走 Bloom）| 暗场、科幻、梦境 |
+| `ui name 墨影` | 角色色渐变 + 白细边 + 大扩散软影 | 柔和文艺，压得住花哨背景 |
+| `ui name 糖果` | 角色色亮面 + 白粗边 + 同色深外圈 | 可爱系、日常轻松 |
+| `ui name 粗体` | 出厂设定：角色色渐变 + 白描边 + 下划线 | 深色背景 |
+| `ui name 描边` / `底板` / `朴素` | 旧版三套（描边=白字深边，底板=有底色块）| 兼容用 |
+| `ui name default` | 回出厂设定（= 粗体）| |
+
+英文枚举名也认（`ui name Gold` 等价于 `ui name 金边`）。**样式进存档**，读档会回到存档时那套。
+
+```
+# 用法示例：日常用双描边，告白那场换金边
+ui name 双描边
+星野结衣：今天天气不错呢。
+
+ui name 金边
+星野结衣：那个……我一直想跟你说……
+ui name 双描边               # 场面结束换回来
+```
+
+> 「镶金边」的原理是 TMP shader 的 **Bevel 浮雕 + Lighting 打光**（金色渐变只是颜色，
+> 金属感来自高光和暗面）。如果字体资产用的是 TMP **Mobile 版 shader**，
+> 这组属性不存在，金/银会退化成普通渐变描边并在 Console 提示一次。
+
 ---
 
 ## 九、玩家操作
@@ -1815,7 +1946,8 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
 | | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
 | | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
-| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒]`（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
+| | `first-waypoint-stay` | camseq 的第一个路径点写成了 `stay`——没有「上一个点」可沿用，运行时会跳过它 |
+| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位\|stay [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级\|强度,秒数]`（`stay` 行只能有一个数字＝时长）（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
 | **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
 
 ### 两条设计取舍
@@ -1891,7 +2023,10 @@ mark <角色> <符号|clear> [keep|off] [pos:x,y] [size:] [dur:]  立绘漫符
 move <角色> <位置> [秒]                          滑步换位
 wait <秒>                                        停顿
 camera <pushin|snapzoom|pan|dolly|reset> [...]   预设运镜
-camseq + > 目标点 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒]  多段镜头路径（hold = 到点后停留）
+bgscroll on|off [speed:] [dir:] [mode:] [time:] 背景无限滚动（走路/坐车/云飘；mirror 不挑图）
+camseq + > 目标点|stay [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]
+                                          多段镜头路径（hold = 到点后停留，shake = 到点震屏，
+                                          stay = 原地不动、沿用上一个点，此时唯一的数字是时长）
 camto <目标点> [zoom] [秒] / camcut <目标点> [zoom]  单段直达/瞬切
 shake <light|medium|heavy>                       震动
 weather <id> [density:] [wind:] [speed:] [size:]  天气

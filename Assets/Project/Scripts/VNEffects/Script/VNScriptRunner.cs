@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -274,6 +274,9 @@ namespace VNEffects
             {
                 weather = VNWeather.None.ToString(),
                 mood = VNMood.Neutral.ToString(),
+                scrollSpeed = VNBackgroundScroll.DefaultSpeed,
+                scrollDir = VNBackgroundScroll.DefaultDirection,
+                scrollMode = VNScrollMode.Mirror.ToString(),
             };
             // Ken Burns 默认开启：先种入再按剧本重放，重建结果才与真实运行一致
             snapshot.fxOn.Add("kenburns");
@@ -351,6 +354,20 @@ namespace VNEffects
                         float w = cmd.KwF("wind", float.NaN);
                         snapshot.weatherWindSet = !float.IsNaN(w);
                         snapshot.weatherWind = snapshot.weatherWindSet ? w : 0f;
+                        break;
+                    }
+                    case "bgscroll":
+                    {
+                        // 参数留空 = 沿用上一次的设定，重建时也要照这个语义累积，
+                        // 不能每条都重置成默认值（否则 bgscroll on speed:120 后面
+                        // 一句 bgscroll off / on 就把速度打回 80）
+                        snapshot.scrollOn = cmd.Arg(0, "on") != "off";
+                        if (cmd.kwargs.ContainsKey("speed"))
+                            snapshot.scrollSpeed = cmd.KwF("speed", VNBackgroundScroll.DefaultSpeed);
+                        var rDir = VNBackgroundScroll.ParseDirection(cmd.Kw("dir"));
+                        if (rDir.HasValue) snapshot.scrollDir = rDir.Value;
+                        var rMode = VNBackgroundScroll.ParseMode(cmd.Kw("mode"));
+                        if (rMode.HasValue) snapshot.scrollMode = rMode.Value.ToString();
                         break;
                     }
                     case "mood":
@@ -432,6 +449,7 @@ namespace VNEffects
                         if (skinId == "default") skinId = null;
                         if (cmd.Arg(0) == "dialogue") snapshot.dialogueSkin = skinId;
                         else if (cmd.Arg(0) == "choice") snapshot.choiceSkin = skinId;
+                        else if (cmd.Arg(0) == "name") snapshot.nameplateStyle = skinId;
                         break;
                     }
                     case "show":
@@ -1295,6 +1313,7 @@ namespace VNEffects
                         ease = Replace(point.ease),
                         fade = point.fade,
                         hold = point.hold,
+                        shake = point.shake,
                         line = point.line,
                     });
             }
@@ -1983,6 +2002,26 @@ namespace VNEffects
                         Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：reset 用法为「reset effects」");
                     return null;
 
+                case "bgscroll":
+                {
+                    // bgscroll on|off [speed:] [dir:] [mode:repeat|mirror] [time:]
+                    bool on = cmd.Arg(0, "on") != "off";
+                    float? speed = cmd.kwargs.ContainsKey("speed")
+                        ? cmd.KwF("speed", VNBackgroundScroll.DefaultSpeed) : (float?)null;
+                    float? dir = VNBackgroundScroll.ParseDirection(cmd.Kw("dir"));
+                    if (dir == null && !string.IsNullOrEmpty(cmd.Kw("dir")))
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：bgscroll dir" +
+                                         $"「{cmd.Kw("dir")}」认不出，应为 left/right/up/down 或角度");
+                    var mode = VNBackgroundScroll.ParseMode(cmd.Kw("mode"));
+                    if (mode == null && !string.IsNullOrEmpty(cmd.Kw("mode")))
+                        Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：bgscroll mode" +
+                                         $"「{cmd.Kw("mode")}」认不出，应为 repeat 或 mirror");
+                    float? fade = cmd.kwargs.ContainsKey("time")
+                        ? cmd.KwF("time", VNBackgroundScroll.DefaultFade) : (float?)null;
+                    stage.SetBackgroundScroll(on, speed, dir, mode, fade, cmd.line);
+                    return null;
+                }
+
                 case "shake":
                 {
                     var level = cmd.Arg(0, "medium").ToLower();
@@ -2000,6 +2039,7 @@ namespace VNEffects
 
                 case "ui":
                     // ui dialogue|choice <皮肤id|default>：切换对话框/选项面板皮肤
+                    // ui name <样式|default>：切换名字（说话人）的装饰样式
                     stage.SetUiSkin(cmd.Arg(0), cmd.Arg(1, "default"), cmd.line);
                     return null;
 
@@ -2673,21 +2713,51 @@ namespace VNEffects
 
             // 执行时才解析点位（角色可能刚移动过）
             var list = new List<VNCamera.Waypoint>();
-            for (int i = skipFirst ? 1 : 0; i < cmd.camPoints.Count; i++)
+            // stay 要沿用「上一个点」的位置与 zoom。哪怕首点被 skipFirst 跳过不进 list，
+            // 也得先把它解析出来当基准——否则 start:cut 后面第一个 stay 就没得沿用
+            Vector2? lastPoint = null;
+            float lastZoom = 1f;
+            for (int i = 0; i < cmd.camPoints.Count; i++)
             {
                 var def = cmd.camPoints[i];
-                var p = stage.ResolveCamPoint(def.point, def.line);
-                if (!p.HasValue) continue; // 已告警，跳过该点
+                Vector2 resolved;
+                float zoom;
+                if (VNCamWaypointDef.IsStay(def.point))
+                {
+                    if (!lastPoint.HasValue)
+                    {
+                        Debug.LogWarning($"[VNScript] 第 {def.line} 行：stay 没有「上一个点」" +
+                                         "可沿用（不能当第一个路径点），已跳过");
+                        continue;
+                    }
+                    resolved = lastPoint.Value;
+                    zoom = lastZoom;
+                }
+                else
+                {
+                    var p = stage.ResolveCamPoint(def.point, def.line);
+                    if (!p.HasValue) continue; // 已告警，跳过该点
+                    resolved = p.Value;
+                    zoom = def.zoom;
+                }
+                lastPoint = resolved;
+                lastZoom = zoom;
+
+                if (skipFirst && i == 0) continue; // 首点已由 bg 转场盖屏时应用过
+
                 bool easeSet = System.Enum.TryParse(def.ease, true, out Ease easeVal);
+                // 认不出的 shake 值 parser 已经告警过并置空，这里拿到的一定是合法的
+                VNShakeSpec.TryParse(def.shake, out VNShakeSpec shakeSpec);
                 list.Add(new VNCamera.Waypoint
                 {
-                    point = p.Value,
-                    zoom = def.zoom,
+                    point = resolved,
+                    zoom = zoom,
                     duration = def.duration,
                     ease = easeVal,
                     easeSet = easeSet,
                     fade = def.fade,
                     hold = def.hold,
+                    shake = shakeSpec,
                 });
             }
 
@@ -2696,7 +2766,7 @@ namespace VNEffects
             float endFade = cmd.Kw("end") == "fade" ? cmd.KwF("endfade", 0.6f) : 0f;
 
             if (list.Count == 0 && endFade <= 0f) yield break;
-            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade);
+            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade, stage.screenShake);
         }
 
         /// <summary>camera 命令的 focus:角色id 参数 → 该角色的画布坐标</summary>

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace VNEffects
@@ -27,7 +27,14 @@ namespace VNEffects
         public string ease;     // 可选缓动名
         public float fade;      // >0 = 交叉淡化到本点（xfade:秒），代替平移/瞬切
         public float hold;      // >0 = 到达本点后停留的秒数（hold:秒）
+        public string shake;    // 到达本点时震一下（shake:light|medium|heavy 或 shake:强度,秒数）
         public int line;
+
+        /// <summary>「沿用上一个路径点」的点位词：点位与 zoom 都不变，用于原地停顿/原地震</summary>
+        public const string StayToken = "stay";
+
+        public static bool IsStay(string point) =>
+            string.Equals(point, StayToken, System.StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>一条剧本命令（解析结果）</summary>
@@ -86,7 +93,7 @@ namespace VNEffects
         static readonly HashSet<string> Keywords = new HashSet<string>
         {
             "bg", "cg", "show", "hide", "emote", "mark", "wait",
-            "camera", "shake", "weather", "mood", "fx", "liquid",
+            "camera", "shake", "weather", "mood", "fx", "liquid", "bgscroll",
             "sakura", "transition", "reset",
             "label", "jump", "call", "return", "params", "flag", "stat", "time", "if", "choice",
             "chapter",
@@ -176,7 +183,13 @@ namespace VNEffects
             return result;
         }
 
-        /// <summary>解析镜头路径点行：> 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒]</summary>
+        /// <summary>
+        /// 解析镜头路径点行：
+        /// &gt; 目标点 [zoom] [时长] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]
+        ///
+        /// 点位写 <c>stay</c> 时**数字位前移**：点位和 zoom 都沿用上一个路径点，
+        /// 没有 zoom 可填，所以第一个数字就是时长（默认 0 = 完全不动）。
+        /// </summary>
         static void ParseCamWaypoint(VNScriptCommand camseqCmd, string raw, int line)
         {
             var tokens = raw.Substring(1).Trim()
@@ -188,7 +201,10 @@ namespace VNEffects
             }
 
             var wp = new VNCamWaypointDef { point = tokens[0], line = line };
-            int numIndex = 0; // 第 1 个数字 = zoom，第 2 个 = 时长
+            // stay = 原地：没有 zoom 可填，第 1 个数字就是时长，默认 0（画面纹丝不动）
+            bool isStay = VNCamWaypointDef.IsStay(wp.point);
+            if (isStay) wp.duration = 0f;
+            int numIndex = 0; // 第 1 个数字 = zoom，第 2 个 = 时长（stay 行只有时长）
             for (int t = 1; t < tokens.Length; t++)
             {
                 if (tokens[t].StartsWith("ease:"))
@@ -210,9 +226,26 @@ namespace VNEffects
                     else
                         Debug.LogWarning($"[VNScript] 第 {line} 行：hold 时长「{tokens[t]}」应为正数");
                 }
+                else if (tokens[t].StartsWith("shake:"))
+                {
+                    // 到达本点的瞬间震一下；三档别名或「强度,秒数」，认不出就整个忽略
+                    string val = tokens[t].Substring(6);
+                    if (VNShakeSpec.TryParse(val, out _))
+                        wp.shake = val;
+                    else
+                        Debug.LogWarning($"[VNScript] 第 {line} 行：shake「{val}」认不出，" +
+                                         "应为 light/medium/heavy 或「强度,秒数」（如 20,0.5）");
+                }
                 else if (float.TryParse(tokens[t], out float v))
                 {
-                    if (numIndex == 0) wp.zoom = v;
+                    if (isStay)
+                    {
+                        if (numIndex == 0) wp.duration = v;
+                        else
+                            Debug.LogWarning($"[VNScript] 第 {line} 行：stay 行只能有一个数字" +
+                                             $"（时长），多余的「{tokens[t]}」已忽略");
+                    }
+                    else if (numIndex == 0) wp.zoom = v;
                     else if (numIndex == 1) wp.duration = v;
                     numIndex++;
                 }
