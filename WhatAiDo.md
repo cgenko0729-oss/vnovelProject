@@ -7518,3 +7518,128 @@ UI Sprite 默认就是关的，开了的话 `frac` 的跳变会让接缝糊掉�
 | `Script/VNSaveSystem.cs` | `scrollOn/scrollSpeed/scrollDir/scrollMode` 四个字段 |
 | `Editor/VNScenarioSchema.cs` | `bgscroll` 命令登记（5 个参数，剧本编辑器/Ctrl+E 面板自动出现）|
 | `Editor/VNEffectsDemoSetup.cs` | 场景生成器给背景挂上滚动组件并回填 VNStage |
+
+---
+
+## 一一九、素材管理：VNGameConfig 分页 Inspector + 素材浏览器窗口（2026-08-29，分支 `agent/asset-manager`）
+
+### 需求 / 背景
+
+`VNGameConfig` 是全项目内容的总配置，一个资产里塞了 30 多个字段、十几个列表。
+用户的原话是「就一个 SO 里面有太多东西了我经常要 scroll 好久才找到我想设定的那个项目」，
+以及「放进去的 CG 或背景图片也没有预览，令我看不到哪张图片是哪张，音频也没有试听之类的功能」。
+
+排查后发现**滚不动的根因不是字段多，而是两件具体的事**：
+
+1. **`[Header]` 被写在了列表元素内部的字段上。** `VNStage.BackgroundEntry` / `CgEntry` /
+   `VNAudio.AudioEntry` / `VNGameConfig.UiSkinEntry` 都是这个写法：
+
+   ```csharp
+   public class CgEntry {
+       [Header("剧本 cg 命令引用的 CG id")]  public string id;
+       [Header("CG 一枚绘")]                 public Sprite sprite;
+       [Header("差分组名（同组 CG 在鉴赏画廊里归为一格翻页；留空 = 独立）")] public string group;
+   }
+   ```
+
+   `[Header]` 是 DecoratorDrawer，Unity 默认 Inspector 会**给列表里的每一项都重画一遍**，
+   于是一个 CG 条目占 6~7 行 —— 7 张 CG 就是 50 行。这才是「要滚很久」的真正来源。
+
+2. **`VNGameConfig` 从来没有 CustomEditor。** Editor 目录下 30 个文件，一个 `[CustomEditor]`
+   都没有，看到的完全是 Unity 默认序列化 Inspector：没有分页、没有搜索、没有缩略图、没有试听。
+
+还有一个隐藏前提让「预览」从锦上添花变成刚需：本项目的素材文件名是 AI 生成时的原始 prompt
+或纯数字 ——
+`masterpiece, very aesthetic, highly detailed, 1girl, solo, anime visual novel cg s-1095962266.png`、
+`1.png`、`c1.png`、`Sweet Homemade  Hitomi.la 3.png`。
+**文件名完全不表意，光看字不可能认出哪张是哪张。**
+所以新界面一律以缩略图为主、id 为标签，文件名退居次要信息。
+（反过来说，「id 手动填中文名」这个既有设计是对的，本次没有动它。）
+
+### 做了什么
+
+分两层，**运行时代码一行没改**、`VNGameConfig` 的字段结构一个没动，所以零迁移风险，
+剧本、存档、既有引用全部不受影响。
+
+**① PropertyDrawer 层（全项目通用）** —— 条目从 6~7 行压成 1 行。
+类型上一旦挂了 `CustomPropertyDrawer`，Unity 就不再递归画子字段，那些 `[Header]` 自然消失；
+说明文字改挂 tooltip，不占版面但鼠标悬停仍看得到。
+因为 drawer 是挂在**类型**上的，`VNStage` / `VNAudio` 组件 Inspector 上的同名列表也一并变紧凑，
+不只 `VNGameConfig` 受益。
+
+- 缩略图够高（≥34px）时排两行：上 id、下 资产 + 附加字段；调小自动退回单行。
+- 缩略图格子本身可拖入资产替换、单击 ping 到 Project。
+- 音频条目多一个 ▶ / ■ 试听按钮 + 波形 + 播放进度条。
+
+**② 分页 Inspector（`VNGameConfigEditor`）** —— 按功能切成
+`剧本｜标题｜UI 皮肤｜舞台｜音频｜玩法｜AI｜大头贴｜全部` 九页，一次只画一组，选中页存 EditorPrefs。
+每个列表再加：搜索框、条数 / 匹配数、分页（默认每页 50）、行内 ▲▼✕、
+id 重复与 id 为空的告警、以及底部的**批量拖入区**（拖一批素材进来自动建条目、id 预填文件名）。
+
+**③ 素材浏览器窗口（`VNAssetBrowserWindow`，Tools → VN Effects → Asset Browser）** ——
+左栏九个类别（带条数），右侧图片走大缩略图网格、音频走波形列表，底部详情栏可直接改 id / 换素材 /
+试听 / 定位 / 移除，右键菜单另有「用文件名填 id」「上移/下移」。
+网格与列表都做了**虚拟化**（只画滚动窗口内的那几行），200+ 素材不掉帧。
+另有「只看未登记」：列出素材目录里有、但库里没登记的文件，一键补登。
+
+### 技术决策与取舍
+
+- **Sprite 缩略图不走 `AssetPreview`。** `AssetPreview.GetAssetPreview` 是异步的，首帧返回 null，
+  要靠反复 Repaint 才等得到，列表里几十张图一起等会闪一片空白。Sprite 自己就知道在哪张 texture
+  的哪个矩形，直接 `GUI.DrawTextureWithTexCoords` 画那块 UV 即可 ——
+  **同步、精确、且不需要 texture 可读**。AudioClip 没有这种捷径（波形只能靠 AssetPreview），
+  所以音频那边仍走异步 + 占位兜底。
+- **异步预览不能无限等。** 有些资产（纯数据 SO、导入失败的音频）永远不会有预览图，
+  一直请求重绘就是空转。原本想用 `AssetPreview.IsLoadingAssetPreview(instanceID)` 问 Unity
+  「还在加载吗」，但 **Unity 6.5 起 `IsLoadingAssetPreview(int)` 和 `Object.GetInstanceID()`
+  都是 error 级弃用（CS0619，不是警告，直接编译失败）**。
+  改成不问 Unity，自己给每个资产一个 3 秒等待窗口，到点放弃 —— 顺带避开了绑死新版 API。
+- **音频试听走反射。** `UnityEditor.AudioUtil` 是 internal。方法名 Unity 各版本改过
+  （2020+ 是 `PlayPreviewClip`，更早叫 `PlayClip`），所以逐个候选探测，
+  探测不到时按钮变灰而不是抛异常。本机实测 `CanPreviewAudio = True`。
+- **Inspector 用分页而不是虚拟化。** Inspector 里拿不到宿主 ScrollView 的可见区域，
+  没法可靠地只画可见行；而窗口是 EditorWindow，滚动位置自己管，所以那边做了真虚拟化。
+  分页在这里反而更对症 —— 用户嫌的就是滚动太长。
+- **搜索口径与剧本编辑器一致**：空格分隔多关键字、全部命中、大小写不敏感、**纯子串包含**，
+  不做模糊 / 拼音，避免「搜出一堆不相干的」。
+  可搜索文本用通用做法拼（元素的所有字符串字段 + 所有引用资产的文件名），
+  所以以后新增条目类型不用改搜索代码。
+- **列表用手绘而不是 `ReorderableList`。** 过滤 + 分页会让 ReorderableList 的重排索引对不上；
+  手绘用 ▲▼ 按钮，且**搜索激活时隐藏 ▲▼**（此时「相邻」没有意义，留着只会误操作）。
+- **未分配字段有兜底。** 页签只登记字段名，绘制仍走 `PropertyField`。
+  没被任何页签认领的字段会自动落到「其他」页并给出提示 ——
+  以后往 `VNGameConfig` 加字段**不会在 Inspector 里静默消失**。
+- **「只看未登记」的扫描目录是反推的，不写死。** 项目里素材目录改过几次
+  （`Assets/CG` 与 `Assets/Art/Images/CG` 并存），写死路径必然过时；
+  改成从已登记条目的资产路径反推目录集合。代价是库全空时无从判断，此时给提示而不是报错。
+- **本次不碰素材文件本身。** 与用户确认过：不做分类 / 标签系统、不做剧本反查引用、
+  不批量重命名或移动文件。文件名乱就乱着，靠缩略图和 id 认。
+- 全程走 `SerializedObject`，改动自动进 Undo、自动标脏；不直接写字段。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Editor/VNAssetUi.cs`（新） | 三边共用的绘制与预览层：Sprite 缩略图（同步 UV 画法）、音频试听（AudioUtil 反射 + 多版本候选）、波形、拖拽接收、搜索匹配、Rect 切割辅助 |
+| `Editor/VNConfigEntryDrawers.cs`（新） | 背景 / CG / 音频 / UI 皮肤四个条目的紧凑单行 drawer，含试听按钮与拖入替换 |
+| `Editor/VNGameConfigEditor.cs`（新） | 九页分页 Inspector + 智能列表（搜索 / 分页 / 行操作 / id 告警 / 批量拖入）+ 未认领字段兜底 |
+| `Editor/VNAssetBrowserWindow.cs`（新） | 素材浏览器窗口：类别栏、虚拟化网格与音频列表、详情栏、右键菜单、只看未登记 |
+
+**没有修改任何既有文件** —— 四个全是新增的 Editor 文件。
+
+### 验证方法
+
+- `dotnet build Assembly-CSharp-Editor.csproj`：0 error，四个新文件 0 warning
+  （临时把新文件加进 csproj，验完还原，见 [vn-debug] 的编译验证节）。
+- Unity 内 `assets-refresh` 后 Console 零 Error / 零 Exception。
+- 冒烟脚本确认：`Editor.CreateEditor(cfg).GetType()` 返回
+  `VNEffects.EditorTools.VNGameConfigEditor`（CustomEditor 确实挂上了，没有静默回退默认 Inspector）、
+  `VNAssetUi.CanPreviewAudio = True`（反射拿到了 AudioUtil）、
+  浏览器窗口打开后持续绘制无异常。
+- 当前库规模：背景 13 / CG 7 / BGM 8 / SE 1 / Voice 11 / 角色 4。
+
+### 后续可做（本次刻意没做）
+
+- 素材分类 / 标签（Unity Asset Labels 零数据结构改动即可实现，用户暂时不需要）。
+- 剧本反查引用（哪张图被哪些 `.vn.txt` 的哪一行用过 / 未使用素材检测）。
+- 批量重命名与目录整理（`Background` 目录里目前混了立绘和 CG）。

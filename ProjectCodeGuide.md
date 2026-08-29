@@ -689,6 +689,20 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNAiStudioLog.cs | （导出） | 试聊会话按游戏内**同格式**写到 `AiTalkLogs/Editor/`，两边日志可互相对比 |
 | VNAiEditorCoroutine.cs | （基础设施） | Play Mode 外的协程泵，试聊台与自检菜单共用。**坑**：子协程跑完弹栈后父协程的 `Current` 仍指着那个已耗尽的对象，不记 `_started` 会无限重新压栈，表现为「点了没反应也不报错」 |
 | VNAiCostReport.cs | Tools → VN Effects → AI → **Cost Report** | 花费累计报表：扫全部日志 json 聚合。**改成本相关代码时的回归入口**——存储金额与重算金额在同模型下必须相等 |
+| VNAssetUi.cs | （共用层） | 素材界面三边（drawer / 分页 Inspector / 浏览器窗口）共用的绘制与预览：Sprite 缩略图、音频试听、波形、拖拽接收、搜索匹配、Rect 切割。**加素材类界面先来这里找零件**，别各画各的 |
+| VNConfigEntryDrawers.cs | （PropertyDrawer） | 背景 / CG / 音频 / UI 皮肤四个条目的紧凑单行绘制。**挂在类型上**，所以 `VNGameConfig`、`VNStage`、`VNAudio` 三处的同名列表一起受益 |
+| VNGameConfigEditor.cs | （CustomEditor） | `VNGameConfig` 的九页分页 Inspector + 智能列表（搜索 / 分页 / 行操作 / id 告警 / 批量拖入） |
+| VNAssetBrowserWindow.cs | Tools → VN Effects → **Asset Browser** | 素材浏览器：大缩略图网格 + 音频波形列表（均虚拟化）+ 详情栏 + 只看未登记 |
+
+**素材界面三条硬约定**（一一九章）：
+① **Sprite 缩略图别用 `AssetPreview`** —— 它异步，列表里几十张一起等会闪一片空白；
+Sprite 自己知道在哪张 texture 的哪个 UV，`GUI.DrawTextureWithTexCoords` 同步画即可（texture 不必可读）。
+② 异步预览（音频波形、prefab）**必须有放弃机制** —— 有些资产永远不会有预览图，
+一直请求重绘就是空转；而 Unity 6.5 起 `AssetPreview.IsLoadingAssetPreview(int)` 与
+`Object.GetInstanceID()` 都是 **error 级弃用（CS0619，直接编译失败）**，问不了 Unity，
+只能自己记时间窗口。
+③ 分页 Inspector 的**页签只登记字段名**，绘制仍走 `PropertyField` ——
+往 `VNGameConfig` 加字段时不改页签也不会静默消失（会落到「其他」页并提示）。
 
 **编辑器铁律**：文本是唯一真相（编辑器状态不落存档）；`say` 的角色/表情走
 `VNRow.speaker/expression` 专用字段，`show` 才用普通参数——两条路径不能混。

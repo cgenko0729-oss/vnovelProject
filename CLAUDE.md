@@ -171,6 +171,9 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNTitleMenu | 开始菜单（同场景覆盖层 Canvas 500）：开始/继续(最新档含快存)/读档/鉴赏/设置/退出，后四者复用现成面板；Runner 启动时接管 playOnStart，ResumeAt 自动收层；标题文字/背景/BGM 配在 VNGameConfig「标题画面」区 |
 | VNSnsView / VNSnsMessage | SNS 手机聊天视图（`sns open` 后台词行渲染成气泡：「我」在右、对方在左）+ 单条消息数据；支持文字/语音/图片/正在输入/已读/限时回复（`sns reply timeout: late:`）；手工测量布局，会话与消息列表进存档，聊天中途可存档 |
 | VNLocale / VNScriptLocale | 本地化（中/英/日）：语言管理+UI 字符串表 / 剧本台词翻译查表（表在 Resources/VNLocale/，抽取工具 Tools→VN Effects→Localization） |
+| VNAssetUi / VNConfigEntryDrawers (Editor) | 素材界面共用层（缩略图·试听·波形·拖拽·搜索）/ 背景·CG·音频·UI皮肤四个条目的**紧凑单行 drawer**。**Sprite 缩略图不用 `AssetPreview`**——它是异步的，几十张一起等会闪空白；Sprite 自己知道在哪张 texture 的哪个 UV，`DrawTextureWithTexCoords` 同步画即可（texture 不必可读）。音频没这捷径只能异步 + 占位，但**不能无限等**（有些资产永远没预览图），自己给 3 秒窗口到点放弃——`IsLoadingAssetPreview(int)` / `GetInstanceID()` 在 Unity 6.5 是 **error 级弃用**不能用。试听走 `UnityEditor.AudioUtil` 反射（`PlayPreviewClip` / 老版 `PlayClip` 逐个探测，探不到就灰掉按钮）。**drawer 挂在类型上**，所以 VNStage / VNAudio 组件的同名列表也一并变紧凑 |
+| VNGameConfigEditor (Editor) | VNGameConfig 的**九页分页 Inspector**（剧本｜标题｜UI皮肤｜舞台｜音频｜玩法｜AI｜大头贴｜全部，选中页进 EditorPrefs）+ 智能列表（搜索·分页 50/页·▲▼✕·id 重复与空值告警·批量拖入自动填文件名当 id）。**页签只登记字段名**，绘制仍走 PropertyField，所以没被认领的新字段会自动落到「其他」页而不是静默消失。用分页而非虚拟化，是因为 Inspector 里拿不到宿主 ScrollView 的可见区域 |
+| VNAssetBrowserWindow (Editor) | 素材浏览器（Tools → VN Effects → **Asset Browser**）：左栏九类带条数，图片走大缩略图网格、音频走波形列表（**都做了虚拟化**，只画可见行），底部详情栏改 id/换素材/试听/定位/移除，右键还有「用文件名填 id」。**以缩略图为主、id 为标签**——本项目文件名是 AI 生成的原始 prompt 或纯数字（`1.png`、`masterpiece, very aesthetic… s-1095962266.png`），看名字根本认不出图。「只看未登记」的扫描目录**从已登记条目反推**，不写死（`Assets/CG` 与 `Assets/Art/Images/CG` 并存过） |
 
 ### 演示场景
 
