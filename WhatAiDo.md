@@ -7692,3 +7692,85 @@ foreach (var decorator in m_DecoratorDrawers) {
 - 素材分类 / 标签（Unity Asset Labels 零数据结构改动即可实现，用户暂时不需要）。
 - 剧本反查引用（哪张图被哪些 `.vn.txt` 的哪一行用过 / 未使用素材检测）。
 - 批量重命名与目录整理（`Background` 目录里目前混了立绘和 CG）。
+
+---
+
+## 一二〇、新图自动设为 Sprite：贴图导入默认值（2026-08-29，分支 `agent/asset-manager`）
+
+### 需求 / 背景
+
+每次往项目里加图片，都要手动把 Texture Type 改成 `Sprite (2D and UI)`、
+Sprite Mode 改成 `Single`，一张张点很烦。希望新图进来就是对的。
+
+### 做了什么
+
+新增 `Editor/VNTextureImportDefaults.cs`（`AssetPostprocessor`）：
+素材目录里首次导入的图片，自动设为 `Sprite (2D and UI)` + `Single`。
+另配一个菜单 **Tools → VN Effects → Textures → Apply Sprite Settings To Selection**
+给存量图手动补（选中图或文件夹，递归处理，会先弹确认）。
+
+### 技术决策与取舍
+
+- **用 `OnPreprocessTexture` 而不是导入后再改**：它在**导入前**跑，改完 importer 才开始
+  真正导入 —— 拖进来一次就是对的，不会先按默认设置导一遍再重导一遍。
+- **必须是白名单目录，不能全项目一刀切**。`Assets/Art/Models/**` 下有 60+ 张模型贴图
+  （法线 / 粗糙度 / 金属度），**法线贴图一旦按 sRGB 的 Sprite 导入光照就全错**，
+  而且这种错很难第一时间联想到导入设置。`Assets/Development/DebugScreenShot` 同理。
+  白名单：`Art/Images/`、`Art/CG/`、`Art/BigPhoto/`、`Art/Mark/`、`Assets/Assets/`
+  （前缀匹配，子目录一并覆盖；新开素材目录时往 `Roots` 补一行）。
+- **只在 `importSettingsMissing` 时设置**，即"这张图的导入设置从没被人配置过"。
+  好处是你手动调过的任何设置（Pivot、Max Size、改成 Multiple 切图…）都会让它变成 false，
+  于是**永远不会被打回去**。无条件强制的话，切好图的立绘图集会在下次 reimport 时
+  被打回 Single，切图数据虽然还在 .meta 里但不再生效 —— 属于"改了没反应"里最难查的一类。
+- 只设 Texture Type 与 Sprite Mode 两项，其余（Max Size、压缩质量、mipmap）保持 Unity 默认。
+  按用户要求不额外预设。顺带一提，Sprite 类型默认就不生成 mipmap，
+  与「背景图别开 Generate Mip Maps」（一一八章 bgscroll）天然一致。
+
+### 修复记录：`importSettingsMissing` 的语义比字面更宽
+
+初版只判断 `importSettingsMissing`，实测后发现 **5 张存量背景图的 .meta 被静默改写**
+（`bg06a` / `bg08a` / `bg17a` / `zbg13aa` / `zbg26ab`，`textureType: 0 → 8`，
+连带 `enableMipMap`、`wrapU/V`、`nPOTScale`、`alphaIsTransparency` 一串默认值跟着变）。
+
+原因：`importSettingsMissing` **不等于"没有 .meta"**。
+meta 存在却不含完整 importer 设置块时它同样返回 true ——
+工程里那些很早以前加进来、一直是 Default 类型没人动过的老图就属于这种。
+
+**试过的修法（失败）**：加一条「磁盘上没有 .meta 文件」来卡死"新文件"。
+**不成立** —— Unity 在调用 preprocessor 之前就已经把 .meta 写盘了，新旧图一律为真，
+加上这条之后整个 postprocessor 完全不生效（新图也变不成 Sprite 了）。
+这条已写进代码注释，免得以后有人再试一遍。
+
+**最终处置**：还原那 5 个 meta，保留 `importSettingsMissing` 判断（这是 Unity 官方推荐
+用来做"仅在用户尚未配置时应用默认值"的信号），并扫描确认实际影响面：
+
+```
+白名单目录内贴图共 187
+  已是 Sprite/Single ............ 172
+  已被人为配置过（不会被碰）...... 15
+  ★从未配置过（会被顺带改）....... 0
+```
+
+**当前工程里已经没有会被顺带修改的图**，所以保持简单方案。
+需要严格到"只碰新文件"的话，得引入一份基线 GUID 清单并进 git，
+当前收益为零，没做。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Editor/VNTextureImportDefaults.cs`（新） | AssetPostprocessor + 白名单目录 + 对选中项手动应用的菜单 |
+
+### 验证方法
+
+真实导入测试（放测试图 → refresh → 查 importer → 删测试图）：
+
+| 用例 | 结果 |
+|---|---|
+| 新图 · `Art/Images/Background/` | `Sprite / Single` ✓ |
+| 新图 · `Art/Mark/` | `Sprite / Single` ✓ |
+| 新图 · `Art/Models/`（对照组）| `Default / None` ✓ 模型贴图未被误伤 |
+| 存量 `bg06a.png` | `Default / None` ✓ 未被碰 |
+| `ForceUpdate` 全量重导入后 `git status` | 零个存量 .meta 被修改 ✓ |
+
+`InScope` 判定：Background=✓ Mark=✓ Models=✗ Development=✗。

@@ -693,6 +693,14 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNConfigEntryDrawers.cs | （PropertyDrawer） | 背景 / CG / 音频 / UI 皮肤四个条目的紧凑单行绘制。**挂在类型上**，所以 `VNGameConfig`、`VNStage`、`VNAudio` 三处的同名列表一起受益 |
 | VNGameConfigEditor.cs | （CustomEditor） | `VNGameConfig` 的九页分页 Inspector + 智能列表（搜索 / 分页 / 行操作 / id 告警 / 批量拖入） |
 | VNAssetBrowserWindow.cs | Tools → VN Effects → **Asset Browser** | 素材浏览器：大缩略图网格 + 音频波形列表（均虚拟化）+ 详情栏 + 只看未登记 |
+| VNTextureImportDefaults.cs | （AssetPostprocessor）+ Tools → VN Effects → Textures → Apply Sprite Settings To Selection | 素材目录里首次导入的图自动设 `Sprite (2D and UI)` + `Single`。**白名单目录**（`Roots` 数组，新开素材目录往里补一行），**绝不能全项目一刀切**——`Art/Models/**` 下的法线贴图按 Sprite 导入会让光照全错 |
+
+**贴图导入默认值的坑**（一二〇章）：`AssetImporter.importSettingsMissing`
+**不等于「没有 .meta」** —— meta 存在却不含完整 importer 设置块时它同样返回 true，
+工程里那些很早加进来、一直是 Default 类型没人动过的老图就属于这种，
+只信这一条会静默改写存量 .meta（实测中招 5 张）。
+反过来，想用「磁盘上没有 .meta」来卡死"新文件"**也不成立**：
+Unity 在调 preprocessor 之前就已经把 .meta 写盘了，加这条会让 postprocessor 完全不生效。
 
 **素材界面硬约定**（一一九章）：
 ⓪ **列表元素类里的字段说明一律用 `[Tooltip]`，绝不用 `[Header]`。**

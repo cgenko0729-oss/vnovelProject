@@ -1737,6 +1737,31 @@ CG 大图放 `Assets/CG/`，**文件名就是剧本里的 id**（如 `天台告�
 | VNPlanDef | `Assets/VNEffects/Plans/` | 日程方案：候选行动/编号/收益文案 |
 | VNQuestDef | `Assets/VNEffects/Quests/`（可选） | 任务文案 |
 
+### 新图自动设为 Sprite（不用再手动改导入设置）
+
+往这些目录里丢图片，**导入时自动就是 `Sprite (2D and UI)` + `Single`**，不用手动改：
+
+```
+✓ Assets/Art/Images/**   （Background / Character / CG / UI …）
+✓ Assets/Art/CG/
+✓ Assets/Art/BigPhoto/
+✓ Assets/Art/Mark/
+✓ Assets/Assets/          ← 随手丢素材的地方
+
+✗ Assets/Art/Models/**    ← 模型贴图，绝不能动（法线贴图按 Sprite 导入光照会全错）
+✗ Assets/Development/**   ← 调试截图
+```
+
+两条规则要知道：
+
+- **只在图片第一次导入时生效**。你事后手动调过的设置（Pivot、Max Size、
+  改成 Multiple 切图、Pixels Per Unit…）**永远不会被打回去**。
+- **新开素材目录**要走这套的话，去 `VNTextureImportDefaults.Roots` 补一行。
+
+存量图要补，选中图片或文件夹 →
+**Tools → VN Effects → Textures → Apply Sprite Settings To Selection**
+（会先弹确认；若其中有 Multiple 切图模式的图会额外警告，因为改成 Single 后切图不再生效）。
+
 ### 图片导入要求
 
 新素材放进 `Assets/Assets`（或任意位置），确保 Texture Type = **Sprite (2D and UI)**。

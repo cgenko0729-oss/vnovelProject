@@ -34,6 +34,12 @@ VNPlanDef / VNStatDef 等定义资产时。
 | 任务/商店/日程/属性 | Project 右键 → Create → VN → 对应 Definition；文案资产缺失时系统照常运作（只是没好看文案）；显示名翻译填资产 En/Ja 字段 |
 
 ## 图片导入要求
+- **素材目录里的新图会自动设成 Sprite (2D and UI) + Single**（`VNTextureImportDefaults`，
+  一二〇章）：`Art/Images/**`、`Art/CG/`、`Art/BigPhoto/`、`Art/Mark/`、`Assets/Assets/`。
+  **只在首次导入时生效**，手动调过的设置永不被覆盖；存量图用
+  Tools → VN Effects → Textures → Apply Sprite Settings To Selection 补。
+  新开素材目录要走这套 → 往 `VNTextureImportDefaults.Roots` 补一行。
+  **`Art/Models/**` 刻意排除**——法线贴图按 Sprite 导入光照会全错。
 - 立绘/UI：Sprite (2D and UI)，透明背景 PNG；大图注意 Max Size 别被压糊。
 - 演示场景立绘选择规则：`Assets/Assets` 下文件名含 "solo" 的前两张；
   背景轮换 = 其余 ≥900×600 的大图（命名时留意）。
