@@ -635,19 +635,42 @@ letterbox off
 ### hideHUD — 隐藏界面
 
 ```
-hideHUD
+hideHUD                      # 全藏：对话框+快捷条、属性栏、日历
+hideHUD stats                # 只藏顶部属性栏
+hideHUD keep stats calendar  # 藏住不动：点鼠标也不会弹回来
+hideHUD off                  # 全放回来
+hideHUD off stats            # 只把属性栏放回来
 ```
 
-一行关掉对话框、右下快捷功能条、顶部属性 HUD、右下日历，
-用来让玩家看干净的画面（站绘特写 / CG / 风景展示）。
+**目标**（不写 = 全部）：
 
-**只能关，没有 `hideHUD off`。** 玩家按 U / Enter / Space /
-鼠标左键 / 右键 任意一下即恢复，而且**那一下只恢复界面、不会顺带推进台词**。
-所以它等于「剧本替玩家按一下右键」，后面紧跟的台词行会在界面恢复后才继续。
+| 写法 | 藏什么 |
+|---|---|
+| `dialogue` | 对话框 + 右下快捷功能条（两者绑定，不拆） |
+| `stats` | 顶部属性 HUD（金钱 / 行动力 / …） |
+| `calendar` | 右下日历 HUD |
+| `all` | 以上全部 |
 
-> 隐藏状态**不进存档快照**，读档 / 从选中行播放不会重建它（本来就是一碰就还原的瞬态）。
+中文别名也认：`对话框` / `属性` / `日历` / `全部`。多个目标空格分开，顺序随意。
 
-### portrait — 对话头像开关
+**两种隐藏模式**：
+
+- **不写 `keep`（默认）**：玩家按 U / Enter / Space / 鼠标左右键任意一下就恢复，
+  而且**那一下只恢复界面、不推进台词**。适合「让玩家自己看一眼画面」。
+- **写 `keep`**：锁定隐藏，**玩家点击照常推进台词，界面不会弹回来**，
+  直到剧本写 `hideHUD off`。适合整段沉浸演出（风景 / CG / 长镜头）。
+
+```
+hideHUD keep
+: （只有背景和音乐，台词照常推进，界面一直不出现）
+: ……
+hideHUD off                  # 演完了，界面放回来
+```
+
+> **锁定隐藏进存档**（玩家在这段里存档，读档后界面照样是藏的）；
+> 不锁定的普通隐藏是瞬态，不进存档、调试重建也不重放。
+
+### portrait — 对话头像开关### portrait — 对话头像开关
 
 ```
 portrait on      # 对话框左侧显示说话者头像（默认）
@@ -2128,7 +2151,8 @@ liquid <splash|spray|click|wet|dry|cover> [on|off] [...]   液体喷溅
        [power:] [dir:0=右 90=上] [spread:] [rate:] [screen:上屏概率×] [amount:]
 letterbox <on|off> [height:] [time:]             电影黑边
 portrait <on|off>                                对话头像
-hideHUD                                          隐藏界面（只能关，玩家按键恢复）
+hideHUD [off] [keep] [dialogue|stats|calendar|all]…  隐藏界面
+        不写目标=全藏；keep=点鼠标也不弹回来，要 hideHUD off 才恢复
 reset effects                                    清空全部特效
 sakura                                           樱吹雪
 transition <类型>                                独立转场

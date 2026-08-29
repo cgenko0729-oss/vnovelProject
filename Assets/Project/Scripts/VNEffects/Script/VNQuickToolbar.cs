@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
@@ -129,6 +129,25 @@ namespace VNEffects
             _dock = dock;
             if (_root == null) { Build(); return; }
             AttachRoot();
+        }
+
+        /// <summary>
+        /// 「隐藏界面」联动（由 VNDialogueBox.SetInterfaceVisible 调用）。
+        ///
+        /// 【为什么工具栏得自己有一个 CanvasGroup】它的根物体挂着
+        /// overrideSorting = true 的嵌套 Canvas（为了压在对话框上面一层），
+        /// 而带 overrideSorting 的子 Canvas 会**打断父级 CanvasGroup 的 alpha 传播**——
+        /// 对话框把自己的 CanvasGroup.alpha 归零时，工具栏照画不误，
+        /// 表现为「对话框没了，一排圆按钮还浮在半空」。
+        /// </summary>
+        public void SetVisible(bool visible)
+        {
+            if (_root == null) return;   // 还没 Initialize：没东西可藏
+            var group = _root.GetComponent<CanvasGroup>();
+            if (group == null) group = _root.AddComponent<CanvasGroup>();
+            group.alpha = visible ? 1f : 0f;
+            group.blocksRaycasts = visible;
+            group.interactable = visible;
         }
 
         void AttachRoot()

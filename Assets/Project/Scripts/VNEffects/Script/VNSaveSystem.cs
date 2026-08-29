@@ -58,6 +58,10 @@ namespace VNEffects
         public string dialogueSkin;                    // 对话框皮肤 id（空 = 默认，旧存档兼容）
         public string choiceSkin;                      // 选项面板皮肤 id（空 = 默认）
         public string nameplateStyle;                  // 名字样式名（空 = 出厂样式，旧存档兼容）
+        // 锁定隐藏中的界面部件（hideHUD keep），如 "dialogue,stats"。
+        // 普通隐藏（右键 / 光一行 hideHUD）玩家一碰就还原，是瞬态**不存**——
+        // 存了会变成「读档后界面莫名其妙全没了」。空串 = 界面全开（旧存档缺省即此）。
+        public string uiHidden = "";
 
         /// <summary>
         /// AI 自由聊天的跨场记忆。**必须跟着存档走**——读回旧档时她不该记得

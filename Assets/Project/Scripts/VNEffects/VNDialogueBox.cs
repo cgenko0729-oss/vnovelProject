@@ -1,4 +1,4 @@
-using DG.Tweening;
+﻿using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -670,6 +670,12 @@ namespace VNEffects
             _group.alpha = visible && _shown ? 1f : 0f;
             _group.blocksRaycasts = visible && _shown;
             if (_shown) _animRect.anchoredPosition = _animBasePos;
+            // 快捷功能条挂在自己身上，但它的根有 overrideSorting 的嵌套 Canvas，
+            // 不吃这个 CanvasGroup 的 alpha，必须单独通知（见 VNQuickToolbar.SetVisible）。
+            // 只在隐藏界面这条路上联动；Show/HideBox 的淡入淡出照旧不动它，
+            // 那两条路上工具栏一直在是有意的（没台词时也能存档）。
+            var toolbar = GetComponent<VNQuickToolbar>();
+            if (toolbar != null) toolbar.SetVisible(visible);
         }
 
         // ------------------------------------------------------------------

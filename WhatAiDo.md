@@ -7955,3 +7955,89 @@ meta 存在却不含完整 importer 设置块时它同样返回 true ——
 
 - Unity 重编译零 Error（只剩既有的 `FindFirstObjectByType` obsolete 警告）。
 - 编辑器里打字搜 `hi` / `hud` / `hidehud` 都能出 `hideHUD（隐藏界面）` 候选。
+
+## 一二四、hideHUD 分项隐藏 + 锁定隐藏，兼修快捷条藏不掉（2026-08-29，分支 `agent/hidehud-keep`）
+
+### 问题
+
+想要「大部分时间看不到 UI」的沉浸感，但 `hideHUD` 有两个坎：
+
+1. **快捷功能条藏不掉**：对话框消失了，右下那排圆按钮还浮在半空。
+2. **玩家一点鼠标 UI 就全回来了** —— 而推进台词就得点鼠标，所以隐藏根本维持不住。
+3. 顺带：想只藏属性栏、留着对话框演台词，做不到（`hideHUD` 是一刀切全藏）。
+
+### 根因（快捷条那条）
+
+在 Play Mode 里实测（`_uiHidden=True` 时抓的状态）：
+
+```
+对话框    CanvasGroup alpha=0                     → 藏了
+属性 HUD  _hudVisible=False, activeSelf=False     → 藏了
+快捷条    Skin_QuickToolbar_New activeInHierarchy=True   → 没藏
+          canvas overrideSorting=True order=41
+```
+
+`VNQuickToolbar` 的根物体挂着 `overrideSorting = true` 的**嵌套 Canvas**（为了压在对话框上一层），
+而带 `overrideSorting` 的子 Canvas 会**打断父级 CanvasGroup 的 alpha 传播**——
+`VNDialogueBox` 把自己的 `CanvasGroup.alpha` 归零，工具栏照画不误。
+（属性栏其实一直藏得掉，截图里看到它是因为点过鼠标 UI 已经恢复了。）
+
+### 做了什么
+
+**① 修快捷条**：`VNQuickToolbar.SetVisible(bool)` 给自己的根加一个 CanvasGroup 单独关，
+由 `VNDialogueBox.SetInterfaceVisible` 调用。**只在「隐藏界面」这条路上联动**，
+`Show()` / `HideBox()` 的淡入淡出不动它 —— 没台词时工具栏仍在是有意的（那时也能存档）。
+
+**② 状态从 `bool _uiHidden` 改成按部件 + 锁定**：新增 `VNUiParts`（Flags 枚举：
+Dialogue / Stats / Calendar，Dialogue 含快捷条）与 `VNUiPartsUtil`（token 解析 + 存档字符串互转，
+剧本名与存档名共用一张表，永不分家）。Runner 侧 `_uiHiddenParts` + `_uiHideLocked`。
+
+**③ 命令扩成** `hideHUD [off] [keep] [dialogue|stats|calendar|all]…`：
+参数**按 token 分类而不是按位置**，所以 `hideHUD keep stats` 和 `hideHUD stats keep` 等价，
+编辑器里三个下拉留空也不会错位。`keep` = 锁定隐藏：Update 里那段「隐藏后第一次输入只恢复界面」
+的拦截**不再生效**，玩家点击照常推进台词，界面一直藏着，直到剧本 `hideHUD off`。
+
+**④ 存档三处同步**（vn-save-compat）：`VNSaveData.uiHidden`（字符串 `"dialogue,stats"`，
+旧存档缺省空串 = 界面全开）；`SaveTo` **只存锁定隐藏**；`LoadFrom` / `RebuildStateBefore`
+之后 `RestoreUiHidden()`。
+
+### 技术决策与取舍
+
+- **只有 keep 进存档。** 普通隐藏是「玩家一碰就还原」的瞬态，存了会变成
+  「读档后界面莫名其妙全没了」，玩家只会以为游戏坏了。
+- **锁定是整体状态，不是按部件的。** 混着写（keep 藏属性栏 + 普通藏对话框）时以最后一条为准——
+  否则「要不要拦玩家的输入」根本说不清，而那是个二选一的全局问题。
+- **Dialogue 与快捷条绑成一项**，不给快捷条单独的目标名：拆开会出现
+  「台词没了但存档按钮还浮着」的半吊子画面，那正是这次要修的 bug 本身。
+- **`hideHUD on` 不认**（会告警）：`on` 到底是「开启隐藏」还是「界面开」有歧义，
+  统一只用 `off` 表示恢复。
+- 事件模块期间的养成 HUD 隐藏改走 `ApplyGameplayHudVisible(allowed)`：
+  事件结束时按 `_uiHiddenParts` 恢复，不会把剧本藏起来的又翻出来（老代码是 `!_uiHidden` 一刀切）。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Script/VNUiParts.cs`（新） | `VNUiParts` Flags 枚举 + `VNUiPartsUtil`（token / 存档字符串互转，认中文别名） |
+| `Script/VNQuickToolbar.cs` | `SetVisible()`（自带 CanvasGroup，含 overrideSorting 打断 alpha 传播的说明） |
+| `VNDialogueBox.cs` | `SetInterfaceVisible` 联动工具栏 |
+| `Script/VNScriptRunner.cs` | `_uiHiddenParts` / `_uiHideLocked`、`SetUiHidden()`、`ApplyUiHidden()`、`ApplyGameplayHudVisible()`、`ParseHideHudArgs()`、`RestoreUiHidden()`、Update 锁定分支、存档读写、调试重建 |
+| `Script/VNSaveSystem.cs` | `VNSaveData.uiHidden` |
+| `Editor/VNScenarioSchema.cs` | hideHUD 三个位置参数格（同一张候选表） |
+| `HowToUse.md` | hideHUD 小节重写 + 速查表 |
+
+### 验证方法
+
+Unity 重编译零 Error；Play Mode 里逐步调 `SetUiHidden` 抓状态：
+
+| 步骤 | 对话框 alpha | 快捷条 alpha | 属性栏 | 日历 `_visible` |
+|---|---|---|---|---|
+| hide all | 0 | **0**（修复前是 1） | False | False |
+| show all | — | 1 | True | True |
+| keep stats | — | 1 | **False** | True |
+| + dialogue | — | **0** | False | True |
+| off stats | — | 0 | **True** | True |
+| 全恢复 | — | 1 | True | True |
+
+（日历走 `_dirty` 延迟一帧刷新，所以同帧只能看 `_visible`；
+`VNUiPartsUtil.Parse` 的中英/大小写/中文别名与 token 往返也单独跑过。）
