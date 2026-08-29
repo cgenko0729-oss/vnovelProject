@@ -7903,3 +7903,55 @@ meta 存在却不含完整 importer 设置块时它同样返回 true ——
   缺 `scroll1 scroll2 scroll3 scroll4 scroll5 test1 test2`。
 - 修复后：候选 = 20，上述 7 个全部出现，`test1` / `scroll5` 命中检查为 True。
 - 手动 `RaiseChanged()` 广播一次，订阅方重建候选无异常。
+
+## 一二三、`hideHUD` 登记进剧本编辑器（2026-08-29，分支 `agent/hidehud-schema`）
+
+### 问题
+
+`hideHUD`（隐藏对话框 + 快捷功能条 + 属性 HUD + 日历）**运行时早就能用**，
+`VNScriptParser.Keywords` 和 `VNScriptRunner` 的 case 都在，
+但**编辑器里搜不到**：行首命令按钮的分类菜单、打字换命令、`Ctrl+E` 命令面板
+都列不出它，只能自己在文本里手打命令名（还得记住大小写是 `hideHUD`）。
+
+### 根因
+
+编辑器的命令候选表**从 `VNScenarioSchema.Commands` 现场生成**
+（`VNCommandSearch` 里那句「加新命令不用回来登记」说的就是这条链路），
+而当初加 `hideHUD` 时只改了 Parser + Runner，**漏了 Schema 这一步**
+（vn-new-command 清单第 5 步）。
+
+顺带说明为什么它以前还能正常显示：`VNScenarioDoc` 判定「这行是不是命令」用的是
+`VNScriptParser.CommandKeywords`，不是 Schema，所以已有的 `hideHUD` 行会被认成
+`VNRowKind.Command` 正常保留，只是 `VNScenarioSchema.Find()` 返回 null、
+没有中文名也没有提示 —— 表现为「能存在但列不出来」。
+
+### 做了什么
+
+- `VNScenarioSchema` 里 `ui` 之后补一条 `Add("hideHUD", "Scene", hint)`，**零参数**
+  （同 `sakura` / `return` 那种无参命令），hint 写明「只能关 + 玩家按键恢复」。
+- `VNScenarioEditorWindow.CommandTranslations` 补 `{ "hideHUD", "隐藏界面" }`，
+  行首按钮显示成 `hideHUD（隐藏界面）`。
+
+### 技术决策与取舍
+
+- **只做登记，没有顺手加 `hideHUD on|off`。** 加 off 等于新增一条「剧本可主动恢复界面」
+  的语义，那就要考虑隐藏状态进不进存档快照（vn-save-compat 三处同步），
+  与本次「让编辑器搜得到」的目标无关，留作后续需求。
+- **分类归 `Scene` 而不是 `FX`**：它和 `ui` / `portrait` 一样是界面开关，不是画面特效，
+  放 `Scene` 与 `ui` 相邻。
+- 大小写保持 `hideHUD` 原样：`VNScriptParser.Keywords` 是**大小写敏感**的 `HashSet`，
+  Schema 若写成 `hidehud`，编辑器插出来的行运行时会报「未知命令」。
+  搜索本身是 `OrdinalIgnoreCase` 子串匹配，所以打 `hidehud` / `hud` 一样搜得到。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Editor/VNScenarioSchema.cs` | 新增 `hideHUD` 命令定义（Scene 分类，无参数） |
+| `Editor/VNScenarioEditorWindow.cs` | `CommandTranslations` 补中文名「隐藏界面」 |
+| `HowToUse.md` | 新增 `hideHUD` 小节 + 命令速查表补一行 |
+
+### 验证方法
+
+- Unity 重编译零 Error（只剩既有的 `FindFirstObjectByType` obsolete 警告）。
+- 编辑器里打字搜 `hi` / `hud` / `hidehud` 都能出 `hideHUD（隐藏界面）` 候选。

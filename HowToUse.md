@@ -632,6 +632,21 @@ letterbox off
 
 上下黑边滑入/滑出，营造过场/回忆的电影感。`mood Memory` 会自动开启。
 
+### hideHUD — 隐藏界面
+
+```
+hideHUD
+```
+
+一行关掉对话框、右下快捷功能条、顶部属性 HUD、右下日历，
+用来让玩家看干净的画面（站绘特写 / CG / 风景展示）。
+
+**只能关，没有 `hideHUD off`。** 玩家按 U / Enter / Space /
+鼠标左键 / 右键 任意一下即恢复，而且**那一下只恢复界面、不会顺带推进台词**。
+所以它等于「剧本替玩家按一下右键」，后面紧跟的台词行会在界面恢复后才继续。
+
+> 隐藏状态**不进存档快照**，读档 / 从选中行播放不会重建它（本来就是一碰就还原的瞬态）。
+
 ### portrait — 对话头像开关
 
 ```
@@ -2113,6 +2128,7 @@ liquid <splash|spray|click|wet|dry|cover> [on|off] [...]   液体喷溅
        [power:] [dir:0=右 90=上] [spread:] [rate:] [screen:上屏概率×] [amount:]
 letterbox <on|off> [height:] [time:]             电影黑边
 portrait <on|off>                                对话头像
+hideHUD                                          隐藏界面（只能关，玩家按键恢复）
 reset effects                                    清空全部特效
 sakura                                           樱吹雪
 transition <类型>                                独立转场

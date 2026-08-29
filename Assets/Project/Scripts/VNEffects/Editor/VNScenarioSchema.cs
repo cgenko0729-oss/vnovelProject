@@ -222,6 +222,10 @@ namespace VNEffects.EditorTools
                 // 候选跟着 kind 走：dialogue/choice 列 VNGameConfig 里登记的皮肤，
                 // name 列内置的名字样式预设
                 Pos("id", "skin", VNParamSource.UiSkinId, def: "default", dependsOn: "kind"));
+            // 无参数命令：只负责「关」，玩家按 U / Enter / Space / 左右键即还原
+            // （那一下只还原界面，不会顺带推进台词）。没有 hideHUD off 这种写法。
+            Add("hideHUD", "Scene", "hideHUD  （隐藏界面：对话框 + 快捷功能条 + 属性 HUD + 日历）\n" +
+                "只能关：玩家按 U / Enter / Space / 鼠标左右键任意一下即恢复（该操作不推进台词）");
 
             // ---- Camera ----
             Add("camera", "Camera", "camera <move> [a] [b] [focus:char]\n" +
