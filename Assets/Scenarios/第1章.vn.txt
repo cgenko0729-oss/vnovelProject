@@ -25,8 +25,12 @@ letterbox off time:1.2
 bg 教室 transition:Eyelid
 bg 教室_黄昏 transition:WhiteFlash
 mood Neutral
-bg scroll
-bgscroll on speed:70 dir:left mode:mirror
+hideHUD
+bg test1
+camseq
+> -1.1,42.6 1.09 0
+show 星野结衣 at:left expr:默认 with:StepIn
+bgscroll on speed:28 dir:left mode:mirror
 fx godrays on
 fx clouds on
 ui dialogue 黑渐变
@@ -222,6 +226,18 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
