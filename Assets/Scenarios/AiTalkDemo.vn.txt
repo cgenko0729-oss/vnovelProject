@@ -15,12 +15,13 @@
 
 : （放学后。教室里只剩下你和还在收拾书包的她。）
 
-show 星野结衣 at:center
+bg 图书馆 transition:InkSpread
+show 星野结衣 at:left
 
 # ---------- ① 最小用法：只写 vs，其余全用人格资产的默认值 ----------
 # persona: 省略时按 vs 的角色 id 自动找该角色的人格
 
-event aitalk vs:星野结衣 turns:6 topic:随便聊聊今天发生的事 place:放学后的空教室 stat:好感 rate:2 flag:闲聊_
+event aitalk vs:星野结衣 turns:7 topic:日常闲聊 place:学校教室 stat:好感 rate:2 flag:闲聊_
 * 好感提升 -> 聊得不错
 * 普通 -> 平淡收场
 * 冷场 -> 气氛尴尬
@@ -71,3 +72,18 @@ jump 结束
 
 label 结束
 : （AiTalkDemo 播放完毕。四个结果分支、属性联动、倾向统计都看过了。）
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

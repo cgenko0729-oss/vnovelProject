@@ -32,8 +32,9 @@ sns read
 
 # ---------- 限时回复：8 秒内不选就是「已读不回」 ----------
 
-sns typing 1.2
+sns typing 1.2 CG_雨伞 unlock:yes
 星野结衣: 那…明天早点来拿？
+sns image 星野结衣 CG_test
 
 sns reply timeout:8 late:没回复 lateflag:好感度-1
 * 好，明天见 flag:好感度+2 -> 答应了
@@ -90,4 +91,8 @@ label 心情好
 
 label 结束
 : —— SNS 演示结束 ——
+
+
+
+
 

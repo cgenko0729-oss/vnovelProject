@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8752a90c85ebecc4d85539259b064c1b, type: 3}
-  m_Name: "\u661F\u91CE\u7ED3\u8863_\u65E5\u5E38"
+  m_Name: "\u661F\u91CE\u7ED3\u8863_BackUp"
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNAiPersonaDef
   id: "\u661F\u91CE\u7ED3\u8863_\u65E5\u5E38"
   character: {fileID: 11400000, guid: d6da61221a1ce74439a3baf628fd3164, type: 2}
@@ -31,8 +31,8 @@ MonoBehaviour:
   - "\u97F3\u7B26"
   - "\u7701\u7565\u53F7"
   optionTones:
-  - "\u968F\u673A1 "
-  - "\u968F\u673A2"
+  - "\u5B85\u75371 "
+  - "\u5B85\u75372"
   - "\u968F\u673A3"
   - "\u968F\u673A4"
   - "\u968F\u673A5"
