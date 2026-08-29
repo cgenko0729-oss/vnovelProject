@@ -123,6 +123,11 @@ namespace VNEffects.EditorTools
             if (_config == null) { DrawNoConfig(); return; }
             _so.Update();
 
+            // 窗口大底（主题关闭时不画，保持 Unity 原生外观）
+            if (VNAssetTheme.Enabled)
+                EditorGUI.DrawRect(new Rect(0f, 0f, position.width, position.height),
+                                   VNAssetTheme.Window);
+
             var top = new Rect(0f, 0f, position.width, TopH);
             float bodyH = Mathf.Max(60f, position.height - TopH - DetailH);
             var left = new Rect(0f, TopH, LeftW, bodyH);
@@ -158,17 +163,37 @@ namespace VNEffects.EditorTools
 
         void DrawTopBar(Rect r)
         {
-            GUI.Box(r, GUIContent.none, EditorStyles.toolbar);
-            var row = VNAssetUi.Shrink(r, 1f);
+            bool themed = VNAssetTheme.Enabled;
+            if (themed)
+            {
+                EditorGUI.DrawRect(r, VNAssetTheme.Toolbar);
+                EditorGUI.DrawRect(new Rect(r.x, r.yMax - 1f, r.width, 1f), VNAssetTheme.Divider);
+            }
+            else GUI.Box(r, GUIContent.none, EditorStyles.toolbar);
+
+            var row = VNAssetUi.Shrink(r, themed ? 3f : 1f);
 
             // 搜索
             var searchRect = VNAssetUi.CutLeft(ref row, Mathf.Min(240f, row.width * 0.4f));
-            string q = EditorGUI.TextField(searchRect, _query, EditorStyles.toolbarSearchField);
+            if (themed)
+            {
+                VNAssetTheme.Box(searchRect, VNAssetTheme.Card);
+                VNAssetTheme.Outline(searchRect, VNAssetTheme.CardBorder, 1.2f);
+            }
+            string q = EditorGUI.TextField(searchRect, _query, VNAssetTheme.SearchField);
             if (q != _query) { _query = q; _scrollGrid.y = 0f; }
+            if (themed && string.IsNullOrEmpty(q) && Event.current.type == EventType.Repaint)
+            {
+                var old = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, 0.7f);
+                GUI.Label(new Rect(searchRect.x + 8f, searchRect.y, searchRect.width - 12f, searchRect.height),
+                          "搜索…", VNAssetTheme.Dim);
+                GUI.color = old;
+            }
 
             // 缩略图尺寸
             var sizeLabel = VNAssetUi.CutLeft(ref row, 34f, 2f);
-            EditorGUI.LabelField(sizeLabel, "大小", EditorStyles.miniLabel);
+            EditorGUI.LabelField(sizeLabel, "大小", themed ? VNAssetTheme.Dim : EditorStyles.miniLabel);
             var slider = VNAssetUi.CutLeft(ref row, 90f);
             GridSize = GUI.HorizontalSlider(VNAssetUi.Line(slider, 12f), GridSize, 48f, 240f);
 
@@ -176,22 +201,36 @@ namespace VNEffects.EditorTools
             if (Cats[_cat].kind != Kind.Object)
             {
                 var chk = VNAssetUi.CutLeft(ref row, 96f, 6f);
-                _onlyUnregistered = GUI.Toggle(VNAssetUi.Line(chk), _onlyUnregistered,
-                    new GUIContent("只看未登记",
-                        "扫已登记素材所在的那些目录，列出还没登进库的文件。\n" +
-                        "目录是从现有条目反推的，所以库全空时无从判断。"),
-                    EditorStyles.toolbarButton);
+                var content = new GUIContent(_onlyUnregistered ? "✓ 只看未登记" : "只看未登记",
+                    "扫已登记素材所在的那些目录，列出还没登进库的文件。\n" +
+                    "目录是从现有条目反推的，所以库全空时无从判断。");
+                if (themed)
+                {
+                    if (VNAssetTheme.Button(VNAssetUi.Line(chk, 17f), content, _onlyUnregistered))
+                        _onlyUnregistered = !_onlyUnregistered;
+                }
+                else _onlyUnregistered = GUI.Toggle(VNAssetUi.Line(chk), _onlyUnregistered,
+                                                    content, EditorStyles.toolbarButton);
             }
 
-            // 右侧
+            // 右侧：主题切换 → 配置资产 → 扫描目录（从右往左切）
+            var themeRect = VNAssetUi.CutRight(ref row, 60f, 2f);
+            var themeContent = new GUIContent("🌸 " + VNAssetTheme.Names[(int)VNAssetTheme.Current],
+                                              "切换窗口外观");
+            if (themed ? VNAssetTheme.Button(VNAssetUi.Line(themeRect, 17f), themeContent)
+                       : GUI.Button(themeRect, themeContent, EditorStyles.toolbarButton))
+                ShowThemeMenu();
+
             var ping = VNAssetUi.CutRight(ref row, 76f, 2f);
-            if (GUI.Button(ping, new GUIContent("配置资产", "在 Inspector 里打开 VNGameConfig"),
-                           EditorStyles.toolbarButton))
+            var pingContent = new GUIContent("配置资产", "在 Inspector 里打开 VNGameConfig");
+            if (themed ? VNAssetTheme.Button(VNAssetUi.Line(ping, 17f), pingContent)
+                       : GUI.Button(ping, pingContent, EditorStyles.toolbarButton))
                 VNAssetUi.Ping(_config);
 
             var rescan = VNAssetUi.CutRight(ref row, 84f, 2f);
-            if (GUI.Button(rescan, new GUIContent("扫描目录", "按目录补登定义资产"),
-                           EditorStyles.toolbarButton))
+            var rescanContent = new GUIContent("扫描目录", "按目录补登定义资产");
+            if (themed ? VNAssetTheme.Button(VNAssetUi.Line(rescan, 17f), rescanContent)
+                       : GUI.Button(rescan, rescanContent, EditorStyles.toolbarButton))
             {
                 VNGameConfigTools.RescanAssetFolders();
                 _so = null; Acquire();
@@ -199,18 +238,52 @@ namespace VNEffects.EditorTools
             }
         }
 
+        /// <summary>按主题走的小按钮：主题开启时是粉色圆角，否则退回 Unity miniButton。</summary>
+        static bool Btn(Rect r, string label, bool primary = false)
+        {
+            return VNAssetTheme.Enabled
+                 ? VNAssetTheme.Button(r, new GUIContent(label), primary)
+                 : GUI.Button(r, label, EditorStyles.miniButton);
+        }
+
+        void ShowThemeMenu()
+        {
+            var m = new GenericMenu();
+            for (int i = 0; i < VNAssetTheme.Names.Length; i++)
+            {
+                var pick = (VNAssetTheme.Kind)i;
+                m.AddItem(new GUIContent(VNAssetTheme.Names[i]), VNAssetTheme.Current == pick,
+                          () => { VNAssetTheme.Current = pick; Repaint(); });
+            }
+            m.ShowAsContext();
+        }
+
         void DrawCategories(Rect r)
         {
-            EditorGUI.DrawRect(r, new Color(0f, 0f, 0f, 0.10f));
-            float y = r.y + 4f;
+            bool themed = VNAssetTheme.Enabled;
+            if (themed)
+            {
+                EditorGUI.DrawRect(r, VNAssetTheme.SidePanel);
+                EditorGUI.DrawRect(new Rect(r.xMax - 1f, r.y, 1f, r.height), VNAssetTheme.Divider);
+            }
+            else EditorGUI.DrawRect(r, new Color(0f, 0f, 0f, 0.10f));
+
+            float y = r.y + 6f;
             for (int i = 0; i < Cats.Length; i++)
             {
                 var arr = ArrayOf(Cats[i].field);
                 int n = arr != null ? arr.arraySize : 0;
 
-                var row = new Rect(r.x + 3f, y, r.width - 6f, 21f);
+                var row = new Rect(r.x + 5f, y, r.width - 10f, 22f);
                 bool on = i == _cat;
-                if (on) EditorGUI.DrawRect(row, new Color(0.35f, 0.6f, 0.95f, 0.35f));
+                bool hover = row.Contains(Event.current.mousePosition);
+
+                if (themed)
+                {
+                    if (on) { VNAssetTheme.Box(row, VNAssetTheme.Card); VNAssetTheme.Outline(row, VNAssetTheme.Accent, 1.6f); }
+                    else if (hover) VNAssetTheme.Box(row, new Color(1f, 1f, 1f, 0.55f));
+                }
+                else if (on) EditorGUI.DrawRect(row, new Color(0.35f, 0.6f, 0.95f, 0.35f));
 
                 if (GUI.Button(row, GUIContent.none, GUIStyle.none))
                 {
@@ -218,12 +291,12 @@ namespace VNEffects.EditorTools
                     EditorPrefs.SetInt(CatPrefKey, i);
                     GUI.FocusControl(null);
                 }
-                var label = new Rect(row.x + 6f, row.y, row.width - 40f, row.height);
+                var label = new Rect(row.x + 8f, row.y, row.width - 42f, row.height);
                 EditorGUI.LabelField(label, Cats[i].title,
-                                     on ? EditorStyles.boldLabel : EditorStyles.label);
-                EditorGUI.LabelField(new Rect(row.xMax - 36f, row.y, 32f, row.height),
-                                     n.ToString(), VNAssetUi.RowLabel);
-                y += 22f;
+                                     on ? VNAssetTheme.SideOn : VNAssetTheme.Side);
+                EditorGUI.LabelField(new Rect(row.xMax - 34f, row.y, 30f, row.height),
+                                     n.ToString(), VNAssetTheme.Dim);
+                y += 23f;
             }
         }
 
@@ -336,7 +409,7 @@ namespace VNEffects.EditorTools
             if (_visible.Count == 0)
                 EditorGUI.LabelField(new Rect(Gap, Gap, content.width - Gap * 2f, 20f),
                     string.IsNullOrEmpty(_query) ? "这个库还是空的 —— 把素材拖进来即可。" : "没有匹配项",
-                    VNAssetUi.RowLabel);
+                    VNAssetTheme.Dim);
 
             // 末尾的批量拖入提示条
             var hint = new Rect(Gap, Mathf.Max(Gap + rows * stepY, 24f), content.width - Gap * 2f, 28f);
@@ -350,25 +423,36 @@ namespace VNEffects.EditorTools
         void DrawCell(Rect cell, SerializedProperty arr, int index, float size)
         {
             var el = arr.GetArrayElementAtIndex(index);
-            var thumb = new Rect(cell.x, cell.y, size, size);
-            var label = new Rect(cell.x, cell.yMax - LabelH, size, LabelH);
-
             bool selected = _selected == index;
-            if (selected)
-                EditorGUI.DrawRect(VNAssetUi.Shrink(thumb, -3f), new Color(0.35f, 0.6f, 0.95f, 0.45f));
+            bool themed = VNAssetTheme.Enabled;
+
+            // 主题开启时整个格子（图 + 标签）是一张圆角白卡，缩略图缩进去留白边
+            Rect thumb, label;
+            if (themed)
+            {
+                VNAssetTheme.CardBox(cell, selected);
+                thumb = VNAssetUi.Shrink(new Rect(cell.x, cell.y, size, size), 5f);
+                label = new Rect(cell.x + 3f, cell.yMax - LabelH - 2f, size - 6f, LabelH);
+            }
+            else
+            {
+                thumb = new Rect(cell.x, cell.y, size, size);
+                label = new Rect(cell.x, cell.yMax - LabelH, size, LabelH);
+                if (selected)
+                    EditorGUI.DrawRect(VNAssetUi.Shrink(thumb, -3f), new Color(0.35f, 0.6f, 0.95f, 0.45f));
+            }
 
             var asset = AssetOf(el);
             var sprite = asset as Sprite;
-            if (sprite != null) VNAssetUi.DrawSpriteThumb(thumb, sprite);
-            else VNAssetUi.DrawObjectThumb(thumb, asset);
+            // 主题开启时不画 VNAssetUi 那层半透明黑底，卡片自己就是底
+            if (sprite != null) VNAssetUi.DrawSpriteThumb(thumb, sprite, !themed);
+            else VNAssetUi.DrawObjectThumb(thumb, asset, !themed);
 
             if (asset == null)
                 VNAssetUi.DrawOutline(thumb, new Color(1f, 0.6f, 0.2f, 0.8f), 1f);   // 空槽标橙
 
-            var style = new GUIStyle(EditorStyles.miniLabel)
-            { alignment = TextAnchor.MiddleCenter, clipping = TextClipping.Clip };
-            if (selected) style.fontStyle = FontStyle.Bold;
-            GUI.Label(label, new GUIContent(LabelOf(el), Tooltip(el)), style);
+            GUI.Label(label, new GUIContent(LabelOf(el), Tooltip(el)),
+                      selected ? VNAssetTheme.CaptionOn : VNAssetTheme.Caption);
 
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && thumb.Contains(e.mousePosition))
@@ -433,7 +517,7 @@ namespace VNEffects.EditorTools
             if (_visible.Count == 0)
                 EditorGUI.LabelField(new Rect(6f, 6f, content.width - 12f, 20f),
                     string.IsNullOrEmpty(_query) ? "这个库还是空的 —— 把音频拖进来即可。" : "没有匹配项",
-                    VNAssetUi.RowLabel);
+                    VNAssetTheme.Dim);
 
             var hint = new Rect(4f, Mathf.Max(_visible.Count * rowH + 6f, 24f), content.width - 8f, 28f);
             DrawDropHint(hint, arr);
@@ -446,11 +530,19 @@ namespace VNEffects.EditorTools
         {
             var el = arr.GetArrayElementAtIndex(index);
             var clip = AssetOf(el) as AudioClip;
+            bool themed = VNAssetTheme.Enabled;
 
-            if (_selected == index) EditorGUI.DrawRect(row, new Color(0.35f, 0.6f, 0.95f, 0.30f));
+            if (themed)
+            {
+                VNAssetTheme.Box(row, _selected == index ? VNAssetTheme.SelectedFill
+                                                         : (index % 2 == 1 ? VNAssetTheme.RowAlt : VNAssetTheme.Card));
+                VNAssetTheme.Outline(row, _selected == index ? VNAssetTheme.Accent : VNAssetTheme.CardBorder,
+                                     _selected == index ? 1.8f : 1f);
+            }
+            else if (_selected == index) EditorGUI.DrawRect(row, new Color(0.35f, 0.6f, 0.95f, 0.30f));
             else if (index % 2 == 1) EditorGUI.DrawRect(row, new Color(1f, 1f, 1f, 0.025f));
 
-            var work = VNAssetUi.Shrink(row, 2f);
+            var work = VNAssetUi.Shrink(row, themed ? 5f : 2f);
 
             // ▶
             var btn = VNAssetUi.CutLeft(ref work, 22f, 3f);
@@ -468,7 +560,7 @@ namespace VNEffects.EditorTools
 
             // 时长
             var len = VNAssetUi.CutRight(ref work, 46f);
-            EditorGUI.LabelField(VNAssetUi.Line(len), VNAssetUi.ClipLengthText(clip), VNAssetUi.RowLabel);
+            EditorGUI.LabelField(VNAssetUi.Line(len), VNAssetUi.ClipLengthText(clip), VNAssetTheme.Dim);
 
             // 音量
             var volProp = el.propertyType == SerializedPropertyType.ObjectReference
@@ -486,13 +578,13 @@ namespace VNEffects.EditorTools
             if (idProp != null && work.height >= 38f)
             {
                 EditorGUI.PropertyField(top, idProp, GUIContent.none);
-                EditorGUI.LabelField(bottom, VNAssetUi.AssetName(clip), VNAssetUi.RowLabel);
+                EditorGUI.LabelField(bottom, VNAssetUi.AssetName(clip), VNAssetTheme.Dim);
             }
             else if (idProp != null)
             {
                 EditorGUI.PropertyField(VNAssetUi.Line(work), idProp, GUIContent.none);
             }
-            else EditorGUI.LabelField(VNAssetUi.Line(work), LabelOf(el));
+            else EditorGUI.LabelField(VNAssetUi.Line(work), LabelOf(el), VNAssetTheme.Label);
 
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && row.Contains(e.mousePosition))
@@ -507,13 +599,22 @@ namespace VNEffects.EditorTools
 
         void DrawDetail(Rect r, SerializedProperty arr)
         {
-            EditorGUI.DrawRect(r, new Color(0f, 0f, 0f, 0.14f));
-            EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, 1f), new Color(0f, 0f, 0f, 0.35f));
+            bool themed = VNAssetTheme.Enabled;
+            if (themed)
+            {
+                EditorGUI.DrawRect(r, VNAssetTheme.Card);
+                EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, 2f), VNAssetTheme.Accent);
+            }
+            else
+            {
+                EditorGUI.DrawRect(r, new Color(0f, 0f, 0f, 0.14f));
+                EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, 1f), new Color(0f, 0f, 0f, 0.35f));
+            }
 
             if (arr == null || _selected < 0 || _selected >= arr.arraySize)
             {
                 EditorGUI.LabelField(VNAssetUi.Shrink(r, 8f),
-                    "选中一项查看详情（双击 = 在 Project 中定位，右键 = 更多操作）", VNAssetUi.RowLabel);
+                    "选中一项查看详情（双击 = 在 Project 中定位，右键 = 更多操作）", VNAssetTheme.Dim);
                 return;
             }
 
@@ -536,7 +637,7 @@ namespace VNEffects.EditorTools
             if (idProp != null)
             {
                 var lab = new Rect(work.x, y, 56f, lh);
-                EditorGUI.LabelField(lab, "id");
+                EditorGUI.LabelField(lab, "id", VNAssetTheme.Label);
                 EditorGUI.PropertyField(new Rect(work.x + 58f, y, work.width - 58f, lh),
                                         idProp, GUIContent.none);
                 y += lh + 3f;
@@ -546,7 +647,7 @@ namespace VNEffects.EditorTools
             var assetProp = AssetProp(el);
             if (assetProp != null)
             {
-                EditorGUI.LabelField(new Rect(work.x, y, 56f, lh), "素材");
+                EditorGUI.LabelField(new Rect(work.x, y, 56f, lh), "素材", VNAssetTheme.Label);
                 EditorGUI.PropertyField(new Rect(work.x + 58f, y, work.width - 58f, lh),
                                         assetProp, GUIContent.none);
                 y += lh + 3f;
@@ -559,7 +660,7 @@ namespace VNEffects.EditorTools
             if (extra != null)
             {
                 EditorGUI.LabelField(new Rect(work.x, y, 56f, lh),
-                                     extra.name == "group" ? "差分组" : "音量");
+                                     extra.name == "group" ? "差分组" : "音量", VNAssetTheme.Label);
                 EditorGUI.PropertyField(new Rect(work.x + 58f, y, Mathf.Min(220f, work.width - 58f), lh),
                                         extra, GUIContent.none);
                 y += lh + 3f;
@@ -569,7 +670,7 @@ namespace VNEffects.EditorTools
             if (asset != null)
             {
                 var pathRect = new Rect(work.x, y, work.width, lh);
-                EditorGUI.LabelField(pathRect, AssetDatabase.GetAssetPath(asset), VNAssetUi.RowLabel);
+                EditorGUI.LabelField(pathRect, AssetDatabase.GetAssetPath(asset), VNAssetTheme.Dim);
                 y += lh + 2f;
             }
 
@@ -577,7 +678,7 @@ namespace VNEffects.EditorTools
             var bar = new Rect(work.x, work.yMax - 20f, work.width, 20f);
             var b1 = VNAssetUi.CutLeft(ref bar, 100f);
             using (new EditorGUI.DisabledScope(asset == null))
-                if (GUI.Button(b1, "在 Project 中定位", EditorStyles.miniButton)) VNAssetUi.Ping(asset);
+                if (Btn(b1, "在 Project 中定位")) VNAssetUi.Ping(asset);
 
             if (Cats[_cat].kind == Kind.Audio)
             {
@@ -585,14 +686,14 @@ namespace VNEffects.EditorTools
                 var clip = asset as AudioClip;
                 bool playing = VNAssetUi.IsPreviewing(clip);
                 using (new EditorGUI.DisabledScope(clip == null || !VNAssetUi.CanPreviewAudio))
-                    if (GUI.Button(b2, playing ? "停止" : "试听", EditorStyles.miniButton))
+                    if (Btn(b2, playing ? "停止" : "试听", playing))
                     {
                         if (playing) VNAssetUi.StopPreview(); else VNAssetUi.PlayPreview(clip);
                     }
             }
 
             var bDel = VNAssetUi.CutRight(ref bar, 88f);
-            if (GUI.Button(bDel, "从库中移除", EditorStyles.miniButton))
+            if (Btn(bDel, "从库中移除"))
             {
                 RemoveAt(arr, _selected);
                 _selected = -1;
@@ -668,6 +769,15 @@ namespace VNEffects.EditorTools
         void DrawDropHint(Rect r, SerializedProperty arr)
         {
             if (r.height <= 0f) return;
+
+            if (VNAssetTheme.Enabled)
+            {
+                VNAssetTheme.Box(r, new Color(1f, 1f, 1f, 0.65f));
+                VNAssetTheme.Outline(r, VNAssetTheme.CardBorder, 1.2f);
+                GUI.Label(r, "把素材从 Project 拖到这里批量登记（id 预填文件名）", VNAssetTheme.Caption);
+                return;
+            }
+
             EditorGUI.DrawRect(r, new Color(1f, 1f, 1f, 0.035f));
             var style = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleCenter };
             var old = GUI.color;
@@ -792,7 +902,7 @@ namespace VNEffects.EditorTools
             {
                 EditorGUI.LabelField(VNAssetUi.Shrink(r, 10f),
                     "库里一条都没有，无从推断素材放在哪个目录。\n先手动登记一条，之后这里就能列出同目录下漏掉的文件。",
-                    EditorStyles.wordWrappedMiniLabel);
+                    VNAssetTheme.DimWrap);
                 return;
             }
 
@@ -810,7 +920,7 @@ namespace VNEffects.EditorTools
             EditorGUI.LabelField(head,
                 "扫描目录：" + string.Join("、", new List<string>(dirs).ToArray()) +
                 "\n未登记 " + missing.Count + " 个文件（点一个即登记）",
-                EditorStyles.wordWrappedMiniLabel);
+                VNAssetTheme.DimWrap);
 
             var listRect = new Rect(r.x, r.y + 40f, r.width, r.height - 40f);
             float rowH = 20f;
@@ -827,7 +937,7 @@ namespace VNEffects.EditorTools
                 if (i % 2 == 1) EditorGUI.DrawRect(row, new Color(1f, 1f, 1f, 0.03f));
 
                 var btn = VNAssetUi.CutRight(ref row, 52f);
-                EditorGUI.LabelField(row, Path.GetFileName(missing[i]), VNAssetUi.MiniLabel);
+                EditorGUI.LabelField(row, Path.GetFileName(missing[i]), VNAssetTheme.Label);
                 if (GUI.Button(VNAssetUi.Line(btn, 17f), "登记", VNAssetUi.TinyButton))
                 {
                     var o = AssetDatabase.LoadAssetAtPath<Object>(missing[i]);

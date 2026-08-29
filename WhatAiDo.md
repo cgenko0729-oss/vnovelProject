@@ -7774,3 +7774,65 @@ meta 存在却不含完整 importer 设置块时它同样返回 true ——
 | `ForceUpdate` 全量重导入后 `git status` | 零个存量 .meta 被修改 ✓ |
 
 `InScope` 判定：Background=✓ Mark=✓ Models=✗ Development=✗。
+
+---
+
+## 一二一、素材浏览器的樱花粉白主题（2026-08-29，分支 `agent/asset-manager`）
+
+### 需求 / 背景
+
+用户问「Unity Editor 这个界面的 UI 和风格可以改变吗，比如粉粉的可爱风」。
+
+答案分两层，值得先讲清楚：
+
+- **Unity 编辑器整体：基本改不了。** 官方只有 Light / Dark 两套主题
+  （Preferences → General → Editor Theme），没有自定义入口。2019.3+ 编辑器 UI 虽然迁到了
+  UI Toolkit / USS，但那些样式表打包在编辑器资源里，不对外开放覆盖。
+  第三方方案（替换 Unity 安装目录的 skin 文件、反射篡改 `EditorStyles`）影响所有项目、
+  Unity 升级即坏、易与其他插件冲突，**没采用**。
+- **自己 IMGUI 画的窗口：完全可控。** 素材浏览器的每一像素都是自己画的，
+  颜色、圆角、描边、字体样式全归自己管。所以这次只做这一个窗口。
+
+### 做了什么
+
+新增 `Editor/VNAssetTheme.cs`：把窗口的配色、圆角、GUIStyle 收成一处，
+两套主题 **默认 / 樱花**，顶栏 `🌸` 按钮随时切换，选择存 EditorPrefs。
+
+樱花配色：窗口底 `#FFF5F8`、侧栏 `#FDEBF1`、工具条 `#FCE4EC`、卡片纯白、
+描边 `#F5D8E2`、主色 `#FF8FB1`、正文 `#5A4048`、次要 `#9B8189`。
+网格格子变成**圆角白卡**（图 + 标签同在一张卡里，缩略图缩进 5px 留白边），
+选中态是粉色描边 + 淡粉底；侧栏选中项圆角白底粉框；音频行、拖入提示、
+搜索框、按钮全部圆角化；详情栏白底 + 顶部 2px 粉线。
+
+### 技术决策与取舍
+
+- **圆角靠程序化贴图，零美术依赖**：生成一张 32×32 的**白色**圆角贴图，
+  用 `GUI.color` 染成任意颜色后配 `GUI.DrawTexture` 的 borderRadius 参数绘制 ——
+  一张贴图搞定所有尺寸与配色（与 `VNProceduralTextures` 一个路子）。
+  另生成一张"只有描边、中间透明"的用于外框。
+  边缘按到圆心的有符号距离做 1px 软过渡，缩放后不锯齿。
+  贴图是 static 的、域重载后会丢，所以全部 lazy 重建 + `HideFlags.DontSave`（绝不写进资产）。
+- **★ 换浅色底之后，必须显式覆盖每一个 GUIStyle 的文字颜色。**
+  Unity Dark 主题下 `EditorStyles` 的文字是浅色的，直接拿来用在粉白底上
+  就是**白底白字，字直接消失**。而且要覆盖 `normal/hover/active/focused`
+  以及对应的 `on*` 共八个状态，只改 `normal` 的话鼠标一悬停字又不见了。
+  这就是 `VNAssetTheme.Tint()` 存在的理由。
+- **主题是"叠加"而不是"替换"**：`Enabled == false` 时所有绘制函数**原样退回**
+  Unity 原生外观（`Box` 退回 `DrawRect`、`Button` 退回 `miniButton`、
+  样式退回 `EditorStyles`）。所以默认主题下这次改动等于不存在，随时能切回来。
+- **只做这一个窗口**。VNGameConfig 的 Inspector 外层面板框架是 Unity 的，
+  改不动；剧本编辑器等既有窗口各画各的，改动面大且有回归风险。按用户选择先只试这里。
+
+### 改了哪些文件
+
+| 文件 | 改动 |
+|---|---|
+| `Editor/VNAssetTheme.cs`（新） | 主题定义：调色板、程序化圆角贴图、八状态染色的 GUIStyle、Box/Outline/CardBox/Button 绘制辅助 |
+| `Editor/VNAssetBrowserWindow.cs` | 顶栏 / 侧栏 / 网格卡片 / 音频行 / 详情栏 / 拖入提示全部接主题；顶栏加 🌸 主题切换 |
+
+### 验证方法
+
+- Unity 重编译零 Error / 零 Exception。
+- 圆角贴图自检：`fill` 四角 alpha=0.00、中心 alpha=1.00；`outline` 中心 alpha=0.00
+  （描边中间必须透明，否则会糊住卡片内容）。
+- 切到樱花主题后窗口持续绘制无异常；切回「默认」外观与改动前一致。
