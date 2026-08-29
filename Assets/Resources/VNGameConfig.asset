@@ -45,10 +45,10 @@ MonoBehaviour:
     prefab: {fileID: 805707084096112339, guid: 774934d146cf8d148b8588f947c23b43, type: 3}
   systemUiSkin: {fileID: 11400000, guid: 244dec5b51cf9d342842c10a590bf8b6, type: 2}
   characters:
-  - {fileID: 11400000, guid: 85d21fec57553cb4983145ad9f930fbe, type: 2}
   - {fileID: 11400000, guid: d6da61221a1ce74439a3baf628fd3164, type: 2}
   - {fileID: 11400000, guid: 8dc2eb3db6749894994730b676ee521a, type: 2}
   - {fileID: 11400000, guid: 7b20d982cc9dc3e4da0a15740ae7ad4d, type: 2}
+  - {fileID: 11400000, guid: 85d21fec57553cb4983145ad9f930fbe, type: 2}
   backgrounds:
   - id: "\u6559\u5BA4"
     sprite: {fileID: 21300000, guid: a176010961b11324b933533e744a7a12, type: 3}
@@ -76,6 +76,20 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 0032b4797afba264e8d5c66ae76851a2, type: 3}
   - id: "\u8F66\u7AD9"
     sprite: {fileID: 21300000, guid: b7d8d6ad1bc35254b80a0d0b1c773bdf, type: 3}
+  - id: scroll1
+    sprite: {fileID: 21300000, guid: 7797b5597823d67478dddced6b2ccaea, type: 3}
+  - id: scroll2
+    sprite: {fileID: 21300000, guid: c86fb6fdb6641294a863198fa391365e, type: 3}
+  - id: scroll3
+    sprite: {fileID: 21300000, guid: 87b8a641a150b4645964acc68ed5949c, type: 3}
+  - id: scroll4
+    sprite: {fileID: 21300000, guid: af760047296cce440b6456e4ce5c5a45, type: 3}
+  - id: scroll5
+    sprite: {fileID: 21300000, guid: c5129ce89b81ec544a24ded2363899cb, type: 3}
+  - id: test1
+    sprite: {fileID: 21300000, guid: df6320368db88ed4b93d54718cbb5be0, type: 3}
+  - id: test2
+    sprite: {fileID: 21300000, guid: 7cadd6717ce469c42adc09b087b8b516, type: 3}
   cgLibrary:
   - id: "CG_\u521D\u6B21\u5E76\u80A9"
     sprite: {fileID: 21300000, guid: 494c52f379832b843ac1493526dc0977, type: 3}
