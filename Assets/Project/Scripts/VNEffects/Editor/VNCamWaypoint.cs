@@ -7,7 +7,7 @@ using UnityEngine;
 namespace VNEffects.EditorTools
 {
     /// <summary>camseq 路径点的目标点类型（由 point token 反推，不额外存）</summary>
-    public enum VNCamPointKind { Anchor, Character, Coords }
+    public enum VNCamPointKind { Anchor, Character, Coords, Stay }
 
     /// <summary>某一行的舞台推算快照（剧本编辑器算，镜头编排窗口画）</summary>
     public class VNRowStageInfo
@@ -68,6 +68,7 @@ namespace VNEffects.EditorTools
         public static VNCamPointKind KindOf(string point)
         {
             if (string.IsNullOrEmpty(point)) return VNCamPointKind.Anchor;
+            if (VNCamWaypointDef.IsStay(point)) return VNCamPointKind.Stay;
             if (point.Contains(",")) return VNCamPointKind.Coords;
             return System.Array.IndexOf(Anchors, point.ToLower()) >= 0
                 ? VNCamPointKind.Anchor : VNCamPointKind.Character;
@@ -116,9 +117,11 @@ namespace VNEffects.EditorTools
             string point = tokens[0];
             if (point.StartsWith("[") || point.EndsWith(":") || point == ":") return false;
 
+            bool isStay = VNCamWaypointDef.IsStay(point);
             var result = new VNCamWaypoint
             {
                 point = point, omitZoom = true, omitDuration = true,
+                duration = isStay ? 0f : DefaultDuration,
             };
 
             int numIndex = 0;
@@ -157,7 +160,14 @@ namespace VNEffects.EditorTools
                 }
                 else if (TryFloat(tok, out float v))
                 {
-                    if (numIndex == 0) { result.zoom = v; result.omitZoom = false; }
+                    // stay 没有 zoom 可填，第一个数字就是时长（与运行时 ParseCamWaypoint 一致）
+                    if (isStay)
+                    {
+                        if (numIndex != 0) return false;                    // 多余的数字
+                        result.duration = v;
+                        result.omitDuration = false;
+                    }
+                    else if (numIndex == 0) { result.zoom = v; result.omitZoom = false; }
                     else if (numIndex == 1) { result.duration = v; result.omitDuration = false; }
                     else return false;                                      // 多余的数字
                     numIndex++;
@@ -175,6 +185,19 @@ namespace VNEffects.EditorTools
         /// <summary>格式化回一行剧本文本（不含换行）</summary>
         public string Format()
         {
+            // stay：点位和 zoom 都沿用上一个点，只有时长可写。
+            // 时长总是显式写出来（"> stay 0" 比 "> stay" 一眼就知道是不动的）
+            if (Kind == VNCamPointKind.Stay)
+            {
+                var stay = new StringBuilder("> ").Append(VNCamWaypointDef.StayToken)
+                    .Append(' ').Append(Num(duration));
+                if (!string.IsNullOrEmpty(ease)) stay.Append(" ease:").Append(ease);
+                if (fade > 0.0001f) stay.Append(" xfade:").Append(Num(fade));
+                if (hold > 0.0001f) stay.Append(" hold:").Append(Num(hold));
+                if (!string.IsNullOrEmpty(shake)) stay.Append(" shake:").Append(shake);
+                return stay.ToString();
+            }
+
             // 时长是「第二个数字」，要写它就必须先把 zoom 写出来占位
             bool writeDuration = !omitDuration ||
                                  System.Math.Abs(duration - DefaultDuration) > 0.0001f;

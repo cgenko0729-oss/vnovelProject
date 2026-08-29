@@ -377,6 +377,12 @@ camseq                          # shake：到点的瞬间震一下（震完才�
 > 亚里沙:head 1.9 0.25 shake:heavy   # 急推到脸上 + 强震 = 挨了一击
 > middle 1 0.6 shake:20,0.5          # 自定义：20px / 0.5 秒
 
+camseq                          # stay：原地不动的点（专门插震动/停顿用）
+> 亚里沙:head 1.9 1.2           # 1.2 秒推到脸上
+> stay 0 shake:heavy            # 镜头纹丝不动，只震（沿用上一行的点位与 zoom）
+> stay 0 hold:0.8               # 再静静停 0.8 秒
+> middle 1 0.8                  # 拉回全景
+
 camto 亚里沙:head 1.6 0.8       # 单段直达：目标点 [zoom] [秒] [ease:名]
 camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里"）
 ```
@@ -405,6 +411,14 @@ camcut topright 1.8             # 瞬切到镜头状态（"一开始就在那里
   震的是 SceneRoot（背景+立绘），对话框等 UI 不会跟着抖；运镜作用在其子级 ZoomRoot，
   两者互不干扰，所以「一边推镜一边震」是叠加而不是打架。
   值写错（如 `shake:20` 少了秒数）运行时会告警并忽略，Lint 也会点名、编辑器退回纯文本
+- **原地点 `stay`**：点位写 `stay` = **位置与 zoom 都沿用上一个路径点**，镜头一动不动。
+  专门用来在序列中间插一段震动或停顿，不用把上一行的点位和 zoom 手抄一遍
+  （手抄的坏处是：哪天改了上一行忘了改这行，镜头会在震之前先跳一下，而且很难看出来）。
+  **`stay` 行的数字位前移**：没有 zoom 可填，所以**第一个数字就是时长**（默认 0 = 完全静止）。
+  照普通行的习惯写成 `> stay 1.9 0` 会被判为写错——Lint 点名、编辑器退回纯文本标黄。
+  `stay` **不能当第一个路径点**（没有「上一个点」可沿用），Lint 会报错。
+  镜头编排窗口里它的类型显示为「原地」，**画布上不画取景框**（与上一个点完全重合，
+  画出来只会互相遮住、还会拖错），但预览时间轴的长度照常把它算进去
 - **防露边**：高倍 zoom 对准边角时自动钳制偏移，不会把画布边缘露出来
 - 路径点在**执行时**才解析角色位置（角色刚 move 过也能对准）
 - camseq 整块可加 `@` 异步（台词与运镜同时进行）
@@ -1898,7 +1912,8 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
 | | `loop-risk` | 跨文件跳转**缺守卫 flag** → 章节演完跳回来条件再次成立 → 死循环 |
 | | `call-unknown-arg` | call 传了未声明的参数（多半是拼写错误） |
-| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级\|强度,秒数]`（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
+| | `first-waypoint-stay` | camseq 的第一个路径点写成了 `stay`——没有「上一个点」可沿用，运行时会跳过它 |
+| | `unrecognized-waypoint` | camseq 的 `>` 路径点行不符合 `> 点位\|stay [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级\|强度,秒数]`（`stay` 行只能有一个数字＝时长）（多余数字、ease 名拼错、xfade/hold 写了非正数等）→ 剧本编辑器只能把它当纯文本保留 |
 | **提示** | `unreferenced-label` | label 从未被任何跳转引用（默认不显示，工具栏可开） |
 
 ### 两条设计取舍
@@ -1974,8 +1989,9 @@ mark <角色> <符号|clear> [keep|off] [pos:x,y] [size:] [dur:]  立绘漫符
 move <角色> <位置> [秒]                          滑步换位
 wait <秒>                                        停顿
 camera <pushin|snapzoom|pan|dolly|reset> [...]   预设运镜
-camseq + > 目标点 [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]
-                                          多段镜头路径（hold = 到点后停留，shake = 到点震屏）
+camseq + > 目标点|stay [zoom] [秒] [ease:名] [xfade:秒] [hold:秒] [shake:等级|强度,秒数]
+                                          多段镜头路径（hold = 到点后停留，shake = 到点震屏，
+                                          stay = 原地不动、沿用上一个点，此时唯一的数字是时长）
 camto <目标点> [zoom] [秒] / camcut <目标点> [zoom]  单段直达/瞬切
 shake <light|medium|heavy>                       震动
 weather <id> [density:] [wind:] [speed:] [size:]  天气

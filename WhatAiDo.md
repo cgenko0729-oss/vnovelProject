@@ -7392,6 +7392,44 @@ camseq
 > middle 1 0.6 shake:20,0.5          # 自定义 20px / 0.5 秒
 ```
 
+
+### 追加：`stay` 原地点（同日）
+
+`shake:` 做完后发现「镜头不动、只在原地震一下」得这么写：
+
+```
+> 亚里沙:head 1.9 1.2
+> 亚里沙:head 1.9 0 shake:heavy   ← 点位和 zoom 手抄一遍
+```
+
+能用，但**改了上一行忘了改这行，镜头会在震之前先跳一下**，而且这种 bug 很难一眼看出来。
+于是加了点位词 `stay`：位置与 zoom 都沿用**前面最近一个真点位**。
+
+```
+> 亚里沙:head 1.9 1.2
+> stay 0 shake:heavy      # 原地强震
+> stay 0 hold:0.8         # 再静静停 0.8 秒
+```
+
+**唯一的坑：数字位前移**。普通行「第 1 个数字 = zoom、第 2 个 = 时长」，
+但 stay 没有 zoom 可填，所以**第一个数字就是时长**（默认 0）。
+不这么设计的话 `> stay 0` 会被读成 zoom=0、时长取默认 0.8 秒——一个看不见的 0.8 秒空档。
+代价是语法不完全一致，所以 **stay 行出现第二个数字一律判错**（运行时告警、
+`VNCamWaypoint.TryParse` 返回 false 退回纯文本标黄、Lint 点名），让照旧习惯写的人立刻看见。
+编辑器里 stay 行的 zoom 格是禁用的「沿用上一个点」占位，视觉上也不会诱导你去填。
+
+**运行时**：`CamseqCo` 里维护 `lastPoint/lastZoom`。注意循环必须从 0 开始遍历**所有**点，
+`skipFirst`（start:cut 已由 bg 转场应用过首点）只跳过「加进 list」这一步而不是跳过解析——
+否则 `start:cut` 后面第一个 stay 就没有基准可沿用。
+
+**编辑器**：新增 `VNCamPointKind.Stay` / `PointType.Stay`（两套枚举各一个，本来就是两份）。
+`TargetState` 加了按下标的重载，遇到 Stay 就往前找最近一个真点位——与运行时同一条规则。
+画布上**不画 stay 的取景框**：它与上一个点完全重合，画出来只会互相遮住，
+而且点选/拖角/拖中心都会拖错点，所以那几处（画框、命中检测、拖动、空白处点击设坐标）
+全部跳过 Stay。**但预览时间轴照常把它的时长算进去**，拖进度条才和实机对得上。
+
+**Lint 新增一条**：`stay` 当第一个路径点报 Err（没有「上一个点」可沿用，运行时会跳过它）。
+
 ### 改了哪些文件
 
 | 文件 | 改动 |
@@ -7404,3 +7442,9 @@ camseq
 | `Editor/VNScenarioEditorWindow.cs` | 路径点行尾加「震」控件 + 语法提示 |
 | `Editor/VNCamseqEditorWindow.cs` | `Waypoint.shake` + 行 UI + 文本生成/解析 + `AddHoldSegment` 算进震动时长 + 帮助文字 |
 | `Editor/VNScenarioDoc.cs` | Lint 提示语法补上 `hold:`/`shake:`（校验本身复用 TryParse，无需新代码） |
+| `Script/VNScriptParser.cs`（stay） | `VNCamWaypointDef.StayToken`/`IsStay`；stay 行数字位前移、多余数字告警 |
+| `Script/VNScriptRunner.cs`（stay） | `CamseqCo` 维护 lastPoint/lastZoom；skipFirst 只跳过入列不跳过解析 |
+| `Editor/VNCamWaypoint.cs`（stay） | `VNCamPointKind.Stay` + 严格 TryParse/Format |
+| `Editor/VNScenarioEditorWindow.cs`（stay） | 类型下拉加「原地」、目标格换成说明文字、zoom 格禁用占位 |
+| `Editor/VNCamseqEditorWindow.cs`（stay） | `PointType.Stay`、`TargetState(int)` 往前找真点位、画布不画/不可拖、生成文本不写 zoom |
+| `Editor/VNScenarioDoc.cs`（stay） | 新增「首点不能是 stay」的 Err |

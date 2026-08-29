@@ -1668,7 +1668,11 @@ namespace VNEffects.EditorTools
             {
                 wp.point = newKind == VNCamPointKind.Anchor ? "middle"
                     : newKind == VNCamPointKind.Coords ? "0,0"
+                    : newKind == VNCamPointKind.Stay ? VNCamWaypointDef.StayToken
                     : (_ctx.characterIds.Length > 0 ? _ctx.characterIds[0] : "");
+                // 切到「原地」默认时长 0（画面纹丝不动）；切出去时给回常用默认值
+                if (newKind == VNCamPointKind.Stay) wp.duration = 0f;
+                else if (kind == VNCamPointKind.Stay) wp.duration = VNCamWaypoint.DefaultDuration;
                 kind = newKind;
             }
 
@@ -1682,7 +1686,16 @@ namespace VNEffects.EditorTools
             GUI.Label(new Rect(x, rect.y, 34f, rect.height),
                 new GUIContent("zoom", "取景倍率：1 = 全图，越大越推近"), EditorStyles.miniLabel);
             x += 34f;
-            wp.zoom = EditorGUI.FloatField(new Rect(x, rect.y, 48f, rect.height), wp.zoom);
+            if (kind == VNCamPointKind.Stay)
+            {
+                // 原地点的 zoom 沿用上一个点，这里给个禁用占位——留个能敲的框只会误导
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUI.TextField(new Rect(x, rect.y, 48f, rect.height), "沿用");
+            }
+            else
+            {
+                wp.zoom = EditorGUI.FloatField(new Rect(x, rect.y, 48f, rect.height), wp.zoom);
+            }
             x += 52f;
 
             GUI.Label(new Rect(x, rect.y, 20f, rect.height),
@@ -1725,6 +1738,14 @@ namespace VNEffects.EditorTools
         {
             switch (kind)
             {
+                case VNCamPointKind.Stay:
+                    // 沿用上一个点，没有可编辑的目标——写句人话比留个空框强
+                    GUI.Label(rect, new GUIContent("沿用上一个点（位置与 zoom 都不变）",
+                        "原地：镜头一动不动，专门用来在序列中间插一段震动或停顿。\n" +
+                        "时长写 0 就是完全静止；不能当第一个路径点（没有上一个点可沿用）。"),
+                        EditorStyles.miniLabel);
+                    break;
+
                 case VNCamPointKind.Anchor:
                 {
                     int at = Mathf.Max(0,
@@ -1780,7 +1801,7 @@ namespace VNEffects.EditorTools
             return picked <= 0 ? "" : options[picked - 1];
         }
 
-        static readonly string[] CamPointKindNames = { "锚点", "角色", "坐标" };
+        static readonly string[] CamPointKindNames = { "锚点", "角色", "坐标", "原地" };
 
         static readonly string[] CamAnchorDisplayNames =
         {

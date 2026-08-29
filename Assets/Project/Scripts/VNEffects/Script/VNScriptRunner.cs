@@ -2676,18 +2676,45 @@ namespace VNEffects
 
             // 执行时才解析点位（角色可能刚移动过）
             var list = new List<VNCamera.Waypoint>();
-            for (int i = skipFirst ? 1 : 0; i < cmd.camPoints.Count; i++)
+            // stay 要沿用「上一个点」的位置与 zoom。哪怕首点被 skipFirst 跳过不进 list，
+            // 也得先把它解析出来当基准——否则 start:cut 后面第一个 stay 就没得沿用
+            Vector2? lastPoint = null;
+            float lastZoom = 1f;
+            for (int i = 0; i < cmd.camPoints.Count; i++)
             {
                 var def = cmd.camPoints[i];
-                var p = stage.ResolveCamPoint(def.point, def.line);
-                if (!p.HasValue) continue; // 已告警，跳过该点
+                Vector2 resolved;
+                float zoom;
+                if (VNCamWaypointDef.IsStay(def.point))
+                {
+                    if (!lastPoint.HasValue)
+                    {
+                        Debug.LogWarning($"[VNScript] 第 {def.line} 行：stay 没有「上一个点」" +
+                                         "可沿用（不能当第一个路径点），已跳过");
+                        continue;
+                    }
+                    resolved = lastPoint.Value;
+                    zoom = lastZoom;
+                }
+                else
+                {
+                    var p = stage.ResolveCamPoint(def.point, def.line);
+                    if (!p.HasValue) continue; // 已告警，跳过该点
+                    resolved = p.Value;
+                    zoom = def.zoom;
+                }
+                lastPoint = resolved;
+                lastZoom = zoom;
+
+                if (skipFirst && i == 0) continue; // 首点已由 bg 转场盖屏时应用过
+
                 bool easeSet = System.Enum.TryParse(def.ease, true, out Ease easeVal);
                 // 认不出的 shake 值 parser 已经告警过并置空，这里拿到的一定是合法的
                 VNShakeSpec.TryParse(def.shake, out VNShakeSpec shakeSpec);
                 list.Add(new VNCamera.Waypoint
                 {
-                    point = p.Value,
-                    zoom = def.zoom,
+                    point = resolved,
+                    zoom = zoom,
                     duration = def.duration,
                     ease = easeVal,
                     easeSet = easeSet,

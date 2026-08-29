@@ -705,6 +705,16 @@ namespace VNEffects.EditorTools
                             Warn(i, "camseq has no \"> waypoint\" lines");
                         else
                         {
+                            // stay 沿用「上一个点」——当第一行就没得沿用，运行时会跳过它
+                            var firstWp = r.camLines[0].TrimStart();
+                            if (firstWp.StartsWith(">"))
+                            {
+                                var firstTok = firstWp.Substring(1).Trim().Split(
+                                    new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+                                if (firstTok.Length > 0 && VNCamWaypointDef.IsStay(firstTok[0]))
+                                    Err(i, "the first waypoint cannot be \"stay\" " +
+                                           "(there is no previous point to reuse)");
+                            }
                             foreach (var l in r.camLines)
                             {
                                 foreach (var tok in l.Substring(1).Split(new[] { ' ', '\t' },
@@ -716,7 +726,7 @@ namespace VNEffects.EditorTools
                                 // 这里提前点名，免得写错了还以为编辑器坏了
                                 if (!VNCamWaypoint.TryParse(l, out _))
                                     Warn(i, $"waypoint \"{l.Trim()}\" is not recognized " +
-                                            "(> point [zoom] [sec] [ease:Name] [xfade:sec] " +
+                                            "(> point|stay [zoom] [sec] [ease:Name] [xfade:sec] " +
                                             "[hold:sec] [shake:level|strength,sec]); " +
                                             "the scenario editor will keep it as raw text");
                             }

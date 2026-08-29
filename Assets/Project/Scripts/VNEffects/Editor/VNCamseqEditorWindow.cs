@@ -21,7 +21,7 @@ namespace VNEffects.EditorTools
     /// </summary>
     public class VNCamseqEditorWindow : EditorWindow
     {
-        enum PointType { Anchor, Character, Coords }
+        enum PointType { Anchor, Character, Coords, Stay }
 
         [System.Serializable]
         class Waypoint
@@ -774,6 +774,14 @@ namespace VNEffects.EditorTools
             float remain = r1.xMax - x;
             switch (w.type)
             {
+                case PointType.Stay:
+                    GUI.Label(new Rect(x, r1.y, remain, line),
+                        new GUIContent("沿用上一个点（位置与 zoom 都不变）",
+                            "原地：镜头一动不动，专门用来在序列中间插一段震动或停顿。\n" +
+                            "画布上不画它的取景框——与上一个点完全重合，画出来只会互相遮住。"),
+                        EditorStyles.miniLabel);
+                    break;
+
                 case PointType.Anchor:
                     w.anchorIndex = EditorGUI.Popup(new Rect(x, r1.y, remain, line), w.anchorIndex, AnchorTokens);
                     break;
@@ -800,15 +808,27 @@ namespace VNEffects.EditorTools
                     break;
             }
 
-            // 第二行：zoom / 时长 / 缓动 / 叠化 / 停留
+            // 第二行：zoom / 时长 / 缓动 / 叠化 / 停留 / 震
             x = r2.x + 26f;
-            GUI.Label(new Rect(x, r2.y, 42f, line), "zoom"); x += 44f;
+            GUI.Label(new Rect(x, r2.y, 42f, line),
+                new GUIContent("zoom", w.type == PointType.Stay
+                    ? "原地点没有自己的 zoom，沿用上一个点" : "取景倍率：1 = 全图，越大越推近"));
+            x += 44f;
 
             // 右边几个数字框宽度固定，zoom 滑条吃掉剩下的宽度（窗口拉窄时先压滑条）
             const float tail = 6f + 22f + 48f + 32f + 86f + 38f + 44f + 34f + 40f
                                + 6f + 24f + 118f;
             float sliderW = Mathf.Max(60f, r2.xMax - x - tail);
-            w.zoom = EditorGUI.Slider(new Rect(x, r2.y, sliderW, line), w.zoom, 0.5f, 3f);
+            if (w.type == PointType.Stay)
+            {
+                // 禁用占位而不是隐藏：位置留着，切换点位类型时下面几格不会左右横跳
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUI.TextField(new Rect(x, r2.y, sliderW, line), "沿用上一个点");
+            }
+            else
+            {
+                w.zoom = EditorGUI.Slider(new Rect(x, r2.y, sliderW, line), w.zoom, 0.5f, 3f);
+            }
             x += sliderW + 6f;
 
             GUI.Label(new Rect(x, r2.y, 22f, line),
@@ -870,7 +890,9 @@ namespace VNEffects.EditorTools
             Vector2? prevCenter = null;
             for (int i = 0; i < _points.Count; i++)
             {
-                var state = TargetState(_points[i]);
+                // stay 的取景框与上一个点完全重合，画出来只会互相遮住、还会拖错
+                if (_points[i].type == PointType.Stay) continue;
+                var state = TargetState(i);
                 var center = -state.offset / state.zoom;      // 取景中心（画布坐标）
                 var half = CanvasHalf / state.zoom;
 
@@ -908,7 +930,7 @@ namespace VNEffects.EditorTools
             if (_guides != Guides.None && _points.Count > 0)
             {
                 var gs = _list.index >= 0 && _list.index < _points.Count
-                    ? TargetState(_points[_list.index])
+                    ? TargetState(_list.index)
                     : PreviewAtTime(_scrub).state;
                 DrawCompositionGuides(
                     FrameGuiRect(rect, -gs.offset / gs.zoom, CanvasHalf / gs.zoom), rect);
@@ -1010,9 +1032,9 @@ namespace VNEffects.EditorTools
                 var click = GuiToCanvas(rect, e.mousePosition);
 
                 // 1) 选中路径点的取景框四角（GUI 12px 内）→ 拖角改 zoom
-                if (hasSelection)
+                if (hasSelection && _points[_list.index].type != PointType.Stay)
                 {
-                    var st = TargetState(_points[_list.index]);
+                    var st = TargetState(_list.index);
                     var center = -st.offset / st.zoom;
                     var half = CanvasHalf / st.zoom;
                     for (int cx = -1; cx <= 1; cx += 2)
@@ -1034,7 +1056,8 @@ namespace VNEffects.EditorTools
                 float best = 60f;
                 for (int i = 0; i < _points.Count; i++)
                 {
-                    var st = TargetState(_points[i]);
+                    if (_points[i].type == PointType.Stay) continue;  // 画布上没有它的框
+                    var st = TargetState(i);
                     float d = Vector2.Distance(-st.offset / st.zoom, click);
                     if (d < best) { best = d; nearest = i; }
                 }
@@ -1043,9 +1066,9 @@ namespace VNEffects.EditorTools
                     _list.index = nearest;
                     _dragMode = DragMode.Center;
                 }
-                else if (hasSelection)
+                else if (hasSelection && _points[_list.index].type != PointType.Stay)
                 {
-                    // 3) 空白处点击 = 给选中点设坐标
+                    // 3) 空白处点击 = 给选中点设坐标（原地点没有自己的位置，别改它）
                     var w = _points[_list.index];
                     w.type = PointType.Coords;
                     w.coords = Round(click);
@@ -1054,7 +1077,8 @@ namespace VNEffects.EditorTools
                 e.Use();
                 Repaint();
             }
-            else if (e.type == EventType.MouseDrag && e.button == 0 && hasSelection)
+            else if (e.type == EventType.MouseDrag && e.button == 0 && hasSelection &&
+                     _points[_list.index].type != PointType.Stay)
             {
                 var w = _points[_list.index];
                 if (_dragMode == DragMode.Corner)
@@ -1568,6 +1592,17 @@ namespace VNEffects.EditorTools
             return Vector2.zero;
         }
 
+        /// <summary>
+        /// 按下标取镜头状态：<c>stay</c> 点沿用**前面最近一个真点位**的位置与 zoom
+        /// （与运行时 CamseqCo 里 lastPoint/lastZoom 那套是同一条规则）。
+        /// </summary>
+        CamState TargetState(int index)
+        {
+            int i = Mathf.Clamp(index, 0, _points.Count - 1);
+            while (i > 0 && _points[i].type == PointType.Stay) i--;
+            return TargetState(_points[i]);
+        }
+
         CamState TargetState(Waypoint w)
         {
             float zoom = Mathf.Max(0.1f, w.zoom);
@@ -1604,7 +1639,7 @@ namespace VNEffects.EditorTools
             {
                 segs.Add(new Segment
                 {
-                    target = TargetState(_points[0]),
+                    target = TargetState(0),
                     duration = Mathf.Max(0.05f, _startFade),
                     isFade = true,
                 });
@@ -1617,10 +1652,10 @@ namespace VNEffects.EditorTools
                 var w = _points[i];
                 if (w.fade > 0.001f)
                     segs.Add(new Segment
-                        { target = TargetState(w), duration = w.fade, isFade = true });
+                        { target = TargetState(i), duration = w.fade, isFade = true });
                 else
                     segs.Add(new Segment
-                        { target = TargetState(w), duration = Mathf.Max(0f, w.duration) });
+                        { target = TargetState(i), duration = Mathf.Max(0f, w.duration) });
                 pointOf.Add(i);
                 AddHoldSegment(segs, pointOf, i);
             }
@@ -1689,7 +1724,7 @@ namespace VNEffects.EditorTools
                 stall = Mathf.Max(stall, spec.duration);
             if (stall <= 0.001f) return;
             segs.Add(new Segment
-                { target = TargetState(w), duration = stall, isHold = true });
+                { target = TargetState(index), duration = stall, isHold = true });
             pointOf.Add(index);
         }
 
@@ -1765,6 +1800,8 @@ namespace VNEffects.EditorTools
         {
             switch (w.type)
             {
+                case PointType.Stay:
+                    return VNCamWaypointDef.StayToken;
                 case PointType.Anchor:
                     return AnchorTokens[Mathf.Clamp(w.anchorIndex, 0, 8)];
                 case PointType.Character:
@@ -1800,9 +1837,12 @@ namespace VNEffects.EditorTools
 
             foreach (var w in _points)
             {
-                sb.Append("> ").Append(PointToken(w))
-                  .Append(' ').Append(w.zoom.ToString("0.##", CultureInfo.InvariantCulture))
-                  .Append(' ').Append(w.duration.ToString("0.##", CultureInfo.InvariantCulture));
+                sb.Append("> ").Append(PointToken(w));
+                // stay 行没有 zoom（沿用上一个点），数字位前移：唯一的数字就是时长。
+                // 这里多写一个 zoom 出去，运行时会把它当成时长，整条运镜的节奏就错了
+                if (w.type != PointType.Stay)
+                    sb.Append(' ').Append(w.zoom.ToString("0.##", CultureInfo.InvariantCulture));
+                sb.Append(' ').Append(w.duration.ToString("0.##", CultureInfo.InvariantCulture));
                 if (w.easeIndex > 0) sb.Append(" ease:").Append(EaseNames[w.easeIndex]);
                 if (w.fade > 0.001f)
                     sb.Append(" xfade:").Append(w.fade.ToString("0.##", CultureInfo.InvariantCulture));
@@ -1856,7 +1896,12 @@ namespace VNEffects.EditorTools
                 if (def.point.ToLower() == "center" || def.point.ToLower() == "origin"
                     || def.point.ToLower() == "reset") anchor = 4;
 
-                if (anchor >= 0)
+                if (VNCamWaypointDef.IsStay(def.point))
+                {
+                    // 原地：没有自己的点位与 zoom，其余字段（ease/hold/shake）照常走下面
+                    w.type = PointType.Stay;
+                }
+                else if (anchor >= 0)
                 {
                     w.type = PointType.Anchor;
                     w.anchorIndex = anchor;
