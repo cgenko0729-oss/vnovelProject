@@ -222,10 +222,22 @@ namespace VNEffects.EditorTools
                 // 候选跟着 kind 走：dialogue/choice 列 VNGameConfig 里登记的皮肤，
                 // name 列内置的名字样式预设
                 Pos("id", "skin", VNParamSource.UiSkinId, def: "default", dependsOn: "kind"));
-            // 无参数命令：只负责「关」，玩家按 U / Enter / Space / 左右键即还原
-            // （那一下只还原界面，不会顺带推进台词）。没有 hideHUD off 这种写法。
-            Add("hideHUD", "Scene", "hideHUD  （隐藏界面：对话框 + 快捷功能条 + 属性 HUD + 日历）\n" +
-                "只能关：玩家按 U / Enter / Space / 鼠标左右键任意一下即恢复（该操作不推进台词）");
+            // 三个位置格子都给同一张候选表：参数是「按 token 分类」而不是按位置（见
+            // VNScriptRunner.ParseHideHudArgs），所以 off / keep / 部件名随便哪格都对，
+            // 中间留空也不会错位。
+            var hideHudTargets = new[]
+            {
+                "", "off", "keep", "dialogue", "stats", "calendar", "all",
+            };
+            Add("hideHUD", "Scene",
+                "hideHUD [off] [keep] [dialogue|stats|calendar|all]…\n" +
+                "隐藏界面。不写目标 = 全藏（dialogue = 对话框+快捷功能条、stats = 顶部属性栏、calendar = 日历）\n" +
+                "keep = 锁定：玩家点击只推进台词不会把界面弹回来，直到剧本写 hideHUD off\n" +
+                "不写 keep = 老行为：玩家按 U / Enter / Space / 鼠标左右键任意一下即恢复（该操作不推进台词）\n" +
+                "例：hideHUD keep stats calendar / hideHUD off stats",
+                Pos("a", "", VNParamSource.Options, hideHudTargets),
+                Pos("b", "", VNParamSource.Options, hideHudTargets, weight: 0.8f),
+                Pos("c", "", VNParamSource.Options, hideHudTargets, weight: 0.8f));
 
             // ---- Camera ----
             Add("camera", "Camera", "camera <move> [a] [b] [focus:char]\n" +

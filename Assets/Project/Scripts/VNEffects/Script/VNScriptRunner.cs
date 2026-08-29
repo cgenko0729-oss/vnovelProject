@@ -70,7 +70,12 @@ namespace VNEffects
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
         bool _menuPaused;
-        bool _uiHidden;
+        // 隐藏界面（剧本 hideHUD / 右键 / 快捷条按钮）：按部件记录 + 是否锁定。
+        // 锁定 = hideHUD keep：玩家点击只推进台词，不会把界面弹回来，
+        // 只有剧本写 hideHUD off 才恢复（沉浸演出用）。非锁定 = 一碰就还原的老行为。
+        VNUiParts _uiHiddenParts;
+        bool _uiHideLocked;
+        bool _uiHidden => _uiHiddenParts != VNUiParts.None;
         bool _auto;
         bool _skip;
         bool _waitingAtSay;   // 只有停在台词上时才允许存档
@@ -442,6 +447,18 @@ namespace VNEffects
                     case "portrait":
                         snapshot.portraitOff = cmd.Arg(0, "on") == "off";
                         break;
+                    case "hideHUD":
+                    {
+                        // 只重放锁定隐藏（keep）：普通隐藏是「玩家一碰就还原」的瞬态，
+                        // 从选中行播放时重建它只会让人以为界面坏了。
+                        ParseHideHudArgs(cmd, out var uiParts, out bool uiHide, out bool uiLock);
+                        if (uiParts == VNUiParts.None) uiParts = VNUiParts.All;
+                        var current = VNUiPartsUtil.FromToken(snapshot.uiHidden);
+                        if (!uiHide) current &= ~uiParts;
+                        else if (uiLock) current |= uiParts;
+                        snapshot.uiHidden = VNUiPartsUtil.ToToken(current);
+                        break;
+                    }
                     case "ui":
                     {
                         // 皮肤切换是持续状态：记入快照（default = 空 = 程序化默认）
@@ -544,6 +561,7 @@ namespace VNEffects
                 snapshot.characters.Add(character);
 
             stage.RestoreSnapshot(snapshot, true);
+            RestoreUiHidden(snapshot);
             if (stage.vnAudio != null)
             {
                 foreach (var volume in volumes)
@@ -1369,6 +1387,8 @@ namespace VNEffects
             };
             CaptureCallStack(data);
             stage.CaptureSnapshot(data);
+            // 只存锁定隐藏：普通隐藏玩家一碰就还原，存了反而让读档后界面莫名消失
+            data.uiHidden = _uiHideLocked ? VNUiPartsUtil.ToToken(_uiHiddenParts) : "";
             VNSaveSystem.Save(slot, data, thumbnail);
             VNToast.Show(quick ? VNLocale.T("runner.quickSaved")
                                : VNLocale.T("runner.saved", slot));
@@ -1395,6 +1415,7 @@ namespace VNEffects
             }
             RestoreCallStack(data); // 旧存档字段为空，自动得到空栈
             stage.RestoreSnapshot(data);
+            RestoreUiHidden(data);  // 旧存档字段为空 = 界面全开，语义正确
             VNToast.Show(quick ? VNLocale.T("runner.quickLoaded")
                                : VNLocale.T("runner.loaded", slot));
             ResumeAt(data.commandIndex);
@@ -1560,23 +1581,84 @@ namespace VNEffects
             _configPanel.Open();
         }
 
-        public void SetInterfaceHidden(bool hidden)
+        /// <summary>整块界面隐藏/恢复（右键、快捷条的「隐藏UI」按钮）。不锁定，玩家一碰就还原。</summary>
+        public void SetInterfaceHidden(bool hidden) => SetUiHidden(VNUiParts.All, hidden, false);
+
+        /// <summary>
+        /// 按部件隐藏/恢复界面。
+        /// locked = 剧本 hideHUD keep：隐藏后玩家点击只推进台词、不弹回界面，
+        /// 要等剧本写 hideHUD off（或读到一个没锁定的存档）才恢复。
+        /// 部件留空按全部处理，这样老剧本里光秃秃的一行 hideHUD 语义不变。
+        /// </summary>
+        public void SetUiHidden(VNUiParts parts, bool hidden, bool locked)
         {
-            _uiHidden = hidden;
+            if (parts == VNUiParts.None) parts = VNUiParts.All;
+            if (hidden)
+            {
+                _uiHiddenParts |= parts;
+                // 锁定是整体状态而不是按部件的：混着写时以最后一条为准，
+                // 不然「keep 藏属性栏 + 普通藏对话框」要不要拦输入根本说不清。
+                _uiHideLocked = locked;
+            }
+            else
+            {
+                _uiHiddenParts &= ~parts;
+                if (_uiHiddenParts == VNUiParts.None) _uiHideLocked = false;
+            }
+            ApplyUiHidden();
+        }
+
+        /// <summary>把当前的隐藏状态写到各 UI 上（事件进行中时养成 HUD 一律不显示）</summary>
+        void ApplyUiHidden()
+        {
             if (stage != null && stage.dialogue != null)
-                stage.dialogue.SetInterfaceVisible(!hidden);
-            SetGameplayHudVisible(!hidden);
+                stage.dialogue.SetInterfaceVisible((_uiHiddenParts & VNUiParts.Dialogue) == 0);
+            ApplyGameplayHudVisible(!_eventActive);
         }
 
         /// <summary>
-        /// 常驻养成 HUD（属性条 / 日历）的显隐。事件模块期间一律藏掉——
+        /// 常驻养成 HUD（属性条 / 日历）的显隐。事件模块期间一律藏掉（allowed = false）——
         /// 小游戏自己会画满屏 UI，顶上再压一条属性条只是噪音。
-        /// 事件结束时恢复成「玩家是否手动隐藏了 UI」的状态，不会把手动隐藏的又翻出来。
+        /// 事件结束时按 <see cref="_uiHiddenParts"/> 恢复，不会把玩家/剧本藏起来的又翻出来。
         /// </summary>
-        void SetGameplayHudVisible(bool visible)
+        void ApplyGameplayHudVisible(bool allowed)
         {
-            _statsHud?.SetHudVisible(visible);
-            _calendarHud?.SetVisible(visible);
+            _statsHud?.SetHudVisible(allowed && (_uiHiddenParts & VNUiParts.Stats) == 0);
+            _calendarHud?.SetVisible(allowed && (_uiHiddenParts & VNUiParts.Calendar) == 0);
+        }
+
+        /// <summary>hideHUD [off] [keep] [dialogue|stats|calendar|all]… 的参数解析（运行与调试重建共用）</summary>
+        static void ParseHideHudArgs(VNScriptCommand cmd, out VNUiParts parts,
+                                     out bool hide, out bool locked)
+        {
+            parts = VNUiParts.None;
+            hide = true;
+            locked = false;
+            foreach (var token in cmd.args)
+            {
+                if (string.IsNullOrEmpty(token)) continue;
+                string lower = token.Trim().ToLowerInvariant();
+                if (lower == "off" || token == "显示" || token == "恢复") { hide = false; continue; }
+                if (lower == "keep" || lower == "lock" || token == "保持" || token == "锁定")
+                {
+                    locked = true;
+                    continue;
+                }
+                var part = VNUiPartsUtil.Parse(token);
+                if (part != VNUiParts.None) { parts |= part; continue; }
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：hideHUD 不认识的参数「{token}」" +
+                                 "（可用 off / keep / dialogue / stats / calendar / all）");
+            }
+        }
+
+        /// <summary>读档 / 调试重建：把存档里的锁定隐藏状态放回去</summary>
+        void RestoreUiHidden(VNSaveData data)
+        {
+            // 存档里只会有锁定的隐藏（非锁定的一碰就还原，是瞬态不存），
+            // 所以取回来非空就一定是锁定态。
+            _uiHiddenParts = VNUiPartsUtil.FromToken(data.uiHidden);
+            _uiHideLocked = _uiHiddenParts != VNUiParts.None;
+            ApplyUiHidden();
         }
 
         IEnumerator CaptureSaveThumbnailCo(int token)
@@ -1681,7 +1763,9 @@ namespace VNEffects
             if (snsOpen && stage.sns.IsBlockingInput) return;
 
             // 隐藏 UI 后，第一次操作只恢复界面，不会顺便推进台词。
-            if (_uiHidden)
+            // 但 hideHUD keep 的锁定隐藏不吃这一条——那正是「点了也一直藏着」的意思，
+            // 输入照常往下走（台词继续推进，只是看不见对话框）。
+            if (_uiHidden && !_uiHideLocked)
             {
                 bool restore = kb.uKey.wasPressedThisFrame || kb.enterKey.wasPressedThisFrame ||
                                kb.spaceKey.wasPressedThisFrame ||
@@ -2199,8 +2283,11 @@ namespace VNEffects
                         (int)cmd.ArgF(2, 0f), false, cmd.line);
                     return null;
                 case "hideHUD":
-                    SetInterfaceHidden(true);
+                {
+                    ParseHideHudArgs(cmd, out var uiParts, out bool uiHide, out bool uiLock);
+                    SetUiHidden(uiParts, uiHide, uiLock);
                     return null;
+                }
 
                 default:
                     Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：未知命令「{cmd.keyword}」");
@@ -2541,7 +2628,7 @@ namespace VNEffects
             _eventActive = true;
             _activeEventModule = module;
             stage.dialogue?.HideBox();
-            SetGameplayHudVisible(false);
+            ApplyGameplayHudVisible(false);
 
             var outcomes = new List<string>();
             if (cmd.options != null)
@@ -2562,7 +2649,7 @@ namespace VNEffects
             bool recordInBacklog = module.RecordInBacklog; // 销毁前读取
             Destroy(module.gameObject);
             stage.dialogue?.Show();
-            SetGameplayHudVisible(!_uiHidden);
+            ApplyGameplayHudVisible(true);
             _eventActive = false;
 
             if (recordInBacklog)
