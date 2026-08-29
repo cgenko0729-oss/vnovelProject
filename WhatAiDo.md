@@ -7624,8 +7624,55 @@ id 重复与 id 为空的告警、以及底部的**批量拖入区**（拖一批
 | `Editor/VNConfigEntryDrawers.cs`（新） | 背景 / CG / 音频 / UI 皮肤四个条目的紧凑单行 drawer，含试听按钮与拖入替换 |
 | `Editor/VNGameConfigEditor.cs`（新） | 九页分页 Inspector + 智能列表（搜索 / 分页 / 行操作 / id 告警 / 批量拖入）+ 未认领字段兜底 |
 | `Editor/VNAssetBrowserWindow.cs`（新） | 素材浏览器窗口：类别栏、虚拟化网格与音频列表、详情栏、右键菜单、只看未登记 |
+| `Script/VNStage.cs` | `BackgroundEntry` / `CgEntry` 字段上的 `[Header]` → `[Tooltip]`（见下方修复记录）|
+| `Script/VNAudio.cs` | `AudioEntry` 同上 |
+| `Script/VNGameConfig.cs` | `UiSkinEntry` 同上 |
 
-**没有修改任何既有文件** —— 四个全是新增的 Editor 文件。
+三个运行时文件**只动了 attribute**，字段名/类型/顺序一律没碰，序列化格式与存档完全不受影响。
+
+### 修复记录：文字叠印 + 输入框点不进去
+
+初版交付后用户报告：条目行上叠印着一串说明文字（"剧本中引用的 id（可中文，如 黄昏之歌 /
+雨声）"、"背景图"、"该素材的基准音量…"），而且 **id 与名字都没法点进去输入**。
+Inspector 与浏览器窗口的详情栏都中招。
+
+**根因是一个，症状是两面。** 那些叠印的文字正是条目类字段上的 `[Header]`。
+
+一开始的判断「挂了 PropertyDrawer 就不会画内部 Header」只对了一半：
+Unity 确实不会**自动递归**去画子字段的 decorator，但
+**drawer 内部只要自己调 `EditorGUI.PropertyField(rect, 子属性, …)`，就会触发该子属性的 decorator**。
+而 Unity 画 decorator 的方式是（`PropertyHandler.OnGUI`）：
+
+```csharp
+foreach (var decorator in m_DecoratorDrawers) {
+    var rect = position;
+    rect.height = decorator.GetHeight();
+    position.yMin += rect.height;   // ★ 把控件区域往下推 ~26px
+    decorator.OnGUI(rect);
+}
+```
+
+我传进去的 rect 只有 18px 高，`yMin` 被推掉 26px 之后**控件区域高度变成负的**，
+于是控件被画到了错误位置、也接不到点击 —— 这就是「打不了字」。
+同时 Header 文字画在了原 rect 上，叠在别的内容之上 —— 这就是「文字被盖住」。
+两个症状同源。
+
+**修法**：把四个条目类里**字段上的** `[Header]` 全部改成 `[Tooltip]`。
+`[Tooltip]` 不是 DecoratorDrawer，不占布局、不推 rect，说明文字改为悬停可见。
+（列表**字段本身**上的 `[Header]`，如 `[Header("音频库（按通道分开管理）")]`，是正常用法，保留。）
+
+顺带修掉三处同类隐患 —— 我自己也在控件之上叠了 tooltip / 占位提示的 label，
+其中**音量那个 `LabelField` 直接盖在 slider 上，会挡住拖动**。
+统一收进 `VNEntryDrawerBase.Overlay()`，**只在 `Event.current.type == EventType.Repaint` 时画**，
+保证叠加层绝不参与事件处理。
+
+另外把浏览器窗口里音频行的行高从 `max(26, GridSize×0.32)` 提到 `max(46, GridSize×0.42)`：
+`TwoLines` 需要 2×18+2 = 38px，而 `work = rowH − 2 − 4`，所以 rowH 至少要 44，
+原来的值会让 id 与文件名两行挤在一起。
+
+**教训（已写进 `VNStage.BackgroundEntry` 的代码注释与 ProjectCodeGuide）**：
+列表元素类里的字段说明**一律用 `[Tooltip]`，绝不用 `[Header]`**；
+任何画在控件之上的叠加层，都要先想清楚它吃不吃事件。
 
 ### 验证方法
 
@@ -7637,6 +7684,8 @@ id 重复与 id 为空的告警、以及底部的**批量拖入区**（拖一批
   `VNAssetUi.CanPreviewAudio = True`（反射拿到了 AudioUtil）、
   浏览器窗口打开后持续绘制无异常。
 - 当前库规模：背景 13 / CG 7 / BGM 8 / SE 1 / Voice 11 / 角色 4。
+- 修复后回归：反射确认四个条目类 **残留 `[Header]` = 0、`[Tooltip]` = 10**；
+  数据未被破坏（首条背景 id=`教室`、首条 BGM id=`日常` vol=1）；Unity 全量重编译零 Error。
 
 ### 后续可做（本次刻意没做）
 

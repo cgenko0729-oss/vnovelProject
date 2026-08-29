@@ -20,12 +20,17 @@ namespace VNEffects
         [Header("角色与背景库")]
         public List<VNCharacterDef> characters = new List<VNCharacterDef>();
 
+        // ★ 列表元素里的字段说明一律用 [Tooltip]，**绝对不要用 [Header]**。
+        //   [Header] 是 DecoratorDrawer，Unity 画它的方式是把控件区域往下推
+        //   （position.yMin += decorator.GetHeight()，约 26px）。列表里每一项都会重画一遍，
+        //   既让一个条目占掉 6~7 行，又会在自定义 drawer 用固定 rect 画子属性时
+        //   把控件推出 rect —— 表现为文字叠印且**输入框点不进去**。详见 WhatAiDo 一一九章。
         [System.Serializable]
         public class BackgroundEntry
         {
-            [Header("剧本 bg 命令引用的背景 id")]
+            [Tooltip("剧本 bg 命令引用的背景 id")]
             public string id;
-            [Header("背景图")]
+            [Tooltip("背景图")]
             public Sprite sprite;
         }
         public List<BackgroundEntry> backgrounds = new List<BackgroundEntry>();
@@ -33,11 +38,11 @@ namespace VNEffects
         [System.Serializable]
         public class CgEntry
         {
-            [Header("剧本 cg 命令引用的 CG id")]
+            [Tooltip("剧本 cg 命令引用的 CG id")]
             public string id;
-            [Header("CG 一枚绘")]
+            [Tooltip("CG 一枚绘")]
             public Sprite sprite;
-            [Header("差分组名（同组 CG 在鉴赏画廊里归为一格翻页；留空 = 独立）")]
+            [Tooltip("差分组名（同组 CG 在鉴赏画廊里归为一格翻页；留空 = 独立）")]
             public string group;
         }
         [Header("CG 库（生成器从 Assets/CG 自动灌入，文件名 = id）")]

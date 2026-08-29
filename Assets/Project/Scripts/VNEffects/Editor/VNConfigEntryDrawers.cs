@@ -109,16 +109,29 @@ namespace VNEffects.EditorTools
         protected static void IdField(Rect r, SerializedProperty idProp, string tooltip, string placeholder)
         {
             EditorGUI.PropertyField(r, idProp, GUIContent.none);
-            if (string.IsNullOrEmpty(idProp.stringValue))
+            Overlay(r, string.IsNullOrEmpty(idProp.stringValue) ? placeholder : null, tooltip);
+        }
+
+        /// <summary>
+        /// 在一个已经画好的控件上叠占位文字与 tooltip。
+        ///
+        /// **只在 Repaint 事件里画** —— 叠加层绝不能参与事件处理，否则会盖掉底下输入框的点击。
+        /// （这一课是 [Header] 那个 bug 教的：任何画在控件之上的东西都得先想清楚它吃不吃事件。）
+        /// </summary>
+        protected static void Overlay(Rect r, string placeholder, string tooltip)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+
+            if (!string.IsNullOrEmpty(placeholder))
             {
                 var old = GUI.color;
                 GUI.color = new Color(1f, 1f, 1f, 0.35f);
-                EditorGUI.LabelField(new Rect(r.x + 3f, r.y, r.width - 6f, r.height),
-                                     placeholder, EditorStyles.miniLabel);
+                GUI.Label(new Rect(r.x + 3f, r.y, r.width - 6f, r.height),
+                          placeholder, EditorStyles.miniLabel);
                 GUI.color = old;
             }
             if (!string.IsNullOrEmpty(tooltip))
-                EditorGUI.LabelField(r, new GUIContent(string.Empty, tooltip));
+                GUI.Label(r, new GUIContent(string.Empty, tooltip), GUIStyle.none);
         }
 
         /// <summary>右侧淡色附注（尺寸 / 时长 / 文件名）。</summary>
@@ -198,16 +211,8 @@ namespace VNEffects.EditorTools
                 {
                     var grRect = VNAssetUi.CutRight(ref bottom, 96f);
                     EditorGUI.PropertyField(grRect, grProp, GUIContent.none);
-                    if (string.IsNullOrEmpty(grProp.stringValue))
-                    {
-                        var old = GUI.color;
-                        GUI.color = new Color(1f, 1f, 1f, 0.35f);
-                        EditorGUI.LabelField(new Rect(grRect.x + 3f, grRect.y, grRect.width - 6f, grRect.height),
-                                             "（差分组）", EditorStyles.miniLabel);
-                        GUI.color = old;
-                    }
-                    EditorGUI.LabelField(grRect, new GUIContent(string.Empty,
-                        "差分组名：同组 CG 在鉴赏画廊里归为一格翻页；留空 = 独立一格"));
+                    Overlay(grRect, string.IsNullOrEmpty(grProp.stringValue) ? "（差分组）" : null,
+                            "差分组名：同组 CG 在鉴赏画廊里归为一格翻页；留空 = 独立一格");
                 }
                 EditorGUI.PropertyField(bottom, spProp, GUIContent.none);
             }
@@ -279,8 +284,8 @@ namespace VNEffects.EditorTools
                 {
                     var volRect = VNAssetUi.CutRight(ref bottom, 112f);
                     EditorGUI.PropertyField(volRect, volProp, GUIContent.none);
-                    EditorGUI.LabelField(volRect, new GUIContent(string.Empty,
-                        "该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身"));
+                    Overlay(volRect, null,
+                        "该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身");
                 }
                 EditorGUI.PropertyField(bottom, clipProp, GUIContent.none);
             }

@@ -413,7 +413,9 @@ namespace VNEffects.EditorTools
 
             if (_onlyUnregistered) { DrawUnregistered(r, arr); return; }
 
-            float rowH = Mathf.Max(26f, GridSize * 0.32f);
+            // 行高要够画两行（id + 文件名）：TwoLines 需要 2×18+2 = 38，
+            // 而 work = rowH − 2（行距）− 4（Shrink），所以 rowH 至少 44。
+            float rowH = Mathf.Max(46f, GridSize * 0.42f);
             float contentH = _visible.Count * rowH + 40f;
             var content = new Rect(0f, 0f, r.width - 16f, Mathf.Max(contentH, r.height));
             _scrollGrid = GUI.BeginScrollView(r, _scrollGrid, content);
@@ -481,7 +483,7 @@ namespace VNEffects.EditorTools
             Rect top, bottom;
             VNAssetUi.TwoLines(work, out top, out bottom);
             var idProp = IdProp(el);
-            if (idProp != null && work.height >= 34f)
+            if (idProp != null && work.height >= 38f)
             {
                 EditorGUI.PropertyField(top, idProp, GUIContent.none);
                 EditorGUI.LabelField(bottom, VNAssetUi.AssetName(clip), VNAssetUi.RowLabel);

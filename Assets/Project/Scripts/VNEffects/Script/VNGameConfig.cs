@@ -109,12 +109,15 @@ namespace VNEffects
         // UI 皮肤（对话框 / 选项面板；剧本 ui dialogue|choice <id> 切换）
         // ==============================================================
 
+        // ★ 列表元素里的字段说明一律用 [Tooltip]，**绝对不要用 [Header]**——
+        //   它会把控件区域往下推，在自定义 drawer 的固定 rect 里表现为
+        //   文字叠印 + 输入框点不进去。详见 VNStage.BackgroundEntry 上的注释。
         [System.Serializable]
         public class UiSkinEntry
         {
-            [Header("剧本 ui 命令引用的 id（可中文，如 华丽 / 顶部）")]
+            [Tooltip("剧本 ui 命令引用的 id（可中文，如 华丽 / 顶部）")]
             public string id;
-            [Header("皮肤 prefab（根上挂 VNDialogueSkin 或 VNChoiceSkin）")]
+            [Tooltip("皮肤 prefab（根上挂 VNDialogueSkin 或 VNChoiceSkin）")]
             public GameObject prefab;
         }
 

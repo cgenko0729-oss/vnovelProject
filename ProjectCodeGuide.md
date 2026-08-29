@@ -694,7 +694,16 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNGameConfigEditor.cs | （CustomEditor） | `VNGameConfig` 的九页分页 Inspector + 智能列表（搜索 / 分页 / 行操作 / id 告警 / 批量拖入） |
 | VNAssetBrowserWindow.cs | Tools → VN Effects → **Asset Browser** | 素材浏览器：大缩略图网格 + 音频波形列表（均虚拟化）+ 详情栏 + 只看未登记 |
 
-**素材界面三条硬约定**（一一九章）：
+**素材界面硬约定**（一一九章）：
+⓪ **列表元素类里的字段说明一律用 `[Tooltip]`，绝不用 `[Header]`。**
+`[Header]` 是 DecoratorDrawer，Unity 画它时会 `position.yMin += decorator.GetHeight()`
+（约 26px）。后果有两层：列表里每一项都重画一遍，一个条目就占 6~7 行；
+更糟的是**自定义 drawer 内部只要自己调 `EditorGUI.PropertyField(rect, 子属性, …)`
+就会触发那个子属性的 decorator**，把只有 18px 高的 rect 推成负高度 ——
+表现为文字叠印且**输入框点不进去**。挂了 drawer 也挡不住，因为 Unity 只是不*自动递归*而已。
+同理，**任何画在控件之上的叠加层（占位提示、tooltip）都必须只在
+`Event.current.type == EventType.Repaint` 时画**，否则会吃掉底下控件的点击
+（`VNEntryDrawerBase.Overlay()` 就是干这个的）。
 ① **Sprite 缩略图别用 `AssetPreview`** —— 它异步，列表里几十张一起等会闪一片空白；
 Sprite 自己知道在哪张 texture 的哪个 UV，`GUI.DrawTextureWithTexCoords` 同步画即可（texture 不必可读）。
 ② 异步预览（音频波形、prefab）**必须有放弃机制** —— 有些资产永远不会有预览图，

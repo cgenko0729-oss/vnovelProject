@@ -18,14 +18,17 @@ namespace VNEffects
     /// </summary>
     public class VNAudio : MonoBehaviour
     {
+        // ★ 列表元素里的字段说明一律用 [Tooltip]，**绝对不要用 [Header]**——
+        //   它会把控件区域往下推，在自定义 drawer 的固定 rect 里表现为
+        //   文字叠印 + 输入框点不进去。详见 VNStage.BackgroundEntry 上的注释。
         [System.Serializable]
         public class AudioEntry
         {
-            [Header("剧本中引用的 id（可中文，如 黄昏之歌 / 雨声）")]
+            [Tooltip("剧本中引用的 id（可中文，如 黄昏之歌 / 雨声）")]
             public string id;
-            [Header("音频素材")]
+            [Tooltip("音频素材")]
             public AudioClip clip;
-            [Header("该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身")]
+            [Tooltip("该素材的基准音量。素材本身偏响就往下调；Unity 音量上限为 1，无法放大素材本身")]
             [Range(0f, 1f)] public float volume = 1f;
         }
 
