@@ -2035,6 +2035,29 @@ namespace VNEffects
         /// 用射线命中链向上找 Selectable，而不是 IsPointerOverGameObject ——
         /// 后者对任何 raycastTarget 都为 true，本项目全屏皆 UI，会拦掉一切点击。
         /// </summary>
+        /// <summary>
+        /// 外部（事件模块）请求推进当前正在等待的台词。
+        ///
+        /// **为什么必须有这个入口**：Update 第一行就是 `if (_eventActive) return;`
+        /// —— 事件模块进行中，输入全部交给模块。于是模块内部用 RunInlineCo 播的
+        /// 阻塞台词会死等 `_advance`，玩家点破屏幕也过不去。模块在阻塞期间
+        /// 自己检测推进输入，转发到这里。
+        ///
+        /// 语义与 Update 里的手动推进一致：还在打字就先补完，打完了才真推进。
+        /// </summary>
+        public void RequestAdvance()
+        {
+            if (stage != null && stage.dialogue != null && stage.dialogue.IsTyping)
+            {
+                stage.dialogue.CompleteTyping();
+                return;
+            }
+            if (_waitingAtSay) _advance = true;
+        }
+
+        /// <summary>当前是否正卡在某句台词上等玩家推进（模块判断要不要转发输入）</summary>
+        public bool IsWaitingAtSay => _waitingAtSay;
+
         static bool IsPointerOverInteractiveUi(Mouse mouse)
         {
             if (EventSystem.current == null) return false;

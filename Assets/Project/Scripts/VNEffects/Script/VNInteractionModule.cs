@@ -153,6 +153,18 @@ namespace VNEffects
                 _hoverZone = null;
                 _cursor?.SetState(false, false);
                 _hasLastMouse = false;
+
+                // **推进输入必须由这里转发**：Runner.Update 第一行就是
+                // `if (_eventActive) return;`，事件期间它完全不收输入，
+                // 所以模块内播的阻塞台词会死等 _advance —— 玩家点破屏幕也过不去。
+                var kb = Keyboard.current;
+                bool advance =
+                    (kb != null && (kb.enterKey.wasPressedThisFrame ||
+                                    kb.spaceKey.wasPressedThisFrame)) ||
+                    (mouse.leftButton.wasPressedThisFrame &&
+                     !IsPointerOverModuleUi(mouse.position.ReadValue()));
+                if (advance) _runner?.RequestAdvance();
+
                 RefreshHud();
                 return;
             }
