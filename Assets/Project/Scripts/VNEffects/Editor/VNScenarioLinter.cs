@@ -101,6 +101,8 @@ namespace VNEffects.EditorTools
             public HashSet<string> bgms = new HashSet<string>();
             public HashSet<string> ses = new HashSet<string>();
             public HashSet<string> voices = new HashSet<string>();
+            public Dictionary<string, HashSet<string>> charOverlays =
+                new Dictionary<string, HashSet<string>>();
             public Dictionary<string, HashSet<string>> charExpressions =
                 new Dictionary<string, HashSet<string>>();
             public HashSet<string> eventModules = new HashSet<string>();
@@ -268,6 +270,12 @@ namespace VNEffects.EditorTools
                 foreach (var e in def.expressions)
                     if (e != null && !string.IsNullOrEmpty(e.name)) set.Add(e.name);
                 reg.charExpressions[def.id] = set;
+
+                var layers = new HashSet<string>();
+                if (def.overlays != null)
+                    foreach (var o in def.overlays)
+                        if (o != null && !string.IsNullOrEmpty(o.id)) layers.Add(o.id);
+                reg.charOverlays[def.id] = layers;
             }
 
             var registry = Object.FindFirstObjectByType<VNEventRegistry>(FindObjectsInactive.Include);
@@ -570,6 +578,35 @@ namespace VNEffects.EditorTools
                             Add(issues, VNLintSeverity.Error, "bad-mark-mode", f, c.line,
                                 $"mark 的第三个参数「{markMode}」不合法",
                                 "第三个参数只能是 keep（常驻）或 off（移除该符号），留空 = 弹一下就消失。");
+                        break;
+                    }
+
+                    case "overlay":
+                    {
+                        // 层名拼错运行时只有一条 Warning，画面上什么都不会发生
+                        CheckCharacter(issues, f, c.line, c.Arg(0), reg);
+                        string layer = c.Arg(1);
+                        if (!string.IsNullOrEmpty(layer) && !Dynamic(layer) &&
+                            layer != "clear" && layer != "off" && !Dynamic(c.Arg(0)) &&
+                            reg.charOverlays.TryGetValue(c.Arg(0), out var known))
+                        {
+                            if (known.Count == 0)
+                                Add(issues, VNLintSeverity.Warning, "no-overlay", f, c.line,
+                                    $"角色「{c.Arg(0)}」还没有配任何情绪叠加层",
+                                    "在角色资产 VNCharacterDef.overlays 里登记（id + 透明图）。");
+                            else if (!known.Contains(layer))
+                                Add(issues, VNLintSeverity.Warning, "unknown-overlay", f, c.line,
+                                    $"角色「{c.Arg(0)}」没有叠加层「{layer}」",
+                                    $"该角色已有的层：{string.Join(" / ", known.OrderBy(s2 => s2))}。" +
+                                    "清空全部写 `overlay <角色> clear`。");
+                        }
+
+                        string st = c.Arg(2);
+                        if (!string.IsNullOrEmpty(st) && !Dynamic(st) &&
+                            float.TryParse(st, out float sv) && (sv < 0f || sv > 1f))
+                            Add(issues, VNLintSeverity.Warning, "overlay-range", f, c.line,
+                                $"叠加层强度「{st}」超出 0~1，运行时会被钳制",
+                                "强度是 0~1 的比例，实际不透明度还要乘该层资产里的 maxAlpha。");
                         break;
                     }
 

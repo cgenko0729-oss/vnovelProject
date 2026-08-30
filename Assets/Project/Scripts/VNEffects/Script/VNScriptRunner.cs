@@ -537,6 +537,9 @@ namespace VNEffects
                     case "mark":
                         RebuildMarkState(characters, cmd);
                         break;
+                    case "overlay":
+                        RebuildOverlayState(characters, cmd);
+                        break;
                     case "say":
                         if (!string.IsNullOrEmpty(cmd.expression) &&
                             characters.TryGetValue(cmd.speaker, out var speaking))
@@ -755,6 +758,36 @@ namespace VNEffects
         /// 漫符的静默重放：只有 keep 符号是持续状态需要重建，
         /// 一次性符号播完就没了，重建时直接忽略。
         /// </summary>
+        /// <summary>
+        /// overlay 命令的静默重放（编辑器「从选中行播放」重建前置状态用）。
+        /// 直接改快照串，格式与 VNCharacterOverlay.Serialize 一致。
+        /// </summary>
+        void RebuildOverlayState(Dictionary<string, VNSaveData.CharSave> characters,
+            VNScriptCommand cmd)
+        {
+            if (!characters.TryGetValue(cmd.Arg(0), out var character)) return;
+
+            string layer = cmd.Arg(1);
+            if (string.IsNullOrEmpty(layer) || layer == "clear" || layer == "off")
+            {
+                character.overlays = null;
+                return;
+            }
+
+            float strength = Mathf.Clamp01(cmd.ArgF(2, 1f));
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(character.overlays))
+                foreach (var p in character.overlays.Split('|'))
+                {
+                    int eq = p.IndexOf('=');
+                    if (eq > 0 && p.Substring(0, eq) != layer) parts.Add(p);
+                }
+            if (strength > 0.001f)
+                parts.Add(layer + "=" + strength.ToString("0.###"));
+
+            character.overlays = parts.Count > 0 ? string.Join("|", parts) : null;
+        }
+
         void RebuildMarkState(Dictionary<string, VNSaveData.CharSave> characters,
             VNScriptCommand cmd)
         {
@@ -2103,6 +2136,14 @@ namespace VNEffects
                     return WaitTween(stage.Mark(cmd.Arg(0), cmd.Arg(1), cmd.Arg(2),
                         ParseMarkPos(cmd.Kw("pos"), cmd.line),
                         cmd.KwF("size", 1f), cmd.KwF("dur", 1.1f), cmd.line));
+
+                case "overlay":
+                    // overlay <角色> <层id|clear> [强度 0~1] [time:秒]
+                    // 情绪叠加层（潮红/汗/泪）；层在 VNCharacterDef.overlays 登记。
+                    // 强度省略 = 1；瞬发不等待（要等就自己接 wait）
+                    stage.SetOverlay(cmd.Arg(0), cmd.Arg(1), cmd.ArgF(2, 1f),
+                        cmd.KwF("time", 0.35f), cmd.line);
+                    return null;
 
                 case "weather":
                 {

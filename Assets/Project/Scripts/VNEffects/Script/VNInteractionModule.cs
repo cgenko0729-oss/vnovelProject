@@ -275,7 +275,10 @@ namespace VNEffects
 
             if (!string.IsNullOrEmpty(fb.emote)) PlayEmote(fb.emote);
 
-            // TODO(批次4)：fb.overlay → VNCharacterOverlay 叠加层强度
+            if (!string.IsNullOrEmpty(fb.overlay) && _char.overlay != null &&
+                !_char.overlay.SetStrength(fb.overlay, fb.overlayStrength))
+                Debug.LogWarning($"[VNInteract] 角色「{_charId}」没有叠加层「{fb.overlay}」" +
+                                 "（在 VNCharacterDef.overlays 登记）");
 
             if (!string.IsNullOrEmpty(fb.se)) _audio?.PlaySe(fb.se);
 

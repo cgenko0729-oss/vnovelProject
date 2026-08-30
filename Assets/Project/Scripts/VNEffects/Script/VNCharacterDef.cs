@@ -144,6 +144,22 @@ namespace VNEffects
         public float mouthIntervalMax = 0.16f;
 
         [System.Serializable]
+        public class OverlayLayer
+        {
+            [Header("层 id（剧本 fx overlay / 互动反馈里引用，如 潮红 / 汗 / 泪）")]
+            public string id;
+            [Header("透明背景的局部图。保留与默认立绘完全相同的整张画布，只在该部位留像素")]
+            public Sprite sprite;
+            [Header("强度 1.0 时的实际不透明度（潮红这类通常不需要满不透明）")]
+            [Range(0f, 1f)]
+            public float maxAlpha = 0.85f;
+        }
+
+        [Header("情绪叠加层（潮红 / 汗 / 泪）：与表情是加法关系，可多层共存、强度可连续变化。" +
+                "别做成表情——「表情 × 潮红三档」是乘法爆炸，每个组合都要一张完整立绘")]
+        public List<OverlayLayer> overlays = new List<OverlayLayer>();
+
+        [System.Serializable]
         public class MarkOverride
         {
             [Header("漫符名（英文正名 sweat/anger/... 或中文别名 汗/怒/...）")]

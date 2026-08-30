@@ -211,6 +211,14 @@ namespace VNEffects.EditorTools
                 Kw("pos", "pos", VNParamSource.Text),
                 Kw("size", "size", VNParamSource.Number, def: "1"),
                 Kw("dur", "dur", VNParamSource.Number, def: "1.1"));
+            Add("overlay", "Character",
+                "overlay <char> <layer|clear> [strength 0~1] [time:0.35]\n" +
+                "情绪叠加层（潮红/汗/泪）：与表情是加法关系，可多层共存、强度连续变化。\n" +
+                "层在角色资产 VNCharacterDef.overlays 里登记；clear = 全部清空。状态进存档",
+                Pos("character", "char", VNParamSource.Character),
+                Pos("layer", "layer", VNParamSource.Text),
+                Pos("strength", "0~1", VNParamSource.Number, def: "1", weight: 0.6f),
+                Kw("time", "time", VNParamSource.Number, def: "0.35"));
             Add("move", "Character", "move <char> <slot> [seconds]",
                 Pos("character", "char", VNParamSource.Character),
                 Pos("at", "to", VNParamSource.Options, Slots, "center"),

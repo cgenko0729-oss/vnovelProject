@@ -136,6 +136,8 @@ namespace VNEffects
             public VNCharacterBlinkOverlay blinkOverlay;
             public VNCharacterMouth mouth;
             public VNCharacterMarks marks;
+            /// <summary>情绪叠加层（潮红/汗/泪）；强度进存档</summary>
+            public VNCharacterOverlay overlay;
             public string expression;
             /// <summary>登场用的是日常向预设 → 常驻效果里不开周期扫光（进存档）</summary>
             public bool casualEntrance;
@@ -422,6 +424,30 @@ namespace VNEffects
         }
 
         /// <summary>切换表情立绘（P0 为瞬间切换）</summary>
+        /// <summary>
+        /// 设置角色的情绪叠加层强度（潮红/汗/泪）。layer = "clear" 清空全部。
+        /// 剧本 overlay 命令与互动模块共用这一个入口。
+        /// </summary>
+        public void SetOverlay(string id, string layer, float strength, float time, int line = 0)
+        {
+            var c = Get(id);
+            if (c == null)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：角色「{id}」不在场，overlay 无效");
+                return;
+            }
+            if (c.overlay == null) return;
+
+            if (string.IsNullOrEmpty(layer) || layer == "clear" || layer == "off")
+            {
+                c.overlay.ClearAll(time);
+                return;
+            }
+            if (!c.overlay.SetStrength(layer, strength, time))
+                Debug.LogWarning($"[VNScript] 第 {line} 行：角色「{id}」没有叠加层「{layer}」" +
+                                 "（在 VNCharacterDef.overlays 登记）");
+        }
+
         public void SetExpression(string id, string expr)
         {
             var c = Get(id);
@@ -555,6 +581,8 @@ namespace VNEffects
             c.mouth.Initialize(img, def, c.fx.Mat);
             c.marks = go.AddComponent<VNCharacterMarks>();
             c.marks.Initialize(rect, def, c.fx.Mat);
+            c.overlay = go.AddComponent<VNCharacterOverlay>();
+            c.overlay.Initialize(def, c.fx.Mat);
             go.AddComponent<VNFootShadow>();
 
             _active[def.id] = c;
@@ -802,6 +830,7 @@ namespace VNEffects
                     expr = kv.Value.expression,
                     // 只有 keep 漫符是持续状态；一次性符号播完即逝，不进存档
                     marks = kv.Value.marks != null ? kv.Value.marks.SerializeKeep() : null,
+                    overlays = kv.Value.overlay != null ? kv.Value.overlay.Serialize() : null,
                     casualEntrance = kv.Value.casualEntrance,
                 });
             }
@@ -873,7 +902,11 @@ namespace VNEffects
             RestoreLiquid(data);
 
             foreach (var cs in data.characters)
+            {
                 ShowInstant(cs.id, cs.x, cs.expr, cs.marks, cs.casualEntrance);
+                // 叠加层单独还原（不塞进 ShowInstant 签名，那个重载已经四个参数了）
+                Get(cs.id)?.overlay?.Restore(cs.overlays);
+            }
 
             // CG 最后重放：立绘/天气/fx 已就位，ShowCg 会按 keep 参数再次隐藏/暂停
             if (!string.IsNullOrEmpty(data.cgId))
