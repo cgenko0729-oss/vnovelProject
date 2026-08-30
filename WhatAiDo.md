@@ -8344,3 +8344,64 @@ event interact vs:星野结衣 id:初次抚摸 items:手,羽毛 time:120 flag:�
 
 装机：Tools → VN Effects → 场景装机 Install To Scene → **亲密互动 Interaction Module**。
 画部位框：Tools → VN Effects → 预览 Preview → **部位区域编辑器 Touch Zone Editor**。
+
+---
+
+## 一二七、互动内嵌演出的坐标占位符与结束收尾（2026-08-30，分支 `agent/interaction-liquid`）
+
+### 起因
+
+用户问：摸到某个阶段或某个部位时，能不能用 `liquid` 命令在**特定部位或坐标点**喷特效？
+
+一半已经能做 —— 内嵌剧本行（一二六章）本来就放行 `liquid`，场景也早装过液体层，
+写 `liquid splash x:0.5 y:0.55 type:water` 就有效果。
+
+但**写死坐标是个陷阱**：角色一移位、镜头一推拉、换张构图不同的立绘，喷的位置就飘了。
+而「在特定部位」真正想要的是**摸哪儿喷哪儿**。
+
+### 做法：占位符 + 结束收尾
+
+**① 坐标占位符**（`VNInteractionModule.ExpandPlaceholders`）
+
+| 占位符 | 含义 |
+|---|---|
+| `{cx}` `{cy}` | 光标当前位置 |
+| `{zx}` `{zy}` | 当前部位中心 |
+| `{px}` `{py}` | 角色中心 |
+| `{prog}` `{stage}` `{zone}` | 整场进度 0~1 / 阶段序号 / 部位 id |
+
+坐标一律是 **viewport 比例 0~1、左下角为原点** —— 与 `liquid` 的 `x:` `y:` 同一套
+（它内部走 `Camera.ViewportToWorldPoint`），所以能直接写 `liquid splash x:{cx} y:{cy}`。
+换算链是「立绘归一化 → `TransformPoint` → `WorldToScreenPoint` → 除以屏幕尺寸」。
+
+放在模块层而不是给 `liquid` 命令加参数：部位是互动系统的概念，`liquid` 不该知道它；
+而且占位符对**所有**内嵌命令都生效，将来 `fx`、粒子要坐标时照样能用。
+
+**② `cleanupLines`（结束收尾剧本行）**
+
+`spray on` / `wet on` 这类持续状态开了不会自己停。收尾行在**四条退出路径**上都执行：
+正常结束 / 玩家点结束 / ESC / 调试中断。关键实现细节：**协程挂在 Runner 上而不是模块上** ——
+模块马上就要被销毁，挂自己身上的协程会被拦腰打断，于是水就一直喷下去了。
+
+### 修复记录
+
+- **`{cx}{cy}` 取到 (0,0)，水喷到屏幕左下角。** 原先读的是 `_lastMouse`，
+  那个只在 `Update` 里写，而阻塞台词期间 `Update` 提前 return，取到的是过期值甚至初始值。
+  改成直接读 `Mouse.current.position` 实时值。
+- **水花被推迟到玩家点击之后才出现。** `FeedbackCo` 原本是「先说台词 → 再跑内嵌行」，
+  台词若是 `blocking` 会一直等推进，演出就脱节了。改为**演出先于台词** ——
+  演出是「刚发生的事」，台词是随后的反应；而且占位符在这一刻展开，
+  鼠标还停在玩家刚摸的位置上。
+
+### 验证方法
+
+- 反射调 `ExpandPlaceholders`：`{zx},{zy}`=0.507,0.342（颈部）、`{px},{py}`=0.503,0.398
+  （角色中心）、`{prog}`=0.213、`{stage}`=1、`{zone}`=颈，全部正确。
+- `VNLiquidSplash.Burst` 后粒子数 212，确认液体层在本场景可用。
+- 摸到阶段 2 触发 `liquid splash x:{zx} y:{zy}`，截图能看到水珠落在脖颈/肩部一带，
+  且台词是在水花**之后**出现的。
+
+### 示例资产
+
+`初次抚摸` 里写全了四种用法：摸「颈」就喷（`{cx}{cy}`）／阶段「害羞」喷一下（`{zx}{zy}`）／
+阶段「情动」持续喷 + 镜头水渍（`amount:{prog}`）／`cleanupLines` = `liquid spray off` + `liquid dry`。

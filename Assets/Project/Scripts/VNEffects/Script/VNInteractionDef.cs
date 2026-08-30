@@ -94,7 +94,11 @@ namespace VNEffects
         [Header("属性变动，写法同剧本 stat 命令，如「好感 +2」（留空 = 不动）")]
         public string statOp;
 
-        [Header("内嵌剧本行：想要 fx / camseq / liquid 之类的复杂演出就写在这里，一行一条")]
+        [Header("内嵌剧本行：想要 fx / camseq / liquid 之类的复杂演出就写在这里，一行一条。\n" +
+                "可用占位符（会被替换成实时数值）：\n" +
+                "  {cx} {cy} 光标位置　{zx} {zy} 当前部位中心　{px} {py} 角色中心（均为 viewport 比例 0~1）\n" +
+                "  {prog} 整场进度 0~1　{stage} 当前阶段序号　{zone} 当前部位 id\n" +
+                "例：liquid splash x:{cx} y:{cy} type:water power:{prog}")]
         [TextArea(2, 6)]
         public string scriptLines;
 
@@ -299,6 +303,13 @@ namespace VNEffects
 
         [Header("成绩 flag 前缀（剧本 flag: 可覆盖）：写 <前缀>_兴奋度 / _阶段 / _拒绝数 / _<部位>次数")]
         public string flagPrefix;
+
+        [Header("结束收尾剧本行（一行一条）。**任何**退出路径都会执行：正常结束 / 玩家收手 /\n" +
+                "ESC / 调试中断。凡是被反馈开启过的持续状态都该在这里关掉，例如：\n" +
+                "  liquid spray off\n  liquid dry\n  fx shockwave off\n" +
+                "不写的话，一旦玩家中途退出，喷水会一直喷下去")]
+        [TextArea(2, 5)]
+        public string cleanupLines;
 
         // ------------------------------------------------------------------
 

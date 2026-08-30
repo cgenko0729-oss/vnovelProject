@@ -64,6 +64,7 @@ namespace VNEffects
         float _timeLeft;
         bool _timed;
         bool _endExpressionKept;
+        bool _cleanupDone;
 
         Vector2 _lastMouse;
         bool _hasLastMouse;
@@ -321,6 +322,12 @@ namespace VNEffects
 
             if (blocking) _blocked = true;
 
+            // **演出先于台词**：台词若是阻塞型会一直等玩家点击，把喷水/震屏推迟到
+            // 点击之后就完全脱节了 —— 演出是「刚发生的事」，台词是随后的反应。
+            // 占位符也在这一刻展开，鼠标还停在玩家刚摸的位置上。
+            if (!string.IsNullOrEmpty(scriptLines))
+                yield return _runner.RunInlineCo(ExpandPlaceholders(scriptLines));
+
             if (!string.IsNullOrEmpty(line))
             {
                 if (blocking)
@@ -333,10 +340,78 @@ namespace VNEffects
                 else _stage.Say(_charId, _char.expression, line);
             }
 
-            if (!string.IsNullOrEmpty(scriptLines))
-                yield return _runner.RunInlineCo(scriptLines);
-
             _blocked = false;
+        }
+
+        // ------------------------------------------------------------------
+        // 内嵌剧本行的占位符
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 把内嵌剧本行里的占位符换成实时数值。存在的理由：坐标写死之后，
+        /// 角色一移位、镜头一推拉、换张构图不同的立绘，特效就喷偏了；
+        /// 而这个玩法真正想要的是「摸哪儿喷哪儿」。
+        ///
+        /// 坐标一律是 **viewport 比例 0~1，左下角为原点** —— 与 liquid 命令的
+        /// x:/y: 同一套（它内部走 Camera.ViewportToWorldPoint），所以可以直接写
+        /// <c>liquid splash x:{cx} y:{cy}</c>。fx / 粒子之类将来要坐标时也能复用。
+        /// </summary>
+        string ExpandPlaceholders(string lines)
+        {
+            if (string.IsNullOrEmpty(lines) || lines.IndexOf('{') < 0) return lines;
+
+            // 直接读实时鼠标位置，**不用 _lastMouse** —— 那个只在 Update 里写，
+            // 而阻塞台词期间 Update 提前 return，取到的会是过期值甚至初始的 (0,0)，
+            // 水就喷到屏幕左下角去了
+            Vector2 cursorScreen = Mouse.current != null
+                ? Mouse.current.position.ReadValue() : _lastMouse;
+            Vector2 cursor = ViewportOfScreen(cursorScreen);
+            Vector2 zone = _hoverZone != null
+                ? ViewportOfSpriteNorm(_hoverZone.center) : cursor;
+            Vector2 person = ViewportOfSpriteNorm(Vector2.zero);
+
+            var sb = new System.Text.StringBuilder(lines);
+            sb.Replace("{cx}", F(cursor.x)).Replace("{cy}", F(cursor.y));
+            sb.Replace("{zx}", F(zone.x)).Replace("{zy}", F(zone.y));
+            sb.Replace("{px}", F(person.x)).Replace("{py}", F(person.y));
+            sb.Replace("{prog}", F(_score.ProgressTo(_def.ResolvedTargetStage)));
+            sb.Replace("{stage}", _score.Stage.ToString());
+            sb.Replace("{zone}", _hoverZone != null ? _hoverZone.id : "");
+            return sb.ToString();
+        }
+
+        /// <summary>数值一律用不变文化格式化 —— 逗号小数点的地区会把 x:0,5 拆成两个参数</summary>
+        static string F(float v) =>
+            v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>屏幕点 → viewport 比例</summary>
+        static Vector2 ViewportOfScreen(Vector2 screen) =>
+            new Vector2(Mathf.Clamp01(screen.x / Mathf.Max(1f, Screen.width)),
+                        Mathf.Clamp01(screen.y / Mathf.Max(1f, Screen.height)));
+
+        /// <summary>立绘归一化坐标（-0.5~0.5）→ viewport 比例</summary>
+        Vector2 ViewportOfSpriteNorm(Vector2 norm)
+        {
+            if (_char == null || _char.rect == null) return new Vector2(0.5f, 0.5f);
+            Vector2 size = _char.rect.rect.size;
+            Vector3 world = _char.rect.TransformPoint(
+                new Vector3(norm.x * size.x, norm.y * size.y, 0f));
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(UiCamera, world);
+            return ViewportOfScreen(screen);
+        }
+
+        /// <summary>
+        /// 结束收尾。**四条退出路径都要走到**，且协程挂在 Runner 上而不是模块上 ——
+        /// 模块马上就要被销毁，挂自己身上的协程会被拦腰打断，
+        /// 于是 liquid spray 就一直喷下去了。
+        /// </summary>
+        void RunCleanup()
+        {
+            if (_cleanupDone) return;
+            _cleanupDone = true;
+            if (_def == null || string.IsNullOrEmpty(_def.cleanupLines) || _runner == null)
+                return;
+            _runner.StartCoroutine(_runner.RunInlineCo(ExpandPlaceholders(_def.cleanupLines)));
         }
 
         /// <summary>随机抽一条语音，尽量不重复上一条</summary>
@@ -466,6 +541,7 @@ namespace VNEffects
             WriteFlags();
             DestroyZoneOverlay();     // 结算台词已经在说了，调试框不该还挂在脸上
             _cursor?.Dispose();       // 系统光标立刻还回去，别等模块销毁
+            RunCleanup();             // 关掉被反馈开起来的持续状态（spray / wet …）
 
             VNInteractionFeedback endFb =
                 outcome == _def.outcomeSatisfied ? _def.endSatisfied :
@@ -512,6 +588,7 @@ namespace VNEffects
             RestoreExpression();
             DestroyZoneOverlay();
             _cursor?.Dispose();
+            RunCleanup();
         }
 
         void OnDestroy()
@@ -520,6 +597,7 @@ namespace VNEffects
             if (_phase != Phase.Ending) RestoreExpression();
             DestroyZoneOverlay();
             _cursor?.Dispose();
+            RunCleanup();
         }
 
         /// <summary>

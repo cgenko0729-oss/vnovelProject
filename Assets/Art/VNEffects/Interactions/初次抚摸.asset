@@ -148,7 +148,7 @@ MonoBehaviour:
       se: 
       excite: 0
       statOp: 
-      scriptLines: 
+      scriptLines: liquid splash x:{zx} y:{zy} type:water power:1.4
   - name: "\u60C5\u52A8"
     threshold: 150
     idleExpression: "\u5BB3\u7F9E"
@@ -173,7 +173,13 @@ MonoBehaviour:
       statOp: 
       scriptLines: 'fx shockwave light
 
-        camera pushin 1.08 2 @'
+        camera pushin 1.08 2 @
+
+        liquid
+        spray on x:{zx} y:{zy} type:water rate:0.35 power:0.7
+
+        liquid wet
+        on amount:{prog}'
   rules:
   - zoneId: "\u5934"
     itemId: 
@@ -307,7 +313,7 @@ MonoBehaviour:
       se: 
       excite: 5
       statOp: 
-      scriptLines: 
+      scriptLines: liquid splash x:{cx} y:{cy} type:water power:0.8 screen:0.4
     feedbackEvery: 6
   - zoneId: "\u80A9"
     itemId: 
@@ -493,3 +499,6 @@ MonoBehaviour:
     statOp: 
     scriptLines: 
   flagPrefix: "\u629A\u6478"
+  cleanupLines: 'liquid spray off
+
+    liquid dry'

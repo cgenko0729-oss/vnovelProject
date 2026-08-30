@@ -179,10 +179,17 @@ namespace VNEffects.EditorTools
             {
                 Stage("平静", 0f, "默认"),
                 Stage("心动", 30f, "微笑", "…嗯？怎么突然这样。", "害羞", blocking: true),
-                Stage("害羞", 80f, "害羞", "别、别这样…会被人看到的。", "红晕", blocking: true),
+                // ② 阶段推进时喷一下：{zx}{zy} = 当前部位中心
+                Stage("害羞", 80f, "害羞", "别、别这样…会被人看到的。", "红晕", blocking: true,
+                      script: "liquid splash x:{zx} y:{zy} type:water power:1.4"),
+                // ③ 到最高阶段后持续喷 + ④ 镜头开始沾水渍（浓度跟着整场进度走）
+                //    这两个是**持续状态**，必须靠 cleanupLines 收口
                 Stage("情动", 150f, "害羞", "……我已经，不行了。", "心", blocking: true,
                       // 内嵌剧本行示范：字段配不出来的演出写在这里，走 RunInlineCo
-                      script: "fx shockwave light\ncamera pushin 1.08 2 @"),
+                      script: "fx shockwave light\n" +
+                              "camera pushin 1.08 2 @\n" +
+                              "liquid spray on x:{zx} y:{zy} type:water rate:0.35 power:0.7\n" +
+                              "liquid wet on amount:{prog}"),
             };
 
             def.rules = new List<VNInteractionZoneRule>
@@ -195,8 +202,10 @@ namespace VNEffects.EditorTools
                     Fb("摸脸 · 侧头", emote: "害羞", minStage: 1)),
                 Rule("耳", 1.4f, 6f,
                     Fb("碰耳 · 颤抖", expr: "惊讶", mark: "汗", line: "耳朵…不行啦…", excite: 4f)),
+                // ① 摸到特定部位就喷：{cx}{cy} = 光标位置，所以是「摸哪儿喷哪儿」
                 Rule("颈", 1.5f, 6f,
-                    Fb("脖颈", expr: "害羞", mark: "红晕", line: "呀…！", excite: 5f)),
+                    Fb("脖颈", expr: "害羞", mark: "红晕", line: "呀…！", excite: 5f,
+                       script: "liquid splash x:{cx} y:{cy} type:water power:0.8 screen:0.4")),
                 Rule("肩", 0.8f, 9f,
                     Fb("肩膀", expr: "微笑", line: "肩膀有点酸呢。")),
                 Rule("胸", 2f, 5f,
@@ -223,6 +232,9 @@ namespace VNEffects.EditorTools
             def.allowManualEnd = true;
             def.autoEndOnTarget = true;
             def.flagPrefix = "抚摸";
+            // 四条退出路径（正常结束/收手/ESC/调试中断）都会执行 ——
+            // 不写的话玩家中途退出，spray 会一直喷下去
+            def.cleanupLines = "liquid spray off\nliquid dry";
 
             def.endSatisfied = Fb("结局 · 满足", expr: "害羞", mark: "心",
                                   line: "……今天，就到这里吧。");
@@ -317,10 +329,12 @@ namespace VNEffects.EditorTools
 
         static VNInteractionFeedback Fb(string note, string expr = null, string mark = null,
             string emote = null, string line = null, float excite = 0f,
-            int minStage = -1, float cooldown = 2.5f, bool blocking = false)
+            int minStage = -1, float cooldown = 2.5f, bool blocking = false,
+            string script = null)
         {
             return new VNInteractionFeedback
             {
+                scriptLines = script,
                 note = note,
                 expression = expr,
                 mark = mark,

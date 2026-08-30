@@ -1093,6 +1093,46 @@ event interact vs:星野结衣 id:初次抚摸 items:手,羽毛 time:120 flag:�
 **阶段推进的台词记得勾 `blocking`**：那是场面转折，该让玩家停下来看完；
 过程中的碎反应别勾，不然一直被打断没法连续抚摸。
 
+#### 内嵌剧本行的坐标占位符
+
+想在**摸到的位置**放特效（喷水、震屏…），把占位符写进反馈的「内嵌剧本行」，
+执行前会被换成实时数值：
+
+| 占位符 | 含义 |
+|---|---|
+| `{cx}` `{cy}` | 光标当前位置（**摸哪儿喷哪儿**，最常用） |
+| `{zx}` `{zy}` | 当前部位的中心 |
+| `{px}` `{py}` | 角色中心 |
+| `{prog}` | 整场进度 0~1（拿来当浓度/力度很好用） |
+| `{stage}` | 当前阶段序号 |
+| `{zone}` | 当前部位 id |
+
+坐标都是 **viewport 比例 0~1，左下角为原点** —— 和 `liquid` 的 `x:` `y:` 同一套，
+所以可以直接写：
+
+```
+liquid splash x:{cx} y:{cy} type:water power:0.8 screen:0.4    摸哪儿喷哪儿
+liquid splash x:{zx} y:{zy} type:water power:1.4               喷在部位中心
+liquid spray on x:{zx} y:{zy} type:water rate:0.35             持续噗噗喷
+liquid wet on amount:{prog}                                    镜头水渍随进度加重
+```
+
+写死坐标当然也行，但角色一移位、镜头一推拉就喷偏了。
+
+**持续型的一定要收口**：`spray on` / `wet on` 这类开了就不会自己停，
+要把关掉的命令写在互动定义的 **`cleanupLines`（结束收尾剧本行）** 里：
+
+```
+liquid spray off
+liquid dry
+```
+
+它在**四条退出路径**上都会执行（正常结束 / 玩家点结束 / ESC / 调试中断），
+不写的话玩家中途退出，水就一直喷下去了。
+
+**演出跑在台词之前**：同一条反馈里既有内嵌剧本行又有台词时，先跑演出再说话 ——
+台词若是 `blocking` 会一直等玩家点击，把喷水推到点击之后就完全脱节了。
+
 装机：**Tools → VN Effects → 场景装机 Install To Scene → 亲密互动 Interaction Module**
 （会顺带铺一套星野结衣的示例资产）。
 
