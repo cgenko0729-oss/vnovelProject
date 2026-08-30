@@ -714,6 +714,12 @@ namespace VNEffects.EditorTools
                 EditorGUILayout.HelpBox(
                     "start:cut 要求首个路径点时长为 0（瞬切），否则运行时按普通 camseq 执行",
                     MessageType.Warning);
+            if (_zoomMode == VNCamZoomMode.Char)
+                EditorGUILayout.HelpBox(
+                    "mode:char 下背景纹丝不动，所以路径点的「目标点」不生效——只有 zoom 有用，" +
+                    "它作用在立绘上（zoom 1.6 = 立绘放大到 1.6 倍）。\n" +
+                    "想让镜头也动就换 both / depth。",
+                    MessageType.Info);
 
             GUILayout.Space(4f);
             DrawTextSection();
@@ -1311,9 +1317,18 @@ namespace VNEffects.EditorTools
 
             // 镜头视角模式：整个画面按当前时刻的运镜变换后再画，
             // 画布 = 玩家真正看到的那一帧（拖进度条/▶ 就是运镜动画）
+            //
+            // 整图模式虽然不跟镜头走（永远显示整块画布），但**立绘的额外倍率要照跟**——
+            // mode:depth/bg/char 改的是立绘自己的 localScale，那是画布上的真实内容，
+            // 不是取景。不跟的话 mode:char 会整个预览纹丝不动（容器 zoom 恒为 1），
+            // 而运行时立绘其实正在放大，两边对不上。
+            var previewState = PreviewAtTime(_scrub).state;
             var view = _cameraView
-                ? PreviewAtTime(_scrub).state
-                : new CamState { offset = Vector2.zero, zoom = 1f };
+                ? previewState
+                : new CamState
+                {
+                    offset = Vector2.zero, zoom = 1f, charScale = previewState.CharScale,
+                };
 
             // 内容会超出画布（放大后背景/立绘都溢出），统一裁进画布内
             GUI.BeginGroup(rect);
@@ -1333,6 +1348,16 @@ namespace VNEffects.EditorTools
                 DrawCompositionGuides(rect, rect);
                 GUI.Label(new Rect(rect.x + 6f, rect.y + 4f, 200f, 18f),
                     "镜头视角（拖进度条看运镜）", EditorStyles.whiteMiniLabel);
+                return;
+            }
+
+            // char 模式镜头压根不动：每个点的取景框都等于整块画布，四个框完全重叠，
+            // 序号牌会挤成一坨还挡住立绘。这时候画面里唯一会变的是立绘尺寸（上面已画），
+            // 所以取景框整套跳过，改在角上说一句为什么
+            if (_zoomMode == VNCamZoomMode.Char)
+            {
+                GUI.Label(new Rect(rect.x + 6f, rect.y + 4f, 320f, 18f),
+                    "mode:char —— 镜头不动，只有立绘在缩放", EditorStyles.whiteMiniLabel);
                 return;
             }
 
@@ -1844,6 +1869,9 @@ namespace VNEffects.EditorTools
                 img.raycastTarget = false;
                 _previewChars.Add(go);
             }
+            // 新建的临时立绘 localScale 是 1，补一次当前时刻的倍率，
+            // 免得换绑定行重摆舞台的那一下立绘尺寸闪回原大小
+            ApplyPreviewCharacterScale(PreviewAtTime(_scrub).state.CharScale);
             EditorApplication.QueuePlayerLoopUpdate();
         }
 
@@ -1868,6 +1896,19 @@ namespace VNEffects.EditorTools
             _previewChars.Clear();
         }
 
+        /// <summary>
+        /// 把 mode 给的立绘额外倍率写进场景预览的临时立绘。
+        /// 运行时这一层是 VNImageEffectController 的运镜通道（改 localScale），
+        /// 预览的临时立绘只有裸 RectTransform，所以直接写 localScale——
+        /// 不写的话 mode:char 下 ZoomRoot 恒为 1，整个 Game 视图会完全没反应。
+        /// </summary>
+        void ApplyPreviewCharacterScale(float mult)
+        {
+            var scale = Vector3.one * Mathf.Max(0.01f, mult);
+            foreach (var go in _previewChars)
+                if (go != null) go.transform.localScale = scale;
+        }
+
         void ApplySceneState()
         {
             if (_zoomRoot == null)
@@ -1879,6 +1920,7 @@ namespace VNEffects.EditorTools
             var s = PreviewAtTime(_scrub).state;
             _zoomRoot.localScale = Vector3.one * s.zoom;
             _zoomRoot.anchoredPosition = _origPos + s.offset;
+            ApplyPreviewCharacterScale(s.CharScale);
             EditorApplication.QueuePlayerLoopUpdate(); // 编辑态强制刷新 Game 视图
         }
 

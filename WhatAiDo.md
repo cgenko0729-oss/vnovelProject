@@ -8181,6 +8181,44 @@ Parser 也不用改 —— kwarg 是通用解析，`mode:depth` 自动落进 `cm
 | `Editor/VNCamWaypoint.cs` | `HeaderKeys` 加 `mode`（排最前）、`VNCamseqText.ModeOf()` |
 | `Editor/VNCamseqEditorWindow.cs` | `_zoomMode` 窗口状态（进域重载存活组）、工具栏下拉、`CamState.charScale`、`TargetState` / 插值 / 立绘绘制 / 占位框、生成与解析文本 |
 
+### 补丁：预览的另外两条绘制路径也要跟（同日，分支 `agent/camseq-preview-charscale`）
+
+改完当天就被发现：切到 `mode:char` 后两个预览**完全没反应**，跟实际画面对不上。
+探针（反射读窗口实时状态）确认：
+
+```
+_zoomMode=Char  _cameraView=False(整图)  _scrub=5
+场景预览临时立绘 scale=(1,1,1)   ← 没带 mode 的缩放
+ZoomRoot         scale=(1,1,1)   ← char 模式下本来就该是 1
+```
+
+原因是立绘倍率只接进了「镜头视角」一条路径，**整图模式与场景预览两条漏了**：
+
+1. `DrawCanvas` 在整图模式下硬构造 `new CamState { offset=zero, zoom=1f }` →
+   `charScale` 是 0、被 `CharScale` 兜底成 1，立绘永远画基准大小
+2. `ApplySceneState` 只写 `ZoomRoot`，而 **char 模式下 ZoomRoot 恒为 1** →
+   整个 Game 视图纹丝不动，临时立绘的 localScale 一直是 1
+
+`char` 之所以症状最重：背景不动，画面里唯一会变的就是立绘，而它恰恰是没被预览的那个。
+
+**修法的关键认识：整图模式不跟镜头走（永远显示整块画布），但立绘的额外倍率要照跟**
+——`mode` 改的是立绘自己的 localScale，那是**画布上的真实内容**，不是取景。
+（`bg` 模式下整图里立绘会画小到 `1/zoom`，看着奇怪但正确：取景框只有 `1/zoom` 那么大，
+心里一放大，`0.625 × 1.6 = 1.0`，正是运行时「立绘尺寸不变」的结果。）
+
+场景预览那边则给临时立绘直接写 localScale（它们只有裸 RectTransform，
+没有运行时的 `VNImageEffectController` 运镜通道），并在 `ApplyStageToScene()`
+末尾补一次——否则换绑定行重摆舞台的那一帧立绘会闪回原大小。
+
+顺带两条 char 模式专属的交互修正：
+
+- **取景框整套跳过**：char 模式下每个点的取景框都等于整块画布，四个完全重叠，
+  序号牌会挤成一坨还挡住立绘（截图里 1/2/3/4 全叠在左上角就是这个）。
+  改成不画，在画布角上标一句「mode:char —— 镜头不动，只有立绘在缩放」
+- **加 HelpBox 说明「目标点不生效」**：char 模式下背景连平移都不做，
+  所以路径点写 `星野结衣:head` 也不会推到脸上，只有 zoom 有用（zoom 1.6 = 立绘 1.6 倍）。
+  这一条不写出来，用户一定会以为是 bug
+
 ### 没做的
 
 - **模板**：手册那批场景配方模板（约 45 条）留到下一轮，届时可以直接带上 `mode:`
