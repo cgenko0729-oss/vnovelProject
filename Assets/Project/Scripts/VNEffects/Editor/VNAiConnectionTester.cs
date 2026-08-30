@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -25,13 +25,13 @@ namespace VNEffectsEditor
         // ──────────────── 一级：连通性 ────────────────
 
         /// <summary>当前全局默认那家。日常自检用这个就够。</summary>
-        [MenuItem("Tools/VN Effects/AI/Test Connection (当前默认供应商)", false, 400)]
+        [MenuItem("Tools/VN Effects/AI/测试连接·当前默认供应商 Test Connection", false, 190)]
         public static void TestConnection() => TestConnection(VNAiProviders.GlobalDefault);
 
-        [MenuItem("Tools/VN Effects/AI/Test Connection · Gemini", false, 401)]
+        [MenuItem("Tools/VN Effects/AI/测试连接·Gemini Test Connection", false, 191)]
         public static void TestGemini() => TestConnection(VNAiProvider.Gemini);
 
-        [MenuItem("Tools/VN Effects/AI/Test Connection · DeepSeek", false, 402)]
+        [MenuItem("Tools/VN Effects/AI/测试连接·DeepSeek Test Connection", false, 192)]
         public static void TestDeepSeek() => TestConnection(VNAiProvider.DeepSeek);
 
         /// <summary>
@@ -64,7 +64,7 @@ namespace VNEffectsEditor
             }));
         }
 
-        [MenuItem("Tools/VN Effects/AI/Show Key Status", false, 403)]
+        [MenuItem("Tools/VN Effects/AI/查看 Key 状态 Show Key Status", false, 193)]
         public static void ShowKeyStatus()
         {
             VNAiKey.Invalidate();   // 改过环境变量/文件后强制重查
@@ -94,7 +94,7 @@ namespace VNEffectsEditor
 
         // ──────────────── 二级：人格 + 多轮对话 ────────────────
 
-        [MenuItem("Tools/VN Effects/AI/Test Persona Talk (3 turns)", false, 420)]
+        [MenuItem("Tools/VN Effects/AI/试聊 3 轮 Test Persona Talk", false, 194)]
         public static void TestPersonaTalk()
         {
             var persona = ResolvePersona();

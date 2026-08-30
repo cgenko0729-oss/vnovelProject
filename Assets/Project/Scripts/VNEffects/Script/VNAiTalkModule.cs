@@ -103,7 +103,7 @@ namespace VNEffects
                 Debug.LogError($"[VNAiTalk] 第 {ctx.line} 行：找不到人格" +
                                $"（persona:{ctx.Kw("persona")} vs:{_charId}）。" +
                                "先 Create → VN → AI Persona 建一套，并跑 " +
-                               "Tools → VN Effects → Install AI Talk Module To Scene。");
+                               "Tools → VN Effects → 场景装机 Install To Scene → AI 自由聊天 AI Talk Module。");
                 Done(OutcomeFailed);
                 return;
             }

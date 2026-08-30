@@ -17,7 +17,7 @@ VNPlanDef / VNStatDef 等定义资产时。
 ## 登记素材用哪个界面（一一九章）
 | 场景 | 用哪个 |
 |---|---|
-| 一次加几十张图 / 一批音频 | **Tools → VN Effects → Asset Browser**：选左栏类别 → 直接把文件从 Project 拖进来，id 自动预填文件名，再逐个改成中文 id |
+| 一次加几十张图 / 一批音频 | **Tools → VN Effects → 素材浏览器 Asset Browser**：选左栏类别 → 直接把文件从 Project 拖进来，id 自动预填文件名，再逐个改成中文 id |
 | 找某一张图 / 某一首曲子 | 同上，网格看缩略图、音频列表点 ▶ 试听。**本项目文件名是 AI 生成的原始 prompt 或纯数字，认图只能靠缩略图** |
 | 改单条的 id、音量、CG 差分组 | VNGameConfig 的 Inspector（已按 剧本｜标题｜UI皮肤｜舞台｜音频｜玩法｜AI｜大头贴 分页），每个库自带搜索框 |
 | 怀疑有素材漏登记 | Asset Browser 勾「只看未登记」——扫已登记条目所在目录，列出没进库的文件，点「登记」一键补 |
@@ -37,7 +37,7 @@ VNPlanDef / VNStatDef 等定义资产时。
 - **素材目录里的新图会自动设成 Sprite (2D and UI) + Single**（`VNTextureImportDefaults`，
   一二〇章）：`Art/Images/**`、`Art/CG/`、`Art/BigPhoto/`、`Art/Mark/`、`Assets/Assets/`。
   **只在首次导入时生效**，手动调过的设置永不被覆盖；存量图用
-  Tools → VN Effects → Textures → Apply Sprite Settings To Selection 补。
+  Tools → VN Effects → 贴图 Textures → 套用 Sprite 导入设置到选中项 Apply Sprite Settings 补。
   新开素材目录要走这套 → 往 `VNTextureImportDefaults.Roots` 补一行。
   **`Art/Models/**` 刻意排除**——法线贴图按 Sprite 导入光照会全错。
 - 立绘/UI：Sprite (2D and UI)，透明背景 PNG；大图注意 Max Size 别被压糊。

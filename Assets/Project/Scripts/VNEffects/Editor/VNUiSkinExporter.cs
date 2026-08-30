@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEditor;
@@ -26,7 +26,7 @@ namespace VNEffects
         internal const string SkinDir = "Assets/VNEffects/UISkins";
         internal const string TextureDir = SkinDir + "/Textures";
 
-        [MenuItem("Tools/VN Effects/UI Skins/Export Skin Prefabs (Default + Samples)")]
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/导出皮肤模板（默认+样例）Export Skin Prefabs", priority = 120)]
         public static void ExportAll()
         {
             EnsureFolder(SkinDir);

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -29,7 +29,7 @@ namespace VNEffects.EditorTools
         /// <summary>换字体后必须核对的 GUID：全项目 199 处 TMP 文本按它引用中文字体资产</summary>
         const string ZhAssetExpectedGuid = "fdf08363d8a023d4d929f785c67e4c59";
 
-        [MenuItem("Tools/VN Effects/Create TMP Font Asset")]
+        [MenuItem("Tools/VN Effects/字体 Fonts/生成 TMP 字体资产 Create TMP Font Asset", priority = 150)]
         public static void CreateMenu()
         {
             var asset = EnsureFontAsset();
@@ -49,7 +49,7 @@ namespace VNEffects.EditorTools
         /// 那套字体没有任何汉字，界面就整片变成 □ 方框。
         /// 所以重烘焙之后必须跑一遍 RepairFontMaterialReferences() 把材质重新指回去。
         /// </summary>
-        [MenuItem("Tools/VN Effects/Rebake Chinese Font (Switch Source)")]
+        [MenuItem("Tools/VN Effects/字体 Fonts/重烘中文字体·换字体源 Rebake Chinese Font", priority = 151)]
         public static void RebakeChineseFont()
         {
             var source = AssetDatabase.LoadAssetAtPath<Font>(ZhSourcePath);
@@ -99,7 +99,7 @@ namespace VNEffects.EditorTools
         /// 判定"失效"只认两种情况：材质为空（引用已 Missing），或材质贴的不是这套字体的图集。
         /// 这样描边 / 阴影等共用同一张图集的材质变体不会被误伤。
         /// </summary>
-        [MenuItem("Tools/VN Effects/Repair Font Material References")]
+        [MenuItem("Tools/VN Effects/字体 Fonts/修复字体材质引用 Repair Font Material References", priority = 152)]
         public static void RepairFontMaterialReferences()
         {
             var fonts = new List<TMP_FontAsset>();

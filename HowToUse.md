@@ -28,7 +28,7 @@
 
 ## 一、三分钟上手
 
-1. Unity 菜单 **Tools → VN Effects → Create Script Demo Scene**（只需一次，之后重复使用该场景）
+1. Unity 菜单 **Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene**（只需一次，之后重复使用该场景）
 2. 打开 `Assets/Scenarios/Demo.vn.txt`，用**任何文本编辑器**修改
 3. 回 Unity 点 **Play** —— 你的修改立即生效
 
@@ -41,7 +41,7 @@ show 亚里沙 at:center with:DissolveGlow
 hide 亚里沙 with:dissolve
 ```
 
-> 💡 不想手写文本？**Tools → VN Effects → Scenario Editor** 提供可视化编辑
+> 💡 不想手写文本？**Tools → VN Effects → 剧本编辑器 Scenario Editor** 提供可视化编辑
 > （分层命令菜单、图片缩略图选择、从选中行播放调试），见第十一章。
 
 ### 想写自己的新剧本文件？
@@ -54,7 +54,7 @@ hide 亚里沙 with:dissolve
 
 想换**入口剧本**（游戏从哪个文件开始）：打开
 `Assets/Resources/VNGameConfig.asset` → `Entry Script` 字段设成你的文件。
-（没有这个资产就走 **Tools → VN Effects → Game Config → Create or Select** 建一个，
+（没有这个资产就走 **Tools → VN Effects → 游戏配置 Game Config → 创建或选中配置资产 Create or Select** 建一个，
 详见第八章。设在资产里的好处是**重建场景不会丢**。）
 
 三个官方示例：`Demo.vn.txt`（演出/分支/事件）、`RaisingDemo.vn.txt`（养成循环玩法）、
@@ -504,7 +504,7 @@ weather maple density:20 wind:-1.5 size:1.4     # 临时覆盖参数
 | `size:` | 尺寸倍率 |
 
 想调更多（摆幅/翻转速度/三层景深/堆积/颜色…）就建资产：
-**Tools → VN Effects → Weather Preview** 里边看边调 → 「另存为资产」→
+**Tools → VN Effects → 预览 Preview → 天气预览 Weather Preview** 里边看边调 → 「另存为资产」→
 「登记进 VNGameConfig」，之后剧本直接写你起的 id（可以是中文）。
 
 ### mood — 场景色调（电影级调色）
@@ -619,7 +619,7 @@ liquid cover on                                # 水渍盖到对话框上面
 
 > ⚠️ **老场景要先装一次**：`liquid` 命令依赖场景里的 `VNWetScreen` + `VNLiquidSplash`
 > 两个物体，缺了会**静默无效果**（连报错都没有）。已有的剧本场景跑一次
-> **Tools → VN Effects → Install Liquid Splash To Scene** 即可，它只做加法、
+> **Tools → VN Effects → 场景装机 Install To Scene → 液体喷溅 Liquid Splash** 即可，它只做加法、
 > 不重建场景、可以重复执行。用 Create Script Demo Scene 新造的场景已自带。
 
 ### letterbox — 电影黑边
@@ -1042,9 +1042,9 @@ if 答题正确数>=3 jump 学霸称号
 | 答对奖励 / 答错惩罚 | 属性 id + 增量，逐题单独配（走 VNStatDef 钳制 + 飘字），超时按答错算 |
 
 题干为空、选项少于 2 个、答案序号越界的题会被自动跳过，不会让事件卡住。
-新建题库资产后跑一次 **Tools → VN Effects → Game Config → Rescan Asset Folders** 登记。
+新建题库资产后跑一次 **Tools → VN Effects → 游戏配置 Game Config → 重扫素材目录 Rescan Asset Folders** 登记。
 
-**第一次用要先装模块**：**Tools → VN Effects → Install Quiz Module To Scene**
+**第一次用要先装模块**：**Tools → VN Effects → 场景装机 Install To Scene → 限时问答 Quiz Module**
 ——只往当前场景的 VNEventRegistry 里补一个禁用的 QuizTemplate 并登记题库，
 **不重建场景**（`Create Script Demo Scene` 会从零重造，手工整理的层级会丢）。
 装完记得 Ctrl+S 存场景。重复执行安全：已经装过就只刷新题库列表。
@@ -1122,7 +1122,7 @@ if 羽球_精准数 >= 3 jump 打得漂亮
 | 击球太难 / 太容易 | `perfectDistance`（精准窗口，默认 90px）与 `perfectRate`（非精准球的界内概率） |
 | 对手太强 / 太弱 | `opponentHitRate`（接球率）＞ `trackDisplayRate`（给玩家看多少轨迹）＞ `opponentMoveSpeed` |
 
-**第一次用要先装模块**：**Tools → VN Effects → Install Badminton Module To Scene**
+**第一次用要先装模块**：**Tools → VN Effects → 场景装机 Install To Scene → 羽毛球对战 Badminton Module**
 ——只往当前场景的 VNEventRegistry 补一个禁用的 BadmintonTemplate 并登记对手库，
 **不重建场景**。装完记得 Ctrl+S。重复执行安全。
 
@@ -1240,7 +1240,7 @@ if 大头照_次数 >= 3 jump 拍上瘾了
 > ⚠ 取景框用的是**表情立绘**（`expressions`），不是对话框头像（`portraits`）——
 > 因为头像列表找不到同名表情会退回第一张，那样点表情脸根本不会变。
 
-**第一次用要先装模块**：**Tools → VN Effects → Install Photo Booth Module To Scene**
+**第一次用要先装模块**：**Tools → VN Effects → 场景装机 Install To Scene → 拍大头照 Photo Booth Module**
 ——补一个禁用的 PhotoBoothTemplate 并登记资产库，**缺资产会自动铺一套默认的**
 （已有的绝不覆盖）。装完记得 Ctrl+S。重复执行安全。
 
@@ -1313,7 +1313,7 @@ if 闲聊_好感变化 >= 3 jump 聊得非常好
 | 太贵太慢 | `model` / `thinking` / `maxOutputTokens` / `historyTurns` |
 | 断网时说什么 | `fallbackLines` / `fallbackOptions` |
 
-**第一次用要先装模块**：**Tools → VN Effects → Install AI Talk Module To Scene**
+**第一次用要先装模块**：**Tools → VN Effects → 场景装机 Install To Scene → AI 自由聊天 AI Talk Module**
 ——补一个禁用的 AiTalkTemplate 并登记人格库，顺带体检 key / 人格 / 表情三样。装完记得 Ctrl+S。
 
 **供应商**：默认 DeepSeek（`deepseek-v4-flash`），在 `VNGameConfig` 的「AI 默认供应商」
@@ -1323,7 +1323,7 @@ if 闲聊_好感变化 >= 3 jump 聊得非常好
 **API Key**：按用的那家配——
 DeepSeek 用环境变量 `DEEPSEEK_API_KEY` 或 `DeepSeekAiApiKey.txt`，
 Gemini 用 `GEMINI_API_KEY` 或 `GeminiAiApiKey.txt`（都可放仓库外 / 仓库根目录）。
-用 **Tools → VN Effects → AI → Show Key Status** 看两家分别读到了没有。
+用 **Tools → VN Effects → AI → 查看 Key 状态 Show Key Status** 看两家分别读到了没有。
 没配 key 也能跑——每轮走人格资产里的兜底台词，结果返回「失败」。
 
 > 🔒 **key 只用于本地开发。** 它不打包进 Build（代码里 `#if` 挡住了）、不进仓库
@@ -1624,14 +1624,14 @@ camera pushin 1.05 5      # 卡住 5 秒，镜头推完才出台词 —— 通�
 
 ### ⭐ 先读这一节：VNGameConfig（配置放哪里才不会丢）
 
-**Tools → VN Effects → Create Script Demo Scene** 内部会
+**Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene** 内部会
 `NewScene(EmptyScene)`——**丢弃当前场景从零重造**。所以任何挂在**场景组件**上的
 人工绑定（背景库、音频库、入口剧本、地图坐标）**每次重建都会被清空**。
 
 解法：这些数据统一放进 **`Assets/Resources/VNGameConfig.asset`**（一个 ScriptableObject）。
 它在 `Resources` 下、运行时自动加载，**场景里一个引用都不需要**。
 
-| 菜单（Tools → VN Effects → Game Config →） | 什么时候用 |
+| 菜单（Tools → VN Effects → 游戏配置 Game Config →） | 什么时候用 |
 |---|---|
 | **Create or Select** | 第一次创建；之后用来打开资产编辑背景/音频 |
 | **Import From Scene** | **一次性搬家**：把当前场景已配好的绑定全部抓进资产 |
@@ -1650,7 +1650,7 @@ camera pushin 1.05 5      # 卡住 5 秒，镜头推完才出台词 —— 通�
 > 场景组件（`VNStage.backgrounds`、`VNAudio.bgmLibrary` 等）依然存在且可用，
 > 只是**不建议再往里填**——填了也会被资产覆盖，而且重建就没。
 
-### 🖼️ 素材浏览器：看图认图、听音认曲（Tools → VN Effects → Asset Browser）
+### 🖼️ 素材浏览器：看图认图、听音认曲（Tools → VN Effects → 素材浏览器 Asset Browser）
 
 素材文件名往往是 AI 生成时的原始 prompt 或纯数字（`1.png`、
 `masterpiece, very aesthetic, highly detailed, 1girl… s-1095962266.png`），
@@ -1797,7 +1797,7 @@ CG 大图放 `Assets/CG/`，**文件名就是剧本里的 id**（如 `天台告�
 - **新开素材目录**要走这套的话，去 `VNTextureImportDefaults.Roots` 补一行。
 
 存量图要补，选中图片或文件夹 →
-**Tools → VN Effects → Textures → Apply Sprite Settings To Selection**
+**Tools → VN Effects → 贴图 Textures → 套用 Sprite 导入设置到选中项 Apply Sprite Settings**
 （会先弹确认；若其中有 Multiple 切图模式的图会额外警告，因为改成 Single 后切图不再生效）。
 
 ### 图片导入要求
@@ -1825,7 +1825,7 @@ ui name     <样式|default>   换名字（说话人）的字体装饰样式
 | `粉渐变` | 无框：粉色渐变带 + 居中深粉字（告白、暧昧场面） |
 | `黑渐变` | 无框：黑色渐变带（80% 浓）+ 居中白字，等于经典款去掉金边、改整屏铺满 |
 
-三套无框皮肤由 **Tools → VN Effects → UI Skins → Export Soft Gradient Skins** 生成，
+三套无框皮肤由 **Tools → VN Effects → UI 皮肤 UI Skins → 导出无框渐变皮肤（白·粉·黑）Export Soft Gradient Skins** 生成，
 资产在 `Assets/VNEffects/UISkins/`。想微调：正文颜色改 prefab 里 Body 的 TextMeshPro Color，
 描边/柔光改 `Materials/VN_SoftText_*.mat`，渐变浓淡改 Panel/Gradient 那个 Image 的 Color 的 alpha。
 改完直接生效，不要再跑「(覆盖重建)」那一项——它会用出厂参数冲掉你的调整。
@@ -1906,7 +1906,7 @@ ui name 双描边               # 场面结束换回来
 
 剧本**只写中文**（唯一真相），翻译放旁路表，运行时按当前语言查表显示：
 
-1. 写完/改完剧本后跑 **Tools → VN Effects → Localization → Extract**
+1. 写完/改完剧本后跑 **Tools → VN Effects → 本地化 Localization → Extract**
    ——增量抽取台词到 `Resources/VNLocale/Scenarios/<剧本名>.<lang>.txt`（已译的保留）
 2. 在表里填英/日译文，跑 **Validate** 检查缺译
 3. UI 字符串表在 `Resources/VNLocale/ui.<code>.txt`
@@ -1918,7 +1918,7 @@ ui name 双描边               # 场面结束换回来
 
 ## 十一、剧本可视化编辑器
 
-**Tools → VN Effects → Scenario Editor**——不想手写文本时的图形界面：
+**Tools → VN Effects → 剧本编辑器 Scenario Editor**——不想手写文本时的图形界面：
 
 - `.vn.txt` ↔ 编辑器双向同步，**文本仍是唯一真相**（注释/空行保留）
 - 分层命令菜单（Dialogue / Scene / Character / Camera / FX / Audio / Flow），
@@ -2012,7 +2012,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 
 ## 十二·五、剧本静态校验器 🔍
 
-**Tools → VN Effects → Lint Scenarios**（快捷键 `Ctrl+Shift+L`）
+**Tools → VN Effects → 剧本检查 Lint Scenarios**（快捷键 `Ctrl+Shift+L`）
 
 一键扫描 `Assets/Scenarios/` 下**全部** `.vn.txt`，把"跑到那一行才会发现"的错误
 提前到编辑期。双击结果行直接打开文件并定位到出错行。
@@ -2109,7 +2109,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | 改了剧本没生效 | Unity 需要焦点回到编辑器让它重新导入 .txt；然后重新 Play |
 | 新加的字段/功能报"未连线" | VNStage 会自动补线；仍报错就重新 Tools → Create Script Demo Scene（内容绑定在 VNGameConfig 里，重建不会丢） |
 | 切语言后台词没翻译 | 跑过 Extract 了吗？表里该句填了吗？跑 Validate 查缺译 |
-| `event aitalk` 每轮都说兜底台词 | key 没读到。Tools → VN Effects → AI → Show Key Status 看来源；再跑 Test Gemini Connection 验网络 |
+| `event aitalk` 每轮都说兜底台词 | key 没读到。Tools → VN Effects → AI → 查看 Key 状态 Show Key Status 看来源；再跑 Test Gemini Connection 验网络 |
 | aitalk 台词正常但立绘不动 | `event` 之前没 `show` 角色。模块只换表情不负责出场（Console 有告警） |
 | aitalk 换表情后画面穿帮 | 该角色的表情立绘构图不统一（如默认是校服、生气是冬装）。在人格资产的 `allowedEmotions` 里只列构图一致的那几个 |
 | aitalk 好感涨得离谱 | 人格资产的 `affectionClamp` 调小。AI 不受 schema 数值范围约束，代码已强制钳制并告警 |

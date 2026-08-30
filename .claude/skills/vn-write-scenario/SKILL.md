@@ -28,7 +28,7 @@ description: 写/改 .vn.txt 剧本时的语法要点、只写中文原则、fla
 - 玩法：event（qte/map/battle/shop/plan/result）/ quest / stat / time / ui（皮肤切换）
 
 ## 写完必做
-- [ ] **Tools → VN Effects → Lint Scenarios（Ctrl+Shift+L）**跑静态校验，错误清零，警告逐条判断
+- [ ] **Tools → VN Effects → 剧本检查 Lint Scenarios（Ctrl+Shift+L）**跑静态校验，错误清零，警告逐条判断
 - [ ] 引用了新素材 id → 先按 [vn-add-assets] 登记，否则 unknown-* 警告
 - [ ] 台词有增改 → 本地化 Extract（见 [vn-localize]）
 - [ ] 改完 .txt 要让 Unity 拿回焦点重新导入，再 Play

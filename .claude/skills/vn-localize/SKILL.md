@@ -9,7 +9,7 @@ description: 本地化工作流（中/英/日）：Extract 增量抽取→填表
 翻译台词/UI、查缺译、剧本台词改动之后、或要加新语言时。
 
 ## 日常工作流
-改剧本 → **Tools → VN Effects → Localization → Extract**（增量合并，已译按 key 保留）
+改剧本 → **Tools → VN Effects → 本地化 Localization → Extract**（增量合并，已译按 key 保留）
 → 填翻译表 → **Validate** 查缺译统计。
 
 ## 机制要点

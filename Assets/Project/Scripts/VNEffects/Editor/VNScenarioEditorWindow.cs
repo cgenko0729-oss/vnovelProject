@@ -17,7 +17,7 @@ namespace VNEffects.EditorTools
     ///   - 文本预览页签、外部修改检测、Ctrl+Z/Y 撤销（约 1 秒粒度合并）
     ///   - 热重载调试：Play Mode 中直接重播选中行（不退出 Play Mode）、当前行高亮跟随、
     ///     命令级暂停/单步；播放前静默自动保存
-    /// 菜单：Tools → VN Effects → Scenario Editor
+    /// 菜单：Tools → VN Effects → 剧本编辑器 Scenario Editor
     ///
     /// 【域重载存活】窗口进 Play Mode 会被 Unity 序列化后重建（domain reload），
     /// 普通字段一律清空。文档正文/路径/脏标记/撤销栈全部走 [SerializeField]，
@@ -55,6 +55,7 @@ namespace VNEffects.EditorTools
         bool _stagePreview = true;
         bool _followPlayback = true;
         bool _hideRawRows;
+        bool _showHelp;             // 底部说明文字是否展开（默认收起，存 EditorPrefs）
 
         ReorderableList _list;
         float _pendingScrollY = -1f;
@@ -104,6 +105,7 @@ namespace VNEffects.EditorTools
         const string StagePreviewPref = "VNEffects.ScenarioEditor.StagePreview";
         const string FollowPlaybackPref = "VNEffects.ScenarioEditor.FollowPlayback";
         const string HideRawPref = "VNEffects.ScenarioEditor.HideRawRows";
+        const string ShowHelpPref = "VNEffects.ScenarioEditor.ShowHelp";
         const float StageCellW = 70f;
         readonly List<RowStageState> _stageStates = new List<RowStageState>();
         int _stageStatesVersion = -1;
@@ -221,19 +223,28 @@ namespace VNEffects.EditorTools
             };
         readonly Dictionary<string, Color> _categoryColors = new Dictionary<string, Color>();
 
-        [MenuItem("Tools/VN Effects/Scenario Editor")]
+        [MenuItem("Tools/VN Effects/剧本编辑器 Scenario Editor", priority = 1)]
         static void Open()
         {
             var win = GetWindow<VNScenarioEditorWindow>("Scenario Editor");
-            win.minSize = new Vector2(960f, 560f);
+            win.minSize = MinWindowSize;
         }
+
+        /// <summary>
+        /// 窗口最小尺寸。minSize 是窗口自己序列化的属性，只改 Open() 里那行
+        /// 对【已经开着的窗口】无效（会出现「代码里写了 640，窗口还是拖不到 960 以下」），
+        /// 所以 OnEnable 里也要重新赋一次。
+        /// </summary>
+        static readonly Vector2 MinWindowSize = new Vector2(520f, 140f);
 
         void OnEnable()
         {
+            minSize = MinWindowSize;   // 对已存在的窗口也生效，否则拖不小
             LoadCategoryColors();
             _stagePreview = EditorPrefs.GetBool(StagePreviewPref, true);
             _followPlayback = EditorPrefs.GetBool(FollowPlaybackPref, true);
             _hideRawRows = EditorPrefs.GetBool(HideRawPref, false);
+            _showHelp = EditorPrefs.GetBool(ShowHelpPref, false);   // 说明文字默认收起（太占地方）
             // 素材库改动后自动重建下拉候选（必须在 OnDisable 里退订，见 VNAssetLibraryEvents）
             VNAssetLibraryEvents.Changed += OnAssetLibraryChanged;
             RestoreAfterDomainReload();
@@ -1273,28 +1284,53 @@ namespace VNEffects.EditorTools
             _list.DoLayoutList();
             EditorGUILayout.EndScrollView();
 
-            EditorGUILayout.HelpBox(
-                "热重载调试：F5 / Ctrl+Enter = 从选中行播放（Play Mode 中是原地热重播，不退出播放；" +
-                "编辑期则自动保存后进 Play Mode），F6 / Ctrl+Shift+Enter = 重播上次那一行，" +
-                "Ctrl+S = 保存，F8 = 暂停/继续，F10 = 单步一条命令。" +
-                "F5/F6/F8/F10/Ctrl+S 可在 Edit → Shortcuts → VN/Scenario Editor 里改键位。\n" +
-                "Enter = 在选中行下方插入台词行（自动聚焦，可直接打字），Shift+Enter = 插在上方；" +
-                "在文本框里打字时第一下 Enter 只是结束编辑，再按一次才插入。\n" +
-                "打字找命令：Ctrl+E = 命令面板（选命令 → 逐个问必填参数 → 可选参数菜单 → " +
-                "Enter 插入，Shift+Enter 插到上方，Tab 跳过参数，Esc 取消）；" +
-                "右键点行首的命令按钮 = 打字换这一行的命令（左键仍是原来的分类菜单）；" +
-                "底部 [+] 与各参数下拉也都能打字筛选。\n" +
-                "Ctrl+/ = 把选中行临时禁用/恢复（文本里写成 #! 那行，运行时当注释跳过，" +
-                "但参数格照样能改）；Ctrl+F = 跳到搜索框，只留匹配的行，" +
-                "支持 cmd:say（只要台词行）/ cmd:bg / who:星野（只要她说的话），" +
-                "空格分开的多个词是「都要满足」，清空搜索框即全部显示。\n" +
-                "Shift+click = select range, Ctrl+click = toggle select; " +
-                "drag moves all selected rows, [-] / Duplicate act on the whole selection. " +
-                "Drag handle to reorder. [+] adds after selection. \"@\" = async (do not wait). " +
-                "Popups list registered ids; pick \"custom…\" to type a free value. " +
-                "camseq waypoint lines are kept as text in this batch " +
-                "(use Tools → VN Effects → Camera Sequence Editor and paste).",
-                MessageType.Info);
+            // 底部说明：默认折叠成一行，点标题展开（正文太长，展开会吃掉半个列表）
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool showHelp = GUILayout.Toggle(
+                    _showHelp,
+                    "使用说明 / 快捷键一览",   // 三角箭头由 foldout 样式自己画
+                    EditorStyles.foldout,
+                    GUILayout.Width(170f));
+                if (showHelp != _showHelp)
+                {
+                    _showHelp = showHelp;
+                    EditorPrefs.SetBool(ShowHelpPref, showHelp);
+                }
+                if (!_showHelp)
+                {
+                    GUILayout.Label(
+                        "F5 播放 · Enter 插台词行 · Ctrl+E 命令面板 · Ctrl+F 搜索 · Ctrl+/ 禁用行",
+                        EditorStyles.miniLabel);
+                }
+                GUILayout.FlexibleSpace();
+            }
+
+            if (_showHelp)
+            {
+                EditorGUILayout.HelpBox(
+                    "热重载调试：F5 / Ctrl+Enter = 从选中行播放（Play Mode 中是原地热重播，不退出播放；" +
+                    "编辑期则自动保存后进 Play Mode），F6 / Ctrl+Shift+Enter = 重播上次那一行，" +
+                    "Ctrl+S = 保存，F8 = 暂停/继续，F10 = 单步一条命令。" +
+                    "F5/F6/F8/F10/Ctrl+S 可在 Edit → Shortcuts → VN/Scenario Editor 里改键位。\n" +
+                    "Enter = 在选中行下方插入台词行（自动聚焦，可直接打字），Shift+Enter = 插在上方；" +
+                    "在文本框里打字时第一下 Enter 只是结束编辑，再按一次才插入。\n" +
+                    "打字找命令：Ctrl+E = 命令面板（选命令 → 逐个问必填参数 → 可选参数菜单 → " +
+                    "Enter 插入，Shift+Enter 插到上方，Tab 跳过参数，Esc 取消）；" +
+                    "右键点行首的命令按钮 = 打字换这一行的命令（左键仍是原来的分类菜单）；" +
+                    "底部 [+] 与各参数下拉也都能打字筛选。\n" +
+                    "Ctrl+/ = 把选中行临时禁用/恢复（文本里写成 #! 那行，运行时当注释跳过，" +
+                    "但参数格照样能改）；Ctrl+F = 跳到搜索框，只留匹配的行，" +
+                    "支持 cmd:say（只要台词行）/ cmd:bg / who:星野（只要她说的话），" +
+                    "空格分开的多个词是「都要满足」，清空搜索框即全部显示。\n" +
+                    "Shift+click = select range, Ctrl+click = toggle select; " +
+                    "drag moves all selected rows, [-] / Duplicate act on the whole selection. " +
+                    "Drag handle to reorder. [+] adds after selection. \"@\" = async (do not wait). " +
+                    "Popups list registered ids; pick \"custom…\" to type a free value. " +
+                    "camseq waypoint lines are kept as text in this batch " +
+                    "(use Tools → VN Effects → 镜头编排 Camera Sequence Editor and paste).",
+                    MessageType.Info);
+            }
 
             if (_pendingPalette && Event.current.type == EventType.Repaint)
             {

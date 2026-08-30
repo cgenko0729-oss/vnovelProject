@@ -13,7 +13,7 @@
 
 你只需要设一次**入口剧本**，而且是设在资产里（永不丢失）：
 
-> **Tools → VN Effects → Game Config → Create or Select**
+> **Tools → VN Effects → 游戏配置 Game Config → 创建或选中配置资产 Create or Select**
 > → 在 `VNGameConfig` 的 `Entry Script` 字段设为 `第1章.vn.txt`
 
 新增剧本文件后，跑一次 **Game Config → Rescan Asset Folders** 或重建场景即可。
@@ -86,7 +86,7 @@
 | `CG_圣诞` | 节日活动集 · 圣诞 |
 | `CG_结局_恋人` | 结局集 |
 
-放进目录后跑一次 **Tools → VN Effects → Create Script Demo Scene**，生成器会自动灌进 `cgLibrary`。
+放进目录后跑一次 **Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene**，生成器会自动灌进 `cgLibrary`。
 
 ---
 
@@ -167,7 +167,7 @@
 ## 十、零拖拽工作流 ★（重建场景不再丢配置）
 
 ### 问题
-`Tools → VN Effects → Create Script Demo Scene` 内部会
+`Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene` 内部会
 `EditorSceneManager.NewScene(EmptyScene)`——**丢弃当前场景从零重造**。
 所以挂在场景组件上的一切人工绑定（背景库、音频库、章节列表、地图坐标、入口剧本）
 每次重建全部清空。这不是操作失误，是生成器的定位使然（它本来是"重建 demo"用的）。
@@ -187,9 +187,9 @@
 ### 首次迁移步骤（照做一遍就永久解决）
 
 1. 打开你**现在配好的**场景（先别重建！）
-2. **Tools → VN Effects → Game Config → Import From Scene**
+2. **Tools → VN Effects → 游戏配置 Game Config → 从场景导入 Import From Scene**
    → 弹窗会列出导入了多少条背景/音频/章节/地图地点
-3. **Tools → VN Effects → Game Config → Rescan Asset Folders**
+3. **Tools → VN Effects → 游戏配置 Game Config → 重扫素材目录 Rescan Asset Folders**
    → 自动登记全部角色/章节/CG/属性/商店/日程/任务资产
 4. 打开 `Assets/Resources/VNGameConfig.asset`，把 `Entry Script` 设为 `第1章.vn.txt`
 5. 现在再跑 **Create Script Demo Scene** —— 所有东西会自动回到位

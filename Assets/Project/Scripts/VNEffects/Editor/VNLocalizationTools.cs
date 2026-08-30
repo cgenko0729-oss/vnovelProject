@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -32,7 +32,7 @@ namespace VNEffects.EditorTools
             public string source;  // 中文原文
         }
 
-        [MenuItem("Tools/VN Effects/Localization/Extract Script Translations")]
+        [MenuItem("Tools/VN Effects/本地化 Localization/抽取剧本译文 Extract Script Translations", priority = 110)]
         public static void ExtractAll()
         {
             var files = FindScenarioFiles();
@@ -62,7 +62,7 @@ namespace VNEffects.EditorTools
             Debug.Log(report.ToString());
         }
 
-        [MenuItem("Tools/VN Effects/Localization/Validate Script Translations")]
+        [MenuItem("Tools/VN Effects/本地化 Localization/校验剧本译文 Validate Script Translations", priority = 111)]
         public static void ValidateAll()
         {
             var files = FindScenarioFiles();
@@ -151,7 +151,7 @@ namespace VNEffects.EditorTools
             var sb = new StringBuilder();
             sb.Append("# ==========================================================\n");
             sb.Append($"# {baseName} · {lang} 剧本翻译表\n");
-            sb.Append("# 由 Tools → VN Effects → Localization → Extract 生成/增量合并\n");
+            sb.Append("# 由 Tools → VN Effects → 本地化 Localization → Extract 生成/增量合并\n");
             sb.Append("# 格式：key = 译文；译文留空 = 未翻译（运行时回退中文显示）\n");
             sb.Append("# 台词里的 {shake} {w:0.5} 等演出标记请在译文中原样保留\n");
             sb.Append("# 上方注释行是中文原文（每次抽取自动重写，改了也没用）\n");

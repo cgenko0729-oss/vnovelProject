@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -25,7 +25,7 @@ namespace VNEffects.EditorTools
     /// </summary>
     public class VNAssetBrowserWindow : EditorWindow
     {
-        [MenuItem("Tools/VN Effects/Asset Browser", priority = 203)]
+        [MenuItem("Tools/VN Effects/素材浏览器 Asset Browser", priority = 3)]
         public static void Open()
         {
             var w = GetWindow<VNAssetBrowserWindow>("VN 素材");

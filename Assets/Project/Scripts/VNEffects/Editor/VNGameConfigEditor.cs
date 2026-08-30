@@ -141,7 +141,7 @@ namespace VNEffects.EditorTools
                 GUILayout.FlexibleSpace();
 
                 if (GUILayout.Button(new GUIContent("扫描素材目录",
-                        "Tools → VN Effects → Game Config → Rescan Asset Folders\n" +
+                        "Tools → VN Effects → 游戏配置 Game Config → 重扫素材目录 Rescan Asset Folders\n" +
                         "按目录补登角色/剧本/CG/属性等定义资产"),
                         EditorStyles.toolbarButton, GUILayout.Width(96)))
                 {

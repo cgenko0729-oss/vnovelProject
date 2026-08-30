@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -10,7 +10,7 @@ namespace VNEffects.EditorTools
     /// 把羽毛球模块**增量装进当前场景**，不重建场景。
     ///
     /// 【为什么需要它】
-    /// Tools → VN Effects → Create Script Demo Scene 会从零重造场景，
+    /// Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 会从零重造场景，
     /// 手工整理过的 Hierarchy 会全部丢失。加一个事件模块不值这个代价——
     /// 这里只做三件事：
     ///   ① 在场景的 VNEventRegistry 下补一个**禁用的** BadmintonTemplate（必须带 RectTransform）
@@ -24,7 +24,7 @@ namespace VNEffects.EditorTools
         const string TemplateName = "BadmintonTemplate";
         const string DefsDir = "Assets/VNEffects/Badminton";
 
-        [MenuItem("Tools/VN Effects/Install Badminton Module To Scene", priority = 211)]
+        [MenuItem("Tools/VN Effects/场景装机 Install To Scene/羽毛球对战 Badminton Module", priority = 142)]
         public static void Install()
         {
             var registry = Object.FindFirstObjectByType<VNEventRegistry>(
@@ -34,7 +34,7 @@ namespace VNEffects.EditorTools
                 EditorUtility.DisplayDialog("VN Badminton",
                     "当前场景里找不到 VNEventRegistry。\n\n" +
                     "事件模块要挂在注册表下面。请先打开剧本场景（含 VNEventRegistry 的那个），" +
-                    "或用 Tools → VN Effects → Create Script Demo Scene 造一个新场景。", "OK");
+                    "或用 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 造一个新场景。", "OK");
                 return;
             }
 

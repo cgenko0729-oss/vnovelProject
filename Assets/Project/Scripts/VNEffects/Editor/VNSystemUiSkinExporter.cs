@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
@@ -19,7 +19,7 @@ namespace VNEffects
         static Sprite _rounded;
         static TMP_FontAsset _font;
 
-        [MenuItem("Tools/VN Effects/System UI Skins/Export Default Prefabs")]
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/系统主题：导出默认模板 System UI: Export Default Prefabs", priority = 135)]
         public static void ExportAll()
         {
             EnsureFolder(Dir);
@@ -64,7 +64,7 @@ namespace VNEffects
 
         /// <summary>只导出排程面板与结算弹窗两个默认 prefab，不碰其余 9 个
         /// （已有主题里手改过的 prefab 不会被覆盖）。</summary>
-        [MenuItem("Tools/VN Effects/System UI Skins/Export Event Panel Prefabs (Plan & Result)")]
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/系统主题：导出排程·结算面板 System UI: Export Event Panel Prefabs", priority = 136)]
         public static void ExportEventPanels()
         {
             var set = AssetDatabase.LoadAssetAtPath<VNSystemUiSkinSet>(SetPath);
@@ -89,7 +89,7 @@ namespace VNEffects
                       "（其余系统 UI prefab 未改动）。");
         }
 
-        [MenuItem("Tools/VN Effects/System UI Skins/Validate Global Theme")]
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/系统主题：校验全局主题 System UI: Validate Global Theme", priority = 137)]
         public static void ValidateAll()
         {
             var set = AssetDatabase.LoadAssetAtPath<VNSystemUiSkinSet>(SetPath);

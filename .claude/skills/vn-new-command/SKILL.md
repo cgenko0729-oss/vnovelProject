@@ -19,7 +19,7 @@ description: 给剧本 DSL 加一条新命令的全链路清单：Parser→Runne
 - [ ] 6. `VNScenarioEditorWindow.CommandTranslations` 加中文名；
       参数若是新的动态来源 → `VNParamSource` + `OptionsFor` + `VNScenarioDoc.Validate` 三处补
 - [ ] 7. 参数目标是素材 id / label / 模块 id 之类可校验对象 → 考虑给静态校验器
-      （Tools → VN Effects → Lint Scenarios，Ctrl+Shift+L）加检查项
+      （Tools → VN Effects → 剧本检查 Lint Scenarios，Ctrl+Shift+L）加检查项
 - [ ] 8. 文档：HowToUse.md 对应章 + 文末命令速查卡 + Demo.vn.txt 头部语法速查
 - [ ] 9. 编译验证 → WhatAiDo.md 记录（见 [vn-doc-update]）
 

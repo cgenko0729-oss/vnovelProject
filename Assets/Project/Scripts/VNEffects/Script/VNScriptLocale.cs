@@ -13,7 +13,7 @@ namespace VNEffects
     ///
     /// key = FNV-1a(原文) 8 位十六进制 + "-" + 同文出现序号（同一句中文出现多次时区分）。
     /// 中文原文没改动时，增删其他行不影响 key，已有译文自动保留。
-    /// 表由编辑器工具生成/增量合并：Tools → VN Effects → Localization。
+    /// 表由编辑器工具生成/增量合并：Tools → VN Effects → 本地化 Localization。
     ///
     /// 翻译范围：say 台词 + choice 选项（按索引匹配，翻译只影响显示）。
     /// event 结果行不翻译 —— 它们是逻辑标识符（结果名匹配、去过_&lt;地点&gt; flag）。
@@ -53,7 +53,7 @@ namespace VNEffects
             {
                 Debug.LogWarning($"[VNScriptLocale] 缺少翻译表 Resources/{TableFolder}/" +
                                  $"{scriptName}.{VNLocale.Code}.txt，台词回退中文" +
-                                 "（用 Tools → VN Effects → Localization 生成）");
+                                 "（用 Tools → VN Effects → 本地化 Localization 生成）");
                 return;
             }
 

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -10,7 +10,7 @@ namespace VNEffects.EditorTools
     /// 把限时问答模块**增量装进当前场景**，不重建场景。
     ///
     /// 【为什么需要它】
-    /// Tools → VN Effects → Create Script Demo Scene 会 NewScene(EmptyScene) 从零重造，
+    /// Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 会 NewScene(EmptyScene) 从零重造，
     /// 手工整理过的 Hierarchy 会全部丢失。加了新事件模块以后只为了"让注册表多一条"
     /// 而重建整个场景，代价太大——这里只做三件事：
     ///   ① 在场景的 VNEventRegistry 下补一个**禁用的** QuizTemplate（带 RectTransform）
@@ -23,7 +23,7 @@ namespace VNEffects.EditorTools
         const string ModuleId = "quiz";
         const string TemplateName = "QuizTemplate";
 
-        [MenuItem("Tools/VN Effects/Install Quiz Module To Scene", priority = 210)]
+        [MenuItem("Tools/VN Effects/场景装机 Install To Scene/限时问答 Quiz Module", priority = 140)]
         public static void Install()
         {
             var registry = Object.FindFirstObjectByType<VNEventRegistry>(
@@ -33,7 +33,7 @@ namespace VNEffects.EditorTools
                 EditorUtility.DisplayDialog("VN Quiz",
                     "当前场景里找不到 VNEventRegistry。\n\n" +
                     "事件模块要挂在注册表下面。请先打开剧本场景（含 VNEventRegistry 的那个），" +
-                    "或用 Tools → VN Effects → Create Script Demo Scene 造一个新场景。", "OK");
+                    "或用 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 造一个新场景。", "OK");
                 return;
             }
 

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -25,7 +25,7 @@ namespace VNEffects.EditorTools
         const string ModuleId = "aitalk";
         const string TemplateName = "AiTalkTemplate";
 
-        [MenuItem("Tools/VN Effects/Install AI Talk Module To Scene", priority = 211)]
+        [MenuItem("Tools/VN Effects/场景装机 Install To Scene/AI 自由聊天 AI Talk Module", priority = 141)]
         public static void Install() => Install(true);
 
         /// <summary>
@@ -42,7 +42,7 @@ namespace VNEffects.EditorTools
                 const string msg =
                     "当前场景里找不到 VNEventRegistry。\n\n" +
                     "事件模块要挂在注册表下面。请先打开剧本场景（含 VNEventRegistry 的那个），" +
-                    "或用 Tools → VN Effects → Create Script Demo Scene 造一个新场景。";
+                    "或用 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 造一个新场景。";
                 if (interactive) EditorUtility.DisplayDialog("VN AI Talk", msg, "OK");
                 else Debug.LogError("[VNAiTalk] " + msg);
                 return false;
@@ -121,7 +121,7 @@ namespace VNEffects.EditorTools
                 if (!VNAiKey.HasKeyFor(provider))
                     warnings.Add($"找不到 {VNAiProviders.DisplayName(provider)} API Key" +
                                  " —— 用到它的人格每轮都会走兜底台词。\n" +
-                                 "  配置方式见 Tools → VN Effects → AI → Show Key Status");
+                                 "  配置方式见 Tools → VN Effects → AI → 查看 Key 状态 Show Key Status");
             foreach (var p in personas)
             {
                 var errors = p.Validate();

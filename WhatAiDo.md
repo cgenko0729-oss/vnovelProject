@@ -164,7 +164,7 @@ animator.PlayEntrance(VNEntrancePreset.DissolveGlow)
 
 ### 9. `Assets/Scripts/VNEffects/Editor/VNEffectsDemoSetup.cs` — 一键生成演示场景
 
-菜单 **Tools → VN Effects → Create Demo Scene**，全自动完成：
+菜单 **Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**，全自动完成：
 
 1. 把 `Assets/Assets` 下两张图设置为 Sprite（FullRect 网格——溶解/扫光的 UV 才均匀、关 mipmap、开 alpha 透明），文件名含 "solo" 的当立绘、另一张当背景
 2. 生成材质资产 `Assets/VNEffects/Materials/`（VNImageEffect.mat、VNAdditive.mat）
@@ -178,7 +178,7 @@ animator.PlayEntrance(VNEntrancePreset.DissolveGlow)
 ## 五、怎么用（三步）
 
 1. 回到 Unity，等脚本编译完成（无报错）
-2. 菜单 **Tools → VN Effects → Create Demo Scene**
+2. 菜单 **Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**
 3. 点 **Play**，按 `1`~`5` / `Space` / `X` / `S` / `B` / `P` / `H` 体验全部效果
 
 ### 接入你自己的视觉小说流程
@@ -309,7 +309,7 @@ animator.PlayExitDissolve();
   提示文字同步显示当前情绪/天气状态。
 - `VNEffectsDemoSetup` 自动创建并连线：GodRays（背景与立绘之间）、EdgeGlow（Canvas 最后）、
   VignetteFocus（挂 Volume 上）、WeatherController（moodTargets 自动指向背景+立绘）。
-- **需要重新执行一次 Tools → VN Effects → Create Demo Scene** 让新物体进入场景。
+- **需要重新执行一次 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene** 让新物体进入场景。
 
 ## 十、第三批功能：色调预设 / 情绪动作 / 全屏转场（2026-07-12，分支 `feature/mood-emotes-transitions`）
 
@@ -364,7 +364,7 @@ animator.PlayExitDissolve();
   不同背景不同情绪"）、`6` 惊讶、`7` 生气、`8` 害羞、`9` 沮丧/恢复、`0` 点头、`N` 摇头。
 - 场景生成器：新增 VNScreenTransition.mat 材质资产、MoodGrading/ScreenTransition 物体、
   立绘自动挂 VNCharacterEmotes；把 Assets/Assets 里除立绘外的所有图收集为转场轮换背景。
-- **需要重新执行 Tools → VN Effects → Create Demo Scene**。
+- **需要重新执行 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**。
 
 ## 十一、第四批功能：呼吸立绘 / 轮廓光 / 鼠标星尘 / 热浪（2026-07-12，分支 `feature/breathing-rim-stardust-haze`）
 
@@ -407,7 +407,7 @@ animator.PlayExitDissolve();
 - 新按键：`R` 轮廓光循环（关→夕阳橙→月夜蓝）、`Z` 热浪+蒸汽开关、`C` 鼠标星尘开关；
   呼吸感立绘无需按键，出场后自动生效。
 - 生成器新增 MouseStardust、HeatHaze 物体并连线。
-- **需要重新执行 Tools → VN Effects → Create Demo Scene**。
+- **需要重新执行 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**。
 
 ## 十二、第五批功能：说话者高亮 / 水面波光 / 屏幕震动 / 对话框（2026-07-12，分支 `feature/speaker-highlight`）
 
@@ -456,7 +456,7 @@ animator.PlayExitDissolve();
 
 `Y` 说话者循环（A→B→无）、`U` 水面波光开关、`J/K/L` 轻/中/强震动、
 `Enter` 对话演示（打字中再按 = 催促显示全文）。
-**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+**需要重新执行 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**。
 
 ## 十三、第六批功能：视差 / 点击涟漪 / 眨眼转场 / 荷兰角（2026-07-12，分支 `feature/parallax-ripple-eyelid-dutch`）
 
@@ -504,7 +504,7 @@ Canvas
 
 `O` 视差开关（默认开，晃鼠标看纵深）、`I` 荷兰角开关、`F` 眨眼转场（换背景）、
 鼠标左键点击任意处 = 涟漪+星光。
-**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+**需要重新执行 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**。
 
 ## 十四、第七批功能：镜头语言 / 心跳演出 / 樱吹雪（2026-07-12，分支 `feature/camera-heartbeat-sakura`）
 
@@ -552,7 +552,7 @@ SceneRoot(震动·位置 + 心跳·缩放)
 `Q` 运镜循环（缓推→急推→平移→眩晕→复位，提示栏显示当前运镜名）、
 `A` 心跳演出开关、`D` 樱吹雪告白。
 推荐组合：D 樱吹雪 + Q 缓推 + M 黄昏色调 = 完整告白演出。
-**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+**需要重新执行 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**。
 
 ## 十五、第八批功能：景深/色调匹配/脚影/残影/云影/选项（2026-07-13，分支 `feature/depth-polish-choices`）
 
@@ -604,7 +604,7 @@ SceneRoot(震动·位置 + 心跳·缩放)
 `[` 伪景深开关、`]` 云影开关、`Tab` 残影冲入、`退格` 选项演出；
 色调匹配与脚下阴影全自动无按键。
 推荐组合：`[` 伪景深 + `V` 聚焦渐晕 + `Q` 缓推 = 完整对话特写运镜。
-**需要重新执行 Tools → VN Effects → Create Demo Scene**。
+**需要重新执行 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**。
 
 ## 十六、剧本系统 P0：自研轻量 DSL 核心（2026-07-13，分支 `feature/vn-script-core`）
 
@@ -652,14 +652,14 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 
 - 把原 CreateDemoScene 拆出共享的 **`BuildStageRig()`**（相机/后处理/Canvas/容器层级/
   全部特效管理器），键盘演示场景与剧本场景共用。
-- 新菜单 **Tools → VN Effects → Create Script Demo Scene**：自动创建
+- 新菜单 **Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene**：自动创建
   两个角色定义资产（`Assets/VNEffects/Characters/亚里沙|小雪.asset`）、
   演示剧本 `Assets/Scenarios/Demo.vn.txt`（已存在则不覆盖，放心改）、
   VNStage（背景库 bg1..bgN 自动填充）+ VNScriptRunner，保存为 `VNScriptDemo.unity`。
 
 ### 16.5 使用方法
 
-1. 菜单 Tools → VN Effects → **Create Script Demo Scene** → Play，
+1. 菜单 Tools → VN Effects → 演示场景 Demo Scenes → **重建剧本演示场景 Create Script Demo Scene** → Play，
    Enter/空格/点击推进剧情（演示剧本含出场/表情动作/运镜/心跳/换景/天气/樱吹雪全流程）
 2. 直接编辑 `Assets/Scenarios/Demo.vn.txt` 再 Play 即可看到修改（语法速查在文件头注释）
 3. 后续：P1 分支选项 → P2 存档回想 → P3 台词内嵌演出标记
@@ -821,7 +821,7 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 
 **目标**：不再手写/硬编码 camseq 数值——可视化编排、预览、生成文本粘贴进剧本。
 
-### 23.1 窗口结构（Tools → VN Effects → Camera Sequence Editor）
+### 23.1 窗口结构（Tools → VN Effects → 镜头编排 Camera Sequence Editor）
 
 - **迷你画布**（16:9）：场景背景缩略图打底 + 三个站位参考剪影 + 每个路径点的
   **取景框矩形**（编号标签）+ 取景中心连线（点线）+ 白色"当前预览取景框"。
@@ -953,7 +953,7 @@ camseq start:cut end:fade endfade:0.8
 
 ### 26.6 验证方法
 
-Tools → VN Effects → Create Script Demo Scene 重建剧本场景（或直接 Play 旧场景，
+Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 重建剧本场景（或直接 Play 旧场景，
 CameraFade 会自动创建）→ Play：眨眼转场睁眼时画面应直接在 top 2.05 视角，
 `right` 一镜为 0.5 秒叠化，结尾从 `left` 视角 0.8 秒叠化回全图。
 若截图上下颠倒，把 CameraFade 的 Flip 改为 ForceFlip/NoFlip。
@@ -1047,11 +1047,11 @@ Inspector 后进入 Play，等角色登场和说出台词才能看到实际效�
 
 新增 `Assets/Scripts/VNEffects/Editor/VNCharacterVisualPreviewWindow.cs`，菜单：
 
-**Tools → VN Effects → Character Visual Preview**
+**Tools → VN Effects → 预览 Preview → 角色立绘预览 Character Visual Preview**
 
 也可以在 Project 窗口选中任意 `VNCharacterDef` 后：
 
-- 右键 **VN Effects → Open Character Visual Preview**；
+- 右键 **VN Effects → 角色立绘预览 Open Character Visual Preview**；
 - 或在角色资产 Inspector 的右键上下文菜单打开。
 
 窗口顶部可在项目中的全部角色定义之间切换；在 Project 窗口选择另一个角色资产时，预览窗口
@@ -1130,7 +1130,7 @@ Inspector 后进入 Play，等角色登场和说出台词才能看到实际效�
 
 ## 三十一、剧本可视化编辑器 第一批（2026-07-13，分支 `feature/scenario-editor`）
 
-菜单 **Tools → VN Effects → Scenario Editor**。目标：不再手打关键字（消灭 typo），
+菜单 **Tools → VN Effects → 剧本编辑器 Scenario Editor**。目标：不再手打关键字（消灭 typo），
 用下拉框编排整个剧本。**文本仍是唯一真相**：编辑器打开 .vn.txt →
 行列表 → 保存时逐行重新生成写回（格式规范化；注释/空行原样保留，往返无损）。
 
@@ -2308,7 +2308,7 @@ TextMeshPro（SDF 渲染），为镜头缩放下的文字锐利度和 P3 台词�
   全部走 **Dynamic + 多图集** 模式（1024², SDFAA, 采样 64, padding 6）：
   字形按需光栅化，生僻字零缺字。`Prewarm(text)` 把整段文本预热进图集。
 - **`Editor/VNFontAssetBuilder.cs`（新）**：菜单
-  **Tools → VN Effects → Create TMP Font Asset**。生成持久化 TMP_FontAsset
+  **Tools → VN Effects → 字体 Fonts → 生成 TMP 字体资产 Create TMP Font Asset**。生成持久化 TMP_FontAsset
   （材质/图集用 `AddObjectToAsset` 挂子资产）。**为什么必须预烘焙**：
   场景生成器编辑期创建的 TMP 文字若引用运行时临时字体资产，存场景后会变
   Missing 引用；持久化资产才能被场景安全序列化。
@@ -2351,8 +2351,8 @@ TextMeshPro（SDF 渲染），为镜头缩放下的文字锐利度和 P3 台词�
 - `dotnet build` Assembly-CSharp / Assembly-CSharp-Editor 均 0 错误
   （csproj 已确认包含两个新文件）。
 - **用户需要做的一次性操作**（Unity 编辑器内）：
-  1. Tools → VN Effects → Create TMP Font Asset（生成预烘焙字体资产）
-  2. Tools → VN Effects → Create Demo Scene / Create Script Demo Scene
+  1. Tools → VN Effects → 字体 Fonts → 生成 TMP 字体资产 Create TMP Font Asset（生成预烘焙字体资产）
+  2. Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene / Create Script Demo Scene
      （重建两个演示场景，替换场景里旧的 legacy Text HintText）
 - 包体影响：+8.3MB 字体 OTF；动态图集显存随用随涨（多图集 1024² 递增）。
 - 技术债：`Assets/TextMesh Pro/` Essentials 里的 EmojiOne 表情图集暂保留
@@ -2467,7 +2467,7 @@ cg off [transition:Type]                            # 关闭，恢复背景/立�
 - **Runner 接线**：`Play(TextAsset)` 现在会记住资产（翻译表按名查找）；
   台词/选项/回想记录/存档末句全走译文；`autoWait` 按译文长度算；
   语言切换重新 Apply（当前已显示的那句到下一句才变）。
-- **编辑器工具** Tools → VN Effects → Localization：
+- **编辑器工具** Tools → VN Effects → 本地化 Localization：
   - **Extract Script Translations**：扫 `Assets/Scenarios/*.vn.txt` 生成/增量合并
     en+ja 表。已填译文按 key 保留；中文改过的旧译文挪到文件末尾"孤儿条目"注释区。
     每条上方自动写 `# [说话者] 中文原文` 注释供翻译者对照。
@@ -2672,7 +2672,7 @@ stat 善恶 50        # 直接设值（飘字「善恶 → 50%」）
   不该飘字），stat 是面向玩家的表现层封装；语义分开各自稳定。
 - dotnet build 运行时 + 编辑器程序集 0 错误（csproj 手动补录新文件验证，
   Unity 刷新后自动重生成）。
-- **用户操作**：Unity 里重新 Tools → VN Effects → Create Script Demo Scene
+- **用户操作**：Unity 里重新 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene
   重建剧本场景（生成属性资产并挂 HUD）。
 
 ## 六十四、养成 P2：选项条件显隐 + 花费（2026-07-18，分支 `agent/choice-cost`）
@@ -3034,7 +3034,7 @@ Scenario Editor schema（flag 命令加 rand 参数框）。
 
 ### 使用前提
 
-**必须重建剧本演示场景**（Tools → VN Effects → Create Script Demo Scene）
+**必须重建剧本演示场景**（Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene）
 才会注册 plan/result 模块并生成示例方案资产。
 
 ## 七十一、事件模块回想开关 RecordInBacklog（2026-07-19，分支 `agent/plan-backlog-quiet`）
@@ -3232,7 +3232,7 @@ Scenario Editor 为 call 提供“目标 + 参数串”编辑格，为 params �
 ### 77.1 背景：一次真实的工作流疼痛
 
 用户按 README 配置好场景（背景库 13 条、音频库、章节列表、地图坐标）后，
-执行 **Tools → VN Effects → Create Script Demo Scene**，**全部配置瞬间清空**，
+执行 **Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene**，**全部配置瞬间清空**，
 每次都要重配一遍。
 
 根因在 `VNEffectsDemoSetup.BuildStageRig()`：
@@ -3507,7 +3507,7 @@ ProjectCodeGuide 第十二节的技术债清单里就写着「结果名精确字
 - `Editor/VNScenarioLinter.cs`：分析引擎（纯逻辑，返回 `List<VNLintIssue>`）
 - `Editor/VNScenarioLinterWindow.cs`：结果窗口（按文件分组、严重度筛选、搜索、
   双击/「打开」跳到出错行，走 `AssetDatabase.OpenAsset(asset, line)`）
-- 菜单 **Tools → VN Effects → Lint Scenarios**，快捷键 `Ctrl+Shift+L`
+- 菜单 **Tools → VN Effects → 剧本检查 Lint Scenarios**，快捷键 `Ctrl+Shift+L`
 
 素材登记状态取自 `VNGameConfig` 并与**当前打开场景**的 VNStage/VNAudio/
 VNEventRegistry/VNMapModule 取并集（有人可能还在用旧的场景内配置方式，
@@ -3697,7 +3697,7 @@ VNEventRegistry/VNMapModule 取并集（有人可能还在用旧的场景内配�
 - **`VNScriptRunner.cs`**：Dispatch 加 `ui` 命令；RebuildStateBefore 把 ui
   记入调试重建快照。`VNSaveData` 加 dialogueSkin/choiceSkin（空 = 默认，
   旧存档兼容）。
-- **新增 `Editor/VNUiSkinExporter.cs`**：Tools → VN Effects → UI Skins →
+- **新增 `Editor/VNUiSkinExporter.cs`**：Tools → VN Effects → UI 皮肤 UI Skins →
   Export Skin Prefabs。烘焙程序化贴图为 PNG（prefab 引用运行时贴图会
   Missing，这是 prefab 方案的前提）→ 生成 DialogueSkin_Default/Top、
   ChoiceSkin_Default/Right 四个 prefab（TMP 全部引用
@@ -3762,7 +3762,7 @@ VNEventRegistry/VNMapModule 取并集（有人可能还在用旧的场景内配�
   `VNStatsPanelSkin`/`VNStatsPanelRowSkin`；顶部 HUD 和完整属性页分别配置，动态属性仍来自
   `VNStatDef`/flags，数值条与图标按原逻辑刷新。
 - `agent/system-ui-skin-integration`：`VNSystemUiSkinExporter`；菜单
-  **Tools → VN Effects → System UI Skins → Export Default Prefabs** 一次生成 8 个可编辑起步 prefab
+  **Tools → VN Effects → UI 皮肤 UI Skins → 系统主题：导出默认模板 System UI: Export Default Prefabs** 一次生成 8 个可编辑起步 prefab
   和 `VNSystemUiSkinSet_Default.asset`，并自动写入 `VNGameConfig`。重复执行会更新默认模板；
   **Validate Global Theme** 会检查 8 个 prefab 的组件与必需槽位。
 
@@ -3880,7 +3880,7 @@ SetUpGuide 搭建教程），但 AI 助手每次会话要么全量背 CLAUDE.md�
 ### 验证方法
 
 - `dotnet build Assembly-CSharp-Editor.csproj --no-restore` 0 错误。
-- Unity 内：Tools → VN Effects → System UI Skins → Export Default Prefabs 重新导出
+- Unity 内：Tools → VN Effects → UI 皮肤 UI Skins → 系统主题：导出默认模板 System UI: Export Default Prefabs 重新导出
   （新增 Inventory_Default.prefab 并登记），Validate Global Theme 应通过 9 项。
 - Play 后按 I：买入蝴蝶结发饰 → 右键装备 → 魅力+3 飘字、头部格出现道具、列表行出 E 标；
   再右键卸下 → 魅力-3；精力充沛剂右键使用 → 行动力+2、数量-1；
@@ -3944,7 +3944,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 
 - `dotnet build Assembly-CSharp-Editor.csproj --no-restore` 0 错误（98 个警告均为
   既有过时 API 警告）。
-- Unity 内：Tools → VN Effects → System UI Skins → **Export Event Panel Prefabs
+- Unity 内：Tools → VN Effects → UI 皮肤 UI Skins（系统主题那半截） → **Export Event Panel Prefabs
   (Plan & Result)** 导出 PlanPanel_Default / ResultPopup_Default 并登记；
   Validate Global Theme 应通过 11 项。
 - Play 跑 WeekPlanDemo.vn.txt：排程面板外观来自 prefab（改 prefab 颜色再进验证生效）；
@@ -4102,7 +4102,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 ### 验证方法
 
 - `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**。
-- Unity 内先跑 Tools → VN Effects → Create Script Demo Scene 重建场景
+- Unity 内先跑 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 重建场景
   （生成 `Assets/VNEffects/Quizzes/社团常识.asset` 并注册 `quiz` 模板），
   再用 Scenario Editor 打开 `QuizDemo.vn.txt` → ▶ 从选中行播放。
 - 检查点：倒计时最后 3 秒变红脉动 / 答错时正确项高亮绿、误选项标红 /
@@ -4115,7 +4115,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 用户指出重建场景会把手工整理好的 Hierarchy 全部打乱——这是 `Create Script Demo Scene`
 内部 `NewScene(EmptyScene)` 的固有代价。为「只想让注册表多一条」的场合补了增量入口：
 
-- 新增 `Editor/VNQuizInstaller.cs` —— **Tools → VN Effects → Install Quiz Module To Scene**。
+- 新增 `Editor/VNQuizInstaller.cs` —— **Tools → VN Effects → 场景装机 Install To Scene → 限时问答 Quiz Module**。
   只做三件事：在场景现有的 `VNEventRegistry` 下补一个禁用的 `QuizTemplate`
   （**带 RectTransform**）→ 确保示例题库存在并把工程里全部 `VNQuizDef` 填进模板 →
   登记进 `VNGameConfig`。支持 Undo、重复执行安全（已装过只刷新题库列表）、
@@ -4336,7 +4336,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 
 - `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**
   （构建前 csproj 因未刷新缺 `VNSnsView.cs` / `VNSnsMessage.cs`，临时补进去编译后已还原）。
-- Unity 内 Tools → VN Effects → Scenario Editor 打开任意剧本：
+- Unity 内 Tools → VN Effects → 剧本编辑器 Scenario Editor 打开任意剧本：
   选中中间某行按 Enter，应在其**下方**出现一条空台词行、光标已在台词框里可直接打字；
   Shift+Enter 应插在**上方**；连按两次 Enter 可连续开行；Ctrl+Z 应能整条撤销掉。
 - 回归：footer 的 `+`、Duplicate、多选拖动排序、`▶ 从选中行播放` 行为不变。
@@ -4465,7 +4465,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 
 **新增（编辑器）**
 
-- `Editor/VNWeatherPreviewWindow.cs` —— Tools → VN Effects → **Weather Preview**：
+- `Editor/VNWeatherPreviewWindow.cs` —— Tools → VN Effects → 预览 Preview → **天气预览 Weather Preview**：
   编辑模式下播放翻转帧预览（四种变体并排、按色带着色），运行模式下滑杆实时应用到场景，
   另存为资产 + 一键登记进 VNGameConfig。
 
@@ -4624,7 +4624,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   `FindFirstObjectByType` 过时提示）。
 - 回归：不改任何角色资产 → 原本会眨眼的角色行为完全不变（`blinkMode` 缺省 = 整张替换）。
 - 新方式：角色资产把「眨眼方式」改成**分层叠加**、指定透明闭眼叠加图 →
-  Tools → VN Effects → Character Visual Preview 勾「预览闭眼状态」，
+  Tools → VN Effects → 预览 Preview → 角色立绘预览 Character Visual Preview 勾「预览闭眼状态」，
   应看到只有眼睛变了、身体一动不动；Play Mode 里 `show 角色` 后自动间歇眨眼。
 - 表情切换：切到非默认表情应立刻停止眨眼且不残留闭眼层，切回默认恢复。
 - 特效联动：眨眼期间跑 `fx dissolve` / `fx flash`，闭眼层应与立绘同步溶解/闪白。
@@ -4687,7 +4687,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   拆出按字段名的 `AssignMaterialField`（`VNLiquidSplash` 要 alpha + additive 两份材质）；
   材质目录与 `EnsureMaterial` 开放给增量安装器共用。
 - `Editor/VNLiquidInstaller.cs`（新增）—— 增量安装器
-  （Tools → VN Effects → Install Liquid Splash To Scene）。**这条不是可选的**：
+  （Tools → VN Effects → 场景装机 Install To Scene → 液体喷溅 Liquid Splash）。**这条不是可选的**：
   `VNStage.AutoWire` 只能「找得到才接」，老场景里根本没有这两个物体时
   `liquid` 命令会静默无效果——每个分支都是 `if (xxx == null) break;`，
   连报错都没有。而 Create Script Demo Scene 会 NewScene 重造、丢掉手工整理过的
@@ -4746,7 +4746,7 @@ HDR 高光吃 Bloom。代价是看不见水滴里倒立的背景，正常观看�
 ### 验证方法
 
 - `dotnet build Assembly-CSharp-Editor.csproj` **0 错误**。
-- 演示场景：Tools → VN Effects → Create Demo Scene 重建后，
+- 演示场景：Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene 重建后，
   `` ` `` 在鼠标处爆溅、F1 间歇喷射、F2 循环四种液体、F3 常驻湿镜头。
 - 剧本：Scenario Editor 打开 `LiquidDemo.vn.txt` → 选中首行 → ▶ 从选中行播放。
 - 存档：`liquid spray on` / `liquid wet on` 后存档 → 读档，应仍在喷 / 镜头仍是湿的；
@@ -4898,7 +4898,7 @@ Noto Sans SC 字体档案（`ScProfile`），日文缺字时也是兜底到这�
 - **中文缺字兜底 Noto Sans SC**，做法照抄原来日文兜底中文的模式（现在反过来）。
 - **原地重烘焙保留 GUID**：中文烘焙资产被 26 个文件（1 场景 + 25 个 UI 皮肤
   prefab）硬引用。删除旧 `.asset`+`.meta` 后在 Unity 编辑器里点
-  `Tools → VN Effects → Create TMP Font Asset` 重新生成，Unity 原地复用了
+  `Tools → VN Effects → 字体 Fonts → 生成 TMP 字体资产 Create TMP Font Asset` 重新生成，Unity 原地复用了
   同一路径的旧 GUID（`fdf08363d8a023d4d929f785c67e4c59`），26 处硬引用全部
   不用动——只有 `NotoSansJP-Dynamic.asset` 内部的 fallback 引用需要手动改。
 - **烘焙这一步必须由用户在已打开的 Unity 编辑器里点菜单完成**：AI 只能改文件，
@@ -5098,7 +5098,7 @@ VN/Scenario Editor 里自己改键位）：`F5` 从选中行播放、`F6` 重播
 剧本编辑器里加一条 `camseq` 之后，编辑体验是断的：
 
 - 路径点行 `> middle 1 1` 是**纯文本 TextField**，没下拉、没校验、没提示，全靠手打语法；
-- 真正好用的可视化工具（Tools → VN Effects → Camera Sequence Editor，
+- 真正好用的可视化工具（Tools → VN Effects → 镜头编排 Camera Sequence Editor，
   有迷你画布拖点、拖角改 zoom、时间轴预览、场景实时预览、预设库）
   跟剧本**完全没有连线**，中间隔着一个剪贴板：
   复制整段 → 切窗口 → 粘贴 → 解析载入 → 调 → 生成文本 → 回来删旧的粘新的。
@@ -5525,7 +5525,7 @@ A・D + J + K 键位（鼠标只负责击球）/ ESC 认输 / 不做 Editor 调�
 
 **新增编辑器**
 
-- `Editor/VNBadmintonInstaller.cs` —— `Tools → VN Effects → Install Badminton Module
+- `Editor/VNBadmintonInstaller.cs` —— `Tools → VN Effects → 场景装机 Install To Scene → 羽毛球对战 Badminton Module
   To Scene`，增量装机（照 `VNQuizInstaller` 范式），不重建场景、可重复执行。
 
 **新增资产与内容**
@@ -5708,7 +5708,7 @@ P5（画廊照片页）未做。
 
 **新增编辑器**
 
-- `Editor/VNPhotoBoothInstaller.cs` —— `Tools → VN Effects → Install Photo Booth
+- `Editor/VNPhotoBoothInstaller.cs` —— `Tools → VN Effects → 场景装机 Install To Scene → 拍大头照 Photo Booth Module
   Module To Scene`，增量装机（照 `VNBadmintonInstaller` 范式）。
   额外做一件事：**缺资产就铺一套默认的**（5 边框 / 10 贴纸 / 3 主题），
   已存在的绝不覆盖（那可能是用户改过的）。
@@ -5780,7 +5780,7 @@ event photo vs:<她> [me:<我>] [theme:<主题>] [mode:match|free] [frame:<边�
 - 界面：在 `VNScriptDemo` 场景里用 `HideFlags.DontSave` 的临时对象搭出面板，
   用 `screenshot-camera` 逐轮确认（**不能用 `screenshot-game-view`**，
   非播放状态它返回旧帧——一〇二章「坑」第 6 条）。验证完销毁，不写进场景。
-- 剧本：`Tools → VN Effects → Lint Scenarios`（Ctrl+Shift+L）对 `PhotoDemo.vn.txt` 无报错。
+- 剧本：`Tools → VN Effects → 剧本检查 Lint Scenarios`（Ctrl+Shift+L）对 `PhotoDemo.vn.txt` 无报错。
 
 ### 待办
 
@@ -6137,7 +6137,7 @@ Play Mode 实跑 `PhotoDemo.vn.txt`：第 19 行（自由拍照）与第 31 行�
 **新增（编辑器）**
 
 - `Editor/VNAiConnectionTester.cs`——两级自检菜单（Tools → VN Effects → AI）
-- `Editor/VNAiTalkInstaller.cs`——增量装机（Tools → VN Effects → Install AI Talk Module To Scene）
+- `Editor/VNAiTalkInstaller.cs`——增量装机（Tools → VN Effects → 场景装机 Install To Scene → AI 自由聊天 AI Talk Module）
 
 **新增（资产 / 剧本）**
 
@@ -6246,7 +6246,7 @@ UI 文案（「正在输入…」等）照旧走 `VNLocale.T(key)`。同理 AI �
 - **契约验证**：curl 逐项二分，定位 400 的唯一元凶并测出各 thinkingLevel 的
   思考 token 与延迟（`minimal` 与不写等价，均为 0 token / 约 0.8s）
 - **连通性**：Tools → VN Effects → AI → Test Gemini Connection（不进 Play Mode）
-- **逻辑层**：Tools → VN Effects → AI → Test Persona Talk（3 轮真实对话，
+- **逻辑层**：Tools → VN Effects → AI → 试聊 3 轮 Test Persona Talk（3 轮真实对话，
   每轮随机挑一个选项当玩家回复，验多轮上下文与历史裁剪）。
   两级诊断——前者过、后者挂 = 问题在逻辑层不在网络
 - **Lint**：写了一份故意错五处的探针剧本，确认
@@ -6704,7 +6704,7 @@ Sunset 红通道从 1.27 降到 1.09，立绘再乘 0.3 强度只剩 1.027 —�
 
 - `midTargets`（中景）目前为空 —— GodRays 用的是 `VN/Additive` 材质，
   不走 `VN/ImageEffect`，接不进分层调色。要染中景得先给它换材质。
-- 演示场景 `VNEffectsDemo` 需重跑 Tools → VN Effects → Create Demo Scene
+- 演示场景 `VNEffectsDemo` 需重跑 Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene
   才会带上新接线。
 
 ---
@@ -6787,7 +6787,7 @@ Sunset 红通道从 1.27 降到 1.09，立绘再乘 0.3 强度只剩 1.027 —�
 
 ### 验证方法
 
-1. `Tools → VN Effects → Scenario Editor` 打开剧本。
+1. `Tools → VN Effects → 剧本编辑器 Scenario Editor` 打开剧本。
 2. **右键**点任意行首的彩色命令按钮 → 弹出搜索窗；打 `bg` / `背景` / `场景` 都能命中 `bg`
    （分类名也参与匹配）；↑↓ 选、Enter 换命令、Esc 关。
 3. 底部 `[+]` → 同一套搜索窗，能搜到 `# 注释` 和 `（空行）`。
@@ -6966,7 +6966,7 @@ Instantiate(persona) → 内存副本（HideFlags.DontSave）
 | 文件 | 职责 |
 |---|---|
 | `Script/VNAiPricing.cs` | `VNAiPricingDef` 单价表资产（Create → VN → AI Pricing）+ `VNAiPricing` 查表静态类 |
-| `Editor/VNAiCostReport.cs` | 花费累计报表窗口（Tools → VN Effects → AI → Cost Report） |
+| `Editor/VNAiCostReport.cs` | 花费累计报表窗口（Tools → VN Effects → AI → 花费报表 Cost Report） |
 
 **修改**
 
@@ -7193,7 +7193,7 @@ config 的清缓存入口上。
 文档  HowToUse.md 八章新增「对话框皮肤（ui dialogue）」、CLAUDE.md 组件表与子系统表
 ```
 
-菜单：**Tools → VN Effects → UI Skins → Export Soft Gradient Skins**
+菜单：**Tools → VN Effects → UI 皮肤 UI Skins → 导出无框渐变皮肤（白·粉·黑）Export Soft Gradient Skins**
 （另有「(覆盖重建)」一项，带二次确认，会用出厂参数冲掉 Inspector 里的手工调整）。
 
 ### 规格
@@ -7576,7 +7576,7 @@ UI Sprite 默认就是关的，开了的话 `frac` 的跳变会让接缝糊掉�
 每个列表再加：搜索框、条数 / 匹配数、分页（默认每页 50）、行内 ▲▼✕、
 id 重复与 id 为空的告警、以及底部的**批量拖入区**（拖一批素材进来自动建条目、id 预填文件名）。
 
-**③ 素材浏览器窗口（`VNAssetBrowserWindow`，Tools → VN Effects → Asset Browser）** ——
+**③ 素材浏览器窗口（`VNAssetBrowserWindow`，Tools → VN Effects → 素材浏览器 Asset Browser）** ——
 左栏九个类别（带条数），右侧图片走大缩略图网格、音频走波形列表，底部详情栏可直接改 id / 换素材 /
 试听 / 定位 / 移除，右键菜单另有「用文件名填 id」「上移/下移」。
 网格与列表都做了**虚拟化**（只画滚动窗口内的那几行），200+ 素材不掉帧。
@@ -7706,7 +7706,7 @@ Sprite Mode 改成 `Single`，一张张点很烦。希望新图进来就是对�
 
 新增 `Editor/VNTextureImportDefaults.cs`（`AssetPostprocessor`）：
 素材目录里首次导入的图片，自动设为 `Sprite (2D and UI)` + `Single`。
-另配一个菜单 **Tools → VN Effects → Textures → Apply Sprite Settings To Selection**
+另配一个菜单 **Tools → VN Effects → 贴图 Textures → 套用 Sprite 导入设置到选中项 Apply Sprite Settings**
 给存量图手动补（选中图或文件夹，递归处理，会先弹确认）。
 
 ### 技术决策与取舍

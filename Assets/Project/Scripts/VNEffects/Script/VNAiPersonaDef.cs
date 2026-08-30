@@ -6,7 +6,7 @@ namespace VNEffects
     /// <summary>
     /// AI 自由聊天的人格资产：一场「谁、什么性格、什么边界、用什么模型参数」的全部设定。
     /// 每套人格一个 .asset（Create → VN → AI Persona），登记进 VNGameConfig.aiPersonas
-    /// （留空则由 Tools → VN Effects → Sync Game Config 扫目录自动登记）。
+    /// （留空则由 Tools → VN Effects → 游戏配置 Game Config → 重扫素材目录 Rescan Asset Folders 扫目录自动登记）。
     ///
     /// 【为什么独立于 VNCharacterDef】
     ///   VNCharacterDef 已经有 40+ 字段（立绘/表情/眨眼/口型/头像/漫符/标定…），

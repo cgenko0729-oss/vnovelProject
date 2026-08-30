@@ -9,7 +9,7 @@ namespace VNEffects
     /// 原先参数硬编码在 VNAmbientParticles.Configure() 的一个大 switch 里，
     /// 剧本层只能写一句 `weather petals`，连密度和风力都改不了。
     /// 搬进 ScriptableObject 后：策划可以在 Inspector 里调、可以在
-    /// Tools → VN Effects → Weather Preview 里实时预览、剧本还能临时覆盖单个参数。
+    /// Tools → VN Effects → 预览 Preview → 天气预览 Weather Preview 里实时预览、剧本还能临时覆盖单个参数。
     ///
     /// 【怎么用】
     ///   1. 右键 Create → VN → Weather Def 建资产，填 id（剧本引用名，可中文）

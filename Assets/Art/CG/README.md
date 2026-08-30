@@ -1,7 +1,7 @@
 # CG 素材目录
 
 把 CG（一枚绘）图片放进这个目录（.png / .jpg），然后重新生成剧本场景
-（Tools → VN Effects → Create Script Demo Scene），生成器会把它们
+（Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene），生成器会把它们
 自动灌入 `VNStage.cgLibrary`，**文件名（不含扩展名）= 剧本里的 cg id**。
 
 ## 剧本用法

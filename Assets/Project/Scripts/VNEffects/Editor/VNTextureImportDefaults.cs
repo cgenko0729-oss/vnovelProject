@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -88,9 +88,9 @@ namespace VNEffects.EditorTools
         // 存量补救：对选中的图手动应用
         // ==================================================================
 
-        const string MenuPath = "Tools/VN Effects/Textures/Apply Sprite Settings To Selection";
+        const string MenuPath = "Tools/VN Effects/贴图 Textures/套用 Sprite 导入设置到选中项 Apply Sprite Settings";
 
-        [MenuItem(MenuPath, priority = 204)]
+        [MenuItem(MenuPath, priority = 160)]
         static void ApplyToSelection()
         {
             var paths = CollectSelectedTextures();

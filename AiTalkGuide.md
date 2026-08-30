@@ -23,8 +23,8 @@ event aitalk vs:星野结衣 turns:8 topic:恋爱话题 place:放学后的空教
 
 跑之前要做两件事（各一次）：
 
-1. **装模块**：Tools → VN Effects → Install AI Talk Module To Scene，然后 Ctrl+S 存场景
-2. **配 Key**：按当前用的那家配（用 Tools → VN Effects → AI → Show Key Status 确认读到了）
+1. **装模块**：Tools → VN Effects → 场景装机 Install To Scene → AI 自由聊天 AI Talk Module，然后 Ctrl+S 存场景
+2. **配 Key**：按当前用的那家配（用 Tools → VN Effects → AI → 查看 Key 状态 Show Key Status 确认读到了）
    - DeepSeek（**默认**）：环境变量 `DEEPSEEK_API_KEY`，或项目根放 `DeepSeekAiApiKey.txt`
    - Gemini：环境变量 `GEMINI_API_KEY`，或项目根放 `GeminiAiApiKey.txt`
 
@@ -432,7 +432,7 @@ flag 做**细判断**。别指望结果名能表达「她选了三次直球」�
 ## 十、成本与性能
 
 > **怎么查账**：单场看日志的「开销」段；跨场看
-> **Tools → VN Effects → AI → Cost Report**（按月/日/人格/模型/来源聚合，可导 CSV）。
+> **Tools → VN Effects → AI → 花费报表 Cost Report**（按月/日/人格/模型/来源聚合，可导 CSV）。
 >
 > **单价改哪**：`VNAiPricingDef` 资产（Create → VN → AI Pricing）登记进
 > `VNGameConfig.aiPricing`。不建资产就用内置默认表。
@@ -640,7 +640,7 @@ flag 做**细判断**。别指望结果名能表达「她选了三次直球」�
 
 ## 十六、AI 试聊台（调人格与提示词的主力工具）
 
-**Tools → VN Effects → AI → AI Talk Studio**（人格资产上右键 →「在 AI 试聊台里打开」也行）
+**Tools → VN Effects → AI → AI 试聊台 AI Talk Studio**（人格资产上右键 →「在 AI 试聊台里打开」也行）
 
 不进 Play Mode、不跑剧本，直接改人格、试聊、看提示词、调记忆。
 第九节那套「跑一场留日志 → 改一个字段 → 再跑一场 → 肉眼 diff」的流程，
@@ -733,7 +733,7 @@ Ctrl+Z 能撤销），不满意点「还原」。
 **填错家的模型名会 400**，人格资产的自检（Validate）会先拦下来。
 试聊台切供应商时会自动清掉不属于新那家的模型名。
 
-自检：**Tools → VN Effects → AI → Test Connection · Gemini / · DeepSeek**
+自检：**Tools → VN Effects → AI → 测试连接·当前默认供应商 Test Connection · Gemini / · DeepSeek**
 分别验两家的 key 与网络；`Show Key Status` 一次列出两家 key 找没找到。
 
 ### 两家的差异（会影响你怎么调参）
