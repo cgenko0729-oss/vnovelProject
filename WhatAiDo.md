@@ -8225,3 +8225,122 @@ ZoomRoot         scale=(1,1,1)   ← char 模式下本来就该是 1
 - **Lint**：`mode` 值合法性没加校验规则 —— 目前 camseq 一条 lint 规则都没有，
   而两个编辑器都是下拉框、运行时也会告警，先不为它建一整个规则类别
 - **`{char2}` 第二占位符 / 路径点 `dutch:` 荷兰角**：手册点名过，留作后续
+
+---
+
+## 一二六、亲密互动小游戏模块：光标变道具，摸角色部位推进阶段（2026-08-30，分支 `agent/interaction-minigame`）
+
+### 需求
+
+用户要一个新的互动小游戏：鼠标变成某种图标（一只手、某个道具），玩家用它点/摸角色的
+特定部位（摸头、摸脸…），摸到一定程度角色给出反馈 —— 换表情、说特定台词、播语音音效；
+光标图标本身还要有持续摆动之类的动画。
+
+素材是 `Assets/Art/InteractionMiniGame/item1~4.png`（两只手 + 两个道具），
+试验角色星野结衣。定位是成人向的亲密互动，本次做的是**系统框架**，
+具体台词/语音内容由作者自己填。
+
+问了三轮把岔路定死：event 事件模块承载（但中途要能播台词/语音/特效）／归一化区域 +
+编辑器画框工具／单击与按住拖动都要／道具由剧本给清单玩家在其中选／反馈用字段 +
+内嵌剧本行混合／全局兴奋度 + 每部位独立累计 + 禁忌部位／进度条可见 + 悬停高亮／
+表情 + 叠加层／部位框按每张立绘各一套带继承／随机语音池。
+
+### 文件改动
+
+**新增（运行时）**
+- `VNTouchZoneDef.cs` —— 部位区域资产。归一化坐标（与 `markAnchor` 同语义）；
+  基准一套 + 按立绘/表情覆盖（同 id 覆盖、新 id 追加、未提到的继承、`replaceAll` 完全不继承）；
+  命中数学 `Contains` / `Pick` 是纯静态的，编辑器与运行时共用同一份。
+- `VNInteractionDef.cs` —— 一场互动的全部规则：道具（含光标动画参数）、阶段、
+  部位×道具反馈池、禁忌解禁阶段、结束条件、三种结果名、flag 前缀。
+- `VNTouchScore.cs` —— 判定数学，纯逻辑无 MonoBehaviour，可单测。
+- `VNTouchCursor.cs` —— 道具光标：跟随、待机摆动、按住震动、速度倾斜、悬停发光。
+- `VNCharacterOverlay.cs` —— 立绘情绪叠加层（潮红/汗/泪），多层共存、强度 0~1。
+- `VNInteractionModule.cs` —— 事件模块本体。
+
+**新增（编辑器）**
+- `VNInteractionInstaller.cs` —— 增量装机 + 缺资产时铺一套示例。
+- `VNTouchZoneEditorWindow.cs` —— 在立绘上拖框画部位。
+
+**修改**
+- `VNScriptRunner` —— 新增 `RunInlineCo(lines)`；`overlay` 的 Dispatch 与静默重放。
+- `VNStage` —— `ActiveCharacter.overlay` 字段、挂载、`SetOverlay()`、快照存取。
+- `VNCharacterDef` —— `overlays` 列表。
+- `VNSaveSystem` —— `CharSave.overlays`。
+- `VNScriptParser` / `VNScenarioSchema` / `VNScenarioEditorWindow` / `VNScenarioLinter`
+  —— `overlay` 命令的全链路登记。
+- `VNTextureImportDefaults` —— Sprite 自动导入白名单加 `Art/InteractionMiniGame/`。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— `interact.*` 三条 UI 字符串。
+
+### 技术决策与取舍
+
+**① 模块刻意破「不碰舞台」的铁律（先例 VNAiTalkModule）。**
+玩法本身就是对着舞台上的立绘操作，自绘一套立绘等于要把眨眼/口型/色调匹配/出场动画
+全部重接一遍。边界收紧为「只碰表情与叠加层」，且正常结束 / ESC / `CancelForDebug`
+三条路径都还原原表情。
+
+**② 不铺全屏暗幕。** EventLayer 排序 60 在对话框 40 之上，铺了暗幕台词就看不见了 ——
+而这个玩法全程都要角色说话。HUD 缩在左下角、道具栏放右侧竖排（底部是对话框的地盘）。
+
+**③ 阶段只升不降。** 允许回退的话，玩家一停手兴奋度衰减，表情就会在阈值边界反复横跳。
+衰减只把数值往回拉，不动阶段。
+
+**④ 光标不用 `Cursor.SetCursor`。** 硬件光标做不了摆动、按住震动、速度倾斜、
+悬停发光这四件事，而它们正是手感的来源。代价是必须自己保证退出时把系统光标还回去：
+`Dispose()` 在 Finish / CancelForDebug / OnDestroy / OnDisable **四处**都调 ——
+漏一条路径玩家的鼠标指针就永久消失了。发光走 `VN/Additive` 材质的 `_TintColor`（HDR），
+不写顶点色（uGUI 顶点色被钳到 1，Bloom 抓不到）。
+
+**⑤ 阻塞台词复用 Runner 的 SayCo。** blocking 反馈把台词拼成一行丢回 `RunInlineCo`，
+等打字完、等玩家推进、Auto/Skip 全都是现成的，不在模块里重写一套推进逻辑。
+期间 `_blocked=true` 不吃抚摸输入 —— 否则玩家点一下既推进对话又顺手摸了一把。
+已经在播时新来的一条降级为非阻塞：排队会让台词堆成一串，得连点好几下才能继续摸。
+
+**⑥ `RunInlineCo` 的白名单是必需品。** 调用方（事件模块）此刻正被主协程 yield 等待着，
+让 `jump` / `choice` / `call` / `return` / `event` / 存档类跑起来会搅乱 `_index` 与
+`_callStack`，症状是事件结束后剧本跳到莫名其妙的地方。演出类命令一律放行。
+
+**⑦ 叠加层不做成表情。** 「表情 × 潮红三档」是乘法爆炸，每个组合都得画一张完整立绘；
+叠加层是加法，一张潮红图配所有表情，强度还能连续补间而不是跳变。
+
+**⑧ 部位框按每张立绘各一套但带继承。** 一个角色一套的话，换一张构图不同的立绘
+（坐下/躺下/近景）就全错位；每张都从头画又太费。折中是基准 + 只写差异的覆盖。
+
+### 修复记录
+
+- **部位框在互动结束后留在角色脸上。** 框可视化层挂在 `_char.rect`（立绘）底下 ——
+  必须如此才能跟着立绘一起缩放位移 —— 但那样它就不在模块的子树里，模块销毁时不会被回收。
+  修法：`DestroyZoneOverlay()` 在 Finish / CancelForDebug / OnDestroy 三处显式删。
+  这是破铁律要自己付的账：凡是挂到舞台上的东西，三条退出路径都得亲手清干净。
+- **结束反馈若是 blocking 会被拦腰打断**（模块 0.7 秒后就 Done 并销毁）。
+  改为结束反馈强制非阻塞；结算台词应写在剧本的「* 结果行」下面。
+- 新文件一律用 `FindAnyObjectByType`：`FindFirstObjectByType` 在 Unity 6.5 已是
+  error 级弃用告警（存量文件里还有一批，本次没动）。
+
+### 验证方法
+
+- 从 `InteractionDemo.vn.txt` 第 19 行播放，Lint 对该文件 0 问题。
+- 反射模拟抚摸：摸头 60 次 → 兴奋度 120 / 阶段 2 / 表情「微笑」→ 推到阶段 3
+  触发 `autoEndOnTarget` → 走 `* 满足` 分支（对话框确实出现该分支台词，立绘停在害羞）。
+- 阶段 0 摸禁忌部位（胸，解禁阶段 2）3 次 → 拒绝数 3、兴奋度 0、触发上限 → 走 `* 拒绝`。
+- 跨阶段时 `_blocked=True`，抚摸判定确实被暂停。
+- 单点调 `RunInlineCo`：`fx shockwave light` / `camera pushin` 正常执行，
+  `jump` / `choice` 被白名单挡下并告警。
+- `VN/Additive` 存在且有 `_TintColor`；互动结束后 `Cursor.visible == True`。
+- 对故意写错的探针剧本，Lint 准确报出 3 条 overlay 警告。
+
+### 剧本写法
+
+```
+show 星野结衣 at:center expr:默认
+event interact vs:星野结衣 id:初次抚摸 items:手,羽毛 time:120 flag:抚摸 zones:on
+* 满足 -> 满足
+* 普通 -> 普通
+* 拒绝 -> 拒绝
+```
+
+`zones:on` 把部位框画出来（开发调试用，正式剧本删掉）。`* 拒绝` **必须接住**，
+否则玩家惹毛角色会静默跳过。成绩写 flag `<前缀>_兴奋度 / _阶段 / _拒绝数 / _<部位>次数`。
+
+装机：Tools → VN Effects → 场景装机 Install To Scene → **亲密互动 Interaction Module**。
+画部位框：Tools → VN Effects → 预览 Preview → **部位区域编辑器 Touch Zone Editor**。
