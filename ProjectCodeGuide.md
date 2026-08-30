@@ -644,6 +644,14 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
   `bg ... transition:` 命令的执行者，排序 100 盖住一切。
 - **VNShatterGraphic**：碎裂转场的碎片网格 Graphic（给 ScreenTransition 用）。
 - **VNCameraFade**：camseq 路径点 `xfade:` 交叉淡化的截屏叠化辅助。
+- **VNCamZoomMode**（枚举，在 `VNCamera.cs`）：camseq 的缩放模式 both/depth/bg/char
+  ——「谁跟着 zoom 缩放」。两个静态公式 `VNCamera.CharacterScaleFor(mode, zoom)`
+  与 `ContainerZoomFor(mode, zoom)` 是**运行时与编辑器预览的唯一真相**，改公式只改这两处。
+  **`both` 下 `ApplyCharacterZoom` 是空转**（否则每个路径点都给每个立绘起补间，
+  会打断说话者高亮那条），代价是还原只能在模式切换点做 → 所有切换收口到 `SetMode()`。
+  公开的 `Cut()` / `GoTo()`（= camcut / camto）一律 `SetMode(Both)` 不继承上一段模式；
+  camseq 内部叠化段走私有的 `CutWithMode()`。参与的立绘由
+  `VNStage.RefreshRegistries()` 调 `SetCharacterTargets()` 维护，与 mood 同一时机。
 
 ### 8.6 输入反馈与组合技
 

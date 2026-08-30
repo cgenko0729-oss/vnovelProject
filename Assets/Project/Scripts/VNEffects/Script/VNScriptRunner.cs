@@ -2852,8 +2852,19 @@ namespace VNEffects
             float startFade = cmd.Kw("start") == "fade" ? cmd.KwF("startfade", 0.6f) : 0f;
             float endFade = cmd.Kw("end") == "fade" ? cmd.KwF("endfade", 0.6f) : 0f;
 
+            // mode: 缩放模式（谁跟着 zoom 缩放）。整段一个模式——逐点切换会让立绘尺寸跳变
+            var mode = VNCamZoomMode.Both;
+            string modeArg = cmd.Kw("mode");
+            if (!string.IsNullOrEmpty(modeArg) &&
+                !System.Enum.TryParse(modeArg, true, out mode))
+            {
+                Debug.LogWarning($"[VNScript] 第 {cmd.line} 行：认不出的 mode:{modeArg}，" +
+                                 "已按 both 处理（可用 both/depth/bg/char）");
+                mode = VNCamZoomMode.Both;
+            }
+
             if (list.Count == 0 && endFade <= 0f) yield break;
-            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade, stage.screenShake);
+            yield return stage.vnCamera.PlayPathCo(list, startFade, endFade, stage.screenShake, mode);
         }
 
         /// <summary>camera 命令的 focus:角色id 参数 → 该角色的画布坐标</summary>

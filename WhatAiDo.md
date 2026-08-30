@@ -8041,3 +8041,149 @@ Unity 重编译零 Error；Play Mode 里逐步调 `SetUiHidden` 抓状态：
 
 （日历走 `_dirty` 延迟一帧刷新，所以同帧只能看 `_visible`；
 `VNUiPartsUtil.Parse` 的中英/大小写/中文别名与 token 往返也单独跑过。）
+
+---
+
+## 一二五、camseq 缩放模式 `mode:`：背景与立绘可以不一起缩放（2026-08-30，分支 `agent/camseq-zoom-mode`）
+
+### 起因
+
+用户问：设 zoom 时背景和立绘一起被拉近拉远，这是标准做法吗？
+
+**是标准的，而且是最常用的那一种** —— 演出手册第 1 章表格第一行「トラックアップ（TU）推镜」的
+2D 实现方式就写着「背景 + 立绘同步等比放大」。camseq 缩放的是 `ZoomRoot`，
+`LayerBack / LayerMid / LayerFront` 全在它底下，所以一起动，没做错。
+
+但同一张表把「缩放」拆成了**三种手法**，原来只实现了第一种：
+
+| 手法 | 谁在缩放 | 语义 |
+|---|---|---|
+| TU / TB 推镜·拉镜 | 背景 + 立绘一起 | 通用推拉，情绪升温 / 场面收束 |
+| ズームイン / アウト | **只有立绘**，背景不动 | 强调某人的**反应**、突发惊愕 |
+| ドリーズーム 眩晕变焦 | **只有背景**，立绘不变 | 世界观崩塌，全篇 1~2 次 |
+
+而且还有第四种情况，是「动了但不像镜头」的真正原因：**等比缩放在几何上是「数码变焦」，
+不是真的推镜**。真镜头推近时近处的人放大得比远景快，所有层同一个倍率，观感就是
+「一张照片被放大」。手册 1.3 说「速度差是伪 3D 的全部秘密」，说的就是这件事。
+
+### 做法：`camseq mode:both|depth|bg|char`
+
+写在 **camseq 行**（整段一个模式，不逐点）。逐点切换会让立绘尺寸在两点之间跳变，
+而且手册的语义本来就是「一段镜头 = 一种手法」。
+
+| mode | ZoomRoot | 立绘额外倍率 | 对应手法 |
+|---|---|---|---|
+| `both`（默认，可省略） | zoom | 1 | TU / TB 推拉镜 |
+| `depth` | zoom | `1+(zoom-1)×0.5` | 有纵深的推拉镜（速度差伪 3D） |
+| `bg` | zoom | `1/zoom` | 眩晕变焦 |
+| `char` | **1（背景纹丝不动）** | zoom | 变焦推·只放大立绘 |
+
+四种是同一条公式的四组取值，实现是一份代码：`VNCamera.CharacterScaleFor(mode, zoom)`
+与 `ContainerZoomFor(mode, zoom)` 两个**静态**方法，运行时与编辑器预览共用
+（不共用的话预览和实机迟早对不上，这是老教训）。
+
+`mode:char` 下背景**连平移都不做**：zoom=1 时 `ComputeOffset` 仍会给出一个 overscan 级
+（60px）的偏移，那点位移会让「背景纹丝不动」的语义打折，所以直接置零。
+
+视差系数 k **写死 0.5，不做逐点覆盖**（`VNCamera.DefaultDepthRatio`，组件上可全局调）。
+手册 13 章：「同一部作品内部保持一致比数值本身正确更重要」。
+
+### 关键坑一：立绘缩放倍率必须分通道（否则说一句话尺寸就跳回去）
+
+`VNImageEffectController._scaleMultiplier` 原本是**单一 float**，而
+**`VNSpeakerHighlight` 每句台词都在写它**（说话者 1.03 / 旁听者 0.97）。
+镜头如果写同一个字段，症状是：**推完镜头，玩家点下一句台词，说话者高亮一写倍率，
+立绘尺寸当场跳回去** —— 与当年调色被六方共用踩的是同一个坑（见 `SetGrade` / `VNGradeLayer`）。
+
+改法照抄调色那套，但按需只加一个通道：
+
+```
+_scaleMultiplier      说话者高亮 / 出场动画 / 手动（老 API DOScaleMultiplier）
+_camScaleMultiplier   运镜通道（只由 VNCamera 写，新 API DOCamScaleMultiplier）
+CurrentBaseScale = _origScale × _scaleMultiplier × _camScaleMultiplier
+```
+
+两个通道**共用一条补间** `_scaleTween`，后写的杀掉前一条 —— 两条 `DOScale` 同时跑在
+同一个 Transform 上会互相打架，而合并目标值本来就是从两个通道算出来的，杀掉旧的没有损失。
+另外补了 `duration ≤ 0` 直接写 localScale 不补间（瞬切段用）。
+
+**顺带修掉一个既有 bug**：`VNCamera.DollyZoom()` 原本直接写 `DOScaleMultiplier(1/zoom)`，
+埋着同一个问题，只是它是一次性名场面用、且 `dollyCharacters` 默认多半是空的所以没被发现。
+现已改走运镜通道。
+
+### 关键坑二：`both` 下是空转，所以还原只能在模式切换点做
+
+`ApplyCharacterZoom` 在 `both` 下直接 return —— 否则每个路径点都要给每个立绘起一条补间，
+而那条补间会顺带把说话者高亮的补间打断。代价是「从非 both 切回 both 时立绘倍率不会自己还原」，
+于是所有模式切换收口到 `SetMode(mode, resetDuration)`，只在这一处做还原：
+
+```
+SetMode(both) 且当前不是 both → ResetCharacterZoom() 再切
+```
+
+`camcut` / `camto` 语法里没有缩放模式概念，**公开的 `Cut()` / `GoTo()` 一律 `SetMode(Both)`**，
+不继承上一段 camseq 的模式（不这么做的话，`camseq mode:char` 之后紧跟一条 `camcut`，
+背景不会缩放而且立绘一直是放大的，极难联想到原因）。camseq 内部叠化段要带模式，
+另走私有的 `CutWithMode()`。`DollyZoom()` 则登记成 `_mode = Bg`，下一条 both 运镜自动帮它还原。
+
+### 存档：不用动
+
+camseq 的镜头状态**根本不进存档**（`VNSaveData` 里一个 cam 字段都没有），
+调试重建也明写「动画路径状态不做推断，回到默认镜头」（`VNScriptRunner.RebuildStateBefore`），
+走的是 `SnapReset()`。立绘的运镜倍率跟 camseq 同生命周期，在 `SnapReset()` / `ResetCamera()`
+里一并还原即可，**不用走 vn-save-compat 的三处同步**。持久的只有 `camcut` / `camto`。
+
+### 参与的立绘：全部在场角色，自动维护
+
+`VNCamera.dollyCharacters` 从「手填的 Dolly Zoom 补偿列表」改成「参与运镜缩放的立绘」，
+由 `VNStage.RefreshRegistries()` 在角色进出场时调 `SetCharacterTargets()` 自动维护 ——
+与 `VNMoodGrading.SetCharacterTargets` 同一时机、同一份 `characterFx` 列表。
+
+选全部在场而不是「只缩点名的那个」，是因为同一层的人应该一起动，否则两个人站一起会一大一小。
+
+**已知边界**：camseq 播放**中途**才出场的角色不会带上当前的运镜倍率
+（序列构建时它还不在列表里）。camseq 是同步阻塞命令，正常写法下不会发生。
+
+### 编辑器：预览与运行时同一份公式
+
+镜头编排窗口工具栏加「缩放模式」下拉（带四种手法的 tooltip）。画布预览：
+
+- `CamState` 增加 `charScale` 字段，**`CharScale` 属性把 0 兜底成 1** ——
+  旧代码里有几处直接 `new CamState{offset=..,zoom=1}`，不兜底立绘会被画成 0 尺寸直接消失
+- `TargetState()` 调运行时那两个静态方法算容器 zoom / 立绘倍率 / 偏移
+- 拖进度条的插值里 `charScale` 也跟着 lerp，否则中途那几帧立绘尺寸是错的
+- 立绘位置仍跟容器走（它在 ZoomRoot 底下），**只有尺寸**乘额外倍率；没有立绘时的占位框同理
+
+剧本编辑器那边**零改动**就跟上了：`mode` 加进 `VNCamseqText.HeaderKeys`（排最前，
+它决定整段观感，读剧本时该第一眼看到）+ Schema 的 `Kw("mode", ...)`，
+header 参数的读写、存为预设、镜头窗口双向绑定全都是遍历 `HeaderKeys` 的通用逻辑。
+Parser 也不用改 —— kwarg 是通用解析，`mode:depth` 自动落进 `cmd.kwargs`。
+
+### 素材层的现实约束（顺带查出来的）
+
+背景素材 `Assets/Art/Images/Background/` 全是 **1484×900**，比 1920×1080 画布还小，
+**已经被放大 1.29 倍在用**。zoom 1.8 等于把 1484px 的图放到 2.33 倍，会明显发糊。
+立绘是 832×1216，纵向富余得多 —— 所以 `mode:char` 不只是演出选择，也是画质选择。
+（用户表示背景可以重出到 2560 以上，届时推镜倍率上限可以放宽。）
+
+另外模板里的 zoom **不要低于 1**：`ComputeOffset` 会钳制位置，但 zoom<1 会露出画布边缘，
+「拉远」类一律以 1.0 为底。
+
+### 改动文件
+
+| 文件 | 改了什么 |
+|---|---|
+| `VNCamera.cs` | `VNCamZoomMode` 枚举、`CharacterScaleFor` / `ContainerZoomFor` 两个静态公式、`depthRatio`、`SetMode()`、`ApplyCharacterZoom()` / `ResetCharacterZoom()`、`SetCharacterTargets()`、`CutWithMode()`、`PlayPath` / `PlayPathCo` 加 mode 参数、`DollyZoom` 改走运镜通道 |
+| `VNImageEffectController.cs` | `_camScaleMultiplier` 通道、`DOCamScaleMultiplier()`、`ResetCamScaleMultiplier()`、`ApplyScaleMultipliers()` 合并 + 共用 `_scaleTween` |
+| `Script/VNStage.cs` | `RefreshRegistries()` 里维护 `vnCamera.SetCharacterTargets()` |
+| `Script/VNScriptRunner.cs` | `CamseqCo` 解析 `mode:`（认不出告警并退回 both） |
+| `Editor/VNScenarioSchema.cs` | `CamZoomModes` 候选表 + camseq 的 `Kw("mode")` + 命令说明 |
+| `Editor/VNCamWaypoint.cs` | `HeaderKeys` 加 `mode`（排最前）、`VNCamseqText.ModeOf()` |
+| `Editor/VNCamseqEditorWindow.cs` | `_zoomMode` 窗口状态（进域重载存活组）、工具栏下拉、`CamState.charScale`、`TargetState` / 插值 / 立绘绘制 / 占位框、生成与解析文本 |
+
+### 没做的
+
+- **模板**：手册那批场景配方模板（约 45 条）留到下一轮，届时可以直接带上 `mode:`
+- **Lint**：`mode` 值合法性没加校验规则 —— 目前 camseq 一条 lint 规则都没有，
+  而两个编辑器都是下拉框、运行时也会告警，先不为它建一整个规则类别
+- **`{char2}` 第二占位符 / 路径点 `dutch:` 荷兰角**：手册点名过，留作后续

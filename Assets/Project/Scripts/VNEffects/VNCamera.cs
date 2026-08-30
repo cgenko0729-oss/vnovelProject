@@ -6,6 +6,19 @@ using UnityEngine;
 namespace VNEffects
 {
     /// <summary>
+    /// camseq 的缩放模式——「谁跟着 zoom 一起缩放」。
+    /// 对应演出手册第 1 章里被拆成三条的缩放手法（VN 的 2D 舞台上它们是不同的东西）：
+    ///   Both  トラックアップ/バック（TU/TB）推拉镜：背景+立绘同步等比放大。最常用，默认。
+    ///   Depth 带纵深的推拉镜：立绘比背景多缩放一点。真镜头推近时近处的人放大得比远景快，
+    ///         等比缩放其实是「数码变焦」；这一档才是手册说的「速度差是伪 3D 的全部秘密」。
+    ///   Bg    ドリーズーム/めまいショット 眩晕变焦：只有背景放大、立绘尺寸不变。
+    ///         杀伤力极强，全篇用 1~2 次。
+    ///   Char  ズームイン/アウト 变焦推拉：只放大立绘，**背景纹丝不动**（连平移都不做）。
+    ///         用于强调某人的反应；背景分辨率不够时也靠它做特写而不糊背景。
+    /// </summary>
+    public enum VNCamZoomMode { Both, Depth, Bg, Char }
+
+    /// <summary>
     /// 镜头运动语言库：把电影运镜做成一行调用。
     ///   PushIn()    缓推 —— 重要台词时画面缓慢放大，压迫感（可指定焦点）
     ///   SnapZoom()  急推 —— 惊愕瞬间快速 zoom in（可联动轻震）
@@ -20,8 +33,76 @@ namespace VNEffects
         [Header("镜头容器（场景生成器自动指向 ZoomRoot）")]
         public RectTransform target;
 
-        [Header("Dolly Zoom 时做反向缩放补偿的立绘")]
+        [Header("参与运镜缩放的立绘（VNStage 在角色进出场时自动维护）")]
         public List<VNImageEffectController> dollyCharacters = new List<VNImageEffectController>();
+
+        [Header("mode:depth 的视差系数——立绘额外倍率 = 1+(zoom-1)×k")]
+        [Range(0f, 1.5f)] public float depthRatio = DefaultDepthRatio;
+
+        /// <summary>
+        /// mode:depth 的默认视差系数。手册 13 章：「同一部作品内部保持一致比数值本身正确更重要」，
+        /// 所以这是一个全局值、不做逐点覆盖。编辑器预览读的也是这一个常量。
+        /// </summary>
+        public const float DefaultDepthRatio = 0.5f;
+
+        /// <summary>某个缩放模式下，立绘相对背景的额外倍率（编辑器预览共用同一份公式）</summary>
+        public static float CharacterScaleFor(VNCamZoomMode mode, float zoom,
+            float depthRatio = DefaultDepthRatio)
+        {
+            zoom = Mathf.Max(0.1f, zoom);
+            switch (mode)
+            {
+                case VNCamZoomMode.Depth: return 1f + (zoom - 1f) * depthRatio;
+                case VNCamZoomMode.Bg: return 1f / zoom;   // 立绘尺寸不变 = 抵消掉背景的放大
+                case VNCamZoomMode.Char: return zoom;      // 背景不动，放大量全落在立绘上
+                default: return 1f;
+            }
+        }
+
+        /// <summary>某个缩放模式下 ZoomRoot 实际用的倍率（Char 模式下背景完全不动）</summary>
+        public static float ContainerZoomFor(VNCamZoomMode mode, float zoom) =>
+            mode == VNCamZoomMode.Char ? 1f : Mathf.Max(0.1f, zoom);
+
+        /// <summary>本次路径的缩放模式（PlayPathCo / PlayPath 开始时设置，供各段共用）</summary>
+        VNCamZoomMode _mode = VNCamZoomMode.Both;
+
+        /// <summary>把某一段的立绘额外倍率派发给全部在场立绘（时长/缓动与镜头本段一致）</summary>
+        void ApplyCharacterZoom(float zoom, float duration, Ease ease)
+        {
+            if (_mode == VNCamZoomMode.Both) return;   // 默认模式不碰立绘倍率，等于零开销
+            float mult = CharacterScaleFor(_mode, zoom, depthRatio);
+            foreach (var c in dollyCharacters)
+                if (c != null) c.DOCamScaleMultiplier(mult, duration, ease);
+        }
+
+        /// <summary>
+        /// 切换本次运镜的缩放模式。**从非 both 切回 both 时必须在这里显式还原立绘倍率**——
+        /// ApplyCharacterZoom 在 both 下是空转（否则每个路径点都要给每个立绘起一条补间，
+        /// 顺带把说话者高亮的补间打断），所以还原没有别的地方可做。
+        /// camcut / camto / 复位走的都是这个入口，camseq 跑完不复位也不会污染下一条命令。
+        /// </summary>
+        void SetMode(VNCamZoomMode mode, float resetDuration = 0f)
+        {
+            if (mode == VNCamZoomMode.Both && _mode != VNCamZoomMode.Both)
+                ResetCharacterZoom(resetDuration);
+            _mode = mode;
+        }
+
+        /// <summary>还原全部立绘的运镜通道倍率（不碰说话者高亮那一路）</summary>
+        void ResetCharacterZoom(float duration)
+        {
+            foreach (var c in dollyCharacters)
+                if (c != null) c.DOCamScaleMultiplier(1f, duration);
+        }
+
+        /// <summary>VNStage 在角色进出场后调用，与 VNMoodGrading.SetCharacterTargets 同一时机</summary>
+        public void SetCharacterTargets(IEnumerable<VNImageEffectController> characters)
+        {
+            dollyCharacters.Clear();
+            if (characters == null) return;
+            foreach (var c in characters)
+                if (c != null) dollyCharacters.Add(c);
+        }
 
         Vector2 _basePos;
         bool _cached;
@@ -97,8 +178,11 @@ namespace VNEffects
             var seq = DOTween.Sequence()
                 .Append(target.DOScale(zoom, duration).SetEase(Ease.InOutQuad))
                 .SetTarget(this).SetLink(gameObject);
+            // 走运镜通道：直接写手动通道的话，玩家点下一句台词说话者高亮一改倍率，
+            // 立绘尺寸就会当场跳回去（与 camseq mode:bg 同一份公式）
+            _mode = VNCamZoomMode.Bg;   // 登记模式，下一条 both 运镜才知道要把立绘还原回去
             foreach (var c in dollyCharacters)
-                if (c != null) seq.Join(c.DOScaleMultiplier(1f / zoom, duration));
+                if (c != null) c.DOCamScaleMultiplier(1f / zoom, duration, Ease.InOutQuad);
             return seq;
         }
 
@@ -153,14 +237,29 @@ namespace VNEffects
         Vector2 OffsetFor(Vector2 point, float zoom) =>
             ComputeOffset(point, zoom, canvasHalf, overscan, clampToCanvas);
 
-        /// <summary>瞬切到镜头状态（"一开始就已经 zoom 在那里"的起手）</summary>
+        /// <summary>
+        /// 瞬切到镜头状态（camcut）。**公开入口一律按 both 处理并还原立绘倍率**——
+        /// camcut 语法里没有缩放模式，继承上一段 camseq 的模式只会莫名其妙。
+        /// </summary>
         public void Cut(Vector2 point, float zoom)
+        {
+            SetMode(VNCamZoomMode.Both);
+            CutWithMode(point, zoom);
+        }
+
+        /// <summary>带当前模式的瞬切（camseq 的叠化段内部用）</summary>
+        void CutWithMode(Vector2 point, float zoom)
         {
             Cache();
             if (target == null) return;
             KillTweens();
-            target.localScale = Vector3.one * zoom;
-            target.anchoredPosition = _basePos + OffsetFor(point, zoom);
+            float cz = ContainerZoomFor(_mode, zoom);
+            target.localScale = Vector3.one * cz;
+            // Char 模式下背景连平移都不做：zoom=1 时 ComputeOffset 仍会给出一个 overscan
+            // 级别的偏移，那点位移会让「背景纹丝不动」的语义打折
+            target.anchoredPosition = _mode == VNCamZoomMode.Char
+                ? _basePos : _basePos + OffsetFor(point, cz);
+            ApplyCharacterZoom(zoom, 0f, Ease.Linear);
         }
 
         /// <summary>单段直达：补间到指定镜头状态</summary>
@@ -169,6 +268,7 @@ namespace VNEffects
             Cache();
             if (target == null) return null;
             KillTweens();
+            SetMode(VNCamZoomMode.Both, duration);   // camto 没有模式概念，顺带还原上一段留下的立绘倍率
             return DOTween.Sequence()
                 .Append(target.DOScale(zoom, duration).SetEase(ease))
                 .Join(target.DOAnchorPos(_basePos + OffsetFor(point, zoom), duration).SetEase(ease))
@@ -181,11 +281,13 @@ namespace VNEffects
         /// 首个移动段 InSine（从静止缓起）、中间段 Linear（匀速）、末段 OutSine（缓停）；
         /// 单段路径用 InOutSine；每个路径点可用 ease 覆盖。
         /// </summary>
-        public Sequence PlayPath(System.Collections.Generic.List<Waypoint> points)
+        public Sequence PlayPath(System.Collections.Generic.List<Waypoint> points,
+            VNCamZoomMode mode = VNCamZoomMode.Both)
         {
             Cache();
             if (target == null || points == null || points.Count == 0) return null;
             KillTweens();
+            SetMode(mode);
             return BuildSegment(points, 0, points.Count);
         }
 
@@ -210,15 +312,18 @@ namespace VNEffects
             {
                 var wp = points[i];
                 float zoom = Mathf.Max(0.1f, wp.zoom);
-                var pos = _basePos + OffsetFor(wp.point, zoom);
+                float cz = ContainerZoomFor(_mode, zoom);
+                var pos = _mode == VNCamZoomMode.Char
+                    ? _basePos : _basePos + OffsetFor(wp.point, cz);
 
                 if (wp.duration <= 0.001f)
                 {
                     // 瞬切段
                     seq.AppendCallback(() =>
                     {
-                        target.localScale = Vector3.one * zoom;
+                        target.localScale = Vector3.one * cz;
                         target.anchoredPosition = pos;
+                        ApplyCharacterZoom(zoom, 0f, Ease.Linear);
                     });
                 }
                 else
@@ -229,7 +334,13 @@ namespace VNEffects
                         : i == lastMove ? Ease.OutSine
                         : Ease.Linear;
 
-                    seq.Append(target.DOScale(zoom, wp.duration).SetEase(ease));
+                    // 立绘倍率起独立补间（同 shake 的套路），不 Join 进本 Sequence：
+                    // 它的 target 是立绘的 VNImageEffectController，被那边 Kill 掉时
+                    // 不该连累整条镜头序列。时长与缓动照抄本段，观感上就是同步的
+                    float wpZoom = zoom, wpDur = wp.duration;
+                    Ease wpEase = ease;
+                    seq.AppendCallback(() => ApplyCharacterZoom(wpZoom, wpDur, wpEase));
+                    seq.Append(target.DOScale(cz, wp.duration).SetEase(ease));
                     seq.Join(target.DOAnchorPos(pos, wp.duration).SetEase(ease));
                 }
 
@@ -260,11 +371,13 @@ namespace VNEffects
         /// 连续的普通点仍合成一条 Sequence，保持与 PlayPath 相同的连贯缓动手感。
         /// </summary>
         public IEnumerator PlayPathCo(System.Collections.Generic.List<Waypoint> points,
-            float startFade = 0f, float endFade = 0f, VNScreenShake shaker = null)
+            float startFade = 0f, float endFade = 0f, VNScreenShake shaker = null,
+            VNCamZoomMode mode = VNCamZoomMode.Both)
         {
             Cache();
             if (target == null || points == null) yield break;
             KillTweens();
+            SetMode(mode);
 
             int i = 0;
             if (startFade > 0.001f && points.Count > 0)
@@ -342,11 +455,11 @@ namespace VNEffects
             var fade = EnsureFade();
             if (fade == null)
             {
-                Cut(point, Mathf.Max(0.1f, zoom)); // 退化为瞬切
+                CutWithMode(point, Mathf.Max(0.1f, zoom)); // 退化为瞬切
                 yield break;
             }
             yield return fade.CaptureCo();
-            Cut(point, Mathf.Max(0.1f, zoom));
+            CutWithMode(point, Mathf.Max(0.1f, zoom));
             var t = fade.FadeOut(duration);
             if (t != null) yield return t.WaitForCompletion();
         }
@@ -376,6 +489,7 @@ namespace VNEffects
             KillTweens();
             target.localScale = Vector3.one;
             target.anchoredPosition = _basePos;
+            SetMode(VNCamZoomMode.Both);
         }
 
         /// <summary>镜头复位（缩放/平移/立绘补偿全部还原）</summary>
@@ -388,8 +502,8 @@ namespace VNEffects
                 .Append(target.DOScale(1f, duration).SetEase(Ease.InOutSine))
                 .Join(target.DOAnchorPos(_basePos, duration).SetEase(Ease.InOutSine))
                 .SetTarget(this).SetLink(gameObject);
-            foreach (var c in dollyCharacters)
-                if (c != null) seq.Join(c.DOScaleMultiplier(1f, duration));
+            // 复位只还原运镜通道；写 DOScaleMultiplier 会顺手抹掉说话者高亮的倍率
+            SetMode(VNCamZoomMode.Both, duration);
             return seq;
         }
 

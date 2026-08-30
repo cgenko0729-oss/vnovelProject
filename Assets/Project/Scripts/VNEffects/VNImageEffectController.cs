@@ -438,7 +438,12 @@ namespace VNEffects
         Tween _tiltTween;
         Vector3 _origScale;
         bool _hasOrigScale;
-        float _scaleMultiplier = 1f;
+        // 缩放倍率分两个通道相乘，别合成一个 float——说话者高亮每句台词都写倍率，
+        // 运镜（camseq mode:）如果写同一个字段，就是「说一句话立绘尺寸跳回去」，
+        // 与当年调色被多方共用踩的是同一个坑（见 SetGrade / VNGradeLayer）。
+        float _scaleMultiplier = 1f;      // 说话者高亮 / 出场动画 / 手动（老 API）
+        float _camScaleMultiplier = 1f;   // 运镜通道（camseq 的缩放模式，只由 VNCamera 写）
+        Tween _scaleTween;                // 两通道共用一条补间：后写的杀掉前一条，避免两条 DOScale 打架
         float _lastBreathAmp = 0.013f, _lastBreathPeriod = 3.6f;
         float _lastTiltDeg = 0.7f, _lastTiltPeriod = 7f;
 
@@ -449,14 +454,17 @@ namespace VNEffects
             _hasOrigScale = true;
         }
 
-        /// <summary>当前基准缩放 = 初始缩放 × 缩放倍率（说话者高亮等设置）</summary>
+        /// <summary>当前基准缩放 = 初始缩放 × 手动倍率 × 运镜倍率</summary>
         public Vector3 CurrentBaseScale
         {
-            get { EnsureOrigScale(); return _origScale * _scaleMultiplier; }
+            get { EnsureOrigScale(); return _origScale * (_scaleMultiplier * _camScaleMultiplier); }
         }
 
-        /// <summary>静默重置缩放倍率（出场动画重播前调用）</summary>
+        /// <summary>静默重置手动通道倍率（出场动画重播前调用；不动运镜通道）</summary>
         public void ResetScaleMultiplier() => _scaleMultiplier = 1f;
+
+        /// <summary>静默重置运镜通道倍率（镜头复位时调用；不动手动通道）</summary>
+        public void ResetCamScaleMultiplier() => _camScaleMultiplier = 1f;
 
         /// <summary>
         /// 补间缩放倍率（说话者高亮用：说话者 1.03、旁听者 0.97）。
@@ -466,14 +474,42 @@ namespace VNEffects
         {
             EnsureOrigScale();
             _scaleMultiplier = mult;
+            return ApplyScaleMultipliers(duration, Ease.InOutSine);
+        }
+
+        /// <summary>
+        /// 补间**运镜通道**的缩放倍率（camseq 的 mode: 用：立绘比背景多缩/少缩/反向补偿）。
+        /// 与说话者高亮相乘而非互相覆盖，所以推完镜头再说话不会把尺寸打回去。
+        /// ease 传镜头本段的缓动，立绘才和背景同步起停。
+        /// </summary>
+        public Tween DOCamScaleMultiplier(float mult, float duration, Ease ease = Ease.InOutSine)
+        {
+            EnsureOrigScale();
+            _camScaleMultiplier = mult;
+            return ApplyScaleMultipliers(duration, ease);
+        }
+
+        /// <summary>两个通道合并后落到实际 localScale；瞬切段（时长≤0）直接写不补间</summary>
+        Tween ApplyScaleMultipliers(float duration, Ease ease)
+        {
             bool wasBreathing = _breathScaleX != null;
             _breathScaleX?.Kill();
             _breathScaleY?.Kill();
             _breathScaleX = _breathScaleY = null;
-            var tween = Rect.DOScale(CurrentBaseScale, duration)
-                .SetEase(Ease.InOutSine).SetTarget(this).SetLink(gameObject);
-            if (wasBreathing) tween.OnComplete(RestartBreathScale);
-            return tween;
+            _scaleTween?.Kill();
+
+            if (duration <= 0.001f)
+            {
+                Rect.localScale = CurrentBaseScale;
+                if (wasBreathing) RestartBreathScale();
+                _scaleTween = null;
+                return null;
+            }
+
+            _scaleTween = Rect.DOScale(CurrentBaseScale, duration)
+                .SetEase(ease).SetTarget(this).SetLink(gameObject);
+            if (wasBreathing) _scaleTween.OnComplete(RestartBreathScale);
+            return _scaleTween;
         }
 
         void RestartBreathScale()

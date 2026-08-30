@@ -238,7 +238,18 @@ namespace VNEffects.EditorTools
     public static class VNCamseqText
     {
         /// <summary>camseq 行上允许出现的 kwarg（顺序 = 生成顺序）</summary>
-        public static readonly string[] HeaderKeys = { "start", "startfade", "end", "endfade" };
+        // mode 排在最前：它决定整段的观感，读剧本时应该第一眼看到
+        public static readonly string[] HeaderKeys =
+            { "mode", "start", "startfade", "end", "endfade" };
+
+        /// <summary>读 header 里的缩放模式（没写或写错都按 both）</summary>
+        public static VNCamZoomMode ModeOf(Dictionary<string, string> header)
+        {
+            if (header != null && header.TryGetValue("mode", out string v) &&
+                System.Enum.TryParse(v, true, out VNCamZoomMode mode))
+                return mode;
+            return VNCamZoomMode.Both;
+        }
 
         /// <summary>
         /// 拆成 header kwargs + 路径点行列表。找不到 camseq 行时返回 false。

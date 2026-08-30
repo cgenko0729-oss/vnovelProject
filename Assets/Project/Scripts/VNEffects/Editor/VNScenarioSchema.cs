@@ -101,6 +101,9 @@ namespace VNEffects.EditorTools
               "speedlines", "shockwave", "filmgrain", "crt", "kenburns", "letterbox",
               "meteor", "skycloud", "focus" };
 
+        /// <summary>camseq 的缩放模式（与运行时 VNCamZoomMode 同名同序）</summary>
+        public static readonly string[] CamZoomModes = { "both", "depth", "bg", "char" };
+
         public static readonly string[] CamAnchors =
         {
             "topleft", "top", "topright", "left", "middle", "right",
@@ -255,7 +258,14 @@ namespace VNEffects.EditorTools
                 Pos("zoom", "zoom", VNParamSource.Number, def: "1.4", weight: 0.5f),
                 Pos("seconds", "sec", VNParamSource.Number, def: "0.8", weight: 0.5f),
                 Kw("ease", "ease", VNParamSource.Options, EaseNames));
-            Add("camseq", "Camera", "camseq [start:cut|fade] [end:fade] + '>' waypoint lines",
+            Add("camseq", "Camera",
+                "camseq [mode:both|depth|bg|char] [start:cut|fade] [end:fade] + '>' waypoint lines\n" +
+                "  mode 决定「谁跟着 zoom 缩放」：\n" +
+                "    both  背景+立绘一起（推拉镜 TU/TB，默认）\n" +
+                "    depth 立绘比背景多缩放一点（有纵深的推拉镜，靠速度差伪 3D）\n" +
+                "    bg    只有背景缩放、立绘尺寸不变（眩晕变焦，全篇 1~2 次）\n" +
+                "    char  只放大立绘、背景纹丝不动（强调某人的反应；也避免背景被放糊）",
+                Kw("mode", "mode", VNParamSource.Options, CamZoomModes, def: "both"),
                 Kw("start", "start", VNParamSource.Options, new[] { "cut", "fade" }),
                 Kw("startfade", "startfade", VNParamSource.Number, def: "0.6", weight: 0.5f),
                 Kw("end", "end", VNParamSource.Options, new[] { "fade" }),

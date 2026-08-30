@@ -968,6 +968,9 @@ namespace VNEffects
 
             // 情绪色调的分层目标：中途出场的角色也要立刻带上当前情绪的颜色
             if (mood != null) mood.SetCharacterTargets(characterFx);
+
+            // 运镜缩放（camseq mode:depth/bg/char）的目标，与情绪色调同一时机维护
+            if (vnCamera != null) vnCamera.SetCharacterTargets(characterFx);
         }
 
         // ------------------------------------------------------------------

@@ -48,6 +48,19 @@ namespace VNEffects.EditorTools
             "无", "cut（接 bg 转场盖屏瞬切）", "fade（当前画面叠化到首镜头）",
         };
 
+        // 顺序必须与 VNCamZoomMode 一致（下拉直接用枚举下标）
+        static readonly string[] ZoomModeNames =
+        {
+            "both 背景+立绘一起", "depth 立绘多缩一点", "bg 只缩背景", "char 只缩立绘",
+        };
+
+        static readonly GUIContent ZoomModeLabel = new GUIContent("缩放模式",
+            "谁跟着 zoom 缩放（camseq 的 mode:）：\n" +
+            "both  背景+立绘同步等比放大 —— 推拉镜 TU/TB，最常用，默认\n" +
+            "depth 立绘比背景多缩放（系数 0.5）—— 靠速度差造纵深，等比缩放其实是「数码变焦」\n" +
+            "bg    只有背景缩放、立绘尺寸不变 —— 眩晕变焦，杀伤力极强，全篇 1~2 次\n" +
+            "char  只放大立绘、背景纹丝不动 —— 强调某人的反应；也避免低分辨率背景被放糊");
+
         // ---- 与运行时一致的常量/词汇 ----
         static readonly string[] AnchorTokens =
             { "topleft", "top", "topright", "left", "middle", "right", "bottomleft", "bottom", "bottomright" };
@@ -86,6 +99,7 @@ namespace VNEffects.EditorTools
         [SerializeField] float _startFade = 0.6f;
         [SerializeField] bool _endFade;
         [SerializeField] float _endFadeDur = 0.6f;
+        [SerializeField] VNCamZoomMode _zoomMode = VNCamZoomMode.Both;  // camseq 的 mode:
         [SerializeField] float _scrub;          // 0~总时长 的预览时间
 
         ReorderableList _list;
@@ -673,6 +687,10 @@ namespace VNEffects.EditorTools
             // 开场 / 收尾叠化选项（对应 camseq 的 start: / end: 参数）
             using (new EditorGUILayout.HorizontalScope())
             {
+                GUILayout.Label(ZoomModeLabel, GUILayout.Width(58f));
+                _zoomMode = (VNCamZoomMode)EditorGUILayout.Popup(
+                    (int)_zoomMode, ZoomModeNames, GUILayout.Width(150f));
+                GUILayout.Space(12f);
                 GUILayout.Label("开场", GUILayout.Width(30f));
                 _startMode = (StartMode)EditorGUILayout.Popup(
                     (int)_startMode, StartModeNames, GUILayout.Width(190f));
@@ -1540,7 +1558,9 @@ namespace VNEffects.EditorTools
                     var center = new Vector2(SlotX[Mathf.Clamp(c.slot, 0, 2)], -60f) + offset;
                     float aspect = c.sprite.rect.width / Mathf.Max(1f, c.sprite.rect.height);
                     var half = new Vector2(height * aspect * 0.5f, height * 0.5f);
-                    DrawSpriteAt(rect, ViewPoint(view, center), half * view.zoom, c.sprite);
+                    // 位置跟容器走（立绘在 ZoomRoot 底下），尺寸再乘 mode 给的额外倍率
+                    DrawSpriteAt(rect, ViewPoint(view, center),
+                        half * view.zoom * view.CharScale, c.sprite);
                     drew = true;
                 }
             }
@@ -1549,8 +1569,9 @@ namespace VNEffects.EditorTools
             for (int s = 0; s < 3; s++)
             {
                 var p = CanvasToGui(rect, ViewPoint(view, new Vector2(SlotX[s], -60f)));
-                float hw = 880f * 0.28f * view.zoom * rect.width / 1920f;
-                float hh = 880f * 0.5f * view.zoom * rect.height / 1080f;
+                float cs = view.zoom * view.CharScale;
+                float hw = 880f * 0.28f * cs * rect.width / 1920f;
+                float hh = 880f * 0.5f * cs * rect.height / 1080f;
                 EditorGUI.DrawRect(new Rect(p.x - hw * 0.5f, p.y - hh, hw, hh * 2f),
                     new Color(1f, 1f, 1f, 0.05f));
             }
@@ -2652,7 +2673,19 @@ namespace VNEffects.EditorTools
         // 预览插值（与运行时同一套公式）
         // ==================================================================
 
-        struct CamState { public Vector2 offset; public float zoom; }
+        /// <summary>
+        /// 某一刻的镜头状态。<c>zoom</c> 是 ZoomRoot 的倍率（背景跟着它），
+        /// <c>charScale</c> 是立绘在此之上的**额外**倍率（camseq 的 mode: 决定）。
+        /// 0 视为 1——旧代码里有几处直接 <c>new CamState{offset=..,zoom=1}</c>，
+        /// 不兜底的话立绘会被画成 0 尺寸直接消失。
+        /// </summary>
+        struct CamState
+        {
+            public Vector2 offset;
+            public float zoom;
+            public float charScale;
+            public float CharScale => charScale <= 0.0001f ? 1f : charScale;
+        }
 
         Vector2 PreviewPoint(Waypoint w)
         {
@@ -2688,10 +2721,15 @@ namespace VNEffects.EditorTools
         CamState TargetState(Waypoint w)
         {
             float zoom = Mathf.Max(0.1f, w.zoom);
+            // 容器倍率与立绘额外倍率都走运行时那两个静态方法，避免预览和实机各算一套
+            float cz = VNCamera.ContainerZoomFor(_zoomMode, zoom);
             return new CamState
             {
-                zoom = zoom,
-                offset = VNCamera.ComputeOffset(PreviewPoint(w), zoom, CanvasHalf, Overscan, true),
+                zoom = cz,
+                charScale = VNCamera.CharacterScaleFor(_zoomMode, zoom),
+                // mode:char 背景纹丝不动（连 overscan 级的平移都不给），与 VNCamera.Cut 一致
+                offset = _zoomMode == VNCamZoomMode.Char ? Vector2.zero
+                    : VNCamera.ComputeOffset(PreviewPoint(w), cz, CanvasHalf, Overscan, true),
             };
         }
 
@@ -2881,6 +2919,7 @@ namespace VNEffects.EditorTools
                 {
                     offset = Vector2.LerpUnclamped(prev.offset, s.target.offset, k),
                     zoom = Mathf.LerpUnclamped(prev.zoom, s.target.zoom, k),
+                    charScale = Mathf.LerpUnclamped(prev.CharScale, s.target.CharScale, k),
                 };
                 return ps;
             }
@@ -2910,6 +2949,8 @@ namespace VNEffects.EditorTools
         string GenerateText()
         {
             var sb = new StringBuilder("camseq");
+            if (_zoomMode != VNCamZoomMode.Both)
+                sb.Append(" mode:").Append(_zoomMode.ToString().ToLower());
             if (_startMode == StartMode.Cut)
             {
                 sb.Append(" start:cut");
@@ -2977,6 +3018,10 @@ namespace VNEffects.EditorTools
             _startFade = camseq.KwF("startfade", 0.6f);
             _endFade = camseq.Kw("end") == "fade";
             _endFadeDur = camseq.KwF("endfade", 0.6f);
+            string modeKw = camseq.Kw("mode");
+            if (string.IsNullOrEmpty(modeKw) ||
+                !System.Enum.TryParse(modeKw, true, out _zoomMode))
+                _zoomMode = VNCamZoomMode.Both;
 
             _points.Clear();
             foreach (var def in camseq.camPoints)
