@@ -70,6 +70,8 @@ namespace VNEffects
         readonly List<int> _candidateIdx = new List<int>();
 
         // UI
+        VNTouchCursor _cursor;
+        readonly List<Image> _itemButtons = new List<Image>();
         RectTransform _hud;
         Image _barFill;
         TextMeshProUGUI _stageText, _timerText, _hintText;
@@ -168,6 +170,8 @@ namespace VNEffects
 
             _lastMouse = screen;
             _hasLastMouse = true;
+
+            _cursor?.SetState(_hoverZone != null, held);
 
             RefreshHud();
             RefreshZoneMarkers();
@@ -400,6 +404,7 @@ namespace VNEffects
 
             WriteFlags();
             DestroyZoneOverlay();     // 结算台词已经在说了，调试框不该还挂在脸上
+            _cursor?.Dispose();       // 系统光标立刻还回去，别等模块销毁
 
             VNInteractionFeedback endFb =
                 outcome == _def.outcomeSatisfied ? _def.endSatisfied :
@@ -442,13 +447,15 @@ namespace VNEffects
             _endExpressionKept = false;
             RestoreExpression();
             DestroyZoneOverlay();
+            _cursor?.Dispose();
         }
 
         void OnDestroy()
         {
-            // 保底：任何路径销毁都不留下改过的表情
+            // 保底：任何路径销毁都不留下改过的表情，也绝不留下消失的鼠标指针
             if (_phase != Phase.Ending) RestoreExpression();
             DestroyZoneOverlay();
+            _cursor?.Dispose();
         }
 
         /// <summary>
@@ -565,11 +572,96 @@ namespace VNEffects
             hr.anchorMin = hr.anchorMax = new Vector2(0.5f, 0.86f);
             hr.sizeDelta = new Vector2(900f, 48f);
 
+            if (_usableItems.Count > 1) BuildItemBar(root);
             if (_def.allowManualEnd) BuildEndButton(root);
+
+            // 光标最后建 → 层级最上面，压在道具栏和结束钮之上
+            var cursorGo = new GameObject("TouchCursor", typeof(RectTransform));
+            cursorGo.transform.SetParent(root, false);
+            _cursor = cursorGo.AddComponent<VNTouchCursor>();
+            _cursor.Initialize(root, UiCamera);
+            _cursor.SetItem(_item);
 
             RefreshHud();
             _hud.localScale = Vector3.one * 0.85f;
             _hud.DOScale(1f, 0.3f).SetEase(Ease.OutBack).SetUpdate(true).SetLink(gameObject);
+        }
+
+        /// <summary>
+        /// 右侧竖排道具栏。**放右边不放底部**：底部是对话框的地盘，
+        /// 而互动过程中角色随时会说话。
+        /// </summary>
+        void BuildItemBar(RectTransform root)
+        {
+            const float Cell = 104f, Gap = 12f;
+            float height = _usableItems.Count * Cell + (_usableItems.Count - 1) * Gap + 24f;
+
+            // 底板 raycastTarget=true：整条栏都不该触发抚摸，
+            // 也让 IsPointerOverModuleUi 只查 root 直接子级就够
+            var bar = CreateImage("ItemBar", root, VNProceduralTextures.RoundedRectSprite,
+                PanelColor);
+            var barImg = bar.GetComponent<Image>();
+            barImg.type = Image.Type.Sliced;
+            barImg.raycastTarget = true;
+            bar.anchorMin = bar.anchorMax = new Vector2(1f, 0.5f);
+            bar.pivot = new Vector2(1f, 0.5f);
+            bar.anchoredPosition = new Vector2(-40f, 60f);
+            bar.sizeDelta = new Vector2(Cell + 24f, height);
+
+            _itemButtons.Clear();
+            for (int i = 0; i < _usableItems.Count; i++)
+            {
+                var item = _usableItems[i];
+                var cell = CreateImage("Item_" + item.id, bar,
+                    VNProceduralTextures.RoundedRectSprite, Color.clear);
+                var cellImg = cell.GetComponent<Image>();
+                cellImg.type = Image.Type.Sliced;
+                cellImg.raycastTarget = true;
+                cell.anchorMin = cell.anchorMax = new Vector2(0.5f, 1f);
+                cell.pivot = new Vector2(0.5f, 1f);
+                cell.anchoredPosition = new Vector2(0f, -12f - i * (Cell + Gap));
+                cell.sizeDelta = new Vector2(Cell, Cell);
+                _itemButtons.Add(cellImg);
+
+                if (item.icon != null)
+                {
+                    var icon = CreateImage("Icon", cell, item.icon, Color.white);
+                    icon.GetComponent<Image>().preserveAspect = true;
+                    icon.anchorMin = new Vector2(0.1f, 0.22f);
+                    icon.anchorMax = new Vector2(0.9f, 0.95f);
+                    icon.offsetMin = icon.offsetMax = Vector2.zero;
+                }
+
+                var label = CreateText("Label", cell, 18, new Color(1f, 1f, 1f, 0.85f),
+                    item.Label);
+                var lr = (RectTransform)label.transform;
+                lr.anchorMin = new Vector2(0f, 0f);
+                lr.anchorMax = new Vector2(1f, 0.2f);
+                lr.offsetMin = lr.offsetMax = Vector2.zero;
+
+                var btn = cell.gameObject.AddComponent<Button>();
+                btn.targetGraphic = cellImg;
+                var captured = item;
+                btn.onClick.AddListener(() => SelectItem(captured));
+            }
+            RefreshItemBar();
+        }
+
+        void SelectItem(VNInteractionItem item)
+        {
+            if (_phase != Phase.Playing || item == null) return;
+            _item = item;
+            _cursor?.SetItem(item);
+            _audio?.PlaySe("se1");
+            RefreshItemBar();
+        }
+
+        void RefreshItemBar()
+        {
+            for (int i = 0; i < _itemButtons.Count && i < _usableItems.Count; i++)
+                _itemButtons[i].color = _usableItems[i] == _item
+                    ? new Color(1f, 0.45f, 0.62f, 0.45f)      // 选中
+                    : new Color(1f, 1f, 1f, 0.06f);
         }
 
         void BuildEndButton(RectTransform root)
