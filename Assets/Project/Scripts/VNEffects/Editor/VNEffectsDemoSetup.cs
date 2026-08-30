@@ -13,8 +13,8 @@ namespace VNEffects.EditorTools
 {
     /// <summary>
     /// 场景生成器（两个菜单）：
-    ///   Tools → VN Effects → Create Demo Scene        键盘演示场景（体验全部特效）
-    ///   Tools → VN Effects → Create Script Demo Scene 剧本演示场景（VNStage+VNScriptRunner）
+    ///   Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene        键盘演示场景（体验全部特效）
+    ///   Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 剧本演示场景（VNStage+VNScriptRunner）
     /// 两者共享 BuildStageRig()：相机/后处理/Canvas/容器层级/全部特效管理器。
     /// </summary>
     public static class VNEffectsDemoSetup
@@ -342,7 +342,7 @@ namespace VNEffects.EditorTools
         // 菜单一：键盘演示场景
         // ==================================================================
 
-        [MenuItem("Tools/VN Effects/Create Demo Scene")]
+        [MenuItem("Tools/VN Effects/演示场景 Demo Scenes/重建特效演示场景 Create Demo Scene", priority = 180)]
         public static void CreateDemoScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -447,7 +447,7 @@ namespace VNEffects.EditorTools
         // 菜单二：剧本演示场景（VNStage + VNScriptRunner）
         // ==================================================================
 
-        [MenuItem("Tools/VN Effects/Create Script Demo Scene")]
+        [MenuItem("Tools/VN Effects/演示场景 Demo Scenes/重建剧本演示场景 Create Script Demo Scene", priority = 181)]
         public static void CreateScriptDemoScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -701,7 +701,7 @@ namespace VNEffects.EditorTools
             if (config == null)
                 Debug.LogWarning("[VNScript] 未找到 " + VNGameConfig.AssetPath +
                                  "：背景/音频/入口剧本等人工绑定仍然只存在场景里，下次重建会丢失。\n" +
-                                 "建议执行 Tools → VN Effects → Game Config → Import From Scene " +
+                                 "建议执行 Tools → VN Effects → 游戏配置 Game Config → 从场景导入 Import From Scene " +
                                  "把当前绑定搬进资产。");
             else
                 Debug.Log($"[VNScript] 已挂载内容配置 {VNGameConfig.AssetPath}：" +

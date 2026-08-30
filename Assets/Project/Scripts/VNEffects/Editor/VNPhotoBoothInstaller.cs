@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -27,7 +27,7 @@ namespace VNEffects.EditorTools
         const string BackdropDir = RootDir + "/Backdrops";
         const string ThemeDir = RootDir + "/Themes";
 
-        [MenuItem("Tools/VN Effects/Install Photo Booth Module To Scene", priority = 212)]
+        [MenuItem("Tools/VN Effects/场景装机 Install To Scene/拍大头照 Photo Booth Module", priority = 144)]
         public static void Install()
         {
             string report = InstallCore(out bool ok);
@@ -56,7 +56,7 @@ namespace VNEffects.EditorTools
             {
                 return "当前场景里找不到 VNEventRegistry。\n\n" +
                        "事件模块要挂在注册表下面。请先打开剧本场景（含 VNEventRegistry 的那个），" +
-                       "或用 Tools → VN Effects → Create Script Demo Scene 造一个新场景。";
+                       "或用 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 造一个新场景。";
             }
 
             var report = new List<string>();

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -28,7 +28,7 @@ namespace VNEffects.EditorTools
         // 创建 / 定位
         // ==================================================================
 
-        [MenuItem("Tools/VN Effects/Game Config/Create or Select", priority = 200)]
+        [MenuItem("Tools/VN Effects/游戏配置 Game Config/创建或选中配置资产 Create or Select", priority = 100)]
         public static void CreateOrSelect()
         {
             var config = LoadOrCreate();
@@ -70,7 +70,7 @@ namespace VNEffects.EditorTools
         // 从当前场景导入（一次性搬家）
         // ==================================================================
 
-        [MenuItem("Tools/VN Effects/Game Config/Import From Scene", priority = 201)]
+        [MenuItem("Tools/VN Effects/游戏配置 Game Config/从场景导入 Import From Scene", priority = 101)]
         public static void ImportFromScene()
         {
             var config = LoadOrCreate();
@@ -174,7 +174,7 @@ namespace VNEffects.EditorTools
         // 扫描资产目录（约定优于配置）
         // ==================================================================
 
-        [MenuItem("Tools/VN Effects/Game Config/Rescan Asset Folders", priority = 202)]
+        [MenuItem("Tools/VN Effects/游戏配置 Game Config/重扫素材目录 Rescan Asset Folders", priority = 102)]
         public static void RescanAssetFolders()
         {
             var config = LoadOrCreate();

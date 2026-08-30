@@ -3,7 +3,7 @@
 > 本指南假设你的 Hierarchy **完全是空的**，从第一个物体开始手把手搭出完整的
 > 剧本演示场景（VNScriptDemo 同款）。每一步都附**为什么要这么做**的原理说明。
 >
-> ⚠️ 实际上菜单 **Tools → VN Effects → Create Script Demo Scene** 会自动完成本指南
+> ⚠️ 实际上菜单 **Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene** 会自动完成本指南
 > 的全部步骤。手动搭建的价值在于：① 彻底理解系统结构；② 想自定义层级/参数时知道
 > 哪里能改、哪里不能动。照着做一遍，你对整个特效系统的理解会完全不同。
 
@@ -394,7 +394,7 @@ Canvas 下创建 `DialogueBox`（RectTransform），锚定底部：
 运行时创建的文字由代码自动取 `VNFont.Asset`（随包 Noto Sans SC 动态 SDF，
 中文开箱即用）；手动在场景里摆的 TMP 文字请把 Font Asset 指到
 `Resources/VNFonts/NotoSansSC-Dynamic`（没有就先跑菜单
-Tools → VN Effects → Create TMP Font Asset 生成）。
+Tools → VN Effects → 字体 Fonts → 生成 TMP 字体资产 Create TMP Font Asset 生成）。
 
 ### 7.2 HintText（可选）
 
@@ -543,7 +543,7 @@ show 亚里沙 at:center with:DissolveGlow
 | 转场时背景没换 | VNStage.backgrounds 里没有对应 id | 检查 id 与剧本 `bg` 参数一致 |
 | 汉字显示为方块 | TMP 文字没指含 CJK 的字体资产 | Font Asset 指 NotoSansSC-Dynamic（7.1 节） |
 | 运动中背景边缘露底色 | 背景没设 ±60px 溢出 | 4.1 节 offset 设置 |
-| 修改场景后想恢复"标准答案" | — | 直接跑 Tools → VN Effects → Create Script Demo Scene 重新生成对照 |
+| 修改场景后想恢复"标准答案" | — | 直接跑 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 重新生成对照 |
 
 ---
 

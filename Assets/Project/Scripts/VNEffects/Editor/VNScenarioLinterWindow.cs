@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -6,13 +6,13 @@ using UnityEngine;
 namespace VNEffects.EditorTools
 {
     /// <summary>
-    /// 剧本校验结果窗口：Tools → VN Effects → Lint Scenarios。
+    /// 剧本校验结果窗口：Tools → VN Effects → 剧本检查 Lint Scenarios。
     /// 双击一行直接打开对应 .vn.txt 并定位到出错行。
     /// 分析逻辑全在 VNScenarioLinter，本窗口只负责显示与交互。
     /// </summary>
     public class VNScenarioLinterWindow : EditorWindow
     {
-        [MenuItem("Tools/VN Effects/Lint Scenarios %#l", priority = 100)]
+        [MenuItem("Tools/VN Effects/剧本检查 Lint Scenarios %#l", priority = 2)]
         public static void Open()
         {
             var window = GetWindow<VNScenarioLinterWindow>("剧本校验");

@@ -246,7 +246,7 @@
   预烘焙资产（Resources/VNFonts/NotoSansSC-Dynamic）→ 随包 OTF 运行时动态创建
   → OS 中文字体。动态多图集模式按需光栅化字形，`Prewarm(text)` 可把整段文本
   （如剧本全文，Runner 已接）预热进图集避免播放期卡顿。
-- **VNFontAssetBuilder**：菜单 Tools → VN Effects → Create TMP Font Asset，
+- **VNFontAssetBuilder**：菜单 Tools → VN Effects → 字体 Fonts → 生成 TMP 字体资产 Create TMP Font Asset，
   生成持久化字体资产（材质/图集挂子资产）。**编辑期创建、随场景保存的 TMP
   文字必须用它**（`EnsureFontAsset()`），运行时临时资产存进场景会变 Missing。
 - 扩展：换字体 = 替换 Resources/VNFonts 下的 OTF + 重新生成预烘焙资产；
@@ -270,7 +270,7 @@
   `localizedText`，显示走 `TextOf()`，缺译回退中文。
   **红线：event 结果行、角色 id、flag 名是逻辑标识符，永远不进翻译**；
   choice 选项按索引匹配所以只翻显示文本是安全的。
-- **VNLocalizationTools**：Tools → VN Effects → Localization。
+- **VNLocalizationTools**：Tools → VN Effects → 本地化 Localization。
   Extract = 生成/增量合并翻译表（已译按 key 保留，中文改动的旧译文挪到
   孤儿注释区）；Validate = 缺译统计。日常工作流：改剧本 → Extract → 填表 →
   Validate。
@@ -392,7 +392,7 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   示例剧本 `Assets/Scenarios/QuizDemo.vn.txt`（随机抽题/指定题号/成绩 flag 细分）。
 - **扩展**：想打乱选项顺序，在 `ShowQuestion()` 里洗一次显示索引映射、
   `Answer()` 换算回原始下标即可，是加法不是改法。
-- `Editor/VNQuizInstaller.cs`（Tools → VN Effects → Install Quiz Module To Scene）：
+- `Editor/VNQuizInstaller.cs`（Tools → VN Effects → 场景装机 Install To Scene → 限时问答 Quiz Module）：
   **增量装进当前场景**，不走 `Create Script Demo Scene` 的 `NewScene(EmptyScene)` 重造，
   手工整理过的 Hierarchy 不会丢。模板物体**必须带 RectTransform**
   （`BuildUi` 直接 `(RectTransform)transform`）——这正是不该手工接的原因。
@@ -675,13 +675,13 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 
 | 文件 | 菜单/入口 | 职责 |
 |---|---|---|
-| VNEffectsDemoSetup.cs | Tools → VN Effects → Create Demo Scene / **Create Script Demo Scene** | 两个场景的一键生成器：搭容器层级、连全部组件引用、建材质/角色/任务资产、写演示剧本。**加新运行时组件后要在这里接线并重建场景** |
-| VNScenarioEditorWindow.cs | Tools → VN Effects → Scenario Editor | 剧本可视化编辑器主窗口：行列表 UI、分层添加菜单、Sprite 缩略图浏览器、分类颜色、▶ 从选中行播放（SessionState Bridge） |
+| VNEffectsDemoSetup.cs | Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene / **Create Script Demo Scene** | 两个场景的一键生成器：搭容器层级、连全部组件引用、建材质/角色/任务资产、写演示剧本。**加新运行时组件后要在这里接线并重建场景** |
+| VNScenarioEditorWindow.cs | Tools → VN Effects → 剧本编辑器 Scenario Editor | 剧本可视化编辑器主窗口：行列表 UI、分层添加菜单、Sprite 缩略图浏览器、分类颜色、▶ 从选中行播放（SessionState Bridge） |
 | VNScenarioDoc.cs | （数据层） | `.vn.txt ↔ VNRow 列表`双向转换（注释/空行/未知 token 原样保留）、`Validate()` 静态校验、`SourceLineForRow` 行号换算（choice/event 选项行、camseq 路径点都占行） |
 | VNScenarioSchema.cs | （模式表） | **命令参数的单一数据来源**：每个命令的位置/kwarg 参数、控件类型（VNParamSource）、默认值。加命令时在这里登记，编辑器 UI 自动长出来 |
-| VNCamseqEditorWindow.cs | Tools → VN Effects → （镜头编辑器） | camseq 路径的可视化编辑：Game 视图取点、路径预览、交叉叠化支持 |
-| VNCharacterVisualPreviewWindow.cs | Tools → VN Effects → （角色预览） | 角色立绘/头像/眨眼/口型的实时预览与标定，**确认后才写入资产** |
-| VNWeatherPreviewWindow.cs | Tools → VN Effects → Weather Preview | 飘落天气调参：编辑模式播放翻转帧预览（判断叶型像不像就看这里——宽度随帧呼吸 + 背面变暗），Play Mode 滑杆实时应用到场景，另存资产 + 一键登记进 VNGameConfig |
+| VNCamseqEditorWindow.cs | Tools → VN Effects → 镜头编排 Camera Sequence Editor | camseq 路径的可视化编辑：Game 视图取点、路径预览、交叉叠化支持 |
+| VNCharacterVisualPreviewWindow.cs | Tools → VN Effects → 预览 Preview → 角色立绘预览 Character Visual Preview | 角色立绘/头像/眨眼/口型的实时预览与标定，**确认后才写入资产** |
+| VNWeatherPreviewWindow.cs | Tools → VN Effects → 预览 Preview → 天气预览 Weather Preview | 飘落天气调参：编辑模式播放翻转帧预览（判断叶型像不像就看这里——宽度随帧呼吸 + 背面变暗），Play Mode 滑杆实时应用到场景，另存资产 + 一键登记进 VNGameConfig |
 | VNAiStudioWindow.cs | Tools → VN Effects → AI → **AI Talk Studio** | AI 试聊台主窗口（一一二章）：左改参数 / 中聊天流 / 右 **system prompt 实时预览**。不进 Play Mode 调人格与提示词 |
 | VNAiStudioDraft.cs | （草稿层） | 人格资产的内存副本。**用临时 SO 而不是自建字段**：`SerializedObject` 迭代画＝零 UI 代码就有全部字段，加新字段自动跟上，`VNAiConversation` 也直接能吃。写回逐属性 `CopyFromSerializedProperty`（**不能用 `CopySerialized`**，它连 `m_Name` 一起抄成「xxx(Clone)」） |
 | VNAiStudioSession.cs | （会话层） | 发请求 / 解析 / 轮次记录 / 重跑 / 分岔。域重载后靠轮次记录 `BuildRequest`+`RecordReply` **重建历史**（那两个方法只是组装与追加，不发请求） |
@@ -692,8 +692,8 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNAssetUi.cs | （共用层） | 素材界面三边（drawer / 分页 Inspector / 浏览器窗口）共用的绘制与预览：Sprite 缩略图、音频试听、波形、拖拽接收、搜索匹配、Rect 切割。**加素材类界面先来这里找零件**，别各画各的 |
 | VNConfigEntryDrawers.cs | （PropertyDrawer） | 背景 / CG / 音频 / UI 皮肤四个条目的紧凑单行绘制。**挂在类型上**，所以 `VNGameConfig`、`VNStage`、`VNAudio` 三处的同名列表一起受益 |
 | VNGameConfigEditor.cs | （CustomEditor） | `VNGameConfig` 的九页分页 Inspector + 智能列表（搜索 / 分页 / 行操作 / id 告警 / 批量拖入） |
-| VNAssetBrowserWindow.cs | Tools → VN Effects → **Asset Browser** | 素材浏览器：大缩略图网格 + 音频波形列表（均虚拟化）+ 详情栏 + 只看未登记 |
-| VNTextureImportDefaults.cs | （AssetPostprocessor）+ Tools → VN Effects → Textures → Apply Sprite Settings To Selection | 素材目录里首次导入的图自动设 `Sprite (2D and UI)` + `Single`。**白名单目录**（`Roots` 数组，新开素材目录往里补一行），**绝不能全项目一刀切**——`Art/Models/**` 下的法线贴图按 Sprite 导入会让光照全错 |
+| VNAssetBrowserWindow.cs | Tools → VN Effects → **素材浏览器 Asset Browser** | 素材浏览器：大缩略图网格 + 音频波形列表（均虚拟化）+ 详情栏 + 只看未登记 |
+| VNTextureImportDefaults.cs | （AssetPostprocessor）+ Tools → VN Effects → 贴图 Textures → 套用 Sprite 导入设置到选中项 Apply Sprite Settings | 素材目录里首次导入的图自动设 `Sprite (2D and UI)` + `Single`。**白名单目录**（`Roots` 数组，新开素材目录往里补一行），**绝不能全项目一刀切**——`Art/Models/**` 下的法线贴图按 Sprite 导入会让光照全错 |
 
 **贴图导入默认值的坑**（一二〇章）：`AssetImporter.importSettingsMissing`
 **不等于「没有 .meta」** —— meta 存在却不含完整 importer 设置块时它同样返回 true，

@@ -1,10 +1,10 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 namespace VNEffects.EditorTools
 {
     /// <summary>
-    /// 飘落天气预览与调参窗口：Tools → VN Effects → Weather Preview。
+    /// 飘落天气预览与调参窗口：Tools → VN Effects → 预览 Preview → 天气预览 Weather Preview。
     ///
     /// 【为什么要这个窗口】
     /// 飘落效果的参数（密度/风力/摆幅/翻转速度/三层景深…）光看数字没人调得出来，
@@ -16,7 +16,7 @@ namespace VNEffects.EditorTools
     /// </summary>
     public class VNWeatherPreviewWindow : EditorWindow
     {
-        [MenuItem("Tools/VN Effects/Weather Preview", priority = 110)]
+        [MenuItem("Tools/VN Effects/预览 Preview/天气预览 Weather Preview", priority = 170)]
         static void Open()
         {
             var w = GetWindow<VNWeatherPreviewWindow>("飘落天气");

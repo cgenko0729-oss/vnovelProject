@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -90,10 +90,10 @@ namespace VNEffects
             },
         };
 
-        [MenuItem("Tools/VN Effects/UI Skins/Export Soft Gradient Skins (白渐变/粉渐变/黑渐变)")]
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/导出无框渐变皮肤（白·粉·黑）Export Soft Gradient Skins", priority = 121)]
         public static void Export() => Run(overwrite: false);
 
-        [MenuItem("Tools/VN Effects/UI Skins/Export Soft Gradient Skins (覆盖重建)")]
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/导出无框渐变皮肤·覆盖重建 Export Soft Gradient Skins (Overwrite)", priority = 122)]
         public static void Rebuild()
         {
             if (!EditorUtility.DisplayDialog("覆盖重建柔和渐变皮肤",

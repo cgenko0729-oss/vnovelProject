@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,7 +9,7 @@ namespace VNEffects.EditorTools
     /// 把液体喷溅的两个组件**增量装进当前场景**，不重建场景。
     ///
     /// 【为什么需要它】
-    /// Tools → VN Effects → Create Script Demo Scene 会 NewScene(EmptyScene) 从零重造，
+    /// Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 会 NewScene(EmptyScene) 从零重造，
     /// 手工整理过的 Hierarchy 与场景上的调参会全部丢失。而 VNStage.AutoWire 只能
     /// 「找得到才接」——场景里本来就没有 VNWetScreen / VNLiquidSplash 时，
     /// liquid 命令会静默无效果（连报错都没有，因为每个分支都 `if (xxx == null) break;`）。
@@ -21,7 +21,7 @@ namespace VNEffects.EditorTools
     /// </summary>
     public static class VNLiquidInstaller
     {
-        [MenuItem("Tools/VN Effects/Install Liquid Splash To Scene", priority = 211)]
+        [MenuItem("Tools/VN Effects/场景装机 Install To Scene/液体喷溅 Liquid Splash", priority = 143)]
         public static void Install()
         {
             var stage = Object.FindFirstObjectByType<VNStage>(FindObjectsInactive.Include);
@@ -30,7 +30,7 @@ namespace VNEffects.EditorTools
                 EditorUtility.DisplayDialog("VN Liquid",
                     "当前场景里找不到 VNStage。\n\n" +
                     "请先打开剧本场景（含 VNStage 的那个），" +
-                    "或用 Tools → VN Effects → Create Script Demo Scene 造一个新场景。", "OK");
+                    "或用 Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 造一个新场景。", "OK");
                 return;
             }
 

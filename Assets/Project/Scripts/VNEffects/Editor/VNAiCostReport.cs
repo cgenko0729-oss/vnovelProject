@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -11,7 +11,7 @@ namespace VNEffectsEditor
 {
     /// <summary>
     /// AI 花费累计报表：扫 `AiTalkLogs/`（含 `Editor/` 子目录）的全部 json，
-    /// 按月 / 日 / 人格 / 模型 / 来源聚合。菜单 Tools → VN Effects → AI → Cost Report。
+    /// 按月 / 日 / 人格 / 模型 / 来源聚合。菜单 Tools → VN Effects → AI → 花费报表 Cost Report。
     ///
     /// 【为什么要有它】
     ///   单场成本在每份日志里都有，但「这个月到底花了多少」得手工把几十份加起来，
@@ -25,7 +25,7 @@ namespace VNEffectsEditor
     /// </summary>
     public class VNAiCostReport : EditorWindow
     {
-        [MenuItem("Tools/VN Effects/AI/Cost Report", false, 431)]
+        [MenuItem("Tools/VN Effects/AI/花费报表 Cost Report", false, 196)]
         public static void Open()
         {
             var w = GetWindow<VNAiCostReport>("AI 花费报表");

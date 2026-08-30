@@ -17,7 +17,7 @@ namespace VNEffects.EditorTools
     ///   - 路径点列表：拖拽排序、zoom/时长/缓动编辑
     ///   - 预览：进度条拖动或 ▶ 播放，取景框按真实缓动公式沿路径移动
     ///   - 文本双向：一键生成 camseq 文本到剪贴板；粘贴已有文本反向载入继续调
-    /// 菜单：Tools → VN Effects → Camera Sequence Editor
+    /// 菜单：Tools → VN Effects → 镜头编排 Camera Sequence Editor
     /// </summary>
     public class VNCamseqEditorWindow : EditorWindow
     {
@@ -210,7 +210,7 @@ namespace VNEffects.EditorTools
 
         public const string LibraryPath = "Assets/VNEffects/CamseqPresets.asset";
 
-        [MenuItem("Tools/VN Effects/Camera Sequence Editor")]
+        [MenuItem("Tools/VN Effects/镜头编排 Camera Sequence Editor", priority = 4)]
         static void Open()
         {
             var win = GetWindow<VNCamseqEditorWindow>("镜头编排");

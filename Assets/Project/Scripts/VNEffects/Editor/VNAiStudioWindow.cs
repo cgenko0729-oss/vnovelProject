@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using VNEffects;
@@ -7,7 +7,7 @@ namespace VNEffectsEditor
 {
     /// <summary>
     /// AI 试聊台：不进 Play Mode 就能改人格、试聊、看提示词、调记忆。
-    /// 菜单 Tools → VN Effects → AI → AI Talk Studio。
+    /// 菜单 Tools → VN Effects → AI → AI 试聊台 AI Talk Studio。
     ///
     /// 【三栏各自解决什么】
     ///   左  改参数——改的是**草稿**（内存副本），资产不动，满意了才「写回资产」
@@ -24,7 +24,7 @@ namespace VNEffectsEditor
     /// </summary>
     public class VNAiStudioWindow : EditorWindow, ISerializationCallbackReceiver
     {
-        [MenuItem("Tools/VN Effects/AI/AI Talk Studio", false, 430)]
+        [MenuItem("Tools/VN Effects/AI/AI 试聊台 AI Talk Studio", false, 195)]
         public static void Open()
         {
             var w = GetWindow<VNAiStudioWindow>("AI 试聊台");

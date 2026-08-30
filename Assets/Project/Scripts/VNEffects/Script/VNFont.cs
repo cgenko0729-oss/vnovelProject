@@ -17,7 +17,7 @@ namespace VNEffects
     ///
     /// 每种语言的解析顺序（三级兜底，保证任何情况下都能显示）：
     ///   1. 预烘焙动态 TMP 字体资产（Assets/Resources/VNFonts/&lt;名字&gt;-Dynamic.asset，
-    ///      由 Tools → VN Effects → Create TMP Font Asset 生成，多图集动态填充）
+    ///      由 Tools → VN Effects → 字体 Fonts → 生成 TMP 字体资产 Create TMP Font Asset 生成，多图集动态填充）
     ///   2. 运行时从随包字体文件（Resources/VNFonts/&lt;名字&gt;-Regular）动态创建 TMP 字体资产
     ///   3. 运行时从操作系统字体（雅黑 / Yu Gothic 等）动态创建
     /// 三级全失败时回退到该语言登记的 fallback 档案（见 Profile.fallback）。

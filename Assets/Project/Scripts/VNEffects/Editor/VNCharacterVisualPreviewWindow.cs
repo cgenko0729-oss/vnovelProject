@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -88,7 +88,7 @@ namespace VNEffects.EditorTools
         Vector2 _dragStartMouse;
         Vector2 _dragStartOffset;
 
-        [MenuItem("Tools/VN Effects/Character Visual Preview")]
+        [MenuItem("Tools/VN Effects/预览 Preview/角色立绘预览 Character Visual Preview", priority = 171)]
         static void Open()
         {
             var window = GetWindow<VNCharacterVisualPreviewWindow>("角色视觉预览");
@@ -96,16 +96,16 @@ namespace VNEffects.EditorTools
             window.Show();
         }
 
-        [MenuItem("Assets/VN Effects/Open Character Visual Preview", true)]
+        [MenuItem("Assets/VN Effects/角色立绘预览 Open Character Visual Preview", true)]
         static bool ValidateOpenSelected() => Selection.activeObject is VNCharacterDef;
 
-        [MenuItem("Assets/VN Effects/Open Character Visual Preview")]
+        [MenuItem("Assets/VN Effects/角色立绘预览 Open Character Visual Preview")]
         static void OpenSelected()
         {
             OpenFor(Selection.activeObject as VNCharacterDef);
         }
 
-        [MenuItem("CONTEXT/VNCharacterDef/Open Character Visual Preview")]
+        [MenuItem("CONTEXT/VNCharacterDef/角色立绘预览 Open Character Visual Preview")]
         static void OpenFromContext(MenuCommand command)
         {
             OpenFor(command.context as VNCharacterDef);

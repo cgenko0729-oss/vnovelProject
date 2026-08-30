@@ -46,7 +46,7 @@ description: 加新特效/演出组件（发光、粒子、全屏运动、转场
       （进存档细节走 [vn-save-compat]）
 - [ ] 整屏运动类：确认挂在哪个容器层（SceneRoot/ZoomRoot/TiltRoot 各司其职，见 SetUpGuide 第 0/3 章），
       不要两种运动挤一层
-- [ ] `VNEffectsDemoSetup` 生成器里创建/连线 → **Tools → VN Effects → Create Demo Scene 重建演示场景**
+- [ ] `VNEffectsDemoSetup` 生成器里创建/连线 → **Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene 重建演示场景**
 - [ ] 演示按键/提示文字更新（VNEffectsDemo.UpdateHint）
 - [ ] CLAUDE.md 组件速查表加一行 + WhatAiDo.md 记录（见 [vn-doc-update]）
 

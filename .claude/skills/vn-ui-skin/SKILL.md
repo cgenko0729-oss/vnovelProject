@@ -16,7 +16,7 @@ description: 制作/修改 UI 皮肤：对话框与选项面板皮肤（VNDialog
 | 登记 | VNGameConfig「UI 皮肤」区登记 id | VNGameConfig.systemUiSkin 指向 SkinSet |
 | 切换 | 剧本命令 `ui dialogue\|choice <id\|default>` | 无剧本命令，全局唯一 |
 | 存档 | **进存档** | **不进存档** |
-| 起步模板 | Tools → VN Effects → UI Skins → Export Skin Prefabs | Tools → VN Effects → System UI Skins → Export Default Prefabs（11 个，含背包/排程面板/结算弹窗）；只重导排程+结算两项用 Export Event Panel Prefabs（不覆盖手改过的其他 prefab） |
+| 起步模板 | Tools → VN Effects → UI 皮肤 UI Skins → 导出皮肤模板（默认+样例）Export Skin Prefabs | Tools → VN Effects → UI 皮肤 UI Skins → 系统主题：导出默认模板 System UI: Export Default Prefabs（11 个，含背包/排程面板/结算弹窗）；只重导排程+结算两项用 Export Event Panel Prefabs（不覆盖手改过的其他 prefab） |
 | 校验 | — | 同菜单 Validate Global Theme（查必需槽位） |
 
 ## 铁律

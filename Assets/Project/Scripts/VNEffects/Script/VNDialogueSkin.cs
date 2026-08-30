@@ -16,7 +16,7 @@ namespace VNEffects
     /// 【坐标系】皮肤实例会被拉伸铺满整个画布（1920×1080 参考分辨率），
     /// panel 想放屏幕哪儿就锚在哪儿——对话框放顶部就是把 panel 锚到上边。
     ///
-    /// 制作起点：Tools → VN Effects → UI Skins → Export Default Skin Prefabs
+    /// 制作起点：Tools → VN Effects → UI 皮肤 UI Skins → 导出皮肤模板（默认+样例）Export Skin Prefabs
     /// 会生成一套与程序化默认样式一模一样的 prefab，复制修改即可。
     /// 皮肤在 VNGameConfig 的 dialogueSkins 列表登记 id 后，
     /// 剧本用 `ui dialogue <id>` 切换（`ui dialogue default` 回默认样式）。

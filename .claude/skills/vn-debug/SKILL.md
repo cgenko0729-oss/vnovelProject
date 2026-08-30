@@ -6,7 +6,7 @@ description: 剧本/演出跑不对时的排错手册：先 Lint、从选中行�
 # 剧本 / 演出排错
 
 ## 排错顺序
-1. **先跑 Lint**（Tools → VN Effects → Lint Scenarios，Ctrl+Shift+L）——
+1. **先跑 Lint**（Tools → VN Effects → 剧本检查 Lint Scenarios，Ctrl+Shift+L）——
    大半「跑到那行才发现」的错误它能提前抓，双击结果行直接定位。
 2. 查 Console 报错的**行号/列号**，对照 HowToUse.md 十三章排查表（报错文案→原因→解法，最全）。
 3. 定位到具体行 → Scenario Editor 选中该行 → **▶ 从选中行播放**复现。
@@ -31,7 +31,7 @@ description: 剧本/演出跑不对时的排错手册：先 Lint、从选中行�
 - 日历 HUD 不显示 —— 还没跑过 `time set`（`月份` flag 不存在自动隐藏）。
 - choice 全部消失 —— 所有选项 `if:` 都不满足，留一个无条件保底选项。
 - 场景报「未连线」 —— VNStage 会自动补线；仍报错就重建剧本场景
-  （Tools → VN Effects → Create Script Demo Scene，配置在 VNGameConfig 不会丢）。
+  （Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene，配置在 VNGameConfig 不会丢）。
 
 ## 权威参考
 - HowToUse.md 十三（排查表）+ 十二·五（校验器检查项全表）

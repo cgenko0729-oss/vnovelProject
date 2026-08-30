@@ -7,7 +7,7 @@ namespace VNEffects
     /// 游戏内容总配置（ScriptableObject）——把"重建场景会丢"的人工绑定搬进资产。
     ///
     /// 【为什么存在】
-    /// Tools → VN Effects → Create Script Demo Scene 内部会
+    /// Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene 内部会
     /// EditorSceneManager.NewScene(EmptyScene)，即**丢弃当前场景从零重造**。
     /// 于是所有挂在场景组件上的引用（背景库/音频库/入口剧本/地图坐标…）每次重建全部清空。
     /// 本资产把这些数据搬到 Assets/ 里，场景怎么重建都不受影响。
@@ -122,7 +122,7 @@ namespace VNEffects
         }
 
         [Header("──────── UI 皮肤 ────────")]
-        [Header("对话框皮肤库（起点：Tools → VN Effects → UI Skins 导出默认皮肤后复制修改）")]
+        [Header("对话框皮肤库（起点：Tools → VN Effects → UI 皮肤 UI Skins 导出默认皮肤后复制修改）")]
         public List<UiSkinEntry> dialogueSkins = new List<UiSkinEntry>();
         [Header("选项面板皮肤库")]
         public List<UiSkinEntry> choiceSkins = new List<UiSkinEntry>();

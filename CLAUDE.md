@@ -130,8 +130,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNSpeakerHighlight / VNToneMatch | 说话者高亮 / 立绘色调匹配背景 |
 | VNDialogueBox + VNTypewriterText | 对话框（流光边框/名牌/箭头）+ 打字机逐字上浮（TMP textInfo 顶点动画）；支持皮肤 prefab（VNDialogueSkin 槽位绑定，程序化默认兜底） |
 | VNNameplateStyle | 名牌装饰样式（粗黑体+描边+渐变+投影+浮雕）：**十套内置预设** —— 老四套 Plain/Bold/Plate/Outline + 三层字系列 Duo(双描边)/Gold(金边)/Silver(银边)/Neon(霓虹)/Ink(墨影)/Candy(糖果)；**三层字系列的立身之本是「最外圈必须深色」**——Bold/Outline 最外层是白的，遇到白背景或亮立绘整个消失。金/银的金属感来自 TMP 的 **Bevel 浮雕 + Lighting 打光**（Mobile 版 shader 没这组属性，`HasProperty` 挡掉并警告一次）；霓虹靠 `faceHdrBoost>1` 写进 `_FaceColor` 触发 Bloom（顶点色被钳到 1，所以 **HDR 发光与上下渐变二选一**）。剧本 `ui name <样式|default>` 切换（进存档），或 `VNDialogueBox.nameplateStyle` / `SetNameplateStyle()`；配色每角色一套（VNCharacterDef 没勾自定义就由 nameColor 自动推算渐变，存量资产零改动）。**三条硬约定**：材质必须走 `text.fontMaterial` 实例（改 sharedMaterial 会污染所有同字体文字）／underlay 通道只有一条所以「第二层外描边」与「投影」二选一／改 underlay 前必须 `EnableKeyword("UNDERLAY_ON")`。名牌宽度自适应只动程序化默认皮肤 |
-| VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI Skins → Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；另有 **Export Soft Gradient Skins** 一键出三套**无框渐变**皮肤（白渐变/粉渐变/黑渐变：整屏底部渐变带+居中台词，shineFrame 留空即无边框）；皮肤状态进存档 |
-| VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页/背包/排程面板/结算弹窗分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → System UI Skins → Export Default Prefabs（详见八十三章）；只重导排程/结算两项用 Export Event Panel Prefabs（详见八十六章） |
+| VNDialogueSkin / VNChoiceSkin | UI 皮肤槽位声明组件（挂 prefab 根）：全槽位可选留空降级；剧本 `ui dialogue\|choice <id\|default>` 切换，id 在 VNGameConfig 的 UI 皮肤区登记；起步模板 Tools → VN Effects → UI 皮肤 UI Skins → 导出皮肤模板（默认+样例）Export Skin Prefabs（烘焙贴图+生成默认/顶部/右列样例并自动登记）；另有 **Export Soft Gradient Skins** 一键出三套**无框渐变**皮肤（白渐变/粉渐变/黑渐变：整屏底部渐变带+居中台词，shineFrame 留空即无边框）；皮肤状态进存档 |
+| VNSystemUiSkinSet / VNSystemUiSkinBehaviour | 系统菜单唯一全局 prefab 主题及安全实例化基类；标题/设置/CG/Backlog/快捷条/存读档/顶部属性 HUD/完整属性页/背包/排程面板/结算弹窗分别使用槽位组件，单项缺失或槽位无效时只退回该项程序化 UI；默认模板菜单 Tools → VN Effects → UI 皮肤 UI Skins → 系统主题：导出默认模板 System UI: Export Default Prefabs（详见八十三章）；只重导排程/结算两项用 Export Event Panel Prefabs（详见八十六章） |
 | VNFont / VNFontAssetBuilder | TMP 中文字体统一入口（三级兜底+Prewarm）/ 预烘焙字体资产生成器；另有**装饰字体**入口 `DisplayAsset`（思源黑体 Black，名牌等少量大字专用，正文别用）——单开一套资产是因为 **padding 必须与采样点等比例**：描边厚度 ≈ outlineWidth×(padding+1)×(字号/采样点)，padding 是描边粗细天花板，但 padding 占采样点过大（如 64pt 配 24）反而挤掉字形分辨率、把描边糊成淡影，故装饰字体用 120pt/padding 22（~18%）。语言切换时正文与装饰字体**分开替换**，换 font 会丢材质实例故有 `DisplayFontChanged` 事件通知重新上样式 |
 | VNChoicePanel | 选项演出（飞入/悬停扫光/落选溶解），需 EventSystem |
 | VNSakuraBurst | 樱吹雪告白组合技（走 VNFoliageSystem：起手阵风冲击+Burst、中途补风、尾声风力衰减、近景大瓣横掠） |
@@ -140,12 +140,12 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNEventModule / VNEventRegistry | 玩法事件接口：模块基类 + id→模板注册表（EventLayer 排序 60） |
 | VNQteModule / VNMapModule | 事件示例模块：QTE 连打条 / 地图选地点（条件显隐+去过标记） |
 | VNBattleModule | 回合制小战斗（event battle，结果 胜利/失败/逃跑；patkstat/phpstat/pdefstat 从 flag 读属性=养成联动，结束写 flag 战斗剩余HP 供车轮战） |
-| VNLiquidInstaller (Editor) | 把液体喷溅**增量装进当前场景**（Tools → VN Effects → Install Liquid Splash To Scene）：Canvas 下补 WetScreen + 场外补 LiquidSplash + 两层互连并回填 VNStage，不重建场景、可重复执行。老场景不跑它的话 `liquid` 命令会静默无效果 |
-| VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → Install Quiz Module To Scene）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
+| VNLiquidInstaller (Editor) | 把液体喷溅**增量装进当前场景**（Tools → VN Effects → 场景装机 Install To Scene → 液体喷溅 Liquid Splash）：Canvas 下补 WetScreen + 场外补 LiquidSplash + 两层互连并回填 VNStage，不重建场景、可重复执行。老场景不跑它的话 `liquid` 命令会静默无效果 |
+| VNQuizInstaller (Editor) | 把 quiz 模块**增量装进当前场景**（Tools → VN Effects → 场景装机 Install To Scene → 限时问答 Quiz Module）：补禁用 QuizTemplate（必须带 RectTransform）+ 登记题库，不重建场景、可重复执行 |
 | VNCamWaypoint / VNCamseqText / VNCamseqTemplates (Editor) | camseq 路径点行的结构化视图（严格 TryParse/Format，语法与运行时 ParseCamWaypoint 同构；震屏下拉 VNCamShakeUi 也在这儿，两个编辑器窗口共用）/ 一整段 camseq 文本的 TrySplit·Join / 11 条内置运镜模板（`{char}` 占位按当前角色替换）。**存储仍是 VNRow.camLines 字符串**，本层只做每帧现解析、改完写回的中转 |
-| VNBadmintonModule / VNBadmintonDef | 羽毛球对战事件模块（`event badminton vs: id: target: first: mode: powerstat:/speedstat:/jumpstat: flag:`，结果 胜利/失败/结束）/ 对手+难度+台词+立绘+音效定义资产（登记进 VNGameConfig）；战绩写 flag `<前缀>_我方得分/_对方得分/_精准数/_最长回合`；装机走 Tools → VN Effects → **Install Badminton Module To Scene** |
+| VNBadmintonModule / VNBadmintonDef | 羽毛球对战事件模块（`event badminton vs: id: target: first: mode: powerstat:/speedstat:/jumpstat: flag:`，结果 胜利/失败/结束）/ 对手+难度+台词+立绘+音效定义资产（登记进 VNGameConfig）；战绩写 flag `<前缀>_我方得分/_对方得分/_精准数/_最长回合`；装机走 Tools → VN Effects → 场景装机 Install To Scene → **羽毛球对战 Badminton Module** |
 | VNBadmintonBallistics / VNBadmintonCourt / VNBadmintonActor / VNBadmintonSfx / VNBadmintonUi | 羽球的四层拆分：**纯静态弹道数学**（三点定抛物线/落点抽样/精准判定，无 MonoBehaviour 依赖可单测）/ 程序化球场与 HUD / 角色表现层（六态假动画，**换真动画只改这一个文件**）/ 五个代码合成音效 / 共用 UI 辅助 + 画梯形的 `VNBadmintonQuad` |
-| VNPhotoBoothModule / VNPhotoFrameDef / VNPhotoStickerDef / VNPhotoBackdropDef / VNPhotoThemeDef | 拍大头照事件模块（`event photo vs: me: theme: mode: frame: bg: time: stat:/rate: flag:`，写了 theme: 才评分＝完美/普通/失败，不写＝自由拍照只返回完成）/ 边框（程序化样式+开窗形状+水印+自带装饰）/ 贴纸 / 背景（8 种程序化样式，画在人身后被开窗裁切、按 cover 铺满）/ 主题＋**清单制**评分表（表情·边框·背景·贴纸四张加分清单＋命中评语）；左栏四标签页 边框｜背景｜贴纸｜涂鸦，人物与贴纸同一套手势（拖动·滚轮缩放·Shift+滚轮旋转·双击换前后），背景加 Ctrl（Ctrl+拖动移位·Ctrl+滚轮缩放，缩不到比 cover 更小所以永不露边）；开窗内层序 背景→拖动板→人后贴纸→我→她，**拖动板必须压最底**否则吃掉人后贴纸的射线；操作说明在右上角「?」钮里点击开合（卡片底色必须不透明，且要进拍照的 hide 列表）；结算时左右栏与取景框一起收起（分数栏与右栏横向重叠，不收就读不清）；布局尺寸全部常数化在文件头（机身 1860×1020／取景框 1040×780／侧栏 340×900／相纸 860×770）；成绩写 flag `<前缀>_分数/_档位/_次数`；装机走 Tools → VN Effects → **Install Photo Booth Module To Scene**（缺资产会自动铺一套默认的） |
+| VNPhotoBoothModule / VNPhotoFrameDef / VNPhotoStickerDef / VNPhotoBackdropDef / VNPhotoThemeDef | 拍大头照事件模块（`event photo vs: me: theme: mode: frame: bg: time: stat:/rate: flag:`，写了 theme: 才评分＝完美/普通/失败，不写＝自由拍照只返回完成）/ 边框（程序化样式+开窗形状+水印+自带装饰）/ 贴纸 / 背景（8 种程序化样式，画在人身后被开窗裁切、按 cover 铺满）/ 主题＋**清单制**评分表（表情·边框·背景·贴纸四张加分清单＋命中评语）；左栏四标签页 边框｜背景｜贴纸｜涂鸦，人物与贴纸同一套手势（拖动·滚轮缩放·Shift+滚轮旋转·双击换前后），背景加 Ctrl（Ctrl+拖动移位·Ctrl+滚轮缩放，缩不到比 cover 更小所以永不露边）；开窗内层序 背景→拖动板→人后贴纸→我→她，**拖动板必须压最底**否则吃掉人后贴纸的射线；操作说明在右上角「?」钮里点击开合（卡片底色必须不透明，且要进拍照的 hide 列表）；结算时左右栏与取景框一起收起（分数栏与右栏横向重叠，不收就读不清）；布局尺寸全部常数化在文件头（机身 1860×1020／取景框 1040×780／侧栏 340×900／相纸 860×770）；成绩写 flag `<前缀>_分数/_档位/_次数`；装机走 Tools → VN Effects → 场景装机 Install To Scene → **拍大头照 Photo Booth Module**（缺资产会自动铺一套默认的） |
 | VNPhotoDoodle | 照片涂鸦（落書き）：**两张 768×576 位图画布**（分辨率与取景框 1040×780 成对，放大倍率压在 1.35x 内才不糊）——普通笔走 Alpha 混合、荧光笔走 `VN/Additive`(HDR+Bloom)，两种混合模式没法共存所以分开；位图而非矢量是因为要「擦除」（抹 alpha 一行代码）；线段按笔粗插值补点（否则快速拖动画出一串断圆）；撤销只快照被动过的那张（5 步，1.7MB/张）；输入板只在涂鸦页 `raycastTarget=true` |
 | VNPhotoScore / VNPhotoTextures / VNPhotoCapture / VNPhotoAlbum / VNPhotoBoothUi / VNPhotoSfx | 大头贴的六层拆分：**纯静态评分数学**（无 MonoBehaviour 可单测）/ 程序化边框·遮罩·10 种贴纸·相纸 / **取景框截图**（「怎么拍」全在这一个文件，换 RenderTexture 只改它）/ 相册全局存储（PNG+index.json，与存档槽分离、LRU 纹理缓存、上限 200 张）/ 共用 UI 辅助 + 贴纸拖拽组件 `VNPhotoStickerItem`（拖·滚轮缩放·Shift+滚轮旋转·右键删）/ 五个代码合成音效 |
 | VNQuizDef / VNQuizModule | 限时问答题库资产（三语题干+2~4 选项+每题奖励/惩罚）/ 限时问答事件模块（event quiz id:题库 count: time: pass: pick:，结果 全对/及格/失败，成绩写 flag &lt;前缀&gt;正确数、&lt;前缀&gt;总数；超时按答错，倒计时最后 3 秒变红脉动） |
@@ -153,11 +153,11 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNAiPersonaDef / VNAiConversation | AI 人格资产（独立于 VNCharacterDef，因为一个角色要能有多套人格共用同一套立绘；表情/漫符白名单留空则取角色资产全部）/ **纯逻辑层（无 MonoBehaviour，可单测）**：system prompt 组装、JSON Schema 生成、历史裁剪、响应解析与钳制。提示词顺序 身份→说话方式→关系→此刻情况→输出规则→（没有硬 schema 的家在这里插一段「输出格式」示例 JSON）→边界（越靠后权重越高）。**永远不信任模型输出**：好感强制 Clamp（Gemini schema 不支持 minimum/maximum，不钳实测会给 +5）、表情越界降级、选项不足补齐 |
 | VNAiMemory / VNAiDiary / VNAiDiaryPanel | **跨场记忆（存档态）** / **日记本（全局态）** / 日记本面板（D 键）。两者存储语义**刻意相反**：记忆是剧情状态必须跟着存档回退（读旧档她不该记得未来），日记是玩家收藏品不该因读档消失（同 CG 画廊）。一场聊完额外发一次请求，产出 摘要+话题标签+关键事实（→记忆）和 主角口吻日记（→日记本）。**「少重复」的主力是话题清单**——单独成段作为硬性回避清单注入，比把话题揉进摘要里说「别重复」有效得多。**踩过的坑**：总结请求若按 role:user/model 交替发历史，模型会代入她的身份写出「她的日记」，改成把对话拍平成纯文本放进单条 user 消息才对——身份认知不对时先看 role 结构，再改措辞 |
 | VNAiPricing / VNAiPricingDef | **算钱的唯一入口**（换模型不改代码就会算错的那件事）：按模型名查每百万 token 单价，资产 Create → VN → AI Pricing 登记进 `VNGameConfig.aiPricing`，不建资产用内置默认表（Gemini flash-lite/flash/pro + DeepSeek v4-flash/v4-pro）。**查表按 key 最长优先**——`gemini-3.5-flash-lite` 同时含 `flash` 和 `flash-lite`、`deepseek-v4-flash` 也含 `flash`，不排序会被隔壁家的价抢走；认不出的模型取**最贵**档并标「单价存疑」（低估会让人放心用下去，高估最多多留意一眼）。思考 token 按输出价计费。**三个价 + 一个倍率**：未命中输入 / 命中缓存输入（DeepSeek 便宜约 30 倍）/ 输出，再乘高峰倍率（DeepSeek 高峰翻倍，时段列表也在资产里，官方改时段不用动代码）；重算历史日志时按**那场对话当时**的 UTC 时间判高峰，同一份日志今天看和明天看必须同一个数字 |
-| VNAiCostReport (Editor) | 花费累计报表（Tools → VN Effects → AI → Cost Report）：扫 `AiTalkLogs/`（含 `Editor/`）全部 json，按月/日/人格/模型/来源聚合，可导 CSV。默认**按当前单价重算**（日志存了 token 数、模型名与缓存命中数，能修正历史上按写死单价算出的错误金额；高峰倍率按日志里那场对话当时的时间判，不是按现在） |
-| VNAiStudioWindow (Editor) | **AI 试聊台**（Tools → VN Effects → AI → AI Talk Studio，人格资产右键也能开）：不进 Play Mode 调人格与提示词。三栏＝左改参数／中聊天流／右 **system prompt 实时预览**（不发请求不花钱，改一个字立刻重拼——调 boundaries、speechStyle 的主力）。中栏可点选项、可自由输入任意回复（绕开三选一）、可重跑本轮看方差、可从任意轮重新分岔。配套 `VNAiStudioDraft`（**临时 SO 副本**当草稿层：SerializedObject 迭代画＝零 UI 代码就有全部字段、加新字段自动跟上；写回逐属性 copy 而**不用 CopySerialized**——那会把 m_Name 一起抄成「xxx(Clone)」）／`VNAiStudioSession`（会话驱动，域重载后靠轮次记录 `BuildRequest`+`RecordReply` 重建历史）／`VNAiStudioMemory`（记忆预设，见下）／`VNAiStudioLog`（导出到 `AiTalkLogs/Editor/`，与游戏内**同格式**所以两边能互相对比）／`VNAiEditorCoroutine`（编辑器协程泵，与自检菜单共用） |
+| VNAiCostReport (Editor) | 花费累计报表（Tools → VN Effects → AI → 花费报表 Cost Report）：扫 `AiTalkLogs/`（含 `Editor/`）全部 json，按月/日/人格/模型/来源聚合，可导 CSV。默认**按当前单价重算**（日志存了 token 数、模型名与缓存命中数，能修正历史上按写死单价算出的错误金额；高峰倍率按日志里那场对话当时的时间判，不是按现在） |
+| VNAiStudioWindow (Editor) | **AI 试聊台**（Tools → VN Effects → AI → AI 试聊台 AI Talk Studio，人格资产右键也能开）：不进 Play Mode 调人格与提示词。三栏＝左改参数／中聊天流／右 **system prompt 实时预览**（不发请求不花钱，改一个字立刻重拼——调 boundaries、speechStyle 的主力）。中栏可点选项、可自由输入任意回复（绕开三选一）、可重跑本轮看方差、可从任意轮重新分岔。配套 `VNAiStudioDraft`（**临时 SO 副本**当草稿层：SerializedObject 迭代画＝零 UI 代码就有全部字段、加新字段自动跟上；写回逐属性 copy 而**不用 CopySerialized**——那会把 m_Name 一起抄成「xxx(Clone)」）／`VNAiStudioSession`（会话驱动，域重载后靠轮次记录 `BuildRequest`+`RecordReply` 重建历史）／`VNAiStudioMemory`（记忆预设，见下）／`VNAiStudioLog`（导出到 `AiTalkLogs/Editor/`，与游戏内**同格式**所以两边能互相对比）／`VNAiEditorCoroutine`（编辑器协程泵，与自检菜单共用） |
 | VNAiStudioMemory (Editor) | 试聊台的**可命名记忆预设**（`<项目根>/AiTalkStudio/Memories/*.json`，不进 git）：「初次见面（空）」「聊过 3 次」各存一套，一键切换。**完全独立于运行时 `VNAiMemory`**——那份是存档态，编辑器往里写等于造出「读旧档她却记得未来」的幽灵状态。两个独立开关：`注入记忆`（勾掉再跑一遍＝直接对比有无记忆的差别）与 `结束时做总结`（多发一次请求，结果先预览再决定收不收）。导入三源：试聊后总结／从 `AiTalkLogs` 日志（**要发一次总结请求**，因为日志里没有 summary/topics/facts，导空壳等于没导）／从游戏存档槽（**自己读 JSON，绝不调 `VNSaveSystem.Load()`**——那个会 `VNFlags.Clear()` 冲掉工程 flag） |
 | VNAiTextNormalize | AI 输出的繁体字兜底转简体。提示词已把简体约束放在 system prompt 最后一行仍会漏（三次抽查三次中招），这是玩家直接可见的问题，所以加确定性代码兜底。分工：提示词管「大部分时候对」，兜底管「永远不出错」。作用于台词/选项/日记/摘要/话题 |
-| VNAiTalkModule | AI 自由聊天事件模块（event aitalk）。**刻意破一次模块三铁律**——直接驱动舞台立绘换表情，因为自绘立绘要把眨眼/口型/色调匹配/出场动画全部重接一遍；边界收紧为「只碰表情和对话框内容」且正常结束/ESC/CancelForDebug 三条路径都还原原表情。**射线坑**：EventLayer 排序 60 在选项面板 45 之上，模块自绘的一切默认 `raycastTarget=false`，否则吃掉选项点击（唯 ESC 确认框例外）。装机走 Tools → VN Effects → **Install AI Talk Module To Scene** |
+| VNAiTalkModule | AI 自由聊天事件模块（event aitalk）。**刻意破一次模块三铁律**——直接驱动舞台立绘换表情，因为自绘立绘要把眨眼/口型/色调匹配/出场动画全部重接一遍；边界收紧为「只碰表情和对话框内容」且正常结束/ESC/CancelForDebug 三条路径都还原原表情。**射线坑**：EventLayer 排序 60 在选项面板 45 之上，模块自绘的一切默认 `raycastTarget=false`，否则吃掉选项点击（唯 ESC 确认框例外）。装机走 Tools → VN Effects → 场景装机 Install To Scene → **AI 自由聊天 AI Talk Module** |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
 | VNToast | 左上角堆叠提示卡片（多条排队不覆盖，上限 5）+ 右上角 AUTO/SKIP 角标；`Show(msg)` 中性卡、`Show(msg, icon, iconColor, accent, hold)` 带图标色条 |
@@ -173,14 +173,14 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNLocale / VNScriptLocale | 本地化（中/英/日）：语言管理+UI 字符串表 / 剧本台词翻译查表（表在 Resources/VNLocale/，抽取工具 Tools→VN Effects→Localization） |
 | VNAssetUi / VNConfigEntryDrawers (Editor) | 素材界面共用层（缩略图·试听·波形·拖拽·搜索）/ 背景·CG·音频·UI皮肤四个条目的**紧凑单行 drawer**。**Sprite 缩略图不用 `AssetPreview`**——它是异步的，几十张一起等会闪空白；Sprite 自己知道在哪张 texture 的哪个 UV，`DrawTextureWithTexCoords` 同步画即可（texture 不必可读）。音频没这捷径只能异步 + 占位，但**不能无限等**（有些资产永远没预览图），自己给 3 秒窗口到点放弃——`IsLoadingAssetPreview(int)` / `GetInstanceID()` 在 Unity 6.5 是 **error 级弃用**不能用。试听走 `UnityEditor.AudioUtil` 反射（`PlayPreviewClip` / 老版 `PlayClip` 逐个探测，探不到就灰掉按钮）。**drawer 挂在类型上**，所以 VNStage / VNAudio 组件的同名列表也一并变紧凑 |
 | VNGameConfigEditor (Editor) | VNGameConfig 的**九页分页 Inspector**（剧本｜标题｜UI皮肤｜舞台｜音频｜玩法｜AI｜大头贴｜全部，选中页进 EditorPrefs）+ 智能列表（搜索·分页 50/页·▲▼✕·id 重复与空值告警·批量拖入自动填文件名当 id）。**页签只登记字段名**，绘制仍走 PropertyField，所以没被认领的新字段会自动落到「其他」页而不是静默消失。用分页而非虚拟化，是因为 Inspector 里拿不到宿主 ScrollView 的可见区域 |
-| VNTextureImportDefaults (Editor) | 素材目录里**首次导入**的图自动设 `Sprite (2D and UI)` + `Single`（`OnPreprocessTexture` 在导入前跑，拖进来一次就对，不用二次 reimport）。**白名单目录**（`Roots`，新开素材目录补一行）——**绝不能全项目一刀切**，`Art/Models/**` 下 60+ 张法线/粗糙度贴图按 sRGB 的 Sprite 导入会让光照全错且极难联想到导入设置。只在 `importSettingsMissing` 时设，所以手调过的 Pivot/MaxSize/Multiple 切图永不被打回。**坑**：`importSettingsMissing` ≠「没有 .meta」——meta 存在却缺完整设置块时也为 true（老图中招过 5 张）；而想用「.meta 不存在」卡死新文件**也不行**，Unity 调 preprocessor 前就已写盘。存量补登走 Tools → VN Effects → Textures → Apply Sprite Settings To Selection |
+| VNTextureImportDefaults (Editor) | 素材目录里**首次导入**的图自动设 `Sprite (2D and UI)` + `Single`（`OnPreprocessTexture` 在导入前跑，拖进来一次就对，不用二次 reimport）。**白名单目录**（`Roots`，新开素材目录补一行）——**绝不能全项目一刀切**，`Art/Models/**` 下 60+ 张法线/粗糙度贴图按 sRGB 的 Sprite 导入会让光照全错且极难联想到导入设置。只在 `importSettingsMissing` 时设，所以手调过的 Pivot/MaxSize/Multiple 切图永不被打回。**坑**：`importSettingsMissing` ≠「没有 .meta」——meta 存在却缺完整设置块时也为 true（老图中招过 5 张）；而想用「.meta 不存在」卡死新文件**也不行**，Unity 调 preprocessor 前就已写盘。存量补登走 Tools → VN Effects → 贴图 Textures → 套用 Sprite 导入设置到选中项 Apply Sprite Settings |
 | VNAssetLibraryEvents (Editor) | 「素材库改了」的静态广播：素材浏览器 / VNGameConfig Inspector 登记完新素材后 `RaiseChanged()`，剧本编辑器收到就重建 bg/cg/bgm 下拉候选。**只在 `ApplyModifiedProperties()` 返回 true 时发**（OnGUI 每帧都 Apply，无条件广播 = 每帧重建全部候选）；订阅方 **`OnDisable` 必须退订**，否则静态事件会攥着已销毁窗口的引用 |
 | VNAssetTheme (Editor) | 素材浏览器的配色主题（默认 / 樱花粉白，顶栏 🌸 切换，进 EditorPrefs）。**Unity 编辑器整体只有 Light/Dark 改不了**（USS 打包在编辑器资源里不开放覆盖，第三方替换 skin 的做法升级即坏，不采用）；但自己 IMGUI 画的窗口每一像素归自己管。圆角靠**程序化生成一张白色圆角贴图 + GUI.color 染色**（零美术依赖，static 贴图域重载会丢所以 lazy 重建 + `HideFlags.DontSave`）。**换浅色底后必须显式覆盖每个 GUIStyle 的文字色**——Dark 主题下 EditorStyles 文字是浅色的，直接用就是白底白字字消失，且要覆盖 normal/hover/active/focused 及 on* 共八个状态，只改 normal 的话鼠标一悬停字又没了。主题是**叠加不是替换**：`Enabled==false` 时所有绘制原样退回 Unity 原生 |
-| VNAssetBrowserWindow (Editor) | 素材浏览器（Tools → VN Effects → **Asset Browser**）：左栏九类带条数，图片走大缩略图网格、音频走波形列表（**都做了虚拟化**，只画可见行），底部详情栏改 id/换素材/试听/定位/移除，右键还有「用文件名填 id」。**以缩略图为主、id 为标签**——本项目文件名是 AI 生成的原始 prompt 或纯数字（`1.png`、`masterpiece, very aesthetic… s-1095962266.png`），看名字根本认不出图。「只看未登记」的扫描目录**从已登记条目反推**，不写死（`Assets/CG` 与 `Assets/Art/Images/CG` 并存过） |
+| VNAssetBrowserWindow (Editor) | 素材浏览器（Tools → VN Effects → **素材浏览器 Asset Browser**）：左栏九类带条数，图片走大缩略图网格、音频走波形列表（**都做了虚拟化**，只画可见行），底部详情栏改 id/换素材/试听/定位/移除，右键还有「用文件名填 id」。**以缩略图为主、id 为标签**——本项目文件名是 AI 生成的原始 prompt 或纯数字（`1.png`、`masterpiece, very aesthetic… s-1095962266.png`），看名字根本认不出图。「只看未登记」的扫描目录**从已登记条目反推**，不写死（`Assets/CG` 与 `Assets/Art/Images/CG` 并存过） |
 
 ### 演示场景
 
-- 重建：菜单 **Tools → VN Effects → Create Demo Scene**（每次加新组件后需重建）
+- 重建：菜单 **Tools → VN Effects → 演示场景 Demo Scenes → 重建特效演示场景 Create Demo Scene**（每次加新组件后需重建）
 - 全部按键列表见场景内提示文字或 `VNEffectsDemo.UpdateHint()`
 - 立绘选择规则：`Assets/Assets` 下文件名含 "solo" 的前两张；背景轮换=其余 ≥900×600 的大图
 
@@ -188,7 +188,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 
 - **选型结论**：自研 Ren'Py 风格纯文本剧本（Git/AI 协作友好）；Dialogue System 插件保留不用
 - 代码在 `Assets/Scripts/VNEffects/Script/`：VNScriptParser → VNScriptRunner → VNStage → 特效 API
-- 剧本文件：`Assets/Scenarios/*.vn.txt`；剧本场景：**Tools → VN Effects → Create Script Demo Scene**
+- 剧本文件：`Assets/Scenarios/*.vn.txt`；剧本场景：**Tools → VN Effects → 演示场景 Demo Scenes → 重建剧本演示场景 Create Script Demo Scene**
 - 关键语义：命令默认同步等待，行尾 `@` = 异步；台词行 = 等打字完+玩家推进
 - **写剧本 → 技能 vn-write-scenario；加命令 → 技能 vn-new-command；语法详解 → HowToUse.md**
 
@@ -207,7 +207,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
 | 液体喷溅 | `liquid splash\|spray\|click\|wet\|dry\|cover [on\|off] [x:] [y:] [type:] [power:] [dir:] [spread:] [rate:] [screen:] [amount:]`，type = water/blood/ink/slime（+中文别名）；x/y 是屏幕比例 0~1；**dir 留空=朝镜头扑面而来（默认，正交相机下走伪透视：放射+加速+放大），填了才侧喷**；screen 是溅上镜头的概率倍率；click 模式下左键归喷水、Enter/空格仍推进 | 九十四 |
 | 背景无限滚动 | `bgscroll on\|off [speed:] [dir:] [mode:repeat\|mirror] [time:]`，speed = 画布像素/秒，dir 是画面流向（默认 left），mirror 不挑图但看得出对称 | 一一八 |
-| 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → **Weather Preview** | 九十二 |
+| 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → 预览 Preview → **天气预览 Weather Preview** | 九十二 |
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
 | 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |
@@ -216,14 +216,14 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 本地化 | 剧本只写中文，翻译旁路表 + Extract/Validate → 技能 vn-localize | 五十七 |
 | UI 皮肤 | `ui dialogue\|choice <id>`（进存档）+ 系统菜单全局主题（不进存档）→ 技能 vn-ui-skin；无框渐变三套 id = 白渐变/粉渐变/黑渐变；`ui name <样式>` 换名字装饰（十套内置预设，不用登记） | 八十二、八十三、一一五、一一六 |
 | 标题菜单 | VNTitleMenu 同场景覆盖层，配置在 VNGameConfig「标题画面」区 | 八十 |
-| 静态校验器 | Tools → VN Effects → Lint Scenarios（Ctrl+Shift+L），检查项全表见 HowToUse 十二·五 | 七十九 |
+| 静态校验器 | Tools → VN Effects → 剧本检查 Lint Scenarios（Ctrl+Shift+L），检查项全表见 HowToUse 十二·五 | 七十九 |
 
 - **路线图**：下一步 P3 台词内嵌演出标记 `{shake}{w:0.5}` + VNDirector 名场面命令；
   已知技术债清单见 ProjectCodeGuide 第十二节
 
 ## 剧本可视化编辑器
 
-- 菜单：**Tools → VN Effects → Scenario Editor**；核心文件：
+- 菜单：**Tools → VN Effects → 剧本编辑器 Scenario Editor**；核心文件：
   `Editor/VNScenarioEditorWindow.cs`、`VNScenarioDoc.cs`、`VNScenarioSchema.cs`。
 - 文本是唯一真相：`.vn.txt ↔ VNScenarioDoc.rows`，保存时重新生成文本，注释/空行保留。
 - **素材候选（bg/cg/bgm/se/voice）按覆盖语义取数**：`VNGameConfig` 里填了就用它的，
