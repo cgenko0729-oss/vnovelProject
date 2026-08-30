@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f400a3b22617b84fba1219d39108930, type: 3}
+  m_Name: "\u661F\u91CE\u7ED3\u8863"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNTouchZoneDef
+  characterId: "\u661F\u91CE\u7ED3\u8863"
+  baseZones:
+  - id: "\u5934"
+    displayName: "\u5934\u53D1"
+    shape: 1
+    center: {x: 0, y: 0.368}
+    size: {x: 0.26, y: 0.23}
+    rotation: 0
+    priority: 0
+    gainScale: 1
+    unlockStage: 0
+    enabled: 1
+  - id: "\u8138"
+    displayName: "\u8138\u988A"
+    shape: 1
+    center: {x: 0.008, y: 0.153}
+    size: {x: 0.165, y: 0.21}
+    rotation: 0
+    priority: 10
+    gainScale: 1.4
+    unlockStage: 0
+    enabled: 1
+  - id: "\u8033"
+    displayName: "\u8033\u6735"
+    shape: 1
+    center: {x: 0.1, y: 0.2}
+    size: {x: 0.045, y: 0.06}
+    rotation: 0
+    priority: 20
+    gainScale: 1.6
+    unlockStage: 1
+    enabled: 1
+  - id: "\u9888"
+    displayName: "\u8116\u9888"
+    shape: 1
+    center: {x: 0.005, y: -0.056}
+    size: {x: 0.1, y: 0.09}
+    rotation: 0
+    priority: 15
+    gainScale: 1.8
+    unlockStage: 1
+    enabled: 1
+  - id: "\u80A9"
+    displayName: "\u80A9\u8180"
+    shape: 1
+    center: {x: -0.12, y: -0.136}
+    size: {x: 0.12, y: 0.075}
+    rotation: 0
+    priority: 5
+    gainScale: 1
+    unlockStage: 0
+    enabled: 1
+  - id: "\u80F8"
+    displayName: "\u80F8\u53E3"
+    shape: 1
+    center: {x: 0.005, y: -0.341}
+    size: {x: 0.225, y: 0.19}
+    rotation: 0
+    priority: 8
+    gainScale: 2.5
+    unlockStage: 2
+    enabled: 1
+  - id: "\u8170"
+    displayName: "\u8170\u8179"
+    shape: 1
+    center: {x: 0.005, y: -0.468}
+    size: {x: 0.2, y: 0.08}
+    rotation: 0
+    priority: 5
+    gainScale: 2
+    unlockStage: 2
+    enabled: 1
+  overrides: []

@@ -279,3 +279,7 @@ Talk with her and your notes will appear here.
 diary.hint = D / ESC to close　·　scroll to browse
 diary.all = All
 diary.affection = Affection {0}
+
+interact.end = Finish
+interact.stage = Stage {0}
+interact.rejected = Refused {0} / {1}
