@@ -173,12 +173,16 @@ namespace VNEffects.EditorTools
             def.title = "";
             def.items = BuildDemoItems();
 
+            // 阶段推进的台词一律 blocking：这是「场面转折」，该让玩家停下来看完，
+            // 过程中的碎反应才不阻塞（否则一直被打断没法连续抚摸）
             def.stages = new List<VNInteractionStage>
             {
                 Stage("平静", 0f, "默认"),
-                Stage("心动", 30f, "微笑", "…嗯？", "害羞"),
-                Stage("害羞", 80f, "害羞", "别、别这样…", "红晕"),
-                Stage("情动", 150f, "害羞", "……", "心"),
+                Stage("心动", 30f, "微笑", "…嗯？怎么突然这样。", "害羞", blocking: true),
+                Stage("害羞", 80f, "害羞", "别、别这样…会被人看到的。", "红晕", blocking: true),
+                Stage("情动", 150f, "害羞", "……我已经，不行了。", "心", blocking: true,
+                      // 内嵌剧本行示范：字段配不出来的演出写在这里，走 RunInlineCo
+                      script: "fx shockwave light\ncamera pushin 1.08 2 @"),
             };
 
             def.rules = new List<VNInteractionZoneRule>
@@ -282,16 +286,19 @@ namespace VNEffects.EditorTools
         }
 
         static VNInteractionStage Stage(string name, float threshold, string idleExpr,
-            string enterLine = null, string enterMark = null)
+            string enterLine = null, string enterMark = null, bool blocking = false,
+            string script = null)
         {
+            var fb = enterLine == null && enterMark == null && script == null
+                ? new VNInteractionFeedback()
+                : Fb($"进入 {name}", mark: enterMark, line: enterLine, blocking: blocking);
+            fb.scriptLines = script;
             return new VNInteractionStage
             {
                 name = name,
                 threshold = threshold,
                 idleExpression = idleExpr,
-                enterFeedback = enterLine == null && enterMark == null
-                    ? new VNInteractionFeedback()
-                    : Fb($"进入 {name}", mark: enterMark, line: enterLine, blocking: false),
+                enterFeedback = fb,
             };
         }
 

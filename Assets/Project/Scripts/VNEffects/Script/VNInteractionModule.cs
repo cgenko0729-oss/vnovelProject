@@ -48,6 +48,9 @@ namespace VNEffects
         VNStage _stage;
         VNAudio _audio;
         VNStatsHud _statsHud;
+        VNScriptRunner _runner;
+        /// <summary>正在播阻塞型反馈（等玩家推进），期间不吃抚摸输入</summary>
+        bool _blocked;
         VNInteractionDef _def;
         VNTouchZoneDef _zoneDef;
         VNStage.ActiveCharacter _char;
@@ -87,6 +90,7 @@ namespace VNEffects
             _stage = ctx.stage;
             _audio = _stage != null ? _stage.vnAudio : null;
             _statsHud = FindAnyObjectByType<VNStatsHud>();
+            _runner = FindAnyObjectByType<VNScriptRunner>();
 
             _charId = ctx.Kw("vs");
             _def = FindDef(ctx.Kw("id"));
@@ -140,6 +144,17 @@ namespace VNEffects
 
             var mouse = Mouse.current;
             if (mouse == null) return;
+
+            // 阻塞型反馈（角色正在说需要玩家推进的台词）：不吃抚摸输入，
+            // 否则玩家点一下既推进了对话又顺手摸了一把
+            if (_blocked)
+            {
+                _hoverZone = null;
+                _cursor?.SetState(false, false);
+                _hasLastMouse = false;
+                RefreshHud();
+                return;
+            }
 
             Vector2 screen = mouse.position.ReadValue();
             bool held = mouse.leftButton.isPressed;
@@ -246,7 +261,8 @@ namespace VNEffects
             return pool[chosen];
         }
 
-        void PlayFeedback(VNInteractionFeedback fb, float now, bool isStageEnter = false)
+        void PlayFeedback(VNInteractionFeedback fb, float now, bool isStageEnter = false,
+            bool allowBlocking = true)
         {
             if (fb == null || fb.IsEmpty) return;
 
@@ -266,16 +282,58 @@ namespace VNEffects
             string voice = PickVoice(fb.voicePool);
             if (!string.IsNullOrEmpty(voice)) _audio?.PlayVoice(voice);
 
+            if (!Mathf.Approximately(fb.excite, 0f)) _score.AddExcite(fb.excite);
+            if (!string.IsNullOrEmpty(fb.statOp)) ApplyStatOp(fb.statOp);
+            if (isStageEnter && _hintText != null) FlashHint();
+
             string line = fb.LocalizedLine;
+            bool hasScript = !string.IsNullOrEmpty(fb.scriptLines);
+            // 已经在播阻塞反馈时，新来的一条降级为非阻塞：排队会让台词堆成一串，
+            // 玩家得连点好几下才能继续摸
+            bool blocking = fb.blocking && !_blocked && allowBlocking;
+
+            if (blocking || hasScript)
+            {
+                StartCoroutine(FeedbackCo(line, fb.scriptLines, blocking));
+                return;
+            }
+
             if (!string.IsNullOrEmpty(line))
                 _stage.Say(_charId, _char.expression, line);
+        }
 
-            if (!Mathf.Approximately(fb.excite, 0f)) _score.AddExcite(fb.excite);
+        /// <summary>
+        /// 阻塞台词 / 内嵌剧本行都走 Runner 的 <see cref="VNScriptRunner.RunInlineCo"/>：
+        /// 台词拼成一行丢回去，等打字完与等玩家推进（含 Auto / Skip）全部复用
+        /// Runner 现成的 SayCo，不用在模块里重写一套推进逻辑。
+        /// </summary>
+        System.Collections.IEnumerator FeedbackCo(string line, string scriptLines, bool blocking)
+        {
+            if (_runner == null)
+            {
+                // 没有 Runner（比如单独测试模块）时退化为不等待
+                if (!string.IsNullOrEmpty(line)) _stage.Say(_charId, _char.expression, line);
+                yield break;
+            }
 
-            if (!string.IsNullOrEmpty(fb.statOp)) ApplyStatOp(fb.statOp);
+            if (blocking) _blocked = true;
 
-            // TODO(批次3)：fb.scriptLines → runner.RunInlineCo()；fb.blocking → 暂停判定等推进
-            if (isStageEnter && _hintText != null) FlashHint();
+            if (!string.IsNullOrEmpty(line))
+            {
+                if (blocking)
+                {
+                    // 注意：角色 id 里有空格会拼错行；项目约定 id 不含空格
+                    string expr = string.IsNullOrEmpty(_char.expression)
+                        ? "" : " " + _char.expression;
+                    yield return _runner.RunInlineCo($"{_charId}{expr}: {line}");
+                }
+                else _stage.Say(_charId, _char.expression, line);
+            }
+
+            if (!string.IsNullOrEmpty(scriptLines))
+                yield return _runner.RunInlineCo(scriptLines);
+
+            _blocked = false;
         }
 
         /// <summary>随机抽一条语音，尽量不重复上一条</summary>
@@ -412,7 +470,10 @@ namespace VNEffects
 
             if (endFb != null && !string.IsNullOrEmpty(endFb.expression))
                 _endExpressionKept = true;      // 结局指定了表情 → 保留它，不还原
-            PlayFeedback(endFb, Time.unscaledTime);
+
+            // 结束反馈强制非阻塞：模块 0.7 秒后就 Done 并被销毁，等玩家推进的台词
+            // 会被拦腰打断。结算台词该写在剧本的「* 结果行」下面，这里只放表情/漫符/短演出
+            PlayFeedback(endFb, Time.unscaledTime, false, false);
 
             RestoreExpression();
 

@@ -117,10 +117,10 @@ MonoBehaviour:
       emote: 
       overlay: 
       overlayStrength: 1
-      line: "\u2026\u55EF\uFF1F"
+      line: "\u2026\u55EF\uFF1F\u600E\u4E48\u7A81\u7136\u8FD9\u6837\u3002"
       lineEn: 
       lineJa: 
-      blocking: 0
+      blocking: 1
       voicePool: []
       se: 
       excite: 0
@@ -140,10 +140,10 @@ MonoBehaviour:
       emote: 
       overlay: 
       overlayStrength: 1
-      line: "\u522B\u3001\u522B\u8FD9\u6837\u2026"
+      line: "\u522B\u3001\u522B\u8FD9\u6837\u2026\u4F1A\u88AB\u4EBA\u770B\u5230\u7684\u3002"
       lineEn: 
       lineJa: 
-      blocking: 0
+      blocking: 1
       voicePool: []
       se: 
       excite: 0
@@ -163,15 +163,17 @@ MonoBehaviour:
       emote: 
       overlay: 
       overlayStrength: 1
-      line: "\u2026\u2026"
+      line: "\u2026\u2026\u6211\u5DF2\u7ECF\uFF0C\u4E0D\u884C\u4E86\u3002"
       lineEn: 
       lineJa: 
-      blocking: 0
+      blocking: 1
       voicePool: []
       se: 
       excite: 0
       statOp: 
-      scriptLines: 
+      scriptLines: 'fx shockwave light
+
+        camera pushin 1.08 2 @'
   rules:
   - zoneId: "\u5934"
     itemId: 

@@ -267,6 +267,62 @@ namespace VNEffects
             return actualLine;
         }
 
+        // ------------------------------------------------------------------
+        // 内嵌剧本行（事件模块在交互中途插播演出用）
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 内嵌剧本行里**禁用**的命令。这些命令会改控制流或存档状态，而调用方
+        /// （事件模块）此刻正被主协程 yield 等待着 —— 让它们跑起来会把 Runner
+        /// 的 _index / _callStack / 存档状态搅乱，症状是事件结束后剧本跳到莫名其妙的地方。
+        /// 演出类命令（say / voice / se / fx / mark / camseq / weather …）一律放行。
+        /// </summary>
+        static readonly HashSet<string> InlineBlockedKeywords = new HashSet<string>
+        {
+            "jump", "choice", "call", "return", "label", "event",
+            "save", "load", "chapter", "endgame",
+        };
+
+        /// <summary>
+        /// 执行一小段剧本行（供事件模块在交互中途插播演出）。
+        /// 逐条走与主循环同一个 <see cref="Dispatch"/>，所以命令语义永远一致；
+        /// 行尾 @ 的异步语义也照旧。控制流命令被 <see cref="InlineBlockedKeywords"/> 挡掉。
+        /// </summary>
+        public IEnumerator RunInlineCo(string lines)
+        {
+            if (string.IsNullOrWhiteSpace(lines)) yield break;
+
+            List<VNScriptCommand> commands;
+            try { commands = VNScriptParser.Parse(lines); }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[VNScript] 内嵌剧本行解析失败：{e.Message}");
+                yield break;
+            }
+
+            foreach (var raw in commands)
+            {
+                if (raw == null) continue;
+                if (InlineBlockedKeywords.Contains(raw.keyword))
+                {
+                    Debug.LogWarning($"[VNScript] 内嵌剧本行里不能用「{raw.keyword}」" +
+                                     "（会打乱正在等待模块的剧本流程），该行已跳过");
+                    continue;
+                }
+
+                var cmd = ResolveParameters(raw);
+                IEnumerator co = null;
+                try { co = Dispatch(cmd); }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[VNScript] 内嵌剧本行执行出错（{cmd.keyword}）：{e.Message}");
+                }
+                if (co == null) continue;
+                if (cmd.isAsync) StartCoroutine(co);
+                else yield return StartCoroutine(co);
+            }
+        }
+
         void RebuildStateBefore(int exclusiveIndex)
         {
             if (stage == null)
