@@ -4,6 +4,14 @@ using UnityEngine;
 
 namespace VNEffects
 {
+    /// <summary>反馈的触发方式限制</summary>
+    public enum VNFeedbackTrigger
+    {
+        [InspectorName("点击或拖动都行")] Any = 0,
+        [InspectorName("只在点击时")] ClickOnly = 1,
+        [InspectorName("只在拖动时")] DragOnly = 2,
+    }
+
     /// <summary>光标待机动画（每个道具在资产里各自选一种）</summary>
     public enum VNCursorIdleAnim
     {
@@ -41,6 +49,10 @@ namespace VNEffects
         [Header("触发条件：阶段下限 / 上限（-1 = 不限）")]
         public int minStage = -1;
         public int maxStage = -1;
+
+        [Header("只在点击时 / 只在拖动时触发。掌印那种「点一下印一个」要选「只点击」，" +
+                "否则拖一下会连着印出一串")]
+        public VNFeedbackTrigger trigger = VNFeedbackTrigger.Any;
 
         [Header("随机池里的权重（同时满足条件的多条按权重抽一条）")]
         [Min(0f)]
@@ -113,6 +125,17 @@ namespace VNEffects
                     case VNLanguage.Japanese: return string.IsNullOrEmpty(lineJa) ? line : lineJa;
                     default: return line;
                 }
+            }
+        }
+
+        /// <summary>本次判定的输入方式是否满足 trigger 条件</summary>
+        public bool TriggerOk(bool fromClick)
+        {
+            switch (trigger)
+            {
+                case VNFeedbackTrigger.ClickOnly: return fromClick;
+                case VNFeedbackTrigger.DragOnly: return !fromClick;
+                default: return true;
             }
         }
 

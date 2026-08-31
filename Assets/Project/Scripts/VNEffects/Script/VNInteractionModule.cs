@@ -71,6 +71,8 @@ namespace VNEffects
         VNTouchZone _hoverZone;
         string _lastVoiceId;
         Camera _uiCamera;
+        /// <summary>本次判定是点击触发还是拖动触发（反馈的 trigger 条件用）</summary>
+        bool _lastTouchWasClick;
         readonly List<int> _candidateIdx = new List<int>();
 
         // UI
@@ -193,7 +195,7 @@ namespace VNEffects
                     if (moved > 0.01f) units += moved / Mathf.Max(1f, _def.dragPixelsPerUnit);
                 }
 
-                if (units > 0f) ApplyTouch(_hoverZone, units, now);
+                if (units > 0f) ApplyTouch(_hoverZone, units, now, clicked);
             }
 
             _lastMouse = screen;
@@ -209,8 +211,9 @@ namespace VNEffects
         // 判定
         // ------------------------------------------------------------------
 
-        void ApplyTouch(VNTouchZone zone, float units, float now)
+        void ApplyTouch(VNTouchZone zone, float units, float now, bool fromClick = false)
         {
+            _lastTouchWasClick = fromClick;
             // 禁忌部位：阶段不够 → 拒绝
             if (_score.Stage < zone.unlockStage)
             {
@@ -255,6 +258,7 @@ namespace VNEffects
             {
                 var fb = pool[i];
                 if (fb == null || fb.IsEmpty || !fb.StageOk(_score.Stage)) continue;
+                if (!fb.TriggerOk(_lastTouchWasClick)) continue;
                 if (!_score.CoolDownReady(key + "#" + i, now)) continue;
                 _candidateIdx.Add(i);
                 total += Mathf.Max(0.01f, fb.weight);
@@ -386,9 +390,16 @@ namespace VNEffects
             sb.Replace("{cx}", F(cursor.x)).Replace("{cy}", F(cursor.y));
             sb.Replace("{zx}", F(zone.x)).Replace("{zy}", F(zone.y));
             sb.Replace("{px}", F(person.x)).Replace("{py}", F(person.y));
+            // imprint 要的是立绘归一化坐标，和 liquid 的 viewport 比例不是一回事
+            Vector2 normCursor = SpriteNormOfScreen(cursorScreen);
+            Vector2 normZone = _hoverZone != null ? _hoverZone.center : normCursor;
+            sb.Replace("{nx}", F(normCursor.x)).Replace("{ny}", F(normCursor.y));
+            sb.Replace("{znx}", F(normZone.x)).Replace("{zny}", F(normZone.y));
             sb.Replace("{prog}", F(_score.ProgressTo(_def.ResolvedTargetStage)));
             sb.Replace("{stage}", _score.Stage.ToString());
             sb.Replace("{zone}", _hoverZone != null ? _hoverZone.id : "");
+            // {char} = 本场互动的角色 id，这样示例/模板资产不用写死角色名
+            sb.Replace("{char}", _charId ?? "");
             return sb.ToString();
         }
 
@@ -400,6 +411,17 @@ namespace VNEffects
         static Vector2 ViewportOfScreen(Vector2 screen) =>
             new Vector2(Mathf.Clamp01(screen.x / Mathf.Max(1f, Screen.width)),
                         Mathf.Clamp01(screen.y / Mathf.Max(1f, Screen.height)));
+
+        /// <summary>屏幕点 → 立绘归一化坐标（-0.5~0.5）；换算失败回 (0,0)</summary>
+        Vector2 SpriteNormOfScreen(Vector2 screen)
+        {
+            if (_char == null || _char.rect == null) return Vector2.zero;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    _char.rect, screen, UiCamera, out Vector2 local)) return Vector2.zero;
+            Vector2 size = _char.rect.rect.size;
+            if (size.x <= 0.01f || size.y <= 0.01f) return Vector2.zero;
+            return new Vector2(local.x / size.x, local.y / size.y);
+        }
 
         /// <summary>立绘归一化坐标（-0.5~0.5）→ viewport 比例</summary>
         Vector2 ViewportOfSpriteNorm(Vector2 norm)
@@ -552,6 +574,7 @@ namespace VNEffects
 
             WriteFlags();
             DestroyZoneOverlay();     // 结算台词已经在说了，调试框不该还挂在脸上
+            ClearImprints();
             _cursor?.Dispose();       // 系统光标立刻还回去，别等模块销毁
             RunCleanup();             // 关掉被反馈开起来的持续状态（spray / wet …）
 
@@ -599,6 +622,7 @@ namespace VNEffects
             _endExpressionKept = false;
             RestoreExpression();
             DestroyZoneOverlay();
+            ClearImprints();
             _cursor?.Dispose();
             RunCleanup();
         }
@@ -608,6 +632,7 @@ namespace VNEffects
             // 保底：任何路径销毁都不留下改过的表情，也绝不留下消失的鼠标指针
             if (_phase != Phase.Ending) RestoreExpression();
             DestroyZoneOverlay();
+            ClearImprints();
             _cursor?.Dispose();
             RunCleanup();
         }
@@ -618,6 +643,16 @@ namespace VNEffects
         /// 破「模块不碰舞台」的铁律要自己付的账：凡是挂到舞台上的东西，
         /// 三条退出路径都得亲手清干净。
         /// </summary>
+        /// <summary>
+        /// 清掉本场留下的立绘痕迹。痕迹是**互动内的临时演出**（不进存档），
+        /// 所以四条退出路径都要清 —— 否则互动结束了掌印还留在脸上，
+        /// 而它又不在存档里，读档后会莫名其妙地消失。
+        /// </summary>
+        void ClearImprints()
+        {
+            if (_char != null && _char.imprints != null) _char.imprints.ClearAll(0.35f);
+        }
+
         void DestroyZoneOverlay()
         {
             if (_zoneOverlay == null) return;

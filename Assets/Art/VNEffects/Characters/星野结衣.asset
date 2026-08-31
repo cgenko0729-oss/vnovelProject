@@ -36,6 +36,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 587ce8543c233f14d874893fe0f2d5f6, type: 3}
   - name: "\u574F\u7B11"
     sprite: {fileID: 21300000, guid: e24e321aab529e648aa3c28d84742397, type: 3}
+  - name: inter
+    sprite: {fileID: 21300000, guid: 6fa680597dc856841b173b006dff1d4c, type: 3}
   enableBlink: 1
   blinkMode: 1
   blinkSprite: {fileID: 21300000, guid: 8f7e0401a82d505429ebbf54e5d801a3, type: 3}
@@ -48,6 +50,14 @@ MonoBehaviour:
   mouthDefaultExpressionOnly: 1
   mouthIntervalMin: 0.14
   mouthIntervalMax: 0.28
+  overlays: []
+  imprints:
+  - id: "\u624B\u638C"
+    sprite: {fileID: 21300000, guid: 253db09f9554e4243977ebc71fa090ca, type: 3}
+    baseScale: 0.13
+    tint: {r: 1, g: 0.32, b: 0.38, a: 0.5}
+    life: 7
+    randomRotation: 14
   markAnchor: {x: 0.1, y: 0.45}
   markScale: 1
   markSprites:

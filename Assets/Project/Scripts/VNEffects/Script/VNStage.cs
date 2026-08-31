@@ -138,6 +138,8 @@ namespace VNEffects
             public VNCharacterMarks marks;
             /// <summary>情绪叠加层（潮红/汗/泪）；强度进存档</summary>
             public VNCharacterOverlay overlay;
+            /// <summary>立绘痕迹（掌印等）；临时演出，不进存档</summary>
+            public VNCharacterImprints imprints;
             public string expression;
             /// <summary>登场用的是日常向预设 → 常驻效果里不开周期扫光（进存档）</summary>
             public bool casualEntrance;
@@ -448,6 +450,31 @@ namespace VNEffects
                                  "（在 VNCharacterDef.overlays 登记）");
         }
 
+        /// <summary>
+        /// 印一枚立绘痕迹。pos 是立绘归一化坐标（-0.5~0.5），与部位框同一套语义。
+        /// id 为 clear/off 时清空全部。剧本 imprint 命令与互动模块共用这一个入口。
+        /// </summary>
+        public void Imprint(string id, string charId, Vector2 pos, float size, float life,
+            float rotation, string zoneId = null, int line = 0)
+        {
+            var c = Get(charId);
+            if (c == null)
+            {
+                Debug.LogWarning($"[VNScript] 第 {line} 行：角色「{charId}」不在场，imprint 无效");
+                return;
+            }
+            if (c.imprints == null) return;
+
+            if (string.IsNullOrEmpty(id) || id == "clear" || id == "off")
+            {
+                c.imprints.ClearAll();
+                return;
+            }
+            if (!c.imprints.Add(id, pos, size, life, rotation, zoneId))
+                Debug.LogWarning($"[VNScript] 第 {line} 行：角色「{charId}」没有痕迹「{id}」" +
+                                 "（在 VNCharacterDef.imprints 登记）");
+        }
+
         public void SetExpression(string id, string expr)
         {
             var c = Get(id);
@@ -583,6 +610,8 @@ namespace VNEffects
             c.marks.Initialize(rect, def, c.fx.Mat);
             c.overlay = go.AddComponent<VNCharacterOverlay>();
             c.overlay.Initialize(def, c.fx.Mat);
+            c.imprints = go.AddComponent<VNCharacterImprints>();
+            c.imprints.Initialize(rect, def, c.fx.Mat);
             go.AddComponent<VNFootShadow>();
 
             _active[def.id] = c;

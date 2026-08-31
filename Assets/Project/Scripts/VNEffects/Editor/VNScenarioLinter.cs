@@ -101,6 +101,8 @@ namespace VNEffects.EditorTools
             public HashSet<string> bgms = new HashSet<string>();
             public HashSet<string> ses = new HashSet<string>();
             public HashSet<string> voices = new HashSet<string>();
+            public Dictionary<string, HashSet<string>> charImprints =
+                new Dictionary<string, HashSet<string>>();
             public Dictionary<string, HashSet<string>> charOverlays =
                 new Dictionary<string, HashSet<string>>();
             public Dictionary<string, HashSet<string>> charExpressions =
@@ -276,6 +278,12 @@ namespace VNEffects.EditorTools
                     foreach (var o in def.overlays)
                         if (o != null && !string.IsNullOrEmpty(o.id)) layers.Add(o.id);
                 reg.charOverlays[def.id] = layers;
+
+                var traceIds = new HashSet<string>();
+                if (def.imprints != null)
+                    foreach (var im in def.imprints)
+                        if (im != null && !string.IsNullOrEmpty(im.id)) traceIds.Add(im.id);
+                reg.charImprints[def.id] = traceIds;
             }
 
             var registry = Object.FindFirstObjectByType<VNEventRegistry>(FindObjectsInactive.Include);
@@ -578,6 +586,28 @@ namespace VNEffects.EditorTools
                             Add(issues, VNLintSeverity.Error, "bad-mark-mode", f, c.line,
                                 $"mark 的第三个参数「{markMode}」不合法",
                                 "第三个参数只能是 keep（常驻）或 off（移除该符号），留空 = 弹一下就消失。");
+                        break;
+                    }
+
+                    case "imprint":
+                    {
+                        // 痕迹 id 拼错运行时只有一条 Warning，画面上什么都不会发生
+                        CheckCharacter(issues, f, c.line, c.Arg(0), reg);
+                        string trace = c.Arg(1);
+                        if (!string.IsNullOrEmpty(trace) && !Dynamic(trace) &&
+                            trace != "clear" && trace != "off" && !Dynamic(c.Arg(0)) &&
+                            reg.charImprints.TryGetValue(c.Arg(0), out var traces))
+                        {
+                            if (traces.Count == 0)
+                                Add(issues, VNLintSeverity.Warning, "no-imprint", f, c.line,
+                                    $"角色「{c.Arg(0)}」还没有配任何立绘痕迹",
+                                    "在角色资产 VNCharacterDef.imprints 里登记（id + 痕迹图）。");
+                            else if (!traces.Contains(trace))
+                                Add(issues, VNLintSeverity.Warning, "unknown-imprint", f, c.line,
+                                    $"角色「{c.Arg(0)}」没有痕迹「{trace}」",
+                                    $"该角色已有的痕迹：{string.Join(" / ", traces.OrderBy(s3 => s3))}。" +
+                                    "清空全部写 `imprint <角色> clear`。");
+                        }
                         break;
                     }
 

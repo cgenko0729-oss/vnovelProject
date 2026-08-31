@@ -51,6 +51,7 @@ namespace VNEffects.EditorTools
             EnsureFolder(ZoneDir);
             EnsureFolder(InteractionDir);
             var zoneDef = EnsureDemoZones(report);
+            EnsureDemoImprint(report);
             EnsureDemoInteraction(zoneDef, report);
 
             var allZones = LoadAll<VNTouchZoneDef>();
@@ -142,6 +143,35 @@ namespace VNEffects.EditorTools
             return def;
         }
 
+        /// <summary>
+        /// 角色资产上补一枚「手掌」痕迹（图直接用道具目录里的红手掌）。
+        /// 已经有的话原样不动 —— 绝不覆盖用户调过的配色与尺寸。
+        /// </summary>
+        static void EnsureDemoImprint(List<string> report)
+        {
+            var ch = AssetDatabase.LoadAssetAtPath<VNCharacterDef>(
+                $"Assets/Art/VNEffects/Characters/{DemoCharacter}.asset");
+            if (ch == null) return;
+            if (ch.imprints == null) ch.imprints = new List<VNCharacterDef.ImprintDef>();
+            if (ch.imprints.Exists(i => i != null && i.id == "手掌"))
+            {
+                report.Add("角色资产已有「手掌」痕迹，保留不动");
+                return;
+            }
+
+            ch.imprints.Add(new VNCharacterDef.ImprintDef
+            {
+                id = "手掌",
+                sprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{ItemDir}/item2.png"),
+                baseScale = 0.13f,
+                tint = new Color(1f, 0.32f, 0.38f, 0.5f),   // 半透明粉红，不是实心红
+                life = 7f,
+                randomRotation = 14f,
+            });
+            EditorUtility.SetDirty(ch);
+            report.Add($"角色资产「{DemoCharacter}」新增痕迹「手掌」");
+        }
+
         static VNTouchZone Zone(string id, string label, Vector2 center, Vector2 size,
             int priority, float gain, int unlockStage = 0)
         {
@@ -202,6 +232,11 @@ namespace VNEffects.EditorTools
                     Fb("摸脸 · 侧头", emote: "害羞", minStage: 1)),
                 Rule("耳", 1.4f, 6f,
                     Fb("碰耳 · 颤抖", expr: "惊讶", mark: "汗", line: "耳朵…不行啦…", excite: 4f)),
+                // ⑤ 点一下印一个掌印：限定道具「手掌」，且只在点击时触发
+                //    （trigger 不设 ClickOnly 的话，拖一下会连着印出一串）
+                RuleFor("脸", "手掌", 1.2f, 0.5f,
+                    FbClick("脸·掌印", expr: "害羞",
+                        script: "imprint {char} 手掌 pos:{nx},{ny} life:7")),
                 // ① 摸到特定部位就喷：{cx}{cy} = 光标位置，所以是「摸哪儿喷哪儿」
                 Rule("颈", 1.5f, 6f,
                     Fb("脖颈", expr: "害羞", mark: "红晕", line: "呀…！", excite: 5f,
@@ -312,6 +347,24 @@ namespace VNEffects.EditorTools
                 idleExpression = idleExpr,
                 enterFeedback = fb,
             };
+        }
+
+        /// <summary>限定道具的规则：只有拿着这个道具摸这个部位才走这条</summary>
+        static VNInteractionZoneRule RuleFor(string zoneId, string itemId, float gainPerUnit,
+            float feedbackEvery, params VNInteractionFeedback[] feedbacks)
+        {
+            var r = Rule(zoneId, gainPerUnit, feedbackEvery, feedbacks);
+            r.itemId = itemId;
+            return r;
+        }
+
+        /// <summary>只在「点击」时触发的反馈（拖动不算）</summary>
+        static VNInteractionFeedback FbClick(string note, string expr = null,
+            string script = null)
+        {
+            var fb = Fb(note, expr: expr, cooldown: 0.2f, script: script);
+            fb.trigger = VNFeedbackTrigger.ClickOnly;
+            return fb;
         }
 
         static VNInteractionZoneRule Rule(string zoneId, float gainPerUnit,

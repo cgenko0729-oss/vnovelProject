@@ -2160,6 +2160,18 @@ namespace VNEffects
                         ParseMarkPos(cmd.Kw("pos"), cmd.line),
                         cmd.KwF("size", 1f), cmd.KwF("dur", 1.1f), cmd.line));
 
+                case "imprint":
+                {
+                    // imprint <角色> <痕迹id|clear> [pos:x,y] [size:] [life:秒] [rot:度]
+                    // 立绘痕迹（掌印等）：pos 是立绘归一化坐标 (0,0)=立绘中心，
+                    // 与部位框/markAnchor 同一套。临时演出，会自己褪色消失，不进存档
+                    Vector2 ipos = ParseMarkPos(cmd.Kw("pos"), cmd.line) ?? Vector2.zero;
+                    stage.Imprint(cmd.Arg(1), cmd.Arg(0), ipos,
+                        cmd.KwF("size", 1f), cmd.KwF("life", 0f), cmd.KwF("rot", 0f),
+                        null, cmd.line);
+                    return null;
+                }
+
                 case "overlay":
                     // overlay <角色> <层id|clear> [强度 0~1] [time:秒]
                     // 情绪叠加层（潮红/汗/泪）；层在 VNCharacterDef.overlays 登记。

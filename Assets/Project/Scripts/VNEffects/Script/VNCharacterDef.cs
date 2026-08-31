@@ -160,6 +160,36 @@ namespace VNEffects
         public List<OverlayLayer> overlays = new List<OverlayLayer>();
 
         [System.Serializable]
+        public class ImprintDef
+        {
+            [Header("痕迹 id（剧本 imprint 命令引用，如 手掌 / 口红 / 绳痕）")]
+            public string id;
+
+            [Header("痕迹图（透明背景的小图，会被染成下面的 tint 色）")]
+            public Sprite sprite;
+
+            [Header("基准尺寸：边长 = 立绘显示高度 × 此值（再乘剧本的 size:）")]
+            [Range(0.02f, 1f)]
+            public float baseScale = 0.16f;
+
+            [Header("着色。alpha 就是印上瞬间的浓度；之后会自动褪色（红→粉→无）")]
+            public Color tint = new Color(1f, 0.35f, 0.4f, 0.75f);
+
+            [Header("默认存在时长（秒），剧本 life: 可覆盖")]
+            [Min(0.5f)]
+            public float life = 8f;
+
+            [Header("随机旋转范围（度）：每枚痕迹角度略有不同，" +
+                    "否则连点出来一排一模一样的印子会很假")]
+            [Range(0f, 90f)]
+            public float randomRotation = 12f;
+        }
+
+        [Header("立绘痕迹（imprint 命令：掌印 / 口红印 / 绳痕…）。" +
+                "**临时演出，不进存档** —— 会自己褪色消失")]
+        public List<ImprintDef> imprints = new List<ImprintDef>();
+
+        [System.Serializable]
         public class MarkOverride
         {
             [Header("漫符名（英文正名 sweat/anger/... 或中文别名 汗/怒/...）")]

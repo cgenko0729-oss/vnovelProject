@@ -211,6 +211,17 @@ namespace VNEffects.EditorTools
                 Kw("pos", "pos", VNParamSource.Text),
                 Kw("size", "size", VNParamSource.Number, def: "1"),
                 Kw("dur", "dur", VNParamSource.Number, def: "1.1"));
+            Add("imprint", "Character",
+                "imprint <char> <trace|clear> [pos:x,y] [size:1] [life:秒] [rot:度]" + "\n" +
+                "立绘痕迹（掌印/口红印/绳痕…）：印在 pos 指定的位置，随时间褪色并自行消失。" + "\n" +
+                "pos 是立绘归一化坐标，(0,0) = 立绘中心，与部位框/markAnchor 同一套；" + "\n" +
+                "痕迹在角色资产 VNCharacterDef.imprints 里登记。临时演出，不进存档",
+                Pos("character", "char", VNParamSource.Character),
+                Pos("imprint", "trace", VNParamSource.Text),
+                Kw("pos", "pos", VNParamSource.Text),
+                Kw("size", "size", VNParamSource.Number, def: "1"),
+                Kw("life", "life", VNParamSource.Number),
+                Kw("rot", "rot", VNParamSource.Number));
             Add("overlay", "Character",
                 "overlay <char> <layer|clear> [strength 0~1] [time:0.35]\n" +
                 "情绪叠加层（潮红/汗/泪）：与表情是加法关系，可多层共存、强度连续变化。\n" +
