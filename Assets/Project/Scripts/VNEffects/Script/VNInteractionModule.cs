@@ -19,8 +19,9 @@ namespace VNEffects
     ///
     /// **本模块刻意破一次「模块不碰舞台」的铁律**（先例：VNAiTalkModule）——
     /// 玩法本身就是对着舞台上的立绘操作，自绘一套立绘等于要把眨眼/口型/
-    /// 色调匹配/出场动画全部重接一遍。边界收紧为：只碰**表情与叠加层**，
-    /// 且正常结束 / ESC / CancelForDebug 三条路径都还原原表情。
+    /// 色调匹配/出场动画全部重接一遍。边界收紧为：只碰**表情与叠加层**
+    /// （外加互动期间临时关掉鼠标视差，见 SuspendParallax），
+    /// 且正常结束 / ESC / CancelForDebug 三条路径都原样还原。
     ///
     /// 射线：EventLayer 排序 60 在对话框 40 之上，所以
     ///   1) 不铺全屏暗幕 —— 会盖住对话框，台词就看不见了；
@@ -56,6 +57,9 @@ namespace VNEffects
         VNStage.ActiveCharacter _char;
         string _charId;
         string _originalExpression;
+        /// <summary>互动期间被临时关掉的鼠标视差（结束时按原状还原）</summary>
+        VNParallax _parallax;
+        bool _parallaxWasOn;
 
         readonly VNTouchScore _score = new VNTouchScore();
         readonly List<VNInteractionItem> _usableItems = new List<VNInteractionItem>();
@@ -126,6 +130,7 @@ namespace VNEffects
 
             BuildItemList(ctx.Kw("items"));
             _score.Init(_def.Thresholds());
+            SuspendParallax();
             ApplyStageIdleExpression(0);
 
             BuildUi();
@@ -591,6 +596,7 @@ namespace VNEffects
             PlayFeedback(endFb, VNTime.Time, false, false);
 
             RestoreExpression();
+            RestoreParallax();
 
             if (_hud != null)
                 _hud.DOScale(0.85f, 0.25f).SetUpdate(true).SetLink(gameObject);
@@ -617,11 +623,38 @@ namespace VNEffects
                 _stage.SetExpression(_charId, _originalExpression);
         }
 
+        /// <summary>
+        /// 互动期间关掉鼠标视差。这个玩法全程要拿光标去瞄立绘上的部位框，
+        /// 而视差干的正是「鼠标一动，整层就反向位移」——瞄哪儿哪儿跑。
+        /// 关的是整个 <see cref="VNParallax"/>（远/中/近三层一起定住）：
+        /// 只冻立绘那一层的话，立绘会和背景相对滑动，看着比全动还怪。
+        /// 关掉后 VNParallax 自己会按 damping 平滑归位，不会「啪」地跳一下。
+        /// </summary>
+        void SuspendParallax()
+        {
+            _parallax = FindAnyObjectByType<VNParallax>();
+            if (_parallax == null) return;      // 老场景没装视差，无事发生
+            _parallaxWasOn = _parallax.IsEnabled;
+            if (_parallaxWasOn) _parallax.SetEnabled(false);
+        }
+
+        /// <summary>
+        /// 还原视差。四条退出路径（正常结束 / ESC / 调试中断 / 销毁兜底）都要走，
+        /// 靠把 _parallax 置空做成幂等——本来就关着的话不要替玩家打开。
+        /// </summary>
+        void RestoreParallax()
+        {
+            if (_parallax == null) return;
+            if (_parallaxWasOn) _parallax.SetEnabled(true);
+            _parallax = null;
+        }
+
         public override void CancelForDebug()
         {
             _phase = Phase.Ending;
             _endExpressionKept = false;
             RestoreExpression();
+            RestoreParallax();
             DestroyZoneOverlay();
             ClearImprints();
             _cursor?.Dispose();
@@ -632,6 +665,7 @@ namespace VNEffects
         {
             // 保底：任何路径销毁都不留下改过的表情，也绝不留下消失的鼠标指针
             if (_phase != Phase.Ending) RestoreExpression();
+            RestoreParallax();
             DestroyZoneOverlay();
             ClearImprints();
             _cursor?.Dispose();

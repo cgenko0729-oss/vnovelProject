@@ -27,6 +27,7 @@ bg 教室_黄昏 transition:WhiteFlash
 mood Neutral
 hideHUD
 bg test1
+event badminton tutorial:羽毛球基础
 camseq
 > -1.1,42.6 1.09 0
 show 星野结衣 at:left expr:默认 with:StepIn
@@ -53,8 +54,21 @@ camera snapzoom 1.12 @
 show 星野结衣 at:center expr:默认 with:StepIn
 camseq
 > left 1.3 0 hold:1
-> right 1.3 1.1 ease:InOutSine xfade:1 shake:medium
+> right 1.3 1.1 ease:InOutSine shake:medium
 > -959,376 1 0.8 ease:OutSine
+camseq mode:char
+> 星野结衣:feet 1.5 0
+> stay 2
+> 星野结衣:head 1.6 2
+> middle 1 1 xfade:1
+camseq
+> 星野结衣:chest 1.5 0
+> middle 1 3 ease:OutSine
+camseq
+> 星野结衣:chest 1.3 1.5
+> 星野结衣:head 1.9 1.2
+> 星野结衣:head 2.4 0.9
+> 星野结衣:chest 1.3 1.2 ease:OutSine
 hide 星野结衣 with:RunOut
 show 星野结衣 at:left expr:默认 with:WalkIn
 mark 星野结衣 heart @ # 漫符：惊！弹一下就消失
@@ -226,6 +240,26 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
