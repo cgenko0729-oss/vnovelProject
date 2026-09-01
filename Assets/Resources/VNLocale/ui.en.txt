@@ -293,3 +293,12 @@ tutorial.next = ▼ Click to continue
 tutorial.done = ▼ Click to start
 tutorial.skip = ESC to skip
 tutorial.progress = {0} / {1}
+
+# -- Fog wipe --
+fogwipe.clarity = Clarity {0}%
+fogwipe.timer = {0}s
+fogwipe.hint = Hold the left button to wipe the glass
+fogwipe.result = Best clarity {0}%
+fogwipe.quit = Give up wiping?
+fogwipe.quit.yes = Give up
+fogwipe.quit.no = Keep wiping

@@ -210,6 +210,9 @@ namespace VNEffects
         public List<VNQuizDef> quizzes = new List<VNQuizDef>();
         public List<VNBadmintonDef> badmintons = new List<VNBadmintonDef>();
 
+        [Header("擦雾库（event wipefog id: 引用）")]
+        public List<VNFogWipeDef> fogWipes = new List<VNFogWipeDef>();
+
         [Header("AI 自由聊天人格（event aitalk persona: 引用）\n" +
                 "留空 = 生成器扫全工程 VNAiPersonaDef 自动登记")]
         public List<VNAiPersonaDef> aiPersonas = new List<VNAiPersonaDef>();

@@ -76,6 +76,9 @@ namespace VNEffects.EditorTools
                 ["photo"] = new HashSet<string> { "完美", "普通", "失败", "完成" },
                 // aitalk 的「失败」= 断网/无 key/被内容安全拦下，剧本必须接住
                 ["aitalk"] = new HashSet<string> { "好感提升", "普通", "冷场", "失败" },
+                // wipefog 的三档结果名可以在资产里改，这里只列默认值——
+                // 改过名的资产会让拼写校验误报，改名时记得同步这一行
+                ["wipefog"] = new HashSet<string> { "完美", "普通", "失败" },
                 // map 的结果名 = 地点名，取自场景模板，运行时补
             };
 
@@ -112,6 +115,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> quizIds = new HashSet<string>();
             public HashSet<string> badmintonIds = new HashSet<string>();
             public HashSet<string> aiPersonaIds = new HashSet<string>();
+            public HashSet<string> fogWipeIds = new HashSet<string>();
             /// <summary>人格 id → 它绑定的角色 id（校验 vs: 和 persona: 是否对得上）</summary>
             public Dictionary<string, string> aiPersonaCharacter =
                 new Dictionary<string, string>();
@@ -326,6 +330,15 @@ namespace VNEffects.EditorTools
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (def != null && !string.IsNullOrEmpty(def.badmintonId))
                     reg.badmintonIds.Add(def.badmintonId);
+            }
+
+            // 擦雾定义 id：同理扫资产，新建后不必重建场景就能被校验到
+            foreach (var guid in AssetDatabase.FindAssets("t:VNFogWipeDef"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<VNFogWipeDef>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (def != null && !string.IsNullOrEmpty(def.fogWipeId))
+                    reg.fogWipeIds.Add(def.fogWipeId);
             }
 
             // AI 人格 id：同理扫资产，新建人格后不必重建场景就能被校验到
@@ -993,6 +1006,64 @@ namespace VNEffects.EditorTools
                                     "评分模式不会返回「完成」",
                                     "写了 theme: 就会评分，结果是 完美 / 普通 / 失败 三选一。");
                         }
+                }
+
+                // 擦雾：id 拼错 = 事件直接返回空结果，整段被静默跳过
+                if (module == "wipefog")
+                {
+                    // ★ 谜底提前揭晓：event 之前先 cg 出同一张图。
+                    // 模块要到 OnLaunch 才铺得出雾，剧本先 cg 的话，从 cg 的转场开始
+                    // 到事件真正启动为止，清晰的画面一直摆在玩家眼前（中间再夹一句台词
+                    // 还得等玩家点一下，暴露得更久）。整个玩法的前提就没了。
+                    //
+                    // 只在「先 cg 的那张 == 要擦的那张」时报——先 cg 出别的图再擦另一张
+                    // 是正常写法，那张的谜底并没有被暴露。
+                    VNScriptCommand lastCg = null;
+                    foreach (var other in f.cmds)
+                    {
+                        if (other.keyword != "cg" || other.line >= c.line) continue;
+                        if (lastCg == null || other.line > lastCg.line) lastCg = other;
+                    }
+                    string shownCg = lastCg?.Arg(0);
+                    if (!string.IsNullOrEmpty(shownCg) && shownCg != "off")
+                    {
+                        string wantCg = c.Kw("cg");
+                        // cg: 留空 = 用舞台当前那张，也就是刚被 cg 出来的这张
+                        bool exposed = string.IsNullOrEmpty(wantCg) || Dynamic(wantCg)
+                                       || shownCg == wantCg;
+                        if (exposed)
+                            Add(issues, VNLintSeverity.Warning, "wipefog-cg-before-event",
+                                f, c.line,
+                                $"第 {lastCg.line} 行的「cg {shownCg}」会让谜底在开始擦之前就揭晓",
+                                "擦雾的雾要到事件启动才铺得出来，先 cg 的话清晰画面会先摆在" +
+                                "玩家眼前。改成删掉那行 cg、在 event 上写 " +
+                                $"`cg:{shownCg}` 让模块自己铺底图，进事件的第一帧就是盖满雾的" +
+                                "状态；要让画面在事件结束后留下继续演，就在「* 结果行」" +
+                                "跳到的分支里再写 cg（同一帧交接，不会闪）。");
+                    }
+
+                    string fogId = c.Kw("id");
+                    if (!string.IsNullOrEmpty(fogId) && !Dynamic(fogId) &&
+                        reg.fogWipeIds.Count > 0 && !reg.fogWipeIds.Contains(fogId))
+                        Add(issues, VNLintSeverity.Warning, "unknown-fogwipe", f, c.line,
+                            $"没有 id 为「{fogId}」的擦雾定义资产",
+                            "擦雾定义是 VN/Fog Wipe Definition 资产，fogWipeId 要和剧本写的一致；" +
+                            "拼错会让整段擦雾被静默跳过。" +
+                            $"当前已有：{string.Join(" / ", reg.fogWipeIds.OrderBy(s => s))}");
+
+                    // 手残的玩家会拿到「失败」，没接住就整段剧情静默跳过
+                    if (c.options != null && c.options.Count > 0)
+                    {
+                        bool hasFailure = false;
+                        foreach (var o in c.options)
+                            if (o.text?.Trim() == "失败") hasFailure = true;
+                        if (!hasFailure)
+                            Add(issues, VNLintSeverity.Warning, "wipefog-no-failure-branch",
+                                f, c.line,
+                                "event wipefog 没有接住「* 失败」结果行",
+                                "玩家没擦到门槛时模块会返回「失败」，没接住就会静默按顺序继续。" +
+                                "不想要失败分支的话，把资产的「普通」门槛调到 0 更稳。");
+                    }
                 }
 
                 // AI 自由聊天：三种配置错误都会让整段对话退化成兜底台词
