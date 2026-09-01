@@ -824,9 +824,11 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
 5. 发光走材质 HDR 颜色（>1）+ Bloom，不走顶点色
    （**推论**：任何"让某层躲开后处理"的方案都会连 Bloom 一起躲开，见下方坑清单）
 6. 事件模块三铁律（见第六节）
-7. 新功能**动手前**先开 `feature/<名>` 分支；实现完等用户确认 → 用户叫了才 commit/push/
-   `gh pr create` → 用户叫了才写文档（同分支同 PR）→ 用户自己在 GitHub 合并 → 我 checkout main + pull。
-   **永不删分支**（详见技能 `vn-new-feature`）
+7. 动手前先问用户「走 `feature` 分支 + PR，还是当小改动直接改 main」。
+   分支路线：开 `feature/<名>` → 实现完等确认 → 用户叫了才 commit/push/`gh pr create` →
+   用户叫了才写文档（同分支同 PR）→ 用户自己在 GitHub 合并 → 我 checkout main + pull。
+   小改动路线（纯文档/typo/单文件小修/技能与素材登记）：直接在 main 上改，
+   **改完仍要等用户说「推」才 commit + push**。**永不删分支**（详见技能 `vn-new-feature`）
 8. 调色一律走 `VNImageEffectController.SetGrade(通道, …)`，禁止直接写
    `_Brightness` / `_Saturation`（六方共用会互相覆盖，详见 8.1 节）
 

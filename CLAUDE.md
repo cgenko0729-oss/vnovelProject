@@ -31,16 +31,26 @@
    | ③ 文档 | 用户说「更新文档」 | 在**同一个功能分支**上补 `WhatAiDo.md` 等文档 → commit → push，PR 自动带上（模板见技能 **vn-doc-update**） |
    | ④ 收尾 | 用户在 GitHub 上合并完并叫我 | `git checkout main` → `git pull`，确认同步；**合并由用户本人做，AI 不执行 merge** |
 
-3. **永远不删除任何分支**——用户靠分支回滚（GitHub 上合并 PR 时**不要勾 Delete branch**）
-4. 分支命名统一 `feature/<英文短名>`（历史上还有 `agent/*` 与更早的 `feature/*`，都保留不动）
-5. 提交信息英文标题、正文中文；尾部加 Co-Authored-By。**只 add 本次功能相关文件**——
+3. **小改动走「直接 main」快速通道**（不开分支、不开 PR）——**但走哪条路由用户拍板**：
+   **每个任务动手前先问用户一句**「这个走 `feature` 分支 + PR，还是当小改动直接在 `main` 上改？」，
+   等回答再动手（用户在需求里已经说了走哪条的，就不用再问）。
+   - 可以走快速通道的范围：**纯文档改动**（`.md`）／**typo、注释、玩家可见文案与本地化词条微调**／
+     **小 bug 修复与参数调值**（单文件、几行、不改架构不动存档格式）／
+     **技能文件（`.claude/skills/`）与素材登记**（进 VNGameConfig 这类配置性改动）
+   - 快速通道的节奏仍是**两段**：我在 `main` 工作区改完 → 报告 → **用户说「推」才**
+     逐文件 `git add` → commit → `git push origin main`。
+     **push 到 main 不可撤回，绝不自作主张推**
+   - 功能 PR 里的第③阶段文档**不走这条**——那是功能分支上的事，仍进同一个 PR
+4. **永远不删除任何分支**——用户靠分支回滚（GitHub 上合并 PR 时**不要勾 Delete branch**）
+5. 分支命名统一 `feature/<英文短名>`（历史上还有 `agent/*` 与更早的 `feature/*`，都保留不动）
+6. 提交信息英文标题、正文中文；尾部加 Co-Authored-By。**只 add 本次功能相关文件**——
    用户 Unity 工作区常年有无关的未提交改动，禁止 `git add -A` / `git add .`
 
 ## 技能索引（.claude/skills/，按需调用）
 
 | 技能 | 什么时候用 |
 |---|---|
-| vn-new-feature | 开始任何新功能/修 bug（切分支 → 实现 → 等确认 → gh 提交开 PR → 收尾） |
+| vn-new-feature | 开始任何新功能/修 bug（先问走分支还是直推 main → 实现 → 等确认 → gh 提交开 PR → 收尾） |
 | vn-doc-update | 用户叫「更新文档」时同步文档（WhatAiDo 章节模板等，写在功能分支上） |
 | vn-new-command | 给剧本 DSL 加新命令（全链路 9 步清单） |
 | vn-new-event-module | 写新玩法事件模块（三铁律、注册、结果契约） |
