@@ -1,0 +1,567 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02b4603c3d3b3ac4f9d0e2545f5583c4, type: 3}
+  m_Name: "\u521D\u6B21\u629A\u6478"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNInteractionDef
+  id: "\u521D\u6B21\u629A\u6478"
+  title: 
+  items:
+  - id: "\u624B"
+    displayName: "\u624B"
+    icon: {fileID: 21300000, guid: 5f65be2e5a1a1d941bda6c57ba068669, type: 3}
+    cursorHeight: 170
+    hotspot: {x: 0, y: 0.28}
+    iconRotation: 0
+    idleAnim: 1
+    idleFrequency: 1.2
+    idleAmplitude: 12
+    pressAnim: 2
+    pressFrequency: 9
+    pressAmplitude: 9
+    tiltWithMotion: 1
+    tiltMax: 22
+    gainScale: 1
+    unlockCondition: 
+  - id: "\u624B\u638C"
+    displayName: "\u624B\u638C"
+    icon: {fileID: 21300000, guid: 253db09f9554e4243977ebc71fa090ca, type: 3}
+    cursorHeight: 170
+    hotspot: {x: 0, y: 0.25}
+    iconRotation: 0
+    idleAnim: 3
+    idleFrequency: 1
+    idleAmplitude: 8
+    pressAnim: 3
+    pressFrequency: 6
+    pressAmplitude: 6
+    tiltWithMotion: 1
+    tiltMax: 22
+    gainScale: 1.1
+    unlockCondition: 
+  - id: "\u6309\u6469\u68D2"
+    displayName: "\u6309\u6469\u68D2"
+    icon: {fileID: 21300000, guid: 7a6f0709f60433a468871c8f530f3410, type: 3}
+    cursorHeight: 170
+    hotspot: {x: 0, y: 0.42}
+    iconRotation: 0
+    idleAnim: 2
+    idleFrequency: 0.8
+    idleAmplitude: 6
+    pressAnim: 1
+    pressFrequency: 22
+    pressAmplitude: 5
+    tiltWithMotion: 1
+    tiltMax: 22
+    gainScale: 1.6
+    unlockCondition: 
+  - id: "\u73A9\u5177"
+    displayName: "\u73A9\u5177"
+    icon: {fileID: 21300000, guid: 506c836ed1fc80843b8ae91664ae68a6, type: 3}
+    cursorHeight: 170
+    hotspot: {x: 0, y: 0.4}
+    iconRotation: 0
+    idleAnim: 4
+    idleFrequency: 0.9
+    idleAmplitude: 5
+    pressAnim: 1
+    pressFrequency: 18
+    pressAmplitude: 4
+    tiltWithMotion: 1
+    tiltMax: 22
+    gainScale: 1.5
+    unlockCondition: 
+  stages:
+  - name: "\u5E73\u9759"
+    threshold: 0
+    idleExpression: "\u9ED8\u8BA4"
+    enterFeedback:
+      note: 
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 1.5
+      expression: 
+      mark: 
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: 
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+  - name: "\u5FC3\u52A8"
+    threshold: 30
+    idleExpression: "\u5FAE\u7B11"
+    enterFeedback:
+      note: "\u8FDB\u5165 \u5FC3\u52A8"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: 
+      mark: "\u5BB3\u7F9E"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u2026\u55EF\uFF1F\u600E\u4E48\u7A81\u7136\u8FD9\u6837\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 1
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+  - name: "\u5BB3\u7F9E"
+    threshold: 80
+    idleExpression: "\u5BB3\u7F9E"
+    enterFeedback:
+      note: "\u8FDB\u5165 \u5BB3\u7F9E"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: 
+      mark: "\u7EA2\u6655"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u522B\u3001\u522B\u8FD9\u6837\u2026\u4F1A\u88AB\u4EBA\u770B\u5230\u7684\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 1
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: liquid splash x:{zx} y:{zy} type:water power:1.4
+  - name: "\u60C5\u52A8"
+    threshold: 150
+    idleExpression: "\u5BB3\u7F9E"
+    enterFeedback:
+      note: "\u8FDB\u5165 \u60C5\u52A8"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: 
+      mark: "\u5FC3"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u2026\u2026\u6211\u5DF2\u7ECF\uFF0C\u4E0D\u884C\u4E86\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 1
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 'fx shockwave light
+
+        camera pushin 1.08 2 @
+
+        liquid
+        spray on x:{zx} y:{zy} type:water rate:0.35 power:0.7
+
+        liquid wet
+        on amount:{prog}'
+  rules:
+  - zoneId: "\u5934"
+    itemId: 
+    gainPerUnit: 1
+    feedbacks:
+    - note: "\u6478\u5934 \xB7 \u8212\u670D"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u5FAE\u7B11"
+      mark: "\u97F3\u7B26"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u547C\u547C\u2026\u597D\u8212\u670D\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+    - note: "\u6478\u5934 \xB7 \u70B9\u5934"
+      minStage: 1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: 
+      mark: 
+      emote: "\u70B9\u5934"
+      overlay: 
+      overlayStrength: 1
+      line: 
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+    feedbackEvery: 8
+  - zoneId: "\u8138"
+    itemId: 
+    gainPerUnit: 1.2
+    feedbacks:
+    - note: "\u6478\u8138 \xB7 \u5BB3\u7F9E"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u5BB3\u7F9E"
+      mark: "\u7EA2\u6655"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u5514\u2026\u75D2\u75D2\u7684\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+    - note: "\u6478\u8138 \xB7 \u4FA7\u5934"
+      minStage: 1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: 
+      mark: 
+      emote: "\u5BB3\u7F9E"
+      overlay: 
+      overlayStrength: 1
+      line: 
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+    feedbackEvery: 7
+  - zoneId: "\u8033"
+    itemId: 
+    gainPerUnit: 1.4
+    feedbacks:
+    - note: "\u78B0\u8033 \xB7 \u98A4\u6296"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u60CA\u8BB6"
+      mark: "\u6C57"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u8033\u6735\u2026\u4E0D\u884C\u5566\u2026"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 4
+      statOp: 
+      scriptLines: 
+    feedbackEvery: 6
+  - zoneId: "\u9888"
+    itemId: 
+    gainPerUnit: 1.5
+    feedbacks:
+    - note: "\u8116\u9888"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u5BB3\u7F9E"
+      mark: "\u7EA2\u6655"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u5440\u2026\uFF01"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 5
+      statOp: 
+      scriptLines: liquid splash x:{cx} y:{cy} type:water power:0.8 screen:0.4
+    feedbackEvery: 6
+  - zoneId: "\u80A9"
+    itemId: 
+    gainPerUnit: 0.8
+    feedbacks:
+    - note: "\u80A9\u8180"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u5FAE\u7B11"
+      mark: 
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u80A9\u8180\u6709\u70B9\u9178\u5462\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: 
+    feedbackEvery: 9
+  - zoneId: "\u80F8"
+    itemId: 
+    gainPerUnit: 2
+    feedbacks:
+    - note: "\u80F8\u53E3"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u5BB3\u7F9E"
+      mark: "\u5FC3"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u2026\u7B28\u86CB\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 8
+      statOp: 
+      scriptLines: 
+    - note: "\u6301\u7EED\u55B7\u6C34"
+      minStage: 1
+      maxStage: -1
+      trigger: 0
+      weight: 10
+      cooldown: 999
+      expression: inter
+      mark: "\u5FC3"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u2026\u7B28\u86CB\u3002"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 8
+      statOp: 
+      scriptLines: liquid spray on x:{zx} y:{zy} type:water rate:7 power:7
+    feedbackEvery: 5
+  - zoneId: "\u8170"
+    itemId: 
+    gainPerUnit: 1.8
+    feedbacks:
+    - note: "\u8170"
+      minStage: -1
+      maxStage: -1
+      trigger: 0
+      weight: 1
+      cooldown: 2.5
+      expression: "\u60CA\u8BB6"
+      mark: "\u6C57"
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: "\u8170\u2026\u597D\u75D2\u2026"
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 6
+      statOp: 
+      scriptLines: 
+    feedbackEvery: 6
+  - zoneId: "\u8138"
+    itemId: "\u624B\u638C"
+    gainPerUnit: 1.2
+    feedbacks:
+    - note: "\u8138\xB7\u638C\u5370"
+      minStage: -1
+      maxStage: -1
+      trigger: 1
+      weight: 1
+      cooldown: 0.2
+      expression: "\u5BB3\u7F9E"
+      mark: 
+      emote: 
+      overlay: 
+      overlayStrength: 1
+      line: 
+      lineEn: 
+      lineJa: 
+      blocking: 0
+      voicePool: []
+      se: 
+      excite: 0
+      statOp: 
+      scriptLines: "imprint \u661F\u91CE\u7ED3\u8863 \u624B\u638C pos:{nx},{ny} life:7"
+    feedbackEvery: 0.5
+  dragPixelsPerUnit: 60
+  clickUnits: 0.6
+  exciteDecayPerSecond: 0
+  rejectFeedbacks:
+  - note: "\u62D2\u7EDD \xB7 \u751F\u6C14"
+    minStage: -1
+    maxStage: -1
+    trigger: 0
+    weight: 1
+    cooldown: 1.5
+    expression: "\u751F\u6C14"
+    mark: "\u6012"
+    emote: "\u751F\u6C14"
+    overlay: 
+    overlayStrength: 1
+    line: "\u5582\u2026\u2026\u73B0\u5728\u8FD8\u4E0D\u884C\u3002"
+    lineEn: 
+    lineJa: 
+    blocking: 0
+    voicePool: []
+    se: 
+    excite: -6
+    statOp: 
+    scriptLines: 
+  - note: "\u62D2\u7EDD \xB7 \u8EB2\u5F00"
+    minStage: -1
+    maxStage: -1
+    trigger: 0
+    weight: 1
+    cooldown: 1.5
+    expression: "\u60CA\u8BB6"
+    mark: 
+    emote: "\u6447\u5934"
+    overlay: 
+    overlayStrength: 1
+    line: "\u7B49\u3001\u7B49\u4E00\u4E0B\uFF01"
+    lineEn: 
+    lineJa: 
+    blocking: 0
+    voicePool: []
+    se: 
+    excite: -4
+    statOp: 
+    scriptLines: 
+  rejectLimit: 5
+  rejectCooldown: 1.2
+  targetStage: 3
+  timeLimit: 0
+  allowManualEnd: 1
+  autoEndOnTarget: 1
+  outcomeSatisfied: "\u6EE1\u8DB3"
+  outcomeNormal: "\u666E\u901A"
+  outcomeRejected: "\u62D2\u7EDD"
+  endSatisfied:
+    note: "\u7ED3\u5C40 \xB7 \u6EE1\u8DB3"
+    minStage: -1
+    maxStage: -1
+    trigger: 0
+    weight: 1
+    cooldown: 2.5
+    expression: "\u5BB3\u7F9E"
+    mark: "\u5FC3"
+    emote: 
+    overlay: 
+    overlayStrength: 1
+    line: "\u2026\u2026\u4ECA\u5929\uFF0C\u5C31\u5230\u8FD9\u91CC\u5427\u3002"
+    lineEn: 
+    lineJa: 
+    blocking: 0
+    voicePool: []
+    se: 
+    excite: 0
+    statOp: 
+    scriptLines: 
+  endNormal:
+    note: "\u7ED3\u5C40 \xB7 \u666E\u901A"
+    minStage: -1
+    maxStage: -1
+    trigger: 0
+    weight: 1
+    cooldown: 2.5
+    expression: "\u5FAE\u7B11"
+    mark: 
+    emote: 
+    overlay: 
+    overlayStrength: 1
+    line: "\u55EF\uFF0C\u8C22\u8C22\u4F60\u3002"
+    lineEn: 
+    lineJa: 
+    blocking: 0
+    voicePool: []
+    se: 
+    excite: 0
+    statOp: 
+    scriptLines: 
+  endRejected:
+    note: "\u7ED3\u5C40 \xB7 \u62D2\u7EDD"
+    minStage: -1
+    maxStage: -1
+    trigger: 0
+    weight: 1
+    cooldown: 2.5
+    expression: "\u751F\u6C14"
+    mark: 
+    emote: 
+    overlay: 
+    overlayStrength: 1
+    line: "\u2026\u2026\u6211\u5148\u8D70\u4E86\u3002"
+    lineEn: 
+    lineJa: 
+    blocking: 0
+    voicePool: []
+    se: 
+    excite: 0
+    statOp: 
+    scriptLines: 
+  flagPrefix: "\u629A\u6478"
+  cleanupLines: 'liquid spray off
+
+    liquid dry'

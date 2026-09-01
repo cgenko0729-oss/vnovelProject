@@ -92,9 +92,9 @@ namespace VNEffects
         /// <summary>P0 已实现 + 为 P1 预留的关键字（label/jump/choice 等先解析不执行）</summary>
         static readonly HashSet<string> Keywords = new HashSet<string>
         {
-            "bg", "cg", "show", "hide", "emote", "mark", "wait",
+            "bg", "cg", "show", "hide", "emote", "mark", "overlay", "imprint", "wait",
             "camera", "shake", "weather", "mood", "fx", "liquid", "bgscroll",
-            "sakura", "transition", "reset",
+            "sakura", "transition", "reset", "interlude",
             "label", "jump", "call", "return", "params", "flag", "stat", "time", "if", "choice",
             "chapter",
             "move", "bgm", "se", "voice", "volume",

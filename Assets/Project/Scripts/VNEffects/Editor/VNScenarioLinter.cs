@@ -101,6 +101,10 @@ namespace VNEffects.EditorTools
             public HashSet<string> bgms = new HashSet<string>();
             public HashSet<string> ses = new HashSet<string>();
             public HashSet<string> voices = new HashSet<string>();
+            public Dictionary<string, HashSet<string>> charImprints =
+                new Dictionary<string, HashSet<string>>();
+            public Dictionary<string, HashSet<string>> charOverlays =
+                new Dictionary<string, HashSet<string>>();
             public Dictionary<string, HashSet<string>> charExpressions =
                 new Dictionary<string, HashSet<string>>();
             public HashSet<string> eventModules = new HashSet<string>();
@@ -115,6 +119,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> photoFrameIds = new HashSet<string>();
             public HashSet<string> photoBackdropIds = new HashSet<string>();
             public HashSet<string> weatherIds = new HashSet<string>();
+            public HashSet<string> interludeIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
             public bool sceneRegistryFound;   // 场景里有没有 VNEventRegistry
@@ -242,6 +247,12 @@ namespace VNEffects.EditorTools
                     if (s != null && !string.IsNullOrEmpty(s.id)) reg.dialogueSkins.Add(s.id);
                 foreach (var s in cfg.choiceSkins)
                     if (s != null && !string.IsNullOrEmpty(s.id)) reg.choiceSkins.Add(s.id);
+                foreach (var d in cfg.interludes)
+                {
+                    if (d == null) continue;
+                    // id 留空按资产文件名认，与运行时 VNScriptRunner.FindInterlude 一致
+                    reg.interludeIds.Add(string.IsNullOrEmpty(d.id) ? d.name : d.id);
+                }
             }
 
             var stage = Object.FindFirstObjectByType<VNStage>(FindObjectsInactive.Include);
@@ -268,6 +279,18 @@ namespace VNEffects.EditorTools
                 foreach (var e in def.expressions)
                     if (e != null && !string.IsNullOrEmpty(e.name)) set.Add(e.name);
                 reg.charExpressions[def.id] = set;
+
+                var layers = new HashSet<string>();
+                if (def.overlays != null)
+                    foreach (var o in def.overlays)
+                        if (o != null && !string.IsNullOrEmpty(o.id)) layers.Add(o.id);
+                reg.charOverlays[def.id] = layers;
+
+                var traceIds = new HashSet<string>();
+                if (def.imprints != null)
+                    foreach (var im in def.imprints)
+                        if (im != null && !string.IsNullOrEmpty(im.id)) traceIds.Add(im.id);
+                reg.charImprints[def.id] = traceIds;
             }
 
             var registry = Object.FindFirstObjectByType<VNEventRegistry>(FindObjectsInactive.Include);
@@ -573,6 +596,57 @@ namespace VNEffects.EditorTools
                         break;
                     }
 
+                    case "imprint":
+                    {
+                        // 痕迹 id 拼错运行时只有一条 Warning，画面上什么都不会发生
+                        CheckCharacter(issues, f, c.line, c.Arg(0), reg);
+                        string trace = c.Arg(1);
+                        if (!string.IsNullOrEmpty(trace) && !Dynamic(trace) &&
+                            trace != "clear" && trace != "off" && !Dynamic(c.Arg(0)) &&
+                            reg.charImprints.TryGetValue(c.Arg(0), out var traces))
+                        {
+                            if (traces.Count == 0)
+                                Add(issues, VNLintSeverity.Warning, "no-imprint", f, c.line,
+                                    $"角色「{c.Arg(0)}」还没有配任何立绘痕迹",
+                                    "在角色资产 VNCharacterDef.imprints 里登记（id + 痕迹图）。");
+                            else if (!traces.Contains(trace))
+                                Add(issues, VNLintSeverity.Warning, "unknown-imprint", f, c.line,
+                                    $"角色「{c.Arg(0)}」没有痕迹「{trace}」",
+                                    $"该角色已有的痕迹：{string.Join(" / ", traces.OrderBy(s3 => s3))}。" +
+                                    "清空全部写 `imprint <角色> clear`。");
+                        }
+                        break;
+                    }
+
+                    case "overlay":
+                    {
+                        // 层名拼错运行时只有一条 Warning，画面上什么都不会发生
+                        CheckCharacter(issues, f, c.line, c.Arg(0), reg);
+                        string layer = c.Arg(1);
+                        if (!string.IsNullOrEmpty(layer) && !Dynamic(layer) &&
+                            layer != "clear" && layer != "off" && !Dynamic(c.Arg(0)) &&
+                            reg.charOverlays.TryGetValue(c.Arg(0), out var known))
+                        {
+                            if (known.Count == 0)
+                                Add(issues, VNLintSeverity.Warning, "no-overlay", f, c.line,
+                                    $"角色「{c.Arg(0)}」还没有配任何情绪叠加层",
+                                    "在角色资产 VNCharacterDef.overlays 里登记（id + 透明图）。");
+                            else if (!known.Contains(layer))
+                                Add(issues, VNLintSeverity.Warning, "unknown-overlay", f, c.line,
+                                    $"角色「{c.Arg(0)}」没有叠加层「{layer}」",
+                                    $"该角色已有的层：{string.Join(" / ", known.OrderBy(s2 => s2))}。" +
+                                    "清空全部写 `overlay <角色> clear`。");
+                        }
+
+                        string st = c.Arg(2);
+                        if (!string.IsNullOrEmpty(st) && !Dynamic(st) &&
+                            float.TryParse(st, out float sv) && (sv < 0f || sv > 1f))
+                            Add(issues, VNLintSeverity.Warning, "overlay-range", f, c.line,
+                                $"叠加层强度「{st}」超出 0~1，运行时会被钳制",
+                                "强度是 0~1 的比例，实际不透明度还要乘该层资产里的 maxAlpha。");
+                        break;
+                    }
+
                     case "weather":
                     {
                         // 认不出的天气 id 运行时会静默变成「无天气」——画面少了一整层演出
@@ -589,6 +663,21 @@ namespace VNEffects.EditorTools
                                 "飘落类可写 petals/sakura/落樱、maple/枫叶、ginkgo/银杏、" +
                                 "leaves/落叶、bamboo/竹叶；其余写 Rain / Snow / Fireflies / None；" +
                                 "自定义参数资产要在 VNGameConfig 的飘落天气库里登记 id。");
+                        break;
+                    }
+
+                    case "interlude":
+                    {
+                        // 没登记的过场 id 运行时只有一条 Console 报错，画面上整段静默跳过
+                        string iid = c.Arg(0);
+                        if (string.IsNullOrEmpty(iid))
+                            Add(issues, VNLintSeverity.Error, "interlude-no-id", f, c.line,
+                                "interlude 缺少过场 id",
+                                "写成 interlude <过场id>，id 是 VNGameConfig「过场库」里 VNInterludeDef 资产的 id。");
+                        else if (!Dynamic(iid) && !reg.interludeIds.Contains(iid))
+                            Add(issues, VNLintSeverity.Error, "unknown-interlude", f, c.line,
+                                $"过场「{iid}」没有登记",
+                                "在 VNGameConfig 的「过场库」里登记对应的 VNInterludeDef 资产。");
                         break;
                     }
 

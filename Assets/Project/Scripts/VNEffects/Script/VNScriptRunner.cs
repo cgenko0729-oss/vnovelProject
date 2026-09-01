@@ -267,6 +267,62 @@ namespace VNEffects
             return actualLine;
         }
 
+        // ------------------------------------------------------------------
+        // 内嵌剧本行（事件模块在交互中途插播演出用）
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 内嵌剧本行里**禁用**的命令。这些命令会改控制流或存档状态，而调用方
+        /// （事件模块）此刻正被主协程 yield 等待着 —— 让它们跑起来会把 Runner
+        /// 的 _index / _callStack / 存档状态搅乱，症状是事件结束后剧本跳到莫名其妙的地方。
+        /// 演出类命令（say / voice / se / fx / mark / camseq / weather …）一律放行。
+        /// </summary>
+        static readonly HashSet<string> InlineBlockedKeywords = new HashSet<string>
+        {
+            "jump", "choice", "call", "return", "label", "event",
+            "save", "load", "chapter", "endgame",
+        };
+
+        /// <summary>
+        /// 执行一小段剧本行（供事件模块在交互中途插播演出）。
+        /// 逐条走与主循环同一个 <see cref="Dispatch"/>，所以命令语义永远一致；
+        /// 行尾 @ 的异步语义也照旧。控制流命令被 <see cref="InlineBlockedKeywords"/> 挡掉。
+        /// </summary>
+        public IEnumerator RunInlineCo(string lines)
+        {
+            if (string.IsNullOrWhiteSpace(lines)) yield break;
+
+            List<VNScriptCommand> commands;
+            try { commands = VNScriptParser.Parse(lines); }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[VNScript] 内嵌剧本行解析失败：{e.Message}");
+                yield break;
+            }
+
+            foreach (var raw in commands)
+            {
+                if (raw == null) continue;
+                if (InlineBlockedKeywords.Contains(raw.keyword))
+                {
+                    Debug.LogWarning($"[VNScript] 内嵌剧本行里不能用「{raw.keyword}」" +
+                                     "（会打乱正在等待模块的剧本流程），该行已跳过");
+                    continue;
+                }
+
+                var cmd = ResolveParameters(raw);
+                IEnumerator co = null;
+                try { co = Dispatch(cmd); }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[VNScript] 内嵌剧本行执行出错（{cmd.keyword}）：{e.Message}");
+                }
+                if (co == null) continue;
+                if (cmd.isAsync) StartCoroutine(co);
+                else yield return StartCoroutine(co);
+            }
+        }
+
         void RebuildStateBefore(int exclusiveIndex)
         {
             if (stage == null)
@@ -480,6 +536,9 @@ namespace VNEffects
                         break;
                     case "mark":
                         RebuildMarkState(characters, cmd);
+                        break;
+                    case "overlay":
+                        RebuildOverlayState(characters, cmd);
                         break;
                     case "say":
                         if (!string.IsNullOrEmpty(cmd.expression) &&
@@ -699,6 +758,36 @@ namespace VNEffects
         /// 漫符的静默重放：只有 keep 符号是持续状态需要重建，
         /// 一次性符号播完就没了，重建时直接忽略。
         /// </summary>
+        /// <summary>
+        /// overlay 命令的静默重放（编辑器「从选中行播放」重建前置状态用）。
+        /// 直接改快照串，格式与 VNCharacterOverlay.Serialize 一致。
+        /// </summary>
+        void RebuildOverlayState(Dictionary<string, VNSaveData.CharSave> characters,
+            VNScriptCommand cmd)
+        {
+            if (!characters.TryGetValue(cmd.Arg(0), out var character)) return;
+
+            string layer = cmd.Arg(1);
+            if (string.IsNullOrEmpty(layer) || layer == "clear" || layer == "off")
+            {
+                character.overlays = null;
+                return;
+            }
+
+            float strength = Mathf.Clamp01(cmd.ArgF(2, 1f));
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(character.overlays))
+                foreach (var p in character.overlays.Split('|'))
+                {
+                    int eq = p.IndexOf('=');
+                    if (eq > 0 && p.Substring(0, eq) != layer) parts.Add(p);
+                }
+            if (strength > 0.001f)
+                parts.Add(layer + "=" + strength.ToString("0.###"));
+
+            character.overlays = parts.Count > 0 ? string.Join("|", parts) : null;
+        }
+
         void RebuildMarkState(Dictionary<string, VNSaveData.CharSave> characters,
             VNScriptCommand cmd)
         {
@@ -868,6 +957,33 @@ namespace VNEffects
         static string NormalizeChapterName(string name)
         {
             return VNStoryAddress.NormalizeFile(name);
+        }
+
+        /// <summary>
+        /// 按 id 找过场资产（interlude 命令用）。库只在 VNGameConfig 里，
+        /// 不像角色/背景那样在场景组件上也有一份——过场是纯资产数据，没有场景侧配置。
+        /// </summary>
+        static VNInterludeDef FindInterlude(string id, int line)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError($"[VNScript] 第 {line} 行：interlude 缺少过场 id");
+                return null;
+            }
+            var config = VNGameConfig.Active;
+            if (config != null && config.interludes != null)
+            {
+                foreach (var def in config.interludes)
+                {
+                    if (def == null) continue;
+                    // id 留空时按资产文件名认，和 chapter 的容错保持一致
+                    string key = string.IsNullOrEmpty(def.id) ? def.name : def.id;
+                    if (key == id) return def;
+                }
+            }
+            Debug.LogError($"[VNScript] 第 {line} 行：找不到过场「{id}」，" +
+                           "请在 VNGameConfig 的「过场库」里登记该 VNInterludeDef 资产");
+            return null;
         }
 
         TextAsset FindChapter(string chapterName)
@@ -1946,6 +2062,29 @@ namespace VNEffects
         /// 用射线命中链向上找 Selectable，而不是 IsPointerOverGameObject ——
         /// 后者对任何 raycastTarget 都为 true，本项目全屏皆 UI，会拦掉一切点击。
         /// </summary>
+        /// <summary>
+        /// 外部（事件模块）请求推进当前正在等待的台词。
+        ///
+        /// **为什么必须有这个入口**：Update 第一行就是 `if (_eventActive) return;`
+        /// —— 事件模块进行中，输入全部交给模块。于是模块内部用 RunInlineCo 播的
+        /// 阻塞台词会死等 `_advance`，玩家点破屏幕也过不去。模块在阻塞期间
+        /// 自己检测推进输入，转发到这里。
+        ///
+        /// 语义与 Update 里的手动推进一致：还在打字就先补完，打完了才真推进。
+        /// </summary>
+        public void RequestAdvance()
+        {
+            if (stage != null && stage.dialogue != null && stage.dialogue.IsTyping)
+            {
+                stage.dialogue.CompleteTyping();
+                return;
+            }
+            if (_waitingAtSay) _advance = true;
+        }
+
+        /// <summary>当前是否正卡在某句台词上等玩家推进（模块判断要不要转发输入）</summary>
+        public bool IsWaitingAtSay => _waitingAtSay;
+
         static bool IsPointerOverInteractiveUi(Mouse mouse)
         {
             if (EventSystem.current == null) return false;
@@ -2018,15 +2157,19 @@ namespace VNEffects
                     return WaitCo(cmd.ArgF(0, 0.5f));
 
                 case "bg":
+                    // via:black = 回到老的「先被纯色盖住再散开」；不写 = 新图直接过渡出来
                     return WaitTween(stage.SetBackground(
-                        cmd.Arg(0), cmd.Kw("transition"), cmd.line, PrecutFor(cmd)));
+                        cmd.Arg(0), cmd.Kw("transition"), cmd.line, PrecutFor(cmd),
+                        cmd.Kw("via") == "black"));
 
                 case "cg":
-                    // cg <id> [transition:Type] [chars:keep] [fx:keep] / cg off [transition:Type]
+                    // cg <id> [transition:Type] [chars:keep] [fx:keep] [via:black] / cg off [...]
                     if (cmd.Arg(0) == "off")
-                        return WaitTween(stage.HideCg(cmd.Kw("transition"), cmd.line));
+                        return WaitTween(stage.HideCg(cmd.Kw("transition"), cmd.line,
+                            cmd.Kw("via") == "black"));
                     return WaitTween(stage.ShowCg(cmd.Arg(0), cmd.Kw("transition"),
-                        cmd.Kw("chars") == "keep", cmd.Kw("fx") == "keep", cmd.line));
+                        cmd.Kw("chars") == "keep", cmd.Kw("fx") == "keep", cmd.line,
+                        false, cmd.Kw("via") == "black"));
 
                 case "show":
                     // show <角色> [at:] [expr:] [with:预设] [from:方向] [dur:秒]
@@ -2047,6 +2190,26 @@ namespace VNEffects
                     return WaitTween(stage.Mark(cmd.Arg(0), cmd.Arg(1), cmd.Arg(2),
                         ParseMarkPos(cmd.Kw("pos"), cmd.line),
                         cmd.KwF("size", 1f), cmd.KwF("dur", 1.1f), cmd.line));
+
+                case "imprint":
+                {
+                    // imprint <角色> <痕迹id|clear> [pos:x,y] [size:] [life:秒] [rot:度]
+                    // 立绘痕迹（掌印等）：pos 是立绘归一化坐标 (0,0)=立绘中心，
+                    // 与部位框/markAnchor 同一套。临时演出，会自己褪色消失，不进存档
+                    Vector2 ipos = ParseMarkPos(cmd.Kw("pos"), cmd.line) ?? Vector2.zero;
+                    stage.Imprint(cmd.Arg(1), cmd.Arg(0), ipos,
+                        cmd.KwF("size", 1f), cmd.KwF("life", 0f), cmd.KwF("rot", 0f),
+                        null, cmd.line);
+                    return null;
+                }
+
+                case "overlay":
+                    // overlay <角色> <层id|clear> [强度 0~1] [time:秒]
+                    // 情绪叠加层（潮红/汗/泪）；层在 VNCharacterDef.overlays 登记。
+                    // 强度省略 = 1；瞬发不等待（要等就自己接 wait）
+                    stage.SetOverlay(cmd.Arg(0), cmd.Arg(1), cmd.ArgF(2, 1f),
+                        cmd.KwF("time", 0.35f), cmd.line);
+                    return null;
 
                 case "weather":
                 {
@@ -2159,6 +2322,18 @@ namespace VNEffects
                     if (stage.transition == null) return null;
                     return WaitTween(stage.transition.Play(
                         VNScriptParser.ParseEnum(cmd.Arg(0), VNTransition.NoiseDissolve, cmd.line)));
+
+                case "interlude":
+                {
+                    // interlude <过场id> [time:秒]
+                    // 快进时整段跳过（连语音都不放）：章节卡本来就是给正常速度看的，
+                    // 而 1.5 秒的固定停留在 SKIP 里是纯粹的卡顿。
+                    if (_skip) return null;
+                    VNInterludeDef interlude = FindInterlude(cmd.Arg(0), cmd.line);
+                    if (interlude == null || stage.interlude == null) return null;
+                    return stage.interlude.PlayCo(interlude, cmd.KwF("time", -1f),
+                        stage.vnAudio);
+                }
 
                 case "sakura":
                     stage.sakura?.Play();

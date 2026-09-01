@@ -22,6 +22,7 @@ namespace VNEffects.EditorTools
         QuestId,     // 任务 id（项目中的 VNQuestDef 资产）
         WeatherId,   // 天气 id（内置叶型 + VNWeatherDef 资产 + 雨雪萤火虫枚举）
         UiSkinId,    // ui 命令的第二参数：候选跟着同行的 kind 变（见 dependsOn）
+        InterludeId, // 过场 id（VNGameConfig 过场库里的 VNInterludeDef 资产）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -142,14 +143,19 @@ namespace VNEffects.EditorTools
         static VNScenarioSchema()
         {
             // ---- Scene ----
-            Add("bg", "Scene", "bg <id> [transition:Type]",
+            Add("bg", "Scene", "bg <id> [transition:Type] [via:black]\n" +
+                "转场默认**直接过渡**：新图从图案缝隙里长出来，不经过中间那片纯色。\n" +
+                "写 via:black 才回到老行为（先被纯色盖满再散开），时间跳跃/章节切换那种\n" +
+                "刻意要黑一下的地方用它。白闪/光斑/眨眼三种本来就是罩子，永远走老行为",
                 Pos("id", "bg", VNParamSource.Background),
-                Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()));
-            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep]",
+                Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
+                Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f));
+            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep] [via:black]",
                 Pos("id", "cg", VNParamSource.Cg),
                 Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
                 Kw("chars", "chars", VNParamSource.Options, new[] { "keep" }),
-                Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }));
+                Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }),
+                Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f));
             Add("weather", "Scene",
                 "weather <id> [density:] [wind:] [speed:] [size:]\n" +
                 "飘落类：petals/sakura（落樱）· maple（枫叶）· ginkgo（银杏）· " +
@@ -181,6 +187,14 @@ namespace VNEffects.EditorTools
                 Pos("target", "target", VNParamSource.Options, new[] { "effects" }, "effects"));
             Add("transition", "Scene", "transition <type>  (fullscreen, no bg change)",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNTransition>(), "NoiseDissolve"));
+            Add("interlude", "Scene",
+                "interlude <过场id> [time:秒]\n" +
+                "过场（章节标题卡）：转场图铺满 + 标题居中 + loading 图标转固定时长 + 随机一句语音。\n" +
+                "内容全在 VNGameConfig「过场库」里的 VNInterludeDef 资产上配；\n" +
+                "time 留空 = 用资产里的 loading 时长（默认 1.5 秒）。\n" +
+                "转完自动继续，玩家点击不能提前跳过；SKIP 快进时整段跳过",
+                Pos("id", "过场", VNParamSource.InterludeId),
+                Kw("time", "秒", VNParamSource.Number, weight: 0.5f));
 
             // ---- Character ----
             Add("show", "Character", "show <char> [at:] [expr:] [with:预设] [from:方向] [dur:秒]\n" +
@@ -211,6 +225,25 @@ namespace VNEffects.EditorTools
                 Kw("pos", "pos", VNParamSource.Text),
                 Kw("size", "size", VNParamSource.Number, def: "1"),
                 Kw("dur", "dur", VNParamSource.Number, def: "1.1"));
+            Add("imprint", "Character",
+                "imprint <char> <trace|clear> [pos:x,y] [size:1] [life:秒] [rot:度]" + "\n" +
+                "立绘痕迹（掌印/口红印/绳痕…）：印在 pos 指定的位置，随时间褪色并自行消失。" + "\n" +
+                "pos 是立绘归一化坐标，(0,0) = 立绘中心，与部位框/markAnchor 同一套；" + "\n" +
+                "痕迹在角色资产 VNCharacterDef.imprints 里登记。临时演出，不进存档",
+                Pos("character", "char", VNParamSource.Character),
+                Pos("imprint", "trace", VNParamSource.Text),
+                Kw("pos", "pos", VNParamSource.Text),
+                Kw("size", "size", VNParamSource.Number, def: "1"),
+                Kw("life", "life", VNParamSource.Number),
+                Kw("rot", "rot", VNParamSource.Number));
+            Add("overlay", "Character",
+                "overlay <char> <layer|clear> [strength 0~1] [time:0.35]\n" +
+                "情绪叠加层（潮红/汗/泪）：与表情是加法关系，可多层共存、强度连续变化。\n" +
+                "层在角色资产 VNCharacterDef.overlays 里登记；clear = 全部清空。状态进存档",
+                Pos("character", "char", VNParamSource.Character),
+                Pos("layer", "layer", VNParamSource.Text),
+                Pos("strength", "0~1", VNParamSource.Number, def: "1", weight: 0.6f),
+                Kw("time", "time", VNParamSource.Number, def: "0.35"));
             Add("move", "Character", "move <char> <slot> [seconds]",
                 Pos("character", "char", VNParamSource.Character),
                 Pos("at", "to", VNParamSource.Options, Slots, "center"),

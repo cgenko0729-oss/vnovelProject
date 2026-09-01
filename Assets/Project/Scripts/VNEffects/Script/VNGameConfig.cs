@@ -159,6 +159,14 @@ namespace VNEffects
                 "登记自定义资产后可以用中文 id，并覆盖同名内置预设")]
         public List<VNWeatherDef> weatherDefs = new List<VNWeatherDef>();
 
+        [Header("过场库：剧本 interlude 命令的 id -> 过场资产（章节标题卡）\n" +
+                "留空 = 生成器扫全项目的 VNInterludeDef 自动登记")]
+        public List<VNInterludeDef> interludes = new List<VNInterludeDef>();
+
+        [Header("全局转场图池：过场资产没写自己的图池时，从这里随机抽一张铺满\n" +
+                "这些图不进 CG 鉴赏画廊 —— 它们是演出素材，不是收集品")]
+        public List<Sprite> interludeImages = new List<Sprite>();
+
         // ==============================================================
         // 音频
         // ==============================================================

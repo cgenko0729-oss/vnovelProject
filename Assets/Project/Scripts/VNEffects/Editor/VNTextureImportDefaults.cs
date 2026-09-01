@@ -40,6 +40,7 @@ namespace VNEffects.EditorTools
             "Assets/Art/CG/",
             "Assets/Art/BigPhoto/",
             "Assets/Art/Mark/",
+            "Assets/Art/InteractionMiniGame/",  // 亲密互动的道具/光标图
             "Assets/Assets/",         // 随手丢素材的地方
         };
 

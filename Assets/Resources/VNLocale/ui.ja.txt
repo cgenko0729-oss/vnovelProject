@@ -279,3 +279,7 @@ diary.empty = まだ何も書かれていない。
 diary.hint = D / ESC で閉じる　·　スクロールでめくる
 diary.all = すべて
 diary.affection = 好感度 {0}
+
+interact.end = おわり
+interact.stage = 段階 {0}
+interact.rejected = 拒否 {0} / {1}

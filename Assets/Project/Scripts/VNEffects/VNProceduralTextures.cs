@@ -367,6 +367,51 @@ namespace VNEffects
             }
         }
 
+        static Texture2D _loadingRing;
+        static Sprite _loadingRingSprite;
+
+        /// <summary>
+        /// loading 图标用的细环（256px，锐利边缘）。
+        /// 与上面软绵绵的 <see cref="Ring"/> 分开：那个是给粒子/光晕用的柔光环，
+        /// 缩到 56px 当 spinner 会糊成一团灰。这里要 1px 抗锯齿的实边。
+        /// </summary>
+        public static Texture2D LoadingRing
+        {
+            get
+            {
+                if (_loadingRing == null)
+                {
+                    const int size = 256;
+                    _loadingRing = Generate("VN_LoadingRing", size, (dx, dy) =>
+                    {
+                        float r = Mathf.Sqrt(dx * dx + dy * dy);
+                        // 半径 0.40、半厚 0.038 的环，边缘按像素宽度做抗锯齿
+                        float aa = 1.2f / size;
+                        return Mathf.Clamp01((0.038f - Mathf.Abs(r - 0.40f)) / aa);
+                    });
+                }
+                return _loadingRing;
+            }
+        }
+
+        /// <summary>loading 细环的 Sprite 包装（Image 用；配 Filled + Radial360 就是转圈弧）</summary>
+        public static Sprite LoadingRingSprite
+        {
+            get
+            {
+                if (_loadingRingSprite == null)
+                {
+                    var tex = LoadingRing;
+                    _loadingRingSprite = Sprite.Create(
+                        tex, new Rect(0, 0, tex.width, tex.height),
+                        new Vector2(0.5f, 0.5f), 100f);
+                    _loadingRingSprite.name = "VN_LoadingRingSprite";
+                    _loadingRingSprite.hideFlags = HideFlags.DontSave;
+                }
+                return _loadingRingSprite;
+            }
+        }
+
         // ------------------------------------------------------------------
         // 漫符（汗滴 / 井字怒气 / 感叹号 …）—— VNCharacterMarks 用
         // 与上面的粒子贴图不同：漫符自带颜色与描边，所以走 RGBA 生成而不是纯 alpha。

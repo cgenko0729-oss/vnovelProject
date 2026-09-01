@@ -109,6 +109,8 @@ namespace VNEffects
             public float x;
             public string expr;
             public string marks;   // 常驻漫符的英文正名，逗号分隔（空 = 无，旧存档兼容）
+            // 情绪叠加层强度「id=强度|id=强度」（空 = 全 0，旧存档兼容）
+            public string overlays;
             // 登场用的是日常向预设（crossfade/slidein/stepin/walkin）→ 不开周期扫光。
             // 旧存档缺省 false = 保持原来"一律开扫光"的行为。
             public bool casualEntrance;

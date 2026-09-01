@@ -250,6 +250,8 @@ animator.PlayExitDissolve();
   1. 每个新功能都在**新分支**上开发：`git checkout -b feature/<功能名>`
   2. 完成后提交并推送该分支，再合并回 `main`
   3. **任何分支都不删除**——每个功能分支都是一个可随时回滚的历史版本点
+- ⚠️ **本约定已于 2026-09-01 升级为「GitHub CLI + PR + 分阶段等用户确认」流程，见第一二九章。**
+  本节保留为历史记录。
 
 ## 九、第二批功能：氛围特效四件套（2026-07-12，分支 `feature/atmosphere-effects`）
 
@@ -8225,3 +8227,409 @@ ZoomRoot         scale=(1,1,1)   ← char 模式下本来就该是 1
 - **Lint**：`mode` 值合法性没加校验规则 —— 目前 camseq 一条 lint 规则都没有，
   而两个编辑器都是下拉框、运行时也会告警，先不为它建一整个规则类别
 - **`{char2}` 第二占位符 / 路径点 `dutch:` 荷兰角**：手册点名过，留作后续
+
+---
+
+## 一二六、亲密互动小游戏模块：光标变道具，摸角色部位推进阶段（2026-08-30，分支 `agent/interaction-minigame`）
+
+### 需求
+
+用户要一个新的互动小游戏：鼠标变成某种图标（一只手、某个道具），玩家用它点/摸角色的
+特定部位（摸头、摸脸…），摸到一定程度角色给出反馈 —— 换表情、说特定台词、播语音音效；
+光标图标本身还要有持续摆动之类的动画。
+
+素材是 `Assets/Art/InteractionMiniGame/item1~4.png`（两只手 + 两个道具），
+试验角色星野结衣。定位是成人向的亲密互动，本次做的是**系统框架**，
+具体台词/语音内容由作者自己填。
+
+问了三轮把岔路定死：event 事件模块承载（但中途要能播台词/语音/特效）／归一化区域 +
+编辑器画框工具／单击与按住拖动都要／道具由剧本给清单玩家在其中选／反馈用字段 +
+内嵌剧本行混合／全局兴奋度 + 每部位独立累计 + 禁忌部位／进度条可见 + 悬停高亮／
+表情 + 叠加层／部位框按每张立绘各一套带继承／随机语音池。
+
+### 文件改动
+
+**新增（运行时）**
+- `VNTouchZoneDef.cs` —— 部位区域资产。归一化坐标（与 `markAnchor` 同语义）；
+  基准一套 + 按立绘/表情覆盖（同 id 覆盖、新 id 追加、未提到的继承、`replaceAll` 完全不继承）；
+  命中数学 `Contains` / `Pick` 是纯静态的，编辑器与运行时共用同一份。
+- `VNInteractionDef.cs` —— 一场互动的全部规则：道具（含光标动画参数）、阶段、
+  部位×道具反馈池、禁忌解禁阶段、结束条件、三种结果名、flag 前缀。
+- `VNTouchScore.cs` —— 判定数学，纯逻辑无 MonoBehaviour，可单测。
+- `VNTouchCursor.cs` —— 道具光标：跟随、待机摆动、按住震动、速度倾斜、悬停发光。
+- `VNCharacterOverlay.cs` —— 立绘情绪叠加层（潮红/汗/泪），多层共存、强度 0~1。
+- `VNInteractionModule.cs` —— 事件模块本体。
+
+**新增（编辑器）**
+- `VNInteractionInstaller.cs` —— 增量装机 + 缺资产时铺一套示例。
+- `VNTouchZoneEditorWindow.cs` —— 在立绘上拖框画部位。
+
+**修改**
+- `VNScriptRunner` —— 新增 `RunInlineCo(lines)`；`overlay` 的 Dispatch 与静默重放。
+- `VNStage` —— `ActiveCharacter.overlay` 字段、挂载、`SetOverlay()`、快照存取。
+- `VNCharacterDef` —— `overlays` 列表。
+- `VNSaveSystem` —— `CharSave.overlays`。
+- `VNScriptParser` / `VNScenarioSchema` / `VNScenarioEditorWindow` / `VNScenarioLinter`
+  —— `overlay` 命令的全链路登记。
+- `VNTextureImportDefaults` —— Sprite 自动导入白名单加 `Art/InteractionMiniGame/`。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— `interact.*` 三条 UI 字符串。
+
+### 技术决策与取舍
+
+**① 模块刻意破「不碰舞台」的铁律（先例 VNAiTalkModule）。**
+玩法本身就是对着舞台上的立绘操作，自绘一套立绘等于要把眨眼/口型/色调匹配/出场动画
+全部重接一遍。边界收紧为「只碰表情与叠加层」，且正常结束 / ESC / `CancelForDebug`
+三条路径都还原原表情。
+
+**② 不铺全屏暗幕。** EventLayer 排序 60 在对话框 40 之上，铺了暗幕台词就看不见了 ——
+而这个玩法全程都要角色说话。HUD 缩在左下角、道具栏放右侧竖排（底部是对话框的地盘）。
+
+**③ 阶段只升不降。** 允许回退的话，玩家一停手兴奋度衰减，表情就会在阈值边界反复横跳。
+衰减只把数值往回拉，不动阶段。
+
+**④ 光标不用 `Cursor.SetCursor`。** 硬件光标做不了摆动、按住震动、速度倾斜、
+悬停发光这四件事，而它们正是手感的来源。代价是必须自己保证退出时把系统光标还回去：
+`Dispose()` 在 Finish / CancelForDebug / OnDestroy / OnDisable **四处**都调 ——
+漏一条路径玩家的鼠标指针就永久消失了。发光走 `VN/Additive` 材质的 `_TintColor`（HDR），
+不写顶点色（uGUI 顶点色被钳到 1，Bloom 抓不到）。
+
+**⑤ 阻塞台词复用 Runner 的 SayCo。** blocking 反馈把台词拼成一行丢回 `RunInlineCo`，
+等打字完、等玩家推进、Auto/Skip 全都是现成的，不在模块里重写一套推进逻辑。
+期间 `_blocked=true` 不吃抚摸输入 —— 否则玩家点一下既推进对话又顺手摸了一把。
+已经在播时新来的一条降级为非阻塞：排队会让台词堆成一串，得连点好几下才能继续摸。
+
+**⑥ `RunInlineCo` 的白名单是必需品。** 调用方（事件模块）此刻正被主协程 yield 等待着，
+让 `jump` / `choice` / `call` / `return` / `event` / 存档类跑起来会搅乱 `_index` 与
+`_callStack`，症状是事件结束后剧本跳到莫名其妙的地方。演出类命令一律放行。
+
+**⑦ 叠加层不做成表情。** 「表情 × 潮红三档」是乘法爆炸，每个组合都得画一张完整立绘；
+叠加层是加法，一张潮红图配所有表情，强度还能连续补间而不是跳变。
+
+**⑧ 部位框按每张立绘各一套但带继承。** 一个角色一套的话，换一张构图不同的立绘
+（坐下/躺下/近景）就全错位；每张都从头画又太费。折中是基准 + 只写差异的覆盖。
+
+### 修复记录
+
+- **部位框在互动结束后留在角色脸上。** 框可视化层挂在 `_char.rect`（立绘）底下 ——
+  必须如此才能跟着立绘一起缩放位移 —— 但那样它就不在模块的子树里，模块销毁时不会被回收。
+  修法：`DestroyZoneOverlay()` 在 Finish / CancelForDebug / OnDestroy 三处显式删。
+  这是破铁律要自己付的账：凡是挂到舞台上的东西，三条退出路径都得亲手清干净。
+- **结束反馈若是 blocking 会被拦腰打断**（模块 0.7 秒后就 Done 并销毁）。
+  改为结束反馈强制非阻塞；结算台词应写在剧本的「* 结果行」下面。
+- 新文件一律用 `FindAnyObjectByType`：`FindFirstObjectByType` 在 Unity 6.5 已是
+  error 级弃用告警（存量文件里还有一批，本次没动）。
+
+### 验证方法
+
+- 从 `InteractionDemo.vn.txt` 第 19 行播放，Lint 对该文件 0 问题。
+- 反射模拟抚摸：摸头 60 次 → 兴奋度 120 / 阶段 2 / 表情「微笑」→ 推到阶段 3
+  触发 `autoEndOnTarget` → 走 `* 满足` 分支（对话框确实出现该分支台词，立绘停在害羞）。
+- 阶段 0 摸禁忌部位（胸，解禁阶段 2）3 次 → 拒绝数 3、兴奋度 0、触发上限 → 走 `* 拒绝`。
+- 跨阶段时 `_blocked=True`，抚摸判定确实被暂停。
+- 单点调 `RunInlineCo`：`fx shockwave light` / `camera pushin` 正常执行，
+  `jump` / `choice` 被白名单挡下并告警。
+- `VN/Additive` 存在且有 `_TintColor`；互动结束后 `Cursor.visible == True`。
+- 对故意写错的探针剧本，Lint 准确报出 3 条 overlay 警告。
+
+### 剧本写法
+
+```
+show 星野结衣 at:center expr:默认
+event interact vs:星野结衣 id:初次抚摸 items:手,羽毛 time:120 flag:抚摸 zones:on
+* 满足 -> 满足
+* 普通 -> 普通
+* 拒绝 -> 拒绝
+```
+
+`zones:on` 把部位框画出来（开发调试用，正式剧本删掉）。`* 拒绝` **必须接住**，
+否则玩家惹毛角色会静默跳过。成绩写 flag `<前缀>_兴奋度 / _阶段 / _拒绝数 / _<部位>次数`。
+
+装机：Tools → VN Effects → 场景装机 Install To Scene → **亲密互动 Interaction Module**。
+画部位框：Tools → VN Effects → 预览 Preview → **部位区域编辑器 Touch Zone Editor**。
+
+---
+
+## 一二七、互动内嵌演出的坐标占位符与结束收尾（2026-08-30，分支 `agent/interaction-liquid`）
+
+### 起因
+
+用户问：摸到某个阶段或某个部位时，能不能用 `liquid` 命令在**特定部位或坐标点**喷特效？
+
+一半已经能做 —— 内嵌剧本行（一二六章）本来就放行 `liquid`，场景也早装过液体层，
+写 `liquid splash x:0.5 y:0.55 type:water` 就有效果。
+
+但**写死坐标是个陷阱**：角色一移位、镜头一推拉、换张构图不同的立绘，喷的位置就飘了。
+而「在特定部位」真正想要的是**摸哪儿喷哪儿**。
+
+### 做法：占位符 + 结束收尾
+
+**① 坐标占位符**（`VNInteractionModule.ExpandPlaceholders`）
+
+| 占位符 | 含义 |
+|---|---|
+| `{cx}` `{cy}` | 光标当前位置 |
+| `{zx}` `{zy}` | 当前部位中心 |
+| `{px}` `{py}` | 角色中心 |
+| `{prog}` `{stage}` `{zone}` | 整场进度 0~1 / 阶段序号 / 部位 id |
+
+坐标一律是 **viewport 比例 0~1、左下角为原点** —— 与 `liquid` 的 `x:` `y:` 同一套
+（它内部走 `Camera.ViewportToWorldPoint`），所以能直接写 `liquid splash x:{cx} y:{cy}`。
+换算链是「立绘归一化 → `TransformPoint` → `WorldToScreenPoint` → 除以屏幕尺寸」。
+
+放在模块层而不是给 `liquid` 命令加参数：部位是互动系统的概念，`liquid` 不该知道它；
+而且占位符对**所有**内嵌命令都生效，将来 `fx`、粒子要坐标时照样能用。
+
+**② `cleanupLines`（结束收尾剧本行）**
+
+`spray on` / `wet on` 这类持续状态开了不会自己停。收尾行在**四条退出路径**上都执行：
+正常结束 / 玩家点结束 / ESC / 调试中断。关键实现细节：**协程挂在 Runner 上而不是模块上** ——
+模块马上就要被销毁，挂自己身上的协程会被拦腰打断，于是水就一直喷下去了。
+
+### 修复记录
+
+- **`{cx}{cy}` 取到 (0,0)，水喷到屏幕左下角。** 原先读的是 `_lastMouse`，
+  那个只在 `Update` 里写，而阻塞台词期间 `Update` 提前 return，取到的是过期值甚至初始值。
+  改成直接读 `Mouse.current.position` 实时值。
+- **水花被推迟到玩家点击之后才出现。** `FeedbackCo` 原本是「先说台词 → 再跑内嵌行」，
+  台词若是 `blocking` 会一直等推进，演出就脱节了。改为**演出先于台词** ——
+  演出是「刚发生的事」，台词是随后的反应；而且占位符在这一刻展开，
+  鼠标还停在玩家刚摸的位置上。
+
+### 验证方法
+
+- 反射调 `ExpandPlaceholders`：`{zx},{zy}`=0.507,0.342（颈部）、`{px},{py}`=0.503,0.398
+  （角色中心）、`{prog}`=0.213、`{stage}`=1、`{zone}`=颈，全部正确。
+- `VNLiquidSplash.Burst` 后粒子数 212，确认液体层在本场景可用。
+- 摸到阶段 2 触发 `liquid splash x:{zx} y:{zy}`，截图能看到水珠落在脖颈/肩部一带，
+  且台词是在水花**之后**出现的。
+
+### 修复记录（追加）：阻塞台词把玩家卡死
+
+用户实测报告「摸两下头就卡住了，点也没反应，进度条也不涨」。
+
+**根因**：`VNScriptRunner.Update()` 的第一行就是
+
+```csharp
+if (_eventActive) return; // 事件模块进行中：输入全部交给模块
+```
+
+事件期间 Runner 完全不收输入 —— 这个设计本身是对的。但一二六章引入 blocking 台词时，
+我复用了 Runner 的 `SayCo`，而它靠 `while (!_advance)` 等推进，`_advance` 只在
+Runner.Update 里被设置。于是模块内播的阻塞台词**永远等不到推进**，玩家点破屏幕也过不去。
+
+**修法**：Runner 新增 `public void RequestAdvance()`（语义与 Update 里的手动推进一致：
+还在打字就先补完，打完了才真推进）与 `IsWaitingAtSay`；模块在 `_blocked` 期间自己检测
+Enter / 空格 / 左键（排除自己的 UI），转发到 `RequestAdvance()`。
+「输入交给模块」的约定不变，只是模块要负责把推进意图转回去。
+
+**为什么没在开发时发现**：一二六章的全部验证都是用反射模拟抚摸跑的，
+从没真的用鼠标点过推进 —— 反射直接调 `ApplyTouch` 会绕开整条输入路径。
+教训是：**凡是「等玩家输入」的分支，反射模拟验证不了，必须真点一次**。
+
+### 示例资产
+
+`初次抚摸` 里写全了四种用法：摸「颈」就喷（`{cx}{cy}`）／阶段「害羞」喷一下（`{zx}{zy}`）／
+阶段「情动」持续喷 + 镜头水渍（`amount:{prog}`）／`cleanupLines` = `liquid spray off` + `liquid dry`。
+
+---
+
+## 一二八、立绘痕迹 imprint：点一下印一个掌印，随时间消退（2026-08-31，分支 `agent/character-imprints`）
+
+### 起因
+
+用户问：能不能点一下就在那个部位印一个手掌印，然后随时间逐渐消退。
+
+**可行，而且不用发明新东西** —— 它是三样现成机制的拼接：
+
+| 现成机制 | 借来的部分 |
+|---|---|
+| `VNCharacterMarks` | 挂在立绘下、归一化坐标、共用立绘材质实例 |
+| `VNWetScreen` 水渍 | 对象池 + 数量上限 + 印上→保持→淡出的生命周期 |
+| `VNCharacterOverlay` | 「淡」由颜色而非纯 alpha 主导的观感 |
+
+### 做法
+
+- `VNCharacterImprints`：痕迹层组件。三段生命周期（印上时放大 1.18 倍再回弹 =
+  拍上去的力道 → 缓慢褪色 **红→粉** → 淡出自毁），同屏上限 20 枚、超了淘汰最旧的。
+  每枚叠一点随机旋转，否则连点出来一排一模一样的印子很假。
+- `VNCharacterDef.imprints`：id + 图 + 基准尺寸 + 着色 + 默认时长 + 随机旋转范围。
+- 剧本命令 `imprint <角色> <痕迹|clear> [pos:x,y] [size:] [life:] [rot:]`，
+  走 vn-new-command 全链路（Parser / Dispatch / Schema / 中文名 / Lint）。
+  **不进存档**（同 mark 的一次性符号）：它会自己消失，也就没有「读档后该不该还在」的问题。
+- 新占位符 `{nx}{ny}`（光标处的立绘归一化坐标）、`{znx}{zny}`（部位中心）、
+  `{char}`（本场角色 id）。`imprint` 要的是立绘坐标系，与 `liquid` 的 viewport 比例
+  不是一回事，所以是两组占位符。
+- `VNInteractionFeedback.trigger`（点击/拖动/都行）：掌印必须选「只在点击时」，
+  否则拖一下会连着印出一串。
+
+**「按道具分 + 按部位分」零新字段**：`VNInteractionZoneRule` 本来就有 `zoneId` 和
+`itemId`，一条规则就是「脸 × 红手掌」。拿普通「手」摸脸会回退到 itemId 为空的通用规则，
+`FindRule` 的精确匹配优先逻辑天然支持。
+
+### 踩到的点
+
+- **痕迹共用立绘材质实例（VN/ImageEffect）依然能独立控制 alpha**，
+  所以淡出正常 —— 一开始担心材质会吃掉顶点色 alpha，实测顶点色有效。
+- 坐标要 **clamp 到 ±0.5**：正常流程里点击必定落在部位内不会越界，
+  但坐标来自外部（剧本手写的 `pos:` / 占位符），不钳就会印到立绘外面去
+  （反射测试时鼠标不在立绘上，印记直接飞到了画面左上角）。
+- 互动结束时必须 `ClearImprints()`（四条退出路径都要）：痕迹不进存档，
+  留在脸上的话读档后会莫名其妙地消失。
+
+### 验证方法
+
+- 在「脸」的中心印一枚：落位 (12.14, 158.88) 与部位中心 (0.01, 0.15) × 立绘尺寸吻合，
+  颜色 RGBA(1, 0.32, 0.38, 0.5) 半透明生效，截图确认掌印贴在脸颊上、能透出五官。
+- 点击三下印三枚（`LiveCount=3`）。
+- 生命周期走完自动清 0；`ClearAll` 清 0。
+
+## 一二九、版本控制流程升级：GitHub CLI + PR + 分阶段等用户确认（2026-09-01）
+
+### 需求
+用户要求把版本控制改成 **GitHub CLI（`gh`）+ Pull Request** 流程，并且把节奏权完全交回自己手上：
+AI 只负责实现，提交/推送/开 PR/写文档各自等用户点名才做，**合并由用户本人在 GitHub 上完成**。
+旧约定里「功能做完顺手写文档、顺手合并回 main」的部分作废。
+
+### 新流程（四阶段，阶段之间必须停）
+
+| 阶段 | 触发 | AI 做什么 |
+|---|---|---|
+| ① 实现 | 用户提需求 | 动手前先 `git checkout -b feature/<英文短名>`，只写代码 + 编译验证；**不 commit、不 push、不开 PR、不碰文档**；做完报告改了哪些文件，等验收 |
+| ② 提交 | 用户说「提交 / 推送 / 开 PR」 | 逐文件 `git add` → commit → `git push -u origin` → `gh pr create`，把 PR 链接给用户 |
+| ③ 文档 | 用户说「更新文档」 | **留在同一个功能分支**补 WhatAiDo 等文档 → commit → push，PR 自动带上 |
+| ④ 收尾 | 用户合并完并叫我 | `git checkout main` → `git pull` |
+
+### 变更点对照
+
+- **分支命名**：`agent/<名>` → **`feature/<名>`**（历史上的 `agent/*` 与更早的 `feature/*` 分支全部保留不动）
+- **合并方式**：AI 本地 `git merge` → **用户在 GitHub 上合并 PR**；AI 不执行 `git merge` / `gh pr merge`
+- **文档时机**：功能做完自动写 → **用户点名才写**，且写在功能分支上进同一个 PR（不是合并后在 main 上补）
+- **不变**：永不删除任何分支（GitHub 合并时不要勾 Delete branch）；英文标题 + 中文正文 + Co-Authored-By；
+  逐文件 `git add`，禁止 `git add -A`（用户 Unity 工作区常年有无关的未提交改动）
+
+### 文件改动清单
+- `CLAUDE.md`：「工作规则」整段重写为四阶段表格 + 分支命名/不删分支/提交纪律；技能索引两行描述同步
+- `.claude/skills/vn-new-feature/SKILL.md`：整篇重写为四阶段清单，补 `gh pr create` 的用法与坑
+- `.claude/skills/vn-doc-update/SKILL.md`：「何时用我」改为「只在用户明确说更新文档时」，
+  新增「写在哪、怎么提交」小节（留在功能分支、push 后 PR 自动更新）
+- `ProjectCodeGuide.md` 十二·7：约定条目改写为新流程一句话版
+- `AiTalkIdeas.md`：「每次动手前的固定动作」同步改口
+- `WhatAiDo.md` 第八章：加一行指路到本章，原文保留为历史记录
+
+### 已知坑（写进技能了）
+- `gh pr create` 在无交互 shell 里不带参数会挂住 → 必须显式给 `--title` 与 `--body-file`
+- 切分支时 `unable to unlink … .unity`：Unity 占用场景文件 → `git clean -f -- <残留新文件>` 后重试
+
+### 验证
+`gh --version` = 2.97.0、`gh auth status` 已登录 `cgenko0729-oss`（scopes 含 `repo`），流程可直接跑。
+
+---
+
+## 一三〇、过场命令 `interlude` + 转场「贴图模式」：换场不再闪一片黑（2026-09-01，分支 `feature/interlude-screen`）
+
+### 需求
+
+两件事，后一件是做前一件时被逼出来的。
+
+1. **过场（章节标题卡）**：切 label / 切章节时插一屏——一张转场图铺满 + 章节标题居中
+   + 右下角 loading 图标转固定 1.5 秒 + 播一句跟这个标题相关的语音，转完自动继续。
+2. 做完发现 `enter = Transition`（复用全屏转场）时，**画面会先变成一片黑再出现过场图**。
+   查下来这不是 bug 而是 `VNScreenTransition.Play()` 的设计本身，于是顺带把「不经过纯色的
+   直接过渡」做进 shader，并推广到 `bg` / `cg`。
+
+### 文件改动
+
+**新增**
+
+| 文件 | 一句话 |
+|---|---|
+| `Script/VNInterludeDef.cs` | 过场资产：三语标题/副标题、语音池、专属图池、loading 时长、进出方式、暗幕与配色；`PickVoice()` / `PickImage()` 负责随机取，图池为空时退到全局池 |
+| `Script/VNInterludeScreen.cs` | 过场层：cover 铺图 + 暗幕 + 标题（装饰字体）+ 右下 spinner；自己持一份贴图模式材质做图案进出 |
+
+**修改**
+
+| 文件 | 改了什么 |
+|---|---|
+| `Art/Shaders/VNScreenTransition.shader` | 加 `_TexMode` / `_Invert` / `_UVRect` 三个参数，图案里可以填贴图而不是纯色 |
+| `VNScreenTransition.cs` | 新增 `CreatePatternMaterial()` / `ConfigurePattern()` / `SupportsPatternBackground()` / `PlayBackgroundPattern()` |
+| `VNProceduralTextures.cs` | 加 `LoadingRing` / `LoadingRingSprite`（锐边细环，spinner 用） |
+| `Script/VNStage.cs` | `interlude` 字段 + AutoWire 自愈 + `ClearStage()` 收起；`SwapStageImage()` 加 `viaBlack` 与图案直接过渡分支；`SetBackground` / `ShowCg` / `HideCg` 透传 |
+| `Script/VNScriptParser.cs` | 关键字 `interlude` |
+| `Script/VNScriptRunner.cs` | `interlude` 的 Dispatch case + `FindInterlude()`；`bg` / `cg` 透传 `via:` |
+| `Script/VNGameConfig.cs` | 「过场库」`interludes` + 「全局转场图池」`interludeImages` |
+| `Editor/VNScenarioSchema.cs` | 新参数来源 `InterludeId`；登记 `interlude`；`bg` / `cg` 加 `via` |
+| `Editor/VNScenarioEditorWindow.cs` | 中文名「过场」+ 过场 id 下拉候选 |
+| `Editor/VNScenarioDoc.cs` | `InterludeId` 的编辑期校验 |
+| `Editor/VNScenarioLinter.cs` | `unknown-interlude` / `interlude-no-id` 两条检查 |
+| `Editor/VNGameConfigEditor.cs` | 两个新字段登记进「舞台」页 |
+| `Editor/VNGameConfigTools.cs` | 目录扫描自动登记 `VNInterludeDef` |
+
+### 技术决策与取舍
+
+**为什么是普通命令而不是 event 模块。** 事件模块有「结果行 `* xxx`」契约、期间禁止存档、
+要进注册表。过场是纯演出、没有分支，用 event 属于杀鸡用牛刀，Lint 还会逼着接结果行。
+它该和 `transition` / `letterbox` 一样是普通命令。
+
+**为什么不挂在 `jump` / `chapter` 上自动触发。** 隐式钩子会在 `call` / `return` /
+读档重建 / 编辑器「从选中行播放」时误触发，而且不是每次跳 label 都想要过场。
+
+**中间那片黑是怎么来的。** `VNScreenTransition.shader` 原本的输出是
+`col.rgb = _Color.rgb`、`col.a = mask`——瓦片 / 百叶窗 / 噪声这些**只是遮罩形状**，
+遮罩里填的永远是一块纯色（默认黑）。`Play()` 的流程写死了「覆盖率 0→1 盖满 →
+onCovered 换内容 → 停 0.08 秒 → 1→0 散开」，所以中间必然整屏纯色。这是它的工作原理
+（趁着盖住的时候偷偷换场景），不是缺陷。shader 里 `_MainTex` 声明了但压根没采样。
+
+**贴图模式怎么解。** 加三个参数：
+
+```hlsl
+float m = lerp(mask, 1.0 - mask, step(0.5, _Invert));
+half4 tex = tex2D(_MainTex, rawUv);
+col.rgb = lerp(_Color.rgb, tex.rgb * _Color.rgb, useTex) + _EdgeColor.rgb * edge;
+col.a   = m * lerp(_Color.a, tex.a, useTex) * IN.color.a;
+```
+
+- `_TexMode = 1`：图案里填的是图，背后一直是原画面，中间那片黑消失。
+  此时 `_Color` 退化成**染色系数**，过场层的暗幕就折进它里面，省掉单独一层。
+- `_Invert = 1`：遮罩取反，用在「旧图按图案消失」的叠加层上（`bg` 换图用）。
+- `_UVRect`：**这条是坑**。Image 用图集 Sprite 时 texcoord 不是 0~1，不把它归一化回去
+  的话瓦片格子会跟着图集乱跑。贴图采样仍用原始 uv，只有图案坐标要归一化。
+  取值走 `DataUtility.GetOuterUV`（tight packing 下 `textureRect` 会抛）。
+
+三个参数默认值都是「关」，所以 `transition` 命令、爆闪、眨眼等老用法一行未变。
+
+**bg 的三条路。** `via:black` → `Play()` 老路；卷页 / 碎裂 / 水波 / 墨染 → 原有的
+`PlayBackground()` 专用几何 shader（这四种做得更漂亮，保留）；其余图案 →
+新的 `PlayBackgroundPattern()`。白闪 / 光斑 / 眨眼**永远走老路**——这三种的灵魂就是
+那层罩本身（HDR 白闪 / 柔光光斑 / 黑眼皮），让新图从罩里长出来等于把效果抹掉。
+`cg` 走同一个 `SwapStageImage()`，所以一并跟着变，也一样能写 `via:black`。
+
+**过场层排序 90。** 必须在对话框(40) / 事件层(60) 之上、全屏转场(100) 之下。
+也正因为要能被转场盖住，它**挂在主 Canvas 下而不是自建 Overlay 画布**——
+Screen Space - Overlay 的画布永远压在 Screen Space - Camera 的主画布之上。
+挂主 Canvas 还顺带吃到 URP 后处理（标题发光靠 Bloom）。
+
+**标题不走图案。** 图案只作用于底图，标题 / 副标题 / loading 单独一个 `CanvasGroup`
+延迟淡入。混在一起走图案的话文字会被瓦片切碎，很难看。
+
+**SKIP 时整段跳过，连语音都不放。** 章节卡是给正常速度看的，1.5 秒固定停留在快进里
+是纯粹的卡顿。玩家点击**不能**提前跳（`_group.blocksRaycasts` 吃掉点击）。
+
+**不进存档。** 过场播完什么都不留，所以既不进 `VNSaveData`，也不需要在
+`RebuildStateBefore` 里静默重放。但 `ClearStage()` 里必须 `HideImmediate()`——
+读档 / 停剧本时不能把过场层留在屏幕上（同 SNS 手机的处理）。
+
+**转场图不进 CG 鉴赏画廊。** 它是演出素材，不是收集品，所以走独立的
+`interludeImages` 列表而不是 `cgLibrary`。
+
+### 已知影响
+
+现有剧本里所有 `bg xxx transition:XXX` 的观感都变了（不再过黑）。
+想保留黑场的地方补一个 `via:black`。
+
+### 验证
+
+- Unity 6000.5.3f1 刷新编译零错误；`VNScreenTransition.shader` 的
+  `HasErrors = false` / `IsSupported = true` / `PropertyCount = 13`（原 10 + 新 3）
+- 剧本：建一个 `VNInterludeDef` 资产 → 登记进 `VNGameConfig`「过场库」→
+  写 `interlude <id>` → 观察图案里直接长出过场图，中间没有纯色
+- `bg 教室 transition:Tiles` 与 `bg 教室 transition:Tiles via:black` 对比两种观感

@@ -280,3 +280,7 @@ diary.empty = 还没有写下任何一页。
 diary.hint = D / ESC 关闭　·　滚轮翻页
 diary.all = 全部
 diary.affection = 好感 {0}
+
+interact.end = 结束
+interact.stage = 阶段 {0}
+interact.rejected = 被拒绝 {0} / {1}
