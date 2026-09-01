@@ -250,6 +250,8 @@ animator.PlayExitDissolve();
   1. 每个新功能都在**新分支**上开发：`git checkout -b feature/<功能名>`
   2. 完成后提交并推送该分支，再合并回 `main`
   3. **任何分支都不删除**——每个功能分支都是一个可随时回滚的历史版本点
+- ⚠️ **本约定已于 2026-09-01 升级为「GitHub CLI + PR + 分阶段等用户确认」流程，见第一二九章。**
+  本节保留为历史记录。
 
 ## 九、第二批功能：氛围特效四件套（2026-07-12，分支 `feature/atmosphere-effects`）
 
@@ -8480,3 +8482,154 @@ Enter / 空格 / 左键（排除自己的 UI），转发到 `RequestAdvance()`�
   颜色 RGBA(1, 0.32, 0.38, 0.5) 半透明生效，截图确认掌印贴在脸颊上、能透出五官。
 - 点击三下印三枚（`LiveCount=3`）。
 - 生命周期走完自动清 0；`ClearAll` 清 0。
+
+## 一二九、版本控制流程升级：GitHub CLI + PR + 分阶段等用户确认（2026-09-01）
+
+### 需求
+用户要求把版本控制改成 **GitHub CLI（`gh`）+ Pull Request** 流程，并且把节奏权完全交回自己手上：
+AI 只负责实现，提交/推送/开 PR/写文档各自等用户点名才做，**合并由用户本人在 GitHub 上完成**。
+旧约定里「功能做完顺手写文档、顺手合并回 main」的部分作废。
+
+### 新流程（四阶段，阶段之间必须停）
+
+| 阶段 | 触发 | AI 做什么 |
+|---|---|---|
+| ① 实现 | 用户提需求 | 动手前先 `git checkout -b feature/<英文短名>`，只写代码 + 编译验证；**不 commit、不 push、不开 PR、不碰文档**；做完报告改了哪些文件，等验收 |
+| ② 提交 | 用户说「提交 / 推送 / 开 PR」 | 逐文件 `git add` → commit → `git push -u origin` → `gh pr create`，把 PR 链接给用户 |
+| ③ 文档 | 用户说「更新文档」 | **留在同一个功能分支**补 WhatAiDo 等文档 → commit → push，PR 自动带上 |
+| ④ 收尾 | 用户合并完并叫我 | `git checkout main` → `git pull` |
+
+### 变更点对照
+
+- **分支命名**：`agent/<名>` → **`feature/<名>`**（历史上的 `agent/*` 与更早的 `feature/*` 分支全部保留不动）
+- **合并方式**：AI 本地 `git merge` → **用户在 GitHub 上合并 PR**；AI 不执行 `git merge` / `gh pr merge`
+- **文档时机**：功能做完自动写 → **用户点名才写**，且写在功能分支上进同一个 PR（不是合并后在 main 上补）
+- **不变**：永不删除任何分支（GitHub 合并时不要勾 Delete branch）；英文标题 + 中文正文 + Co-Authored-By；
+  逐文件 `git add`，禁止 `git add -A`（用户 Unity 工作区常年有无关的未提交改动）
+
+### 文件改动清单
+- `CLAUDE.md`：「工作规则」整段重写为四阶段表格 + 分支命名/不删分支/提交纪律；技能索引两行描述同步
+- `.claude/skills/vn-new-feature/SKILL.md`：整篇重写为四阶段清单，补 `gh pr create` 的用法与坑
+- `.claude/skills/vn-doc-update/SKILL.md`：「何时用我」改为「只在用户明确说更新文档时」，
+  新增「写在哪、怎么提交」小节（留在功能分支、push 后 PR 自动更新）
+- `ProjectCodeGuide.md` 十二·7：约定条目改写为新流程一句话版
+- `AiTalkIdeas.md`：「每次动手前的固定动作」同步改口
+- `WhatAiDo.md` 第八章：加一行指路到本章，原文保留为历史记录
+
+### 已知坑（写进技能了）
+- `gh pr create` 在无交互 shell 里不带参数会挂住 → 必须显式给 `--title` 与 `--body-file`
+- 切分支时 `unable to unlink … .unity`：Unity 占用场景文件 → `git clean -f -- <残留新文件>` 后重试
+
+### 验证
+`gh --version` = 2.97.0、`gh auth status` 已登录 `cgenko0729-oss`（scopes 含 `repo`），流程可直接跑。
+
+---
+
+## 一三〇、过场命令 `interlude` + 转场「贴图模式」：换场不再闪一片黑（2026-09-01，分支 `feature/interlude-screen`）
+
+### 需求
+
+两件事，后一件是做前一件时被逼出来的。
+
+1. **过场（章节标题卡）**：切 label / 切章节时插一屏——一张转场图铺满 + 章节标题居中
+   + 右下角 loading 图标转固定 1.5 秒 + 播一句跟这个标题相关的语音，转完自动继续。
+2. 做完发现 `enter = Transition`（复用全屏转场）时，**画面会先变成一片黑再出现过场图**。
+   查下来这不是 bug 而是 `VNScreenTransition.Play()` 的设计本身，于是顺带把「不经过纯色的
+   直接过渡」做进 shader，并推广到 `bg` / `cg`。
+
+### 文件改动
+
+**新增**
+
+| 文件 | 一句话 |
+|---|---|
+| `Script/VNInterludeDef.cs` | 过场资产：三语标题/副标题、语音池、专属图池、loading 时长、进出方式、暗幕与配色；`PickVoice()` / `PickImage()` 负责随机取，图池为空时退到全局池 |
+| `Script/VNInterludeScreen.cs` | 过场层：cover 铺图 + 暗幕 + 标题（装饰字体）+ 右下 spinner；自己持一份贴图模式材质做图案进出 |
+
+**修改**
+
+| 文件 | 改了什么 |
+|---|---|
+| `Art/Shaders/VNScreenTransition.shader` | 加 `_TexMode` / `_Invert` / `_UVRect` 三个参数，图案里可以填贴图而不是纯色 |
+| `VNScreenTransition.cs` | 新增 `CreatePatternMaterial()` / `ConfigurePattern()` / `SupportsPatternBackground()` / `PlayBackgroundPattern()` |
+| `VNProceduralTextures.cs` | 加 `LoadingRing` / `LoadingRingSprite`（锐边细环，spinner 用） |
+| `Script/VNStage.cs` | `interlude` 字段 + AutoWire 自愈 + `ClearStage()` 收起；`SwapStageImage()` 加 `viaBlack` 与图案直接过渡分支；`SetBackground` / `ShowCg` / `HideCg` 透传 |
+| `Script/VNScriptParser.cs` | 关键字 `interlude` |
+| `Script/VNScriptRunner.cs` | `interlude` 的 Dispatch case + `FindInterlude()`；`bg` / `cg` 透传 `via:` |
+| `Script/VNGameConfig.cs` | 「过场库」`interludes` + 「全局转场图池」`interludeImages` |
+| `Editor/VNScenarioSchema.cs` | 新参数来源 `InterludeId`；登记 `interlude`；`bg` / `cg` 加 `via` |
+| `Editor/VNScenarioEditorWindow.cs` | 中文名「过场」+ 过场 id 下拉候选 |
+| `Editor/VNScenarioDoc.cs` | `InterludeId` 的编辑期校验 |
+| `Editor/VNScenarioLinter.cs` | `unknown-interlude` / `interlude-no-id` 两条检查 |
+| `Editor/VNGameConfigEditor.cs` | 两个新字段登记进「舞台」页 |
+| `Editor/VNGameConfigTools.cs` | 目录扫描自动登记 `VNInterludeDef` |
+
+### 技术决策与取舍
+
+**为什么是普通命令而不是 event 模块。** 事件模块有「结果行 `* xxx`」契约、期间禁止存档、
+要进注册表。过场是纯演出、没有分支，用 event 属于杀鸡用牛刀，Lint 还会逼着接结果行。
+它该和 `transition` / `letterbox` 一样是普通命令。
+
+**为什么不挂在 `jump` / `chapter` 上自动触发。** 隐式钩子会在 `call` / `return` /
+读档重建 / 编辑器「从选中行播放」时误触发，而且不是每次跳 label 都想要过场。
+
+**中间那片黑是怎么来的。** `VNScreenTransition.shader` 原本的输出是
+`col.rgb = _Color.rgb`、`col.a = mask`——瓦片 / 百叶窗 / 噪声这些**只是遮罩形状**，
+遮罩里填的永远是一块纯色（默认黑）。`Play()` 的流程写死了「覆盖率 0→1 盖满 →
+onCovered 换内容 → 停 0.08 秒 → 1→0 散开」，所以中间必然整屏纯色。这是它的工作原理
+（趁着盖住的时候偷偷换场景），不是缺陷。shader 里 `_MainTex` 声明了但压根没采样。
+
+**贴图模式怎么解。** 加三个参数：
+
+```hlsl
+float m = lerp(mask, 1.0 - mask, step(0.5, _Invert));
+half4 tex = tex2D(_MainTex, rawUv);
+col.rgb = lerp(_Color.rgb, tex.rgb * _Color.rgb, useTex) + _EdgeColor.rgb * edge;
+col.a   = m * lerp(_Color.a, tex.a, useTex) * IN.color.a;
+```
+
+- `_TexMode = 1`：图案里填的是图，背后一直是原画面，中间那片黑消失。
+  此时 `_Color` 退化成**染色系数**，过场层的暗幕就折进它里面，省掉单独一层。
+- `_Invert = 1`：遮罩取反，用在「旧图按图案消失」的叠加层上（`bg` 换图用）。
+- `_UVRect`：**这条是坑**。Image 用图集 Sprite 时 texcoord 不是 0~1，不把它归一化回去
+  的话瓦片格子会跟着图集乱跑。贴图采样仍用原始 uv，只有图案坐标要归一化。
+  取值走 `DataUtility.GetOuterUV`（tight packing 下 `textureRect` 会抛）。
+
+三个参数默认值都是「关」，所以 `transition` 命令、爆闪、眨眼等老用法一行未变。
+
+**bg 的三条路。** `via:black` → `Play()` 老路；卷页 / 碎裂 / 水波 / 墨染 → 原有的
+`PlayBackground()` 专用几何 shader（这四种做得更漂亮，保留）；其余图案 →
+新的 `PlayBackgroundPattern()`。白闪 / 光斑 / 眨眼**永远走老路**——这三种的灵魂就是
+那层罩本身（HDR 白闪 / 柔光光斑 / 黑眼皮），让新图从罩里长出来等于把效果抹掉。
+`cg` 走同一个 `SwapStageImage()`，所以一并跟着变，也一样能写 `via:black`。
+
+**过场层排序 90。** 必须在对话框(40) / 事件层(60) 之上、全屏转场(100) 之下。
+也正因为要能被转场盖住，它**挂在主 Canvas 下而不是自建 Overlay 画布**——
+Screen Space - Overlay 的画布永远压在 Screen Space - Camera 的主画布之上。
+挂主 Canvas 还顺带吃到 URP 后处理（标题发光靠 Bloom）。
+
+**标题不走图案。** 图案只作用于底图，标题 / 副标题 / loading 单独一个 `CanvasGroup`
+延迟淡入。混在一起走图案的话文字会被瓦片切碎，很难看。
+
+**SKIP 时整段跳过，连语音都不放。** 章节卡是给正常速度看的，1.5 秒固定停留在快进里
+是纯粹的卡顿。玩家点击**不能**提前跳（`_group.blocksRaycasts` 吃掉点击）。
+
+**不进存档。** 过场播完什么都不留，所以既不进 `VNSaveData`，也不需要在
+`RebuildStateBefore` 里静默重放。但 `ClearStage()` 里必须 `HideImmediate()`——
+读档 / 停剧本时不能把过场层留在屏幕上（同 SNS 手机的处理）。
+
+**转场图不进 CG 鉴赏画廊。** 它是演出素材，不是收集品，所以走独立的
+`interludeImages` 列表而不是 `cgLibrary`。
+
+### 已知影响
+
+现有剧本里所有 `bg xxx transition:XXX` 的观感都变了（不再过黑）。
+想保留黑场的地方补一个 `via:black`。
+
+### 验证
+
+- Unity 6000.5.3f1 刷新编译零错误；`VNScreenTransition.shader` 的
+  `HasErrors = false` / `IsSupported = true` / `PropertyCount = 13`（原 10 + 新 3）
+- 剧本：建一个 `VNInterludeDef` 资产 → 登记进 `VNGameConfig`「过场库」→
+  写 `interlude <id>` → 观察图案里直接长出过场图，中间没有纯色
+- `bg 教室 transition:Tiles` 与 `bg 教室 transition:Tiles via:black` 对比两种观感

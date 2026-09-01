@@ -1,7 +1,9 @@
 ﻿# ============================================
 # VN 剧本演示（P0+P1）— 直接编辑本文件后重新 Play 即可
 # 语法速查：
-#   bg <背景id> [transition:转场名]
+#   bg <背景id> [transition:转场名] [via:black]
+#        转场默认直接过渡（新图从图案缝里长出来）；via:black = 老式先黑再散
+#   interlude <过场id> [time:秒]   过场章节卡（图+标题+loading+语音，转完自动继续）
 #   show <角色> [at:left|center|right] [expr:表情] [with:出场预设]
 #   hide <角色> [with:dissolve|fade]
 #   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake>

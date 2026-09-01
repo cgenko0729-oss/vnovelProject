@@ -21,18 +21,27 @@
 ## 工作规则（必须遵守）
 
 1. **全程用中文回复用户**
-2. **每个新功能开新分支**（当前约定 `agent/<名称>`；历史分支也有 `feature/*`），完成后合并回
-   `main`，**永远不删除任何分支**（用户靠分支回滚）
-3. 每批开发完成后**详细追加记录到 `WhatAiDo.md`**（模板见技能 vn-doc-update）
-4. 提交信息英文、正文中文注释；commit 尾部加 Co-Authored-By
-5. 分支/合并/推送的完整流程与坑（unlink 报错、后台推送）见技能 **vn-new-feature**
+2. **版本控制走 GitHub CLI（`gh`）+ Pull Request 流程，分四个阶段，阶段之间一律停下来等用户发话**
+   ——AI 绝不自作主张 commit / push / 开 PR / 合并 / 写文档（完整清单见技能 **vn-new-feature**）：
+
+   | 阶段 | 触发 | 做什么 |
+   |---|---|---|
+   | ① 实现 | 用户提需求 | **动手前先从 `main` 切 `feature/<英文短名>` 分支**，然后只写代码 + 编译验证；**不 commit、不 push、不开 PR、不碰文档**。做完报告改了哪些文件，等用户验收 |
+   | ② 提交 | 用户说「提交 / 推送 / 开 PR」 | 逐文件 `git add` → commit → `git push -u origin feature/<名>` → `gh pr create`，把 PR 链接给用户 |
+   | ③ 文档 | 用户说「更新文档」 | 在**同一个功能分支**上补 `WhatAiDo.md` 等文档 → commit → push，PR 自动带上（模板见技能 **vn-doc-update**） |
+   | ④ 收尾 | 用户在 GitHub 上合并完并叫我 | `git checkout main` → `git pull`，确认同步；**合并由用户本人做，AI 不执行 merge** |
+
+3. **永远不删除任何分支**——用户靠分支回滚（GitHub 上合并 PR 时**不要勾 Delete branch**）
+4. 分支命名统一 `feature/<英文短名>`（历史上还有 `agent/*` 与更早的 `feature/*`，都保留不动）
+5. 提交信息英文标题、正文中文；尾部加 Co-Authored-By。**只 add 本次功能相关文件**——
+   用户 Unity 工作区常年有无关的未提交改动，禁止 `git add -A` / `git add .`
 
 ## 技能索引（.claude/skills/，按需调用）
 
 | 技能 | 什么时候用 |
 |---|---|
-| vn-new-feature | 开始任何新功能/修 bug（分支、提交、合并流程） |
-| vn-doc-update | 功能完成后同步文档（WhatAiDo 章节模板等） |
+| vn-new-feature | 开始任何新功能/修 bug（切分支 → 实现 → 等确认 → gh 提交开 PR → 收尾） |
+| vn-doc-update | 用户叫「更新文档」时同步文档（WhatAiDo 章节模板等，写在功能分支上） |
 | vn-new-command | 给剧本 DSL 加新命令（全链路 9 步清单） |
 | vn-new-event-module | 写新玩法事件模块（三铁律、注册、结果契约） |
 | vn-new-effect | 加新特效/演出组件（硬约定、fx 接线、演示场景） |
@@ -115,7 +124,8 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNWeatherController | 天气总控（双后端）：飘落类走 VNFoliageSystem，雨/雪/萤火虫走 VNAmbientParticles；`SetWeatherId` 三级解析 id（自定义资产 → 内置叶型别名含中文 → VNWeather 枚举），带调色联动 |
 | VNFoliageSystem / VNWeatherDef / VNFoliageTextures | 落樱/落叶三层景深系统（Alpha 混合实体粒子 + 图集翻转 + **每粒子独立相位横摆** + 自动阵风 + 尺寸↔速度伪透视 + 地面堆积）/ 全部参数的 ScriptableObject（五套内置预设，不建资产也能用）/ 五种叶型的程序化图集（列=12 翻转帧、行=4 形态变体，RGB 存明暗、A 存形状） |
 | VNMoodGrading / VNGrade | 八种情绪色调（含 Dream 梦境）**分层调色版**：色彩不走全屏后处理（单相机单 Canvas 下 Volume 物理上没法只染一部分，会把对话框和 HUD 一起染橙），改按 `backgroundStrength(1.0)`／`midStrength(0.8)`／`characterStrength(0.3)` 逐层写进各自材质实例，UI 不在目标列表所以完全不受影响；**Volume 只留 FilmGrain + Vignette**（不改色相，压四角反而有电影感），仍是 A/B 双 Volume 交叉过渡。立绘目标由 VNStage 在角色进出场时自动维护 / 调色值类型 + 来源通道枚举 `VNGradeLayer`（Mood·Weather·Focus·Emote·Manual），合并规则 滤镜相乘·色相相加·其余相乘 |
-| VNScreenTransition | 全屏转场×8：噪声溶解/百叶窗/瓦片/圆扩散/水墨/爆闪/光斑/眨眼 |
+| VNScreenTransition | 全屏转场×12：噪声溶解/百叶窗/瓦片/圆扩散/水墨/爆闪/光斑/眨眼/卷页/碎裂/水波/墨染。**两种填法**：`Play()` 是遮罩式（图案里填纯色 → 必然经过一片黑，趁盖住时偷偷换场景）；`PlayBackground()`（卷页/碎裂/水波/墨染，专用几何 shader）与 `PlayBackgroundPattern()`（其余图案，走 shader 的 `_TexMode=1` 贴图模式）是**直接过渡**，新图从图案缝里长出来不过纯色。bg/cg 默认走直接过渡，写 `via:black` 才回老式；白闪/光斑/眨眼永远老式（它们的效果本体就是那层罩）。**`_UVRect` 是坑**：Image 用图集 Sprite 时 texcoord 不是 0~1，不归一化回去瓦片格子会跟着图集乱跑 |
+| VNInterludeDef / VNInterludeScreen | 过场章节卡（`interlude <id> [time:]`）：转场图铺满 + 标题居中 + 右下 loading 转固定 1.5 秒 + 从该标题语音池随机播一句，转完自动继续、点击不能提前跳、SKIP 整段跳过。图池留空则从 VNGameConfig 全局转场图池随机抽（**不进 CG 画廊**，是演出素材不是收集品）／过场层排序 **90**：在事件层(60) 之上、全屏转场(100) 之下，也因此**必须挂主 Canvas 下**（Overlay 画布永远压在 Screen Space - Camera 之上，就再也盖不住了）。`enter=Transition` 不调 `Play()` 而是自己持一份贴图模式材质，否则中间会闪一片黑。标题/loading 单独 CanvasGroup 淡入（跟着图案走会被瓦片切碎）。不进存档，但 `ClearStage()` 必须 `HideImmediate()` |
 | VNCamera / VNScreenShake / VNDutchAngle / VNHeartbeat | 运镜×5 + 路径镜头（camseq 路径点可带 `shake:` 到点震屏，震完才走下一段，停顿取 max(hold,震动时长)；点位写 `stay` = 原地不动、沿用上一个点的位置与 zoom，**此时唯一的数字是时长**）；**缩放模式 `camseq mode:both\|depth\|bg\|char`**（写在 camseq 行，整段一个）：both 背景+立绘一起（TU/TB 推拉镜，默认）／depth 立绘多缩 `1+(zoom-1)×0.5`（速度差伪 3D，**等比缩放其实是「数码变焦」不像镜头**）／bg 只缩背景（眩晕变焦，全篇 1~2 次）／char 只缩立绘、背景连平移都不做（强调反应；也避免低分辨率背景被放糊）。四种共用两个静态公式 `CharacterScaleFor` / `ContainerZoomFor`，**编辑器预览与运行时同一份**。`both` 下不碰立绘倍率（否则每点起补间会打断说话者高亮），所以还原收口在 `SetMode()`；`camcut`/`camto` 一律 `SetMode(Both)` 不继承上一段模式。镜头状态**不进存档**（调试重建走 SnapReset），故无需 vn-save-compat/ 三级震动（「等级→数值」唯一一张表在 `VNShakeSpec`，运行时与编辑器预览共用）/ 荷兰角 / 心跳脉动 |
 | VNGodRays / VNEdgeGlow / VNCloudShadows / VNHeatHaze / VNFakeDoF | 光束/情绪泛光/云影/热浪+雾/伪景深 |
 | VNSpeedLines | 漫画速度线/集中线 overlay（3 变体贴图闪帧，fx speedlines on/off/burst） |
@@ -214,6 +224,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | AI 自由聊天 | `event aitalk vs:角色 [persona:人格] [turns:] [topic:] [place:] [me:] [stat:属性 rate:换算率] [flag:前缀]`；接 DeepSeek / Gemini（`VNGameConfig` 一处切换）实时生成台词，一次请求同时拿到 台词+表情+漫符+好感变化+三个候选回复（各带隐藏语气标签），结果 好感提升/普通/冷场/**失败**。**`* 失败` 必须接住**否则玩家断网会静默跳过（Lint 有检查）。event 前要先 `show` 角色，模块只换表情不负责出场。**定位：仅番外/自由时间，主线不依赖**——AI 内容不进翻译表、无配音、玩家可能断网。key 仅本地开发用，发行须改玩家自填或自建中转 | 一〇六 |
 | SNS 手机聊天 | `sns open/close/voice/image/typing/read/time/system/reply`；打开后台词行=气泡（「我」在右），不是 event 模块所以中途可存档；Skip/Auto 屏蔽、消息不进回想 | 九十 |
 | 液体喷溅 | `liquid splash\|spray\|click\|wet\|dry\|cover [on\|off] [x:] [y:] [type:] [power:] [dir:] [spread:] [rate:] [screen:] [amount:]`，type = water/blood/ink/slime（+中文别名）；x/y 是屏幕比例 0~1；**dir 留空=朝镜头扑面而来（默认，正交相机下走伪透视：放射+加速+放大），填了才侧喷**；screen 是溅上镜头的概率倍率；click 模式下左键归喷水、Enter/空格仍推进 | 九十四 |
+| 过场章节卡 | `interlude <过场id> [time:秒]`；内容全在 VNInterludeDef 资产（三语标题+语音池+图池+进出方式），登记进 VNGameConfig「过场库」。顺带把转场改成**默认不过黑**：`bg`/`cg` 写 `via:black` 才回老式 | 一三〇 |
 | 背景无限滚动 | `bgscroll on\|off [speed:] [dir:] [mode:repeat\|mirror] [time:]`，speed = 画布像素/秒，dir 是画面流向（默认 left），mirror 不挑图但看得出对称 | 一一八 |
 | 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → 预览 Preview → **天气预览 Weather Preview** | 九十二 |
 | 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |

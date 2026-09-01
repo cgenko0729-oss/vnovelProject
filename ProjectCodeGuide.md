@@ -743,7 +743,7 @@ Sprite 自己知道在哪张 texture 的哪个 UV，`GUI.DrawTextureWithTexCoord
 | VNImageEffect.shader | 单图特效主 shader（溶解/扫光/HSV/波浪/轮廓光/模糊 9-tap…），VNImageEffectController 的载体。传统 CGPROGRAM（Canvas 不走 URP 光照），保留 UI 裁剪兼容 |
 | VNAdditive.shader | 加法混合发光（光环/光束/**发光类**粒子），HDR 颜色 >1 配合 Bloom 阈值 1.0 出辉光 |
 | VNParticleAlpha.shader | 普通透明混合（`SrcAlpha OneMinusSrcAlpha`），**实体类**粒子专用：花瓣/落叶/雨/雪。`_SoftBlur` 做 5-tap 十字模糊供近景层虚焦 |
-| VNScreenTransition.shader | 全屏转场图案生成（噪声/百叶窗/圆扩散…的数学都在这） |
+| VNScreenTransition.shader | 全屏转场图案生成（噪声/百叶窗/圆扩散…的数学都在这）。**两种填充**：`_TexMode=0` 图案里填 `_Color` 纯色（遮罩式转场，必然经过一片纯色）／`_TexMode=1` 填 `_MainTex` 贴图（直接过渡，不过纯色，此时 `_Color` 退化成染色系数）。`_Invert` 给「旧图按图案消失」的叠加层用；`_UVRect` 把图集 Sprite 的 uv 归一化回 0~1，不然瓦片格子会跟着图集乱跑 |
 | VNDirectBackgroundTransition.shader | 背景直切转场（新旧背景在材质内交叉，不经全屏遮罩） |
 
 **发光的公式**：HDR 顶点色会被 uGUI 钳到 1，所以发光=**材质属性**里给 >1 的
@@ -824,7 +824,9 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
 5. 发光走材质 HDR 颜色（>1）+ Bloom，不走顶点色
    （**推论**：任何"让某层躲开后处理"的方案都会连 Bloom 一起躲开，见下方坑清单）
 6. 事件模块三铁律（见第六节）
-7. 新功能开 `agent/<名>` 分支，合并回 main，**永不删分支**
+7. 新功能**动手前**先开 `feature/<名>` 分支；实现完等用户确认 → 用户叫了才 commit/push/
+   `gh pr create` → 用户叫了才写文档（同分支同 PR）→ 用户自己在 GitHub 合并 → 我 checkout main + pull。
+   **永不删分支**（详见技能 `vn-new-feature`）
 8. 调色一律走 `VNImageEffectController.SetGrade(通道, …)`，禁止直接写
    `_Brightness` / `_Saturation`（六方共用会互相覆盖，详见 8.1 节）
 

@@ -113,28 +113,51 @@ hide 亚里沙 with:dissolve
 ```
 bg bg1
 bg bg2 transition:Eyelid
+bg bg2 transition:Tiles via:black     # 要中间黑一下才写 via
 ```
 
 | 参数 | 说明 |
 |---|---|
 | 第 1 个参数 | 背景 id（在 VNGameConfig 的 Backgrounds 表里配置，见第八章） |
 | `transition:` | 可选，切换时播放全屏转场（转场类型见下表） |
+| `via:black` | 可选，回到「先被纯色盖满再散开」的老式转场 |
 
 无转场 = 瞬间切换。切背景后**立绘会自动做色调匹配**（向新背景的平均色微微偏移）。
 背景默认带 Ken Burns 缓慢漂移（永不静止），可用 `fx kenburns off` 关闭。
 
+#### 直接过渡 vs. 经过黑场（`via:`）
+
+写了 `transition:` 时，**默认是直接过渡**：新背景从图案的缝隙里直接长出来，
+中间不会闪一片纯色。
+
+```
+bg 教室 transition:Tiles              # 瓦片缝里直接露出新图（默认）
+bg 教室 transition:Tiles via:black    # 瓦片先用黑盖满 → 再散开露出新图
+```
+
+时间跳跃、章节切换这种**刻意要黑一下**的地方才写 `via:black`。
+`WhiteFlash` / `BokehOrbs` / `Eyelid` 三种永远走老式——它们的效果本体就是那层罩
+（HDR 白闪 / 柔光光斑 / 黑眼皮），让新图从罩里长出来等于把效果抹掉。
+
 **全部转场类型**（`transition:` 和独立 `transition` 命令通用）：
 
-| 名称 | 效果 | 适合场景 |
-|---|---|---|
-| `NoiseDissolve` | 噪声溶解，带金色辉光边缘 | 通用换场 |
-| `Blinds` | 百叶窗横条 | 时间跳跃 |
-| `Tiles` | 瓦片随机翻转，对角线推进 | 轻快换场 |
-| `CircleWipe` | 圆形扩散 | 聚焦某人后展开 |
-| `InkSpread` | 水墨晕染 | 和风/回忆 |
-| `WhiteFlash` | HDR 爆闪（配合 Bloom 超亮一瞬） | 重大剧情节点 |
-| `BokehOrbs` | 大光斑涌满屏幕 | 进入回忆 |
-| `Eyelid` | 上下眼睑合拢再睁开（POV 眨眼） | 醒来/昏迷 |
+| 名称 | 效果 | 适合场景 | 直接过渡 |
+|---|---|---|---|
+| `NoiseDissolve` | 噪声溶解，带金色辉光边缘 | 通用换场 | ✔ |
+| `Blinds` | 百叶窗横条 | 时间跳跃 | ✔ |
+| `Tiles` | 瓦片随机翻转，对角线推进 | 轻快换场 | ✔ |
+| `CircleWipe` | 圆形扩散 | 聚焦某人后展开 | ✔ |
+| `InkSpread` | 水墨晕染 | 和风/回忆 | ✔ |
+| `PageCurl` | 卷页（弯曲页缘 + 背光 + 投影） | 翻篇/日记 | ✔ 专用几何 |
+| `Shatter` | 碎裂（放射碎片 + 裂缝高光） | 崩坏/冲击 | ✔ 专用几何 |
+| `Ripple` | 水波扩散（多重波纹环） | 入水/梦境 | ✔ 专用几何 |
+| `InkBleed` | 墨水晕染（多墨滴融合 + 飞墨） | 和风/黑化 | ✔ 专用几何 |
+| `WhiteFlash` | HDR 爆闪（配合 Bloom 超亮一瞬） | 重大剧情节点 | ✘ 永远过白 |
+| `BokehOrbs` | 大光斑涌满屏幕 | 进入回忆 | ✘ 永远过光罩 |
+| `Eyelid` | 上下眼睑合拢再睁开（POV 眨眼） | 醒来/昏迷 | ✘ 永远过黑 |
+
+> 「专用几何」这四种走的是另一套 shader（卷页弯曲、碎片飞散这些做得更漂亮），
+> 其余走图案贴图模式，两者都不经过纯色。
 
 ### cg — 全屏 CG 显示 🖼️
 
@@ -144,6 +167,7 @@ cg 天台告白 transition:WhiteFlash # 带转场切入
 cg 回忆1 chars:keep fx:keep       # 保留立绘 / 保留环境特效
 cg off                            # 关闭 CG，恢复立绘
 cg off transition:NoiseDissolve
+cg 天台告白 transition:Tiles via:black  # 要中间黑一下才写 via（同 bg）
 ```
 
 - CG 素材放 `Assets/CG/`，**文件名 = 剧本里用的 id**，重建场景时生成器自动灌入
@@ -816,6 +840,53 @@ transition WhiteFlash
 ```
 
 不换背景、只播转场（如爆闪表示时间流逝）。类型同 bg 的转场表。
+
+**注意**：这条命令**永远是老式的**（盖住 → 散开），因为它没有「新画面」可以直接过渡到，
+盖住的那一下就是它全部的演出内容。想要不过黑的换场请用 `bg ... transition:`。
+
+### interlude — 过场（章节标题卡）🎬
+
+```
+interlude 第二章
+interlude 第二章 time:3        # 这次 loading 转 3 秒
+```
+
+一屏过场：**转场图铺满 + 标题居中 + 右下角 loading 图标转固定时长 + 随机一句语音**，
+转完自动继续下一行。典型用法是切 label / 切章节的时候垫一屏：
+
+```
+interlude 第二章
+jump 第二章开场
+```
+
+| 参数 | 说明 |
+|---|---|
+| 第 1 个参数 | 过场 id（`VNInterludeDef` 资产的 id，须登记进 VNGameConfig 的「过场库」） |
+| `time:` | 可选，覆盖这次的 loading 时长（秒）；留空 = 用资产里的（默认 1.5） |
+
+内容全在资产上配，剧本只写 id：
+
+- **标题 / 副标题**：三语字段（En/Ja 留空回退中文），标题用装饰字体
+- **语音池**：跟这个标题相关的一组语音 id，每次**随机播一条**（须先在 Voice 库登记）
+- **转场图**：留空 = 从 VNGameConfig 的**全局转场图池**随机抽一张；
+  想让某个过场固定用某几张，才填资产自己的图池
+- **进出方式**：`Fade`（淡入淡出）或 `Transition`（复用全屏转场的图案，
+  图从瓦片/百叶窗/噪声缝里直接长出来，同样不过黑）
+- **loading 时长 / 暗幕浓度 / 字号配色**
+
+行为上的三条硬规定：
+
+- **转完自动继续**，玩家点击**不能**提前跳过（过场期间吃掉点击）
+- **SKIP 快进时整段跳过**，连语音都不放
+- **不进存档**——过场播完什么都不留；读档 / 停剧本时会被强制收起
+
+转场图**不进 CG 鉴赏画廊**：它是演出素材，不是收集品，所以走独立的图池而不是 CG 库。
+
+**建一个过场要三步**：
+
+1. 右键 `Create → VN → Interlude Def`，填 id 和标题
+2. 打开 `VNGameConfig` →「舞台」页 →「过场库」拖进去；顺便往「全局转场图池」拖几张图
+3. 剧本里写 `interlude <id>`
 
 ---
 
@@ -2292,8 +2363,9 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 
 ```
 ── 演出 ──
-bg <背景> [transition:类型]                      切背景
-cg <id> [transition:] [chars:keep] [fx:keep]     全屏CG / cg off 关闭
+bg <背景> [transition:类型] [via:black]          切背景（默认直接过渡，via:black = 先黑再散）
+cg <id> [transition:] [chars:keep] [fx:keep] [via:black]  全屏CG / cg off 关闭
+interlude <过场id> [time:秒]                     过场章节卡（图+标题+loading+语音，自动继续）
 show <角色> [at:位置] [expr:] [with:预设] [from:方向] [dur:秒]   登场
   日常向 crossfade(默认) / slidein / stepin / walkin
   华丽向 DissolveGlow / FadeSlideUp / ScaleBounce / ShineReveal /
