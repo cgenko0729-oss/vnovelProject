@@ -507,6 +507,12 @@ show 亚里沙 at:center with:DissolveGlow
    `locations`（名称 + 视口坐标 0~1 + 可选显示条件如 `好感度>=2`）；
 4. registry 的 `modules` 列表登记：id=qte → QteTemplate、id=map → MapTemplate。
 
+> 其余玩法模块（限时问答 / 羽毛球 / 大头贴 / 亲密互动 / AI 自由聊天 / **擦雾**）
+> **不用手工建模板**，跑一次 **Tools → VN Effects → 场景装机 Install To Scene → …**
+> 对应那条菜单即可：它会在这个 registry 下补好禁用模板、造缺失的资产、
+> 并登记进 VNGameConfig。可重复执行，已有的绝不覆盖。前提就是本节的
+> `VNEventRegistry` 已经存在。
+
 ### 8.7 VNQuestLog（任务系统，可选）
 
 剧本用到 `quest` 命令时：`Assets/VNEffects/Quests/` 下创建 `VNQuestDef` 资产

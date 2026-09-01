@@ -476,6 +476,50 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 - **扩展位**：`VNAiContext.memory` 字段已预留，接跨场景记忆时把往期摘要塞进去即可，
   提示词层不用改（存储仿 `VNCgUnlocks` / `VNPhotoAlbum` 的全局 JSON）。
 
+### VNFog*.cs —— 示例模块⑦：擦雾（一三一章）
+
+六个文件，前两个是**纯逻辑层**（无 MonoBehaviour），编辑器调参窗口跑的是同一份代码：
+
+| 文件 | 职责 |
+|---|---|
+| `VNFogMask.cs` | 掩码缓冲：擦除 Stamp / 线段补点 / 边缘权重图 / 回雾衰减 / 清晰度求和 |
+| `VNFogScore.cs` | 阶段推进（只升不降）+ 三档判定（按历史峰值）。**纯静态可单测** |
+| `VNFogWipeDef.cs` | 资产：雾外观九参 / 笔刷 / 回雾五参 / 三档门槛 / 分阶段台词 / 音效覆盖 |
+| `VNFogWipeModule.cs` | 表现层：自绘底图与雾层、输入轮询、HUD、台词条、倒计时、ESC、结算 |
+| `VNFogSfx.cs` | 四个代码合成音效 |
+| `VNFogTextures.cs` | 四种道具光标的程序化 SDF 贴图 |
+
+- 剧本 `event wipefog id:<定义> cg:<要擦的CG> [time:] [target:%] [perfect:%] [vs:] [stat: rate:] [flag:]`，
+  结果 `完美/普通/失败`。**★ 剧本不能在 event 之前先 `cg`**——雾要到 `OnLaunch` 才铺得出来，
+  先 cg 会让谜底在开始擦之前就揭晓；Lint 规则 `wipefog-cg-before-event` 会查。
+- **本模块不破模块三铁律**（与 aitalk / interact 相反）：角色在这个玩法里是**被动 CG**，
+  不换表情、不碰立绘，全部绘制都在自己的 UI 子树内，因此也**不进存档**、无需 vn-save-compat。
+- **事件层 60 盖住对话框是必然的**（雾要铺满整屏）。解法不是让雾避开对话框，而是
+  **模块自己铺一份清晰 CG 打底**，画面完全自洽；台词改用自绘的台词条。
+  这一条与 `VNInteractionModule`「不铺全屏暗幕」的解法正好相反——那个玩法全程要角色说话
+  且不需要盖住画面，这个玩法的本体就是盖住画面。
+- **掩码分辨率 384×216**，不是全屏。雾本身就是模糊的，双线性放大 5 倍看不出来；
+  换来每帧全图遍历只有 8 万次运算、上传 81KB、清晰度统计顺手求和。
+  **改分辨率必须保持 16:9**——`384/1920 == 216/1080` 这个等式一破，屏幕上的正圆笔刷
+  在掩码里就变成椭圆了。
+- **内部是 `float[]` 而不是直接操作 `byte[]`**：回雾每帧减约 0.0005，byte 精度会被整数
+  截断完全吃掉，症状是「雾根本不回来」。
+- **★ Stamp 的擦除累加规则**（改这个函数前必读，它同时踩住两个坑）：
+  一笔之内对同一像素取 max、笔与笔之间才累加，用 `_strokeMark[]` / `_strokeBase[]` 记住
+  「这一笔碰到该像素之前的值」实现。直接 `+=` 会让沿线段补点把羽化带填满、边缘退化成
+  硬边（放大后是方块阶梯）；单纯取 max 又会让 `wipeStrength` 变成永久天花板、
+  「反复擦会越来越透」再也不会发生。
+- **难度是算得出来的**：`每秒擦除面积 ≈ 笔刷直径 × 鼠标速度`，减去回雾速率即净推进。
+  `Editor/VNFogTuneWindow.cs` 就是把这个公式做成窗口，**不进 Play Mode** 直接给出预计
+  通关秒数与手感评语。本玩法刻意不做速度惩罚，难度唯一来源就是「笔刷面积 vs 回雾速度」，
+  手感全压在参数上，所以这个窗口是**刚性需求而不是加分项**。
+- `Editor/VNFogWipeInstaller.cs`：与 `VNQuizInstaller` 同款增量装机。
+- **易漏点**：`VNFogMask.Destroy()` 必须按 `Application.isPlaying` 分路——
+  这个类编辑器也在用，`Object.Destroy` 在编辑模式下只打一条 error 什么都不销毁，
+  症状是每关一次调参窗口泄漏一张贴图。同理 `VNTouchCursor.Dispose()` 四处都要调。
+- **CG 解锁**：`VNCgUnlocks.Unlock` 本来是 `VNStage.ShowCg` 顺手做的，推荐写法下剧本不再
+  提前 `cg`，所以模块在结算时补一次（擦到 20% 以上才算看过）。
+
 ### VNSnsView.cs / VNSnsMessage.cs —— SNS 手机聊天（九十章）
 
 - **不是事件模块**，是对话的另一种呈现层：`sns open` 之后 `SayCo` 分流到 `SnsSayCo`，
@@ -690,6 +734,7 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNCamseqEditorWindow.cs | Tools → VN Effects → 镜头编排 Camera Sequence Editor | camseq 路径的可视化编辑：Game 视图取点、路径预览、交叉叠化支持 |
 | VNCharacterVisualPreviewWindow.cs | Tools → VN Effects → 预览 Preview → 角色立绘预览 Character Visual Preview | 角色立绘/头像/眨眼/口型的实时预览与标定，**确认后才写入资产** |
 | VNWeatherPreviewWindow.cs | Tools → VN Effects → 预览 Preview → 天气预览 Weather Preview | 飘落天气调参：编辑模式播放翻转帧预览（判断叶型像不像就看这里——宽度随帧呼吸 + 背面变暗），Play Mode 滑杆实时应用到场景，另存资产 + 一键登记进 VNGameConfig |
+| VNFogTuneWindow.cs | Tools → VN Effects → 预览 Preview → **擦雾调参 Fog Wipe Tuning** | 擦雾调参（一三一章）：上半按 `每秒擦除面积 ≈ 笔刷直径 × 鼠标速度` **算出**预计通关秒数并给手感评语，下半是可拖鼠标试擦的掩码预览、回雾照参数实时跑。跑的是运行时同一个 `VNFogMask`，看到的行为和游戏里一致。本玩法难度唯一来源是「笔刷面积 vs 回雾速度」，手感全压在参数上，**这个窗口是刚性需求不是加分项** |
 | VNAiStudioWindow.cs | Tools → VN Effects → AI → **AI Talk Studio** | AI 试聊台主窗口（一一二章）：左改参数 / 中聊天流 / 右 **system prompt 实时预览**。不进 Play Mode 调人格与提示词 |
 | VNAiStudioDraft.cs | （草稿层） | 人格资产的内存副本。**用临时 SO 而不是自建字段**：`SerializedObject` 迭代画＝零 UI 代码就有全部字段，加新字段自动跟上，`VNAiConversation` 也直接能吃。写回逐属性 `CopyFromSerializedProperty`（**不能用 `CopySerialized`**，它连 `m_Name` 一起抄成「xxx(Clone)」） |
 | VNAiStudioSession.cs | （会话层） | 发请求 / 解析 / 轮次记录 / 重跑 / 分岔。域重载后靠轮次记录 `BuildRequest`+`RecordReply` **重建历史**（那两个方法只是组装与追加，不发请求） |
@@ -745,6 +790,7 @@ Sprite 自己知道在哪张 texture 的哪个 UV，`GUI.DrawTextureWithTexCoord
 | VNParticleAlpha.shader | 普通透明混合（`SrcAlpha OneMinusSrcAlpha`），**实体类**粒子专用：花瓣/落叶/雨/雪。`_SoftBlur` 做 5-tap 十字模糊供近景层虚焦 |
 | VNScreenTransition.shader | 全屏转场图案生成（噪声/百叶窗/圆扩散…的数学都在这）。**两种填充**：`_TexMode=0` 图案里填 `_Color` 纯色（遮罩式转场，必然经过一片纯色）／`_TexMode=1` 填 `_MainTex` 贴图（直接过渡，不过纯色，此时 `_Color` 退化成染色系数）。`_Invert` 给「旧图按图案消失」的叠加层用；`_UVRect` 把图集 Sprite 的 uv 归一化回 0~1，不然瓦片格子会跟着图集乱跑 |
 | VNDirectBackgroundTransition.shader | 背景直切转场（新旧背景在材质内交叉，不经全屏遮罩） |
+| VNFogWipe.shader | 擦雾的雾层（RawImage 专用）。雾 = 底图的 9-tap 模糊 + 提亮 + 偏雾色，**不是一层纯白半透明**——剪影透出来玩家才知道往哪擦。`_MaskTex` 是低分辨率 R8 掩码（r=1 已擦净）；`_UVRect` 把 RawImage 烘进顶点的图集 uv 反算回 0~1 局部坐标供掩码与噪声采样，不反算的话 CG 一进图集擦痕就跟着偏。**★ 边界必须用噪声扰动**（内置 `fbm` 现算，免噪声贴图）——掩码直接当 alpha 用会得到光滑圆边，一眼假 |
 
 **发光的公式**：HDR 顶点色会被 uGUI 钳到 1，所以发光=**材质属性**里给 >1 的
 HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质别走 Image.color。
@@ -857,6 +903,16 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
   用一个 `HashSet<IEnumerator>` 记下已驱动过的，只压栈一次
 - **`EditorUtility.DisplayDialog` 会阻塞主线程**等用户点击。装机器 / 批处理这类
   可能被自动化调用的入口，拆成 `Xxx(bool interactive)`，非交互模式只写 Console
+- **纯逻辑类被编辑器复用时，`Object.Destroy` 要按 `Application.isPlaying` 分路**
+  （一三一章）：编辑模式下它只打一条「may not be called from edit mode」的 error 并且
+  **什么都不销毁**。`VNFogMask` 踩过——症状是每关一次调参窗口就泄漏一张贴图。
+  凡是「运行时与编辑器窗口共用同一份代码」的类（本项目刻意做了好几个），
+  释放资源那一段都要检查这件事
+- **位图笔刷沿线段补点时别无条件累加**（一三一章）：鼠标一帧能跑很远，必须沿线段
+  补 stamp，但同一个像素会被七八个 stamp 连着盖到。直接 `+=` 会把笔刷的羽化带一路
+  填满、边缘退化成硬边（低分辨率画布上放大后就是方块阶梯），而且「强度」参数会变得
+  名不副实（一次划过就到顶）。正解是记住「这一笔碰到该像素之前的值」，
+  一笔之内取 max、笔与笔之间才累加
 - **手感参数别做成 public 序列化字段**：字段一旦被存进场景（生成器/安装器建的组件
   必然如此），改代码里的默认值对已存在的实例**完全无效**。改了半天没反应、
   或者只有一半改动生效（运行时计算的那半生效了、序列化的那半没有），就是这个。

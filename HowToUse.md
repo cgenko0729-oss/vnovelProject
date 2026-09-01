@@ -1138,6 +1138,7 @@ event qte time:3 target:12 title:鼓起勇气连打！
 | `badminton` | `event badminton vs:小雪 id:校队 target:5` | 羽毛球对战，结果 `胜利` / `失败` / `结束`（见下） |
 | `photo` | `event photo vs:星野结衣 theme:甜蜜` | 拍大头照，结果 `完美` / `普通` / `失败`；不写 `theme:` 只返回 `完成`（见下） |
 | `interact` | `event interact vs:星野结衣 id:初次抚摸` | 亲密互动：光标变道具摸角色部位，结果 `满足` / `普通` / `拒绝`（见下） |
+| `wipefog` | `event wipefog id:浴室镜面 cg:CG_浴室` | 擦雾：起雾盖住 CG，擦开看清，结果 `完美` / `普通` / `失败`（见下） |
 
 新玩法（战斗/钓鱼/番长镇日程……）就是照 VNQteModule 的样子再写一个模块类，
 接口/铁律见 `ProjectCodeGuide.md`。
@@ -1488,6 +1489,99 @@ if 大头照_次数 >= 3 jump 拍上瘾了
 
 照片存在 `persistentDataPath/vn_photos/`（与存档槽分离，读旧档也不会丢）。
 完整示例见 `Assets/Scenarios/PhotoDemo.vn.txt`。
+
+### 擦雾：wipefog 🌫
+
+整屏起雾盖住一张 CG，玩家按住左键把雾擦开。雾**会重新凝结**（从画面四周往中间吞，
+中间还随机冒雾团），要在时限内把清晰度推过门槛。
+
+```
+: （什么都看不清……擦一擦吧。）
+event wipefog id:浴室镜面 cg:CG_浴室 time:60 target:65 perfect:90 stat:感性 rate:0.08 flag:擦雾1
+* 完美 -> 看清了
+* 普通 -> 看清了
+* 失败 -> 没看清
+
+label 看清了
+cg CG_浴室          # ← 事件结束后再摆上舞台，画面才留得住继续演
+```
+
+> ### ★ 千万别在 `event` 之前先写 `cg`
+>
+> 这是**唯一一个会毁掉整个玩法**的写法：
+>
+> ```
+> cg CG_浴室                    # ✗ 错
+> : （什么都看不清……）           #   还要玩家点一下，暴露得更久
+> event wipefog id:浴室镜面
+> ```
+>
+> 雾要到事件启动才铺得出来。先写 `cg` 的话，从 cg 的转场开始到事件真正启动为止，
+> **清晰画面一直摆在玩家眼前**——谜底在开始擦之前就已经揭晓了。
+>
+> 正确做法是用 `cg:` 参数把图交给模块自己铺，进事件的**第一帧就是盖满雾**的状态；
+> 想让画面在事件结束后留下继续演，就在「* 结果行」跳到的分支里再写 `cg`
+> （两者同一帧交接，不会闪）。
+>
+> Lint 会用 `wipefog-cg-before-event` 抓这件事。先 `cg` 出别的图再擦另一张是正常写法，
+> 不会误报。
+
+| 参数 | 说明 |
+|---|---|
+| `id:` | 擦雾定义资产 id（只登记一套时可省略） |
+| `cg:` | 要擦的 CG id；留空 = 舞台当前显示的 CG，再留空 = 当前背景（擦车窗看风景就这么用） |
+| `time:` | 时限秒（默认取资产的 60） |
+| `target:` | 「普通」档清晰度门槛 %（默认 65） |
+| `perfect:` | 「完美」档门槛 %（默认 90）。**擦到就提前结束**，不用等时限 |
+| `vs:` | 角色 id，只用来取台词条上的显示名（**不碰立绘**，角色在这个玩法里是被动 CG） |
+| `stat:` `rate:` | 清晰度换算成属性：`加成 = round(清晰度 × rate)`，走 HUD 飘字 |
+| `flag:` | 成绩 flag 前缀（默认 `擦雾`） |
+| `tutorial:` | 第一次进这个模块时先播一篇教程（所有事件模块通用） |
+
+写入三个 flag：
+
+| flag | 内容 |
+|---|---|
+| `<前缀>_清晰度` | 0~100，取的是**历史峰值**不是结束瞬间的值 |
+| `<前缀>_用时` | 实际用了几秒 |
+| `<前缀>_档位` | 2 完美 / 1 普通 / 0 失败 |
+
+**为什么按峰值算**：时限到的那一帧刚好被雾吞掉一点，就把你从「完美」打到「普通」，
+那是运气不是操作。进度条上有一道**黄色峰值刻度线**（你最好成绩到过哪）和一道
+**白色门槛线**（擦到哪算够），显示什么就结算什么。
+
+**手感与难度全在资产里**（`Assets/VNEffects/FogWipes/`，右键 **Create → VN → Fog Wipe Definition**）。
+难度是**算得出来的**，不用瞎试：
+
+```
+每秒擦除面积 ≈ 笔刷直径 × 鼠标速度
+```
+
+1920 宽下，笔刷 180px + 正常拖速 800px/s ≈ 每秒擦掉全屏 6.9%，扣掉重叠浪费约 4.6%/秒；
+再减回雾速率就是净推进。出厂默认（笔刷 180px、回雾 3%/秒、时限 60 秒、门槛 90/65）
+算出来完美档约 55 秒——紧张但拿得到。回雾调到 3.5%/秒 就要 82 秒（拿不到），
+调到 2%/秒 只要 35 秒（毫无对抗）。
+
+调参不要靠试玩硬猜，用 **Tools → VN Effects → 预览 Preview → 擦雾调参 Fog Wipe Tuning**：
+它按当前参数直接算出预计通关秒数并给评语（「太苛刻」/「太轻松」/「紧张但拿得到」），
+下半还能拖鼠标试擦、看回雾实时跑，全程不用进 Play Mode。
+
+三个最值得调的数：
+
+| 参数 | 效果 |
+|---|---|
+| `笔刷直径` | 难度主旋钮之一。调小 = 要跑更多路 |
+| `边缘侵蚀` + `随机雾团` | 难度主旋钮之二。两者之和就是回雾速率 |
+| `雾色混入比例 fogMix` | 决定「不擦能看到多少」。默认 0.76 是「看得见有个人影、看不清五官」；调到 0.55 不擦也能看清七八成，玩家就没有擦的动机了 |
+
+> 还有一个 `边界破碎程度 edgeNoise`（默认 0.5）：把它调到 0，擦痕边缘会变成假的
+> 光滑圆形，一眼就看出是橡皮擦而不是抹布。这一条对真实感的贡献超过其他任何单项。
+
+**第一次用要先装模块**：**Tools → VN Effects → 场景装机 Install To Scene → 擦雾 Fog Wipe**
+——补一个禁用的 FogWipeTemplate、造一个示例资产「浴室镜面」并登记进 VNGameConfig。
+装完记得 Ctrl+S。重复执行安全（已有的绝不覆盖）。
+
+完整示例见 `Assets/Scenarios/FogWipeDemo.vn.txt`。
 
 ### AI 自由聊天：aitalk 🤖
 
@@ -2296,6 +2390,9 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `unknown-photo-frame` | `event photo` 的 `frame:` 没有对应的 VNPhotoFrameDef（静默退回无边框） |
 | | `unknown-photo-backdrop` | `event photo` 的 `bg:` 没有对应的 VNPhotoBackdropDef（静默退回无背景） |
 | | `photo-outcome-mode` | `event photo` 的结果行与模式对不上（写了 `theme:` 却接「完成」，或自由拍照却接「完美/普通/失败」） |
+| | `unknown-fogwipe` | `event wipefog` 的 `id:` 没有对应的 VNFogWipeDef 资产（整段擦雾会被静默跳过） |
+| | `wipefog-no-failure-branch` | `event wipefog` 没接住「* 失败」→ 玩家没擦到门槛时剧情静默继续 |
+| | `wipefog-cg-before-event` | `event wipefog` 之前先 `cg` 出了同一张图 → **谜底在开始擦之前就揭晓**，整个玩法的前提没了。改用 `cg:` 参数交给模块自己铺 |
 | | `sns-not-closed` | 最后一次 `sns open` 之后没有 `sns close`（手机会一直盖在画面上） |
 | | `sns-timeout-no-late` | `sns reply` 写了 `timeout:` 却没写 `late:` → 运行时退回成不限时 |
 | | `all-replies-conditional` | 一组 `sns reply` 的回复全部带 `if:` → 可能一条都不显示 |
@@ -2425,6 +2522,9 @@ event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答
 event badminton vs:<角色> [id:] [target:] [first:] [mode:free] [powerstat:]  羽毛球对战
 event photo vs:<角色> [me:] [theme:] [mode:free] [frame:] [bg:] [time:] [stat: rate:] 拍大头照
+event wipefog id:<擦雾定义> cg:<要擦的CG> [time:] [target:%] [perfect:%] [stat: rate:] [flag:]  擦雾
+  结果 完美/普通/失败 —— ★ 别在 event 之前先 cg（谜底会提前揭晓），用 cg: 交给模块自己铺；
+  要让画面留下继续演，就在结果分支里再写 cg
 event aitalk vs:<角色> [persona:] [turns:] [topic:] [place:] [me:] [stat: rate:] [flag:]  AI自由聊天
   结果 好感提升/普通/冷场/失败 —— * 失败 必须接住；event 前要先 show 角色
                                                  结果 全对/及格/失败
