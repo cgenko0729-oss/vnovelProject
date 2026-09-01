@@ -23,6 +23,7 @@ namespace VNEffects.EditorTools
         WeatherId,   // 天气 id（内置叶型 + VNWeatherDef 资产 + 雨雪萤火虫枚举）
         UiSkinId,    // ui 命令的第二参数：候选跟着同行的 kind 变（见 dependsOn）
         InterludeId, // 过场 id（VNGameConfig 过场库里的 VNInterludeDef 资产）
+        TutorialId,  // 教程 id（VNGameConfig 教程库里的 VNTutorialDef 资产）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -195,6 +196,15 @@ namespace VNEffects.EditorTools
                 "转完自动继续，玩家点击不能提前跳过；SKIP 快进时整段跳过",
                 Pos("id", "过场", VNParamSource.InterludeId),
                 Kw("time", "秒", VNParamSource.Number, weight: 0.5f));
+            Add("tutorial", "Scene",
+                "tutorial <教程id> [force:on]\n" +
+                "教程：压暗全屏 + 挖洞高亮某块 UI + 图文卡片，点一下讲下一条。\n" +
+                "讲解期间整个玩法冻结（含小游戏），ESC 可跳过整篇。\n" +
+                "内容全在 VNGameConfig「教程库」里的 VNTutorialDef 资产上配；\n" +
+                "默认「看过就跳过」（记录是全局的，读旧档 / 新周目都不会重看），\n" +
+                "force:on 强制重看；SKIP 快进时整段跳过",
+                Pos("id", "教程", VNParamSource.TutorialId),
+                Kw("force", "强制", VNParamSource.Options, new[] { "on", "off" }, weight: 0.5f));
 
             // ---- Character ----
             Add("show", "Character", "show <char> [at:] [expr:] [with:预设] [from:方向] [dur:秒]\n" +

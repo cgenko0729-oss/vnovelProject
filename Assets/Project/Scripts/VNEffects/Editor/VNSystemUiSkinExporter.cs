@@ -89,6 +89,33 @@ namespace VNEffects
                       "（其余系统 UI prefab 未改动）。");
         }
 
+        /// <summary>只重导设置面板一个 prefab，不碰其余 10 个。
+        /// 加了「显示教程提示 / 重置教程记录」两行之后要跑一次它才看得到那两个按钮
+        /// （老 prefab 缺这两个槽位不会报错，只是面板里没有这两项）。</summary>
+        [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/系统主题：导出设置面板 System UI: Export Config Panel Prefab", priority = 137)]
+        public static void ExportConfigPanel()
+        {
+            var set = AssetDatabase.LoadAssetAtPath<VNSystemUiSkinSet>(SetPath);
+            if (set == null)
+            {
+                Debug.LogError($"[VNSystemUiSkin] 找不到全局主题资产 {SetPath}，" +
+                               "请先运行 Export Default Prefabs。");
+                return;
+            }
+
+            EnsureFolder(Dir);
+            _rounded = AssetDatabase.LoadAssetAtPath<Sprite>(RoundedPath);
+            _font = VNFontAssetBuilder.EnsureFontAsset();
+
+            set.configPanelPrefab = BuildConfig();
+            EditorUtility.SetDirty(set);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorGUIUtility.PingObject(set);
+            Debug.Log("[VNSystemUiSkin] 设置面板默认 prefab 已重新导出并登记" +
+                      "（其余系统 UI prefab 未改动）。");
+        }
+
         [MenuItem("Tools/VN Effects/UI 皮肤 UI Skins/系统主题：校验全局主题 System UI: Validate Global Theme", priority = 137)]
         public static void ValidateAll()
         {
@@ -177,7 +204,7 @@ namespace VNEffects
             skin.panelRoot = root;
             skin.backgroundCloseButton = FullButton(root.transform, "Dim", new Color(0, 0, .02f, .82f));
             var window = Image(root.transform, "Window", Panel);
-            SetCenter(window.rectTransform, new Vector2(780, 810));  // +70 = 多出「滚轮打开回想」一行
+            SetCenter(window.rectTransform, new Vector2(780, 950));  // +70 滚轮打开回想 +140 教程两行
             skin.titleText = Text(window.transform, "Title", 38, TextAlignmentOptions.Left,
                 new Vector2(58, -34), new Vector2(560, 56));
             (skin.closeButton, _) = FixedButton(window.transform, "Close", new Vector2(700, -34), new Vector2(48, 48), "×");
@@ -192,8 +219,10 @@ namespace VNEffects
             (skin.japaneseButton, skin.japaneseLabel) = FixedButton(window.transform, "Japanese", new Vector2(556, -474), new Vector2(140, 50));
             (skin.fullscreenButton, skin.fullscreenLabel) = FixedButton(window.transform, "Fullscreen", new Vector2(82, -584), new Vector2(616, 58));
             (skin.wheelBacklogButton, skin.wheelBacklogLabel) = FixedButton(window.transform, "WheelBacklog", new Vector2(82, -654), new Vector2(616, 58));
+            (skin.tutorialHintsButton, skin.tutorialHintsLabel) = FixedButton(window.transform, "TutorialHints", new Vector2(82, -724), new Vector2(616, 58));
+            (skin.tutorialResetButton, skin.tutorialResetLabel) = FixedButton(window.transform, "TutorialReset", new Vector2(82, -794), new Vector2(616, 58));
             skin.hintText = Text(window.transform, "Hint", 19, TextAlignmentOptions.Center,
-                new Vector2(80, -738), new Vector2(620, 34));
+                new Vector2(80, -878), new Vector2(620, 34));
             return Save(root);
         }
 

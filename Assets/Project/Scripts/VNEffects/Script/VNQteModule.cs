@@ -52,9 +52,10 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;        // 教程讲解中：连打条与倒计时一起冻住
             if (_phase != Phase.Playing) return;
 
-            _timeLeft -= Time.unscaledDeltaTime; // 不受快进 timeScale 影响
+            _timeLeft -= VNTime.Delta;           // 不受快进 timeScale 影响、受 VNPause 冻结
 
             bool pressed =
                 (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) ||

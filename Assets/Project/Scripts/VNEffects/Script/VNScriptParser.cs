@@ -94,7 +94,7 @@ namespace VNEffects
         {
             "bg", "cg", "show", "hide", "emote", "mark", "overlay", "imprint", "wait",
             "camera", "shake", "weather", "mood", "fx", "liquid", "bgscroll",
-            "sakura", "transition", "reset", "interlude",
+            "sakura", "transition", "reset", "interlude", "tutorial",
             "label", "jump", "call", "return", "params", "flag", "stat", "time", "if", "choice",
             "chapter",
             "move", "bgm", "se", "voice", "volume",

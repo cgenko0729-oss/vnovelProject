@@ -986,6 +986,21 @@ namespace VNEffects
             return null;
         }
 
+        /// <summary>按 id 找教程资产（tutorial 命令用）。同 interlude：库只在 VNGameConfig 里。</summary>
+        static VNTutorialDef FindTutorial(string id, int line)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError($"[VNScript] 第 {line} 行：tutorial 缺少教程 id");
+                return null;
+            }
+            var def = VNTutorialPlayer.Find(id);
+            if (def == null)
+                Debug.LogError($"[VNScript] 第 {line} 行：找不到教程「{id}」，" +
+                               "请在 VNGameConfig 的「教程库」里登记该 VNTutorialDef 资产");
+            return def;
+        }
+
         TextAsset FindChapter(string chapterName)
         {
             string wanted = NormalizeChapterName(chapterName);
@@ -1045,6 +1060,12 @@ namespace VNEffects
         /// <summary>剧本中断时清理进行中的事件模块（正常结束由 EventCo 自己收尾）</summary>
         void CleanupActiveEvent()
         {
+            // 教程要先收：它可能是被模块启动的，模块一销毁就没人来解除暂停了，
+            // 而暂停不解除 = 整个游戏永久卡死（比暗幕留在屏幕上严重得多）
+            (stage != null && stage.tutorial != null
+                ? stage.tutorial : VNTutorialPlayer.Instance)?.CancelImmediate();
+            VNPause.ReleaseAll(); // 兜底：任何漏掉的持有者都在这里被清掉
+
             if (_activeEventModule != null)
             {
                 _activeEventModule.CancelForDebug();
@@ -1874,6 +1895,11 @@ namespace VNEffects
 
             if (_eventActive) return; // 事件模块进行中：输入全部交给模块
 
+            // 教程讲解中（VNPause）：全局快捷键一律屏蔽。
+            // 不加这一条的话，剧情层弹出的教程盖着屏幕，F5 存档 / H 回想 /
+            // A / S / I / C / G / J 还全都能按 —— 存出来的档还会卡在教程半截。
+            if (VNPause.IsPaused) return;
+
             // SNS 手机聊天：等玩家挑回复时输入全部交给面板（同 event，顺带挡掉存档）
             bool snsOpen = stage != null && stage.IsSnsOpen;
             if (snsOpen && stage.sns.IsBlockingInput) return;
@@ -2333,6 +2359,23 @@ namespace VNEffects
                     if (interlude == null || stage.interlude == null) return null;
                     return stage.interlude.PlayCo(interlude, cmd.KwF("time", -1f),
                         stage.vnAudio);
+                }
+
+                case "tutorial":
+                {
+                    // tutorial <教程id> [force:on]
+                    // 默认「看过就跳过」（记录是全局的，读旧档不会重看）；
+                    // force:on 强制重看，帮助菜单/作者点名讲解用。
+                    // 快进时整段跳过：教学是给正常速度看的，SKIP 里只会是干扰。
+                    if (_skip) return null;
+                    var player = stage.tutorial != null ? stage.tutorial : VNTutorialPlayer.Instance;
+                    if (player == null) return null;
+                    var def = FindTutorial(cmd.Arg(0), cmd.line);
+                    if (def == null) return null;
+                    string forceArg = cmd.Kw("force");
+                    bool force = !string.IsNullOrEmpty(forceArg) &&
+                                 forceArg != "off" && forceArg != "false" && forceArg != "0";
+                    return player.PlayCo(def, force);
                 }
 
                 case "sakura":

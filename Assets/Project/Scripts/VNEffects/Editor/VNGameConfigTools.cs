@@ -200,6 +200,8 @@ namespace VNEffects.EditorTools
             report.Add($"AI 人格定义 ×{config.aiPersonas.Count}");
             config.interludes = FindAll<VNInterludeDef>();
             report.Add($"过场定义 ×{config.interludes.Count}");
+            config.tutorials = FindAll<VNTutorialDef>();
+            report.Add($"教程定义 ×{config.tutorials.Count}");
 
             config.chapters = ScanChapters();
             report.Add($"章节剧本 ×{config.chapters.Count}");

@@ -1329,6 +1329,7 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;   // 教程讲解中：限时与全部快捷键一起冻住
             if (_phase == Phase.Dressing) TickTimer();
 
             var keyboard = Keyboard.current;
@@ -1355,7 +1356,7 @@ namespace VNEffects
         {
             if (_timeLimit <= 0f) return;
 
-            _timeLeft -= Time.unscaledDeltaTime;   // 三铁律：不受快进 timeScale 影响
+            _timeLeft -= VNTime.Delta;   // 三铁律：不受快进 timeScale 影响；受 VNPause 冻结
             if (_timeLeft <= 0f)
             {
                 _timeLeft = 0f;
@@ -1519,7 +1520,7 @@ namespace VNEffects
             float t = 0f;
             while (t < seconds)
             {
-                t += Time.unscaledDeltaTime;
+                t += VNTime.Delta;
                 yield return null;
             }
         }

@@ -120,6 +120,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> photoBackdropIds = new HashSet<string>();
             public HashSet<string> weatherIds = new HashSet<string>();
             public HashSet<string> interludeIds = new HashSet<string>();
+            public HashSet<string> tutorialIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
             public bool sceneRegistryFound;   // 场景里有没有 VNEventRegistry
@@ -252,6 +253,11 @@ namespace VNEffects.EditorTools
                     if (d == null) continue;
                     // id 留空按资产文件名认，与运行时 VNScriptRunner.FindInterlude 一致
                     reg.interludeIds.Add(string.IsNullOrEmpty(d.id) ? d.name : d.id);
+                }
+                foreach (var d in cfg.tutorials)
+                {
+                    if (d == null) continue;
+                    reg.tutorialIds.Add(string.IsNullOrEmpty(d.id) ? d.name : d.id);
                 }
             }
 
@@ -678,6 +684,21 @@ namespace VNEffects.EditorTools
                             Add(issues, VNLintSeverity.Error, "unknown-interlude", f, c.line,
                                 $"过场「{iid}」没有登记",
                                 "在 VNGameConfig 的「过场库」里登记对应的 VNInterludeDef 资产。");
+                        break;
+                    }
+
+                    case "tutorial":
+                    {
+                        // 没登记的教程 id 运行时只有一条 Console 报错，画面上整段静默跳过
+                        string tid = c.Arg(0);
+                        if (string.IsNullOrEmpty(tid))
+                            Add(issues, VNLintSeverity.Error, "tutorial-no-id", f, c.line,
+                                "tutorial 缺少教程 id",
+                                "写成 tutorial <教程id>，id 是 VNGameConfig「教程库」里 VNTutorialDef 资产的 id。");
+                        else if (!Dynamic(tid) && !reg.tutorialIds.Contains(tid))
+                            Add(issues, VNLintSeverity.Error, "unknown-tutorial", f, c.line,
+                                $"教程「{tid}」没有登记",
+                                "在 VNGameConfig 的「教程库」里登记对应的 VNTutorialDef 资产。");
                         break;
                     }
 

@@ -30,5 +30,8 @@ namespace VNEffects
         [Header("玩法事件面板（周日程排程 / 结果结算弹窗）")]
         public GameObject planPrefab;
         public GameObject resultPopupPrefab;
+
+        [Header("教程说明卡片（暗幕与挖洞不走皮肤，那是功能件不是装饰）")]
+        public GameObject tutorialPrefab;
     }
 }

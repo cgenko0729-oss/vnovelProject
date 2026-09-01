@@ -65,6 +65,10 @@ config.displayFullscreen = Display Mode　Fullscreen
 config.displayWindowed = Display Mode　Windowed
 config.wheelBacklogOn = Wheel Opens Backlog　On
 config.wheelBacklogOff = Wheel Opens Backlog　Off
+config.tutorialHintsOn = Tutorial Hints　On
+config.tutorialHintsOff = Tutorial Hints　Off
+config.tutorialReset = Reset Tutorial Progress
+config.tutorialResetDone = Tutorial progress cleared
 config.hint = Settings save automatically　·　Esc or click outside to close
 
 # —— Runtime toasts ——
@@ -283,3 +287,9 @@ diary.affection = Affection {0}
 interact.end = Finish
 interact.stage = Stage {0}
 interact.rejected = Refused {0} / {1}
+
+# ---- Tutorial ----
+tutorial.next = ▼ Click to continue
+tutorial.done = ▼ Click to start
+tutorial.skip = ESC to skip
+tutorial.progress = {0} / {1}

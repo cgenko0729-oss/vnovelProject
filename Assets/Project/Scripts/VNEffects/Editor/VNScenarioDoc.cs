@@ -675,6 +675,14 @@ namespace VNEffects.EditorTools
                                 Err(i, $"{r.keyword}: unknown interlude \"{v}\" " +
                                        "(not registered in VNGameConfig interludes)");
                             break;
+                        case VNParamSource.TutorialId:
+                            // 认不出的教程 id 会整段静默跳过，属于真错误。
+                            // 但一个教程资产都没登记时不报——那是「还没开始配」，不是拼错
+                            if (ctx.HasTutorials &&
+                                System.Array.IndexOf(ctx.tutorialIds, v) < 0)
+                                Err(i, $"{r.keyword}: unknown tutorial \"{v}\" " +
+                                       "(not registered in VNGameConfig tutorials)");
+                            break;
                         case VNParamSource.UiSkinId:
                             // 只校验 kind=name：名字样式是内置预设，拼错必然静默无效果。
                             // dialogue/choice 的皮肤 id 交给 Lint——那些可以「先写剧本、稍后登记」，
@@ -929,6 +937,7 @@ namespace VNEffects.EditorTools
         public string[] questIds = System.Array.Empty<string>();
         public string[] weatherIds = System.Array.Empty<string>();
         public string[] interludeIds = System.Array.Empty<string>();
+        public string[] tutorialIds = System.Array.Empty<string>();
         public string[] dialogueSkinIds = System.Array.Empty<string>();
         public string[] choiceSkinIds = System.Array.Empty<string>();
         public readonly Dictionary<string, string[]> scenarioLabels =
@@ -947,6 +956,7 @@ namespace VNEffects.EditorTools
         public bool HasQuests => questIds.Length > 0;
         public bool HasWeathers => weatherIds.Length > 0;
         public bool HasInterludes => interludeIds.Length > 0;
+        public bool HasTutorials => tutorialIds.Length > 0;
 
         public bool HasExpression(string characterId, string expr)
         {

@@ -162,6 +162,8 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;   // 教程讲解中：推进与 ESC 一起冻住
+
             // 打字过程中点一下 = 立刻显示完整台词（和正常台词行的手感一致）
             if (_phase == Phase.Speaking && AnyAdvancePressed())
                 _stage?.dialogue?.CompleteTyping();
@@ -246,7 +248,7 @@ namespace VNEffects
                     float t = 0f;
                     while (t < optionDelay && !_escConfirmed)
                     {
-                        t += Time.unscaledDeltaTime;
+                        t += VNTime.Delta;
                         yield return null;
                     }
                 }

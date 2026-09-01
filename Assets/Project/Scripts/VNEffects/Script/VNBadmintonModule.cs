@@ -163,6 +163,8 @@ namespace VNEffects
 
             // 先同步一次，否则第一帧渲染时球还在原点（低帧率下会看到它在左下角闪一下）
             SyncVisuals();
+
+            RegisterTutorialAnchors();
         }
 
         /// <summary>
@@ -358,8 +360,48 @@ namespace VNEffects
 
         void OnDestroy()
         {
+            UnregisterTutorialAnchors();
             _court?.Dispose();
         }
+
+        // ------------------------------------------------------------------
+        // 教程锚点
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// 把几块 HUD 登记成教程可高亮的目标。**不能靠物体名查找**——
+        /// 球场 UI 全是程序化生成的，改一次布局教程就静默挖到空气上（见
+        /// VNTutorialAnchors 的注释）。登记是一行的事，改布局也不影响。
+        /// </summary>
+        void RegisterTutorialAnchors()
+        {
+            if (_court != null)
+            {
+                VNTutorialAnchors.Register(AnchorScore, _court.ScoreBoard);
+                VNTutorialAnchors.Register(AnchorHint, _court.HintBox);
+                VNTutorialAnchors.Register(AnchorNet, _court.NetRoot);
+            }
+            if (_me != null) VNTutorialAnchors.Register(AnchorMe, _me.Root);
+            if (_op != null) VNTutorialAnchors.Register(AnchorOpponent, _op.Root);
+            VNTutorialAnchors.Register(AnchorBall, _ballRect);
+        }
+
+        void UnregisterTutorialAnchors()
+        {
+            VNTutorialAnchors.Unregister(AnchorScore);
+            VNTutorialAnchors.Unregister(AnchorHint);
+            VNTutorialAnchors.Unregister(AnchorNet);
+            VNTutorialAnchors.Unregister(AnchorMe);
+            VNTutorialAnchors.Unregister(AnchorOpponent);
+            VNTutorialAnchors.Unregister(AnchorBall);
+        }
+
+        public const string AnchorScore = "badminton.scoreboard";
+        public const string AnchorHint = "badminton.hint";
+        public const string AnchorNet = "badminton.net";
+        public const string AnchorMe = "badminton.me";
+        public const string AnchorOpponent = "badminton.opponent";
+        public const string AnchorBall = "badminton.ball";
 
         // ------------------------------------------------------------------
         // 主循环
@@ -367,9 +409,13 @@ namespace VNEffects
 
         void Update()
         {
+            // 教程讲解中：整局冻结。**必须在 ReadInput 之前拦**——
+            // 同下面确认框那条的教训，拦晚了照样能挥拍，「冻结」名不副实。
+            if (VNPause.IsPaused) return;
+
             // 事件模块三铁律②：unscaled 计时，不受 Skip 快进影响。
-            // 上限 0.05s：切窗口回来时的巨大 dt 会让球瞬移过整个球场。
-            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+            // 上限 0.05s（切窗口回来的巨大 dt 会让球瞬移过整个球场）已收进 VNTime.Delta。
+            float dt = VNTime.Delta;
 
 #if UNITY_EDITOR
             // 决策 10 没做 Editor 调参窗口的补偿：Play 着直接拖 Def 资产的 Inspector

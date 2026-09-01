@@ -87,7 +87,8 @@ namespace VNEffects
 
         void Update()
         {
-            if (_closing || Time.unscaledTime - _shownAt < inputDelay) return;
+            if (VNPause.IsPaused) return;   // 教程讲解中：别让结算弹窗被同一下点击收掉
+            if (_closing || VNTime.Time - _shownAt < inputDelay) return;
 
             var kb = Keyboard.current;
             var mouse = Mouse.current;
@@ -225,7 +226,7 @@ namespace VNEffects
                 hint.DOFade(0.2f, 0.7f).SetLoops(-1, LoopType.Yoyo)
                     .SetUpdate(true).SetLink(gameObject);
             }
-            _shownAt = Time.unscaledTime;
+            _shownAt = VNTime.Time;
         }
 
         void PlayStarBurst(Color color, RectTransform origin)

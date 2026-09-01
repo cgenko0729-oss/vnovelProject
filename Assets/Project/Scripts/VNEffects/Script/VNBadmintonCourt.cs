@@ -50,7 +50,12 @@ namespace VNEffects
         /// <summary>影子 / 角色 / 球 / 轨迹虚点都挂这一层</summary>
         public RectTransform ActorLayer { get; private set; }
 
-        RectTransform _scoreBoard, _tipsBox;
+        RectTransform _scoreBoard, _tipsBox, _net;
+
+        /// <summary>记分板 / 右下角操作提示 / 球网——教程高亮用的锚点（可能为空）</summary>
+        public RectTransform ScoreBoard => _scoreBoard;
+        public RectTransform HintBox => _hintText != null ? (RectTransform)_hintText.transform : null;
+        public RectTransform NetRoot => _net;
         TextMeshProUGUI _scoreText, _leftName, _rightName, _tipsText, _hintText, _goalText;
         Sequence _tipsSeq;
         GameObject _linkTarget;
@@ -210,7 +215,7 @@ namespace VNEffects
 
         void BuildNet(VNBadmintonTuning t)
         {
-            var net = VNBadmintonUi.CreateNode("Net", Root);
+            var net = _net = VNBadmintonUi.CreateNode("Net", Root);
             VNBadmintonUi.AnchorBottomCenter(net);
             net.anchoredPosition = Vector2.zero;
             net.sizeDelta = Vector2.zero;

@@ -134,10 +134,11 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;   // 教程讲解中：限时、冷却与抚摸输入一起冻住
             if (_phase != Phase.Playing) return;
 
-            float now = Time.unscaledTime;
-            float dt = Time.unscaledDeltaTime;
+            float now = VNTime.Time;
+            float dt = VNTime.Delta;
 
             if (_timed)
             {
@@ -587,7 +588,7 @@ namespace VNEffects
 
             // 结束反馈强制非阻塞：模块 0.7 秒后就 Done 并被销毁，等玩家推进的台词
             // 会被拦腰打断。结算台词该写在剧本的「* 结果行」下面，这里只放表情/漫符/短演出
-            PlayFeedback(endFb, Time.unscaledTime, false, false);
+            PlayFeedback(endFb, VNTime.Time, false, false);
 
             RestoreExpression();
 

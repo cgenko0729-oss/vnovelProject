@@ -47,6 +47,12 @@ namespace VNEffects
         public Button wheelBacklogButton;
         public TMP_Text wheelBacklogLabel;
 
+        [Header("教程（同上，可留空）")]
+        public Button tutorialHintsButton;   // 「显示教程提示」开关
+        public TMP_Text tutorialHintsLabel;
+        public Button tutorialResetButton;   // 「重置教程记录」，按一下全部教程可重看
+        public TMP_Text tutorialResetLabel;
+
         public override void CollectValidationErrors(List<string> errors)
         {
             Require(panelRoot, "面板根", errors);

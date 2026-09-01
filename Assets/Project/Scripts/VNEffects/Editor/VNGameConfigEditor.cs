@@ -38,7 +38,7 @@ namespace VNEffects.EditorTools
             new Tab("标题",    "gameTitle", "gameTitleEn", "gameTitleJa", "titleBackground", "titleBgm"),
             new Tab("UI 皮肤", "dialogueSkins", "choiceSkins", "systemUiSkin"),
             new Tab("舞台",    "characters", "backgrounds", "cgLibrary", "weatherDefs",
-                               "interludes", "interludeImages"),
+                               "interludes", "interludeImages", "tutorials"),
             new Tab("音频",    "bgmLibrary", "seLibrary", "voiceLibrary", "typingTick",
                                "overrideChannelVolumes", "bgmVolume", "seVolume", "voiceVolume"),
             new Tab("玩法",    "mapSprite", "mapLocations", "stats", "shops", "plans",
