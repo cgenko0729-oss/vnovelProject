@@ -667,6 +667,14 @@ namespace VNEffects.EditorTools
                                 Err(i, $"{r.keyword}: unknown weather \"{v}\" " +
                                        "(not a builtin leaf type, a VNWeatherDef id, or a VNWeather value)");
                             break;
+                        case VNParamSource.InterludeId:
+                            // 认不出的过场 id 会整段静默跳过（连语音都不放），属于真错误。
+                            // 但一个过场资产都没登记时不报——那是「还没开始配」，不是拼错
+                            if (ctx.HasInterludes &&
+                                System.Array.IndexOf(ctx.interludeIds, v) < 0)
+                                Err(i, $"{r.keyword}: unknown interlude \"{v}\" " +
+                                       "(not registered in VNGameConfig interludes)");
+                            break;
                         case VNParamSource.UiSkinId:
                             // 只校验 kind=name：名字样式是内置预设，拼错必然静默无效果。
                             // dialogue/choice 的皮肤 id 交给 Lint——那些可以「先写剧本、稍后登记」，
@@ -920,6 +928,7 @@ namespace VNEffects.EditorTools
         public string[] eventIds = System.Array.Empty<string>();
         public string[] questIds = System.Array.Empty<string>();
         public string[] weatherIds = System.Array.Empty<string>();
+        public string[] interludeIds = System.Array.Empty<string>();
         public string[] dialogueSkinIds = System.Array.Empty<string>();
         public string[] choiceSkinIds = System.Array.Empty<string>();
         public readonly Dictionary<string, string[]> scenarioLabels =
@@ -937,6 +946,7 @@ namespace VNEffects.EditorTools
         public bool HasEvents => eventIds.Length > 0;
         public bool HasQuests => questIds.Length > 0;
         public bool HasWeathers => weatherIds.Length > 0;
+        public bool HasInterludes => interludeIds.Length > 0;
 
         public bool HasExpression(string characterId, string expr)
         {

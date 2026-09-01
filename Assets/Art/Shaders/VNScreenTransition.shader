@@ -27,6 +27,15 @@ Shader "VN/ScreenTransition"
         _Center ("Center (viewport)", Vector) = (0.5,0.5,0,0)
         _Aspect ("Aspect Ratio", Float) = 1.7778
         _EdgeWidth ("Dissolve Edge Width", Range(0.001,0.3)) = 0.07
+        // ---- 贴图模式（「不经过纯色」的直接过渡用）----------------------
+        // _TexMode = 1 时图案里填的是 _MainTex 而不是 _Color，_Color 退化成染色/压暗系数。
+        // 这样「瓦片一格格长出新图」时背后一直是原画面，不会先闪一片黑。
+        _TexMode ("Texture Mode (0 solid / 1 sample _MainTex)", Float) = 0
+        // _Invert = 1 时遮罩取反：用在「旧图按图案消失」的叠加层上。
+        _Invert ("Invert Mask", Float) = 0
+        // 进来的 uv 落在图集里的哪一块（xy = min, zw = max）。图案坐标据此归一化回 0~1，
+        // 否则 Image 用图集 Sprite 时瓦片格子会跟着图集乱跑。贴图采样仍用原始 uv。
+        _UVRect ("Pattern UV Rect (xy=min, zw=max)", Vector) = (0,0,1,1)
     }
 
     SubShader
@@ -78,6 +87,9 @@ Shader "VN/ScreenTransition"
             float4 _Center;
             float _Aspect;
             float _EdgeWidth;
+            float _TexMode;
+            float _Invert;
+            float4 _UVRect;
 
             float hash21(float2 p)
             {
@@ -122,7 +134,11 @@ Shader "VN/ScreenTransition"
 
             half4 frag(v2f IN) : SV_Target
             {
-                float2 uv = IN.texcoord;
+                // rawUv = UI 给的原始 uv（图集 Sprite 下不是 0~1），贴图采样用它；
+                // uv = 归一化回 0~1 的图案坐标，下面所有图案计算都用它。
+                float2 rawUv = IN.texcoord;
+                float2 span = max(_UVRect.zw - _UVRect.xy, float2(1e-5, 1e-5));
+                float2 uv = saturate((rawUv - _UVRect.xy) / span);
                 float p = _Progress;
                 int mode = (int)(_Mode + 0.5);
 
@@ -254,9 +270,16 @@ Shader "VN/ScreenTransition"
                     mask = p;
                 }
 
+                // _Invert：叠加层要的是「旧图按图案消失」，与「新图按图案出现」正好互补
+                float m = lerp(mask, 1.0 - mask, step(0.5, _Invert));
+
+                half useTex = step(0.5, _TexMode);
+                half4 tex = tex2D(_MainTex, rawUv);
+
                 half4 col;
-                col.rgb = _Color.rgb + _EdgeColor.rgb * edge;
-                col.a = mask * _Color.a * IN.color.a;
+                // 贴图模式下 _Color 当染色/压暗系数用（过场层的暗幕就是靠它，不用再叠一层）
+                col.rgb = lerp(_Color.rgb, tex.rgb * _Color.rgb, useTex) + _EdgeColor.rgb * edge;
+                col.a = m * lerp(_Color.a, tex.a, useTex) * IN.color.a;
                 return col;
             }
             ENDCG

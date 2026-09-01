@@ -43,6 +43,8 @@ namespace VNEffects
         static readonly int IdUvRect = Shader.PropertyToID("_UVRect");
         static readonly int IdRectMinMax = Shader.PropertyToID("_RectMinMax");
         static readonly int IdScatter = Shader.PropertyToID("_Scatter");
+        static readonly int IdTexMode = Shader.PropertyToID("_TexMode");
+        static readonly int IdInvert = Shader.PropertyToID("_Invert");
 
         [Header("渲染排序（要盖住一切，包括粒子和边缘泛光）")]
         public int sortingOrder = 100;
@@ -127,6 +129,105 @@ namespace VNEffects
             _inputBlocker.color = Color.clear;
             _inputBlocker.raycastTarget = true;
             _inputBlocker.enabled = false;
+        }
+
+        // ------------------------------------------------------------------
+        // 图案模式（贴图版）：图案里填的是图而不是纯色，所以「不经过中间那一片黑」
+        //
+        // Play() 是遮罩式的：拿一块纯色按图案盖满画面 → 换内容 → 图案散开。
+        // 中间必然有一瞬间整屏是纯色（默认黑）。想要「新图直接从瓦片里长出来」，
+        // 就得让图案里填的是图本身 —— 这就是 shader 的 _TexMode。
+        // ------------------------------------------------------------------
+
+        /// <summary>建一个 VN/ScreenTransition 的图案材质实例（调用方负责 Destroy）</summary>
+        public static Material CreatePatternMaterial()
+        {
+            var shader = Shader.Find("VN/ScreenTransition");
+            if (shader == null)
+            {
+                Debug.LogError("[VNEffects] 找不到 Shader \"VN/ScreenTransition\"。");
+                return null;
+            }
+            return new Material(shader) { hideFlags = HideFlags.DontSave };
+        }
+
+        /// <summary>
+        /// 把某个转场类型的图案参数写进材质，并给出推荐时长。
+        /// 「类型 → 图案参数」唯一一张表仍是 <see cref="GetDefaults"/>，
+        /// 全屏转场、bg 图案过渡、过场层三边共用，改一处三边同步。
+        /// </summary>
+        /// <param name="sprite">材质要贴的图；图集 Sprite 靠它把图案坐标归一化回 0~1</param>
+        public static void ConfigurePattern(Material mat, VNTransition type, float aspect,
+            Vector2? viewportCenter, Sprite sprite,
+            out float appearDuration, out float disappearDuration)
+        {
+            GetDefaults(type, out float defOut, out float defIn, out _,
+                out int mode, out float noiseScale, out float count);
+            appearDuration = defIn;      // 「揭示」这半段的推荐时长
+            disappearDuration = defOut;  // 「盖住」这半段的推荐时长
+            if (mat == null) return;
+
+            mat.SetFloat(IdMode, mode);
+            mat.SetFloat(IdNoiseScale, noiseScale);
+            mat.SetFloat(IdCount, count);
+            mat.SetVector(IdCenter, viewportCenter ?? new Vector2(0.5f, 0.5f));
+            mat.SetFloat(IdAspect, Mathf.Max(0.01f, aspect));
+            mat.SetColor(IdEdgeColor, GetEdgeColor(type));
+            mat.SetFloat(IdTexMode, 1f);
+            // DataUtility 同时支持普通 Sprite 与图集 Sprite（tight packing 下 textureRect 会抛）
+            mat.SetVector(IdUvRect, sprite != null
+                ? DataUtility.GetOuterUV(sprite)
+                : new Vector4(0f, 0f, 1f, 1f));
+        }
+
+        /// <summary>
+        /// 这三种的灵魂就是那层罩本身（白闪 / 柔光光斑 / 黑眼皮），
+        /// 「让新图从罩里长出来」等于把效果抹掉，所以永远走 <see cref="Play"/> 老路。
+        /// </summary>
+        public static bool SupportsPatternBackground(VNTransition type) =>
+            type != VNTransition.WhiteFlash && type != VNTransition.BokehOrbs &&
+            type != VNTransition.Eyelid;
+
+        /// <summary>
+        /// 背景 A→B 的**图案**直接过渡：复制旧背景到上层，真 Image 立刻换成新图，
+        /// 上层旧图按图案（噪声 / 百叶窗 / 瓦片 / 圆扩散 / 水墨）消失，缝隙里直接是新图。
+        /// 与 <see cref="PlayBackground"/> 的区别：那个走专用几何 shader（卷页 / 碎裂 /
+        /// 水波 / 墨染四种做得更漂亮），这个覆盖其余所有图案。两者都不经过纯色。
+        /// </summary>
+        public Sequence PlayBackgroundPattern(VNTransition type, Image backgroundImage,
+            Sprite nextSprite, Action onNextVisible = null, Vector2? viewportCenter = null)
+        {
+            if (!SupportsPatternBackground(type) || backgroundImage == null ||
+                backgroundImage.sprite == null || nextSprite == null)
+                return null;
+
+            Build();
+            StopCurrentTransition();
+
+            Sprite oldSprite = backgroundImage.sprite;
+            _directMat = CreatePatternMaterial();
+            if (_directMat == null) return null;
+
+            Rect localRect = backgroundImage.rectTransform.rect;
+            ConfigurePattern(_directMat, type,
+                localRect.width / Mathf.Max(1f, localRect.height),
+                viewportCenter, oldSprite, out _, out float duration);
+            _directMat.SetFloat(IdInvert, 1f);       // 旧图按图案「消失」，与出现互补
+            _directMat.SetColor(IdColor, Color.white); // 贴图模式下 _Color 是染色，白 = 原色
+            _directMat.SetFloat(IdProgress, 0f);
+
+            CreateImageOverlay(backgroundImage, oldSprite);
+
+            // 新背景先放在临时旧背景下面，动画一开始就能从缝隙里看到
+            backgroundImage.sprite = nextSprite;
+            onNextVisible?.Invoke();
+            if (_inputBlocker != null) _inputBlocker.enabled = true;
+
+            _seq = DOTween.Sequence()
+                .Append(_directMat.DOFloat(1f, IdProgress, duration).SetEase(Ease.InOutSine))
+                .OnComplete(CleanupDirectOverlay)
+                .SetLink(gameObject);
+            return _seq;
         }
 
         /// <summary>这些效果在 bg 命令中直接让旧背景离场并露出新背景，不经过黑色遮罩。</summary>

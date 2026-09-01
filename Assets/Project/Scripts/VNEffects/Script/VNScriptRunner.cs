@@ -959,6 +959,33 @@ namespace VNEffects
             return VNStoryAddress.NormalizeFile(name);
         }
 
+        /// <summary>
+        /// 按 id 找过场资产（interlude 命令用）。库只在 VNGameConfig 里，
+        /// 不像角色/背景那样在场景组件上也有一份——过场是纯资产数据，没有场景侧配置。
+        /// </summary>
+        static VNInterludeDef FindInterlude(string id, int line)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                Debug.LogError($"[VNScript] 第 {line} 行：interlude 缺少过场 id");
+                return null;
+            }
+            var config = VNGameConfig.Active;
+            if (config != null && config.interludes != null)
+            {
+                foreach (var def in config.interludes)
+                {
+                    if (def == null) continue;
+                    // id 留空时按资产文件名认，和 chapter 的容错保持一致
+                    string key = string.IsNullOrEmpty(def.id) ? def.name : def.id;
+                    if (key == id) return def;
+                }
+            }
+            Debug.LogError($"[VNScript] 第 {line} 行：找不到过场「{id}」，" +
+                           "请在 VNGameConfig 的「过场库」里登记该 VNInterludeDef 资产");
+            return null;
+        }
+
         TextAsset FindChapter(string chapterName)
         {
             string wanted = NormalizeChapterName(chapterName);
@@ -2130,15 +2157,19 @@ namespace VNEffects
                     return WaitCo(cmd.ArgF(0, 0.5f));
 
                 case "bg":
+                    // via:black = 回到老的「先被纯色盖住再散开」；不写 = 新图直接过渡出来
                     return WaitTween(stage.SetBackground(
-                        cmd.Arg(0), cmd.Kw("transition"), cmd.line, PrecutFor(cmd)));
+                        cmd.Arg(0), cmd.Kw("transition"), cmd.line, PrecutFor(cmd),
+                        cmd.Kw("via") == "black"));
 
                 case "cg":
-                    // cg <id> [transition:Type] [chars:keep] [fx:keep] / cg off [transition:Type]
+                    // cg <id> [transition:Type] [chars:keep] [fx:keep] [via:black] / cg off [...]
                     if (cmd.Arg(0) == "off")
-                        return WaitTween(stage.HideCg(cmd.Kw("transition"), cmd.line));
+                        return WaitTween(stage.HideCg(cmd.Kw("transition"), cmd.line,
+                            cmd.Kw("via") == "black"));
                     return WaitTween(stage.ShowCg(cmd.Arg(0), cmd.Kw("transition"),
-                        cmd.Kw("chars") == "keep", cmd.Kw("fx") == "keep", cmd.line));
+                        cmd.Kw("chars") == "keep", cmd.Kw("fx") == "keep", cmd.line,
+                        false, cmd.Kw("via") == "black"));
 
                 case "show":
                     // show <角色> [at:] [expr:] [with:预设] [from:方向] [dur:秒]
@@ -2291,6 +2322,18 @@ namespace VNEffects
                     if (stage.transition == null) return null;
                     return WaitTween(stage.transition.Play(
                         VNScriptParser.ParseEnum(cmd.Arg(0), VNTransition.NoiseDissolve, cmd.line)));
+
+                case "interlude":
+                {
+                    // interlude <过场id> [time:秒]
+                    // 快进时整段跳过（连语音都不放）：章节卡本来就是给正常速度看的，
+                    // 而 1.5 秒的固定停留在 SKIP 里是纯粹的卡顿。
+                    if (_skip) return null;
+                    VNInterludeDef interlude = FindInterlude(cmd.Arg(0), cmd.line);
+                    if (interlude == null || stage.interlude == null) return null;
+                    return stage.interlude.PlayCo(interlude, cmd.KwF("time", -1f),
+                        stage.vnAudio);
+                }
 
                 case "sakura":
                     stage.sakura?.Play();

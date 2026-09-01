@@ -119,6 +119,7 @@ namespace VNEffects.EditorTools
             public HashSet<string> photoFrameIds = new HashSet<string>();
             public HashSet<string> photoBackdropIds = new HashSet<string>();
             public HashSet<string> weatherIds = new HashSet<string>();
+            public HashSet<string> interludeIds = new HashSet<string>();
             public HashSet<string> dialogueSkins = new HashSet<string>();
             public HashSet<string> choiceSkins = new HashSet<string>();
             public bool sceneRegistryFound;   // 场景里有没有 VNEventRegistry
@@ -246,6 +247,12 @@ namespace VNEffects.EditorTools
                     if (s != null && !string.IsNullOrEmpty(s.id)) reg.dialogueSkins.Add(s.id);
                 foreach (var s in cfg.choiceSkins)
                     if (s != null && !string.IsNullOrEmpty(s.id)) reg.choiceSkins.Add(s.id);
+                foreach (var d in cfg.interludes)
+                {
+                    if (d == null) continue;
+                    // id 留空按资产文件名认，与运行时 VNScriptRunner.FindInterlude 一致
+                    reg.interludeIds.Add(string.IsNullOrEmpty(d.id) ? d.name : d.id);
+                }
             }
 
             var stage = Object.FindFirstObjectByType<VNStage>(FindObjectsInactive.Include);
@@ -656,6 +663,21 @@ namespace VNEffects.EditorTools
                                 "飘落类可写 petals/sakura/落樱、maple/枫叶、ginkgo/银杏、" +
                                 "leaves/落叶、bamboo/竹叶；其余写 Rain / Snow / Fireflies / None；" +
                                 "自定义参数资产要在 VNGameConfig 的飘落天气库里登记 id。");
+                        break;
+                    }
+
+                    case "interlude":
+                    {
+                        // 没登记的过场 id 运行时只有一条 Console 报错，画面上整段静默跳过
+                        string iid = c.Arg(0);
+                        if (string.IsNullOrEmpty(iid))
+                            Add(issues, VNLintSeverity.Error, "interlude-no-id", f, c.line,
+                                "interlude 缺少过场 id",
+                                "写成 interlude <过场id>，id 是 VNGameConfig「过场库」里 VNInterludeDef 资产的 id。");
+                        else if (!Dynamic(iid) && !reg.interludeIds.Contains(iid))
+                            Add(issues, VNLintSeverity.Error, "unknown-interlude", f, c.line,
+                                $"过场「{iid}」没有登记",
+                                "在 VNGameConfig 的「过场库」里登记对应的 VNInterludeDef 资产。");
                         break;
                     }
 

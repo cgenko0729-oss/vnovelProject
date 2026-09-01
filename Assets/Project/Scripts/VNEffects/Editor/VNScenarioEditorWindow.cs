@@ -138,7 +138,7 @@ namespace VNEffects.EditorTools
                 { "if", "条件" }, { "choice", "选项" }, { "event", "事件" },
                 { "chapter", "章节" }, { "quest", "任务" }, { "letterbox", "电影黑边" },
                 { "mark", "漫符" }, { "overlay", "叠加层" }, { "imprint", "痕迹" }, { "sns", "手机聊天" }, { "liquid", "液体喷溅" },
-                { "hideHUD", "隐藏界面" },
+                { "hideHUD", "隐藏界面" }, { "interlude", "过场" },
             };
 
         static readonly Dictionary<string, string> CategoryTranslations =
@@ -496,6 +496,20 @@ namespace VNEffects.EditorTools
                     weatherIds.Add(wd.id);
             }
             _ctx.weatherIds = weatherIds.ToArray();
+
+            // 过场候选：VNGameConfig 过场库里登记的资产（id 留空按文件名，与运行时 FindInterlude 一致）
+            var interludeIds = new List<string>();
+            var gameConfig = LoadGameConfig();
+            if (gameConfig != null && gameConfig.interludes != null)
+            {
+                foreach (var def in gameConfig.interludes)
+                {
+                    if (def == null) continue;
+                    string id = string.IsNullOrEmpty(def.id) ? def.name : def.id;
+                    if (!string.IsNullOrEmpty(id) && !interludeIds.Contains(id)) interludeIds.Add(id);
+                }
+            }
+            _ctx.interludeIds = interludeIds.ToArray();
 
             // UI 皮肤候选：VNGameConfig 登记的 id（default 由 OptionsFor 统一补在最前）
             var dialogueSkins = new List<string>();
@@ -2736,6 +2750,7 @@ namespace VNEffects.EditorTools
                 case VNParamSource.EventId: return _ctx.eventIds;
                 case VNParamSource.QuestId: return _ctx.questIds;
                 case VNParamSource.WeatherId: return _ctx.weatherIds;
+                case VNParamSource.InterludeId: return _ctx.interludeIds;
                 case VNParamSource.UiSkinId: return UiSkinOptions(r.Get(p.dependsOn));
                 case VNParamSource.Label: return LabelAddressOptions();
                 case VNParamSource.Flag: return _flags.ToArray();

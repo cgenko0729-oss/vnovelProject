@@ -111,6 +111,8 @@ namespace VNEffects
         public VNEventRegistry eventRegistry;
         [Header("SNS 手机聊天视图（sns 命令；留空自动创建）")]
         public VNSnsView sns;
+        [Header("过场层（interlude 命令；留空自动创建，会挂到主 Canvas 下）")]
+        public VNInterludeScreen interlude;
         [Header("液体喷溅（舞台层：空中飞的水珠）")]
         public VNLiquidSplash liquidSplash;
         [Header("镜头水渍（屏幕层：溅在镜头玻璃上挂着往下淌的）")]
@@ -213,6 +215,19 @@ namespace VNEffects
                 sns = FindFirstObjectByType<VNSnsView>();
                 if (sns == null) // 旧场景自愈：自动创建（UI 到 sns open 时才搭）
                     sns = new GameObject("VNSnsView").AddComponent<VNSnsView>();
+            }
+            if (interlude == null)
+            {
+                interlude = FindFirstObjectByType<VNInterludeScreen>(FindObjectsInactive.Include);
+                if (interlude == null) // 旧场景自愈：自动创建（UI 到 interlude 命令时才搭）
+                {
+                    var go = new GameObject("VNInterludeScreen", typeof(RectTransform));
+                    // 必须挂进主 Canvas，才能被排序 100 的全屏转场盖住（见 VNInterludeScreen 注释）
+                    Transform host = transition != null ? transition.transform.parent
+                                   : dialogue != null ? dialogue.transform.parent : null;
+                    if (host != null) go.transform.SetParent(host, false);
+                    interlude = go.AddComponent<VNInterludeScreen>();
+                }
             }
 
             if (wetScreen == null) wetScreen = FindFirstObjectByType<VNWetScreen>();
@@ -954,6 +969,7 @@ namespace VNEffects
         {
             StopSpeaking();
             if (sns != null && sns.IsOpen) sns.Close(true); // 读档/停止剧本时不留残留手机
+            if (interlude != null) interlude.HideImmediate(); // 过场层同理，不能留在屏幕上
             ResetCgState(); // CG 状态清零（立绘层复显；天气/fx 由随后的恢复流程接管）
             foreach (var kv in _active)
                 if (kv.Value.go != null) Destroy(kv.Value.go);
@@ -1096,7 +1112,7 @@ namespace VNEffects
         /// CG 显示期间只更新底层背景记录，不动画面；cg off 时按新背景恢复。
         /// </summary>
         public Sequence SetBackground(string id, string transitionName, int line = 0,
-            System.Action onCovered = null)
+            System.Action onCovered = null, bool viaBlack = false)
         {
             var entry = backgrounds.Find(b => b.id == id);
             if (entry == null || entry.sprite == null)
@@ -1107,18 +1123,21 @@ namespace VNEffects
 
             CurrentBackgroundId = id;
             if (CurrentCgId != null) return null; // CG 盖着：只记账，画面等 cg off 再换
-            return SwapStageImage(entry.sprite, transitionName, line, onCovered);
+            return SwapStageImage(entry.sprite, transitionName, line, onCovered, viaBlack);
         }
 
         /// <summary>舞台主图切换（背景与 CG 共用）：可选全屏转场，含直接背景转场快路径</summary>
         Sequence SwapStageImage(Sprite sprite, string transitionName, int line,
-            System.Action onCovered = null)
+            System.Action onCovered = null, bool viaBlack = false)
         {
             if (!string.IsNullOrEmpty(transitionName) && transition != null)
             {
                 var type = VNScriptParser.ParseEnum(transitionName, VNTransition.NoiseDissolve, line);
-                if (VNScreenTransition.SupportsDirectBackground(type) && sprite != null &&
-                    backgroundImage != null && backgroundImage.sprite != null)
+                bool canDirect = !viaBlack && sprite != null &&
+                    backgroundImage != null && backgroundImage.sprite != null;
+                // 直接过渡两条路：卷页/碎裂/水波/墨染有专用几何 shader（更漂亮），
+                // 其余图案走贴图模式。两条都不经过纯色 —— viaBlack 才回到「先盖住再散开」。
+                if (canDirect && VNScreenTransition.SupportsDirectBackground(type))
                 {
                     var directSequence = transition.PlayBackground(type, backgroundImage, sprite, () =>
                     {
@@ -1127,6 +1146,15 @@ namespace VNEffects
                     });
                     if (directSequence != null) return directSequence;
                     // 直接转场 Shader 不可用时安全退回原全屏转场，确保画面仍会切换。
+                }
+                else if (canDirect && VNScreenTransition.SupportsPatternBackground(type))
+                {
+                    var patternSequence = transition.PlayBackgroundPattern(type, backgroundImage, sprite, () =>
+                    {
+                        if (toneMatch != null) toneMatch.MatchTo(sprite);
+                        onCovered?.Invoke();
+                    });
+                    if (patternSequence != null) return patternSequence;
                 }
                 return transition.Play(type, () =>
                 {
@@ -1189,7 +1217,7 @@ namespace VNEffects
         /// instant 供读档/调试重建静默摆台。
         /// </summary>
         public Sequence ShowCg(string id, string transitionName, bool keepChars, bool keepFx,
-            int line = 0, bool instant = false)
+            int line = 0, bool instant = false, bool viaBlack = false)
         {
             var entry = cgLibrary.Find(c => c.id == id);
             if (entry == null || entry.sprite == null)
@@ -1207,11 +1235,11 @@ namespace VNEffects
             if (!keepFx) PauseCgAmbientFx(instant);
             else if (_cgFxPaused) ResumeCgAmbientFx(instant); // cg A → cg B fx:keep 的切换
 
-            return SwapStageImage(entry.sprite, instant ? null : transitionName, line);
+            return SwapStageImage(entry.sprite, instant ? null : transitionName, line, null, viaBlack);
         }
 
         /// <summary>关闭 CG：恢复立绘层、环境特效与底层背景</summary>
-        public Sequence HideCg(string transitionName, int line = 0)
+        public Sequence HideCg(string transitionName, int line = 0, bool viaBlack = false)
         {
             if (CurrentCgId == null)
             {
@@ -1226,7 +1254,7 @@ namespace VNEffects
             Sprite bgSprite = null;
             if (!string.IsNullOrEmpty(CurrentBackgroundId))
                 bgSprite = backgrounds.Find(b => b.id == CurrentBackgroundId)?.sprite;
-            return SwapStageImage(bgSprite, transitionName, line);
+            return SwapStageImage(bgSprite, transitionName, line, null, viaBlack);
         }
 
         void PauseCgAmbientFx(bool instant)

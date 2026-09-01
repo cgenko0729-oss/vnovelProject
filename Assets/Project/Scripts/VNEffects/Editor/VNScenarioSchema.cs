@@ -22,6 +22,7 @@ namespace VNEffects.EditorTools
         QuestId,     // 任务 id（项目中的 VNQuestDef 资产）
         WeatherId,   // 天气 id（内置叶型 + VNWeatherDef 资产 + 雨雪萤火虫枚举）
         UiSkinId,    // ui 命令的第二参数：候选跟着同行的 kind 变（见 dependsOn）
+        InterludeId, // 过场 id（VNGameConfig 过场库里的 VNInterludeDef 资产）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -142,14 +143,19 @@ namespace VNEffects.EditorTools
         static VNScenarioSchema()
         {
             // ---- Scene ----
-            Add("bg", "Scene", "bg <id> [transition:Type]",
+            Add("bg", "Scene", "bg <id> [transition:Type] [via:black]\n" +
+                "转场默认**直接过渡**：新图从图案缝隙里长出来，不经过中间那片纯色。\n" +
+                "写 via:black 才回到老行为（先被纯色盖满再散开），时间跳跃/章节切换那种\n" +
+                "刻意要黑一下的地方用它。白闪/光斑/眨眼三种本来就是罩子，永远走老行为",
                 Pos("id", "bg", VNParamSource.Background),
-                Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()));
-            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep]",
+                Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
+                Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f));
+            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep] [via:black]",
                 Pos("id", "cg", VNParamSource.Cg),
                 Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
                 Kw("chars", "chars", VNParamSource.Options, new[] { "keep" }),
-                Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }));
+                Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }),
+                Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f));
             Add("weather", "Scene",
                 "weather <id> [density:] [wind:] [speed:] [size:]\n" +
                 "飘落类：petals/sakura（落樱）· maple（枫叶）· ginkgo（银杏）· " +
@@ -181,6 +187,14 @@ namespace VNEffects.EditorTools
                 Pos("target", "target", VNParamSource.Options, new[] { "effects" }, "effects"));
             Add("transition", "Scene", "transition <type>  (fullscreen, no bg change)",
                 Pos("type", "type", VNParamSource.Options, EnumNames<VNTransition>(), "NoiseDissolve"));
+            Add("interlude", "Scene",
+                "interlude <过场id> [time:秒]\n" +
+                "过场（章节标题卡）：转场图铺满 + 标题居中 + loading 图标转固定时长 + 随机一句语音。\n" +
+                "内容全在 VNGameConfig「过场库」里的 VNInterludeDef 资产上配；\n" +
+                "time 留空 = 用资产里的 loading 时长（默认 1.5 秒）。\n" +
+                "转完自动继续，玩家点击不能提前跳过；SKIP 快进时整段跳过",
+                Pos("id", "过场", VNParamSource.InterludeId),
+                Kw("time", "秒", VNParamSource.Number, weight: 0.5f));
 
             // ---- Character ----
             Add("show", "Character", "show <char> [at:] [expr:] [with:预设] [from:方向] [dur:秒]\n" +
