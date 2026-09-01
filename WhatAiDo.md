@@ -8865,3 +8865,277 @@ cg CG_test          ← 事件结束后再摆上舞台，画面才留得住继�
   峰值不回落、三档判定、`wipeStrength` 语义（0.5 → 一笔 0.500、两笔 1.000）、
   编辑模式下 `Destroy` 真的释放
 - Lint 规则实测：坏写法抓到、两种正常写法都不误报
+
+---
+
+## 一三二、新手引导系统 `tutorial`：暗幕挖洞高亮 + 全局暂停（2026-09-01，分支 `feature/tutorial-system`）
+
+### 需求
+
+做一套可复用的新手引导框架，主线剧情和每个小游戏模块共用一份实现：
+压暗全屏 → 只把要讲的那块 UI 抠出来高亮 → 旁边一张图文卡片 → 点一下讲下一条。
+**讲解期间整个玩法冻结**，讲完继续。
+
+动手前做了三轮问答定案，四项决定了整个架构：
+
+| 决策 | 结论 | 影响 |
+|---|---|---|
+| 交互强度 | **只读演示**（全挡，点任意处下一步） | 射线过滤器不用做，暗幕吃掉一切点击 |
+| 内容载体 | ScriptableObject 资产 | 三语文案 + 配图引用，剧本只写 id |
+| 已看记录 | 全局 JSON + 设置里可重置 | 与 CG 解锁同类，不进存档 |
+| 暂停改造范围 | **全量替换 dt 来源** | 10 个模块一次到位，以后新模块照抄 |
+
+### ★ 先说地基：这个项目原本没有「暂停」
+
+事件模块三铁律②规定所有模块用 `Time.unscaledDeltaTime` 计时（为了不受 Skip 快进的
+`DOTween.timeScale` 影响），所以 **`Time.timeScale = 0` 对羽毛球 / 问答 / 拍照 / 互动
+一律无效**——球照飞、倒计时照跑。`VNScriptRunner` 里那个 `Time.timeScale = 0` 只对
+存档/设置面板有效，因为那两个面板底下没有实时模块在跑。
+
+而每个模块的「冻结」此前都是各写各的：羽毛球用 `_confirmOpen` 在 `Update` 首行拦
+（`TickConfirm(); return;`），别的模块各有各的土办法。
+
+所以教程系统的第一块砖不是 UI，是一个全局暂停契约。
+
+### 文件改动
+
+**新增（运行时）**
+
+| 文件 | 一句话 |
+|---|---|
+| `Script/VNPause.cs` | 句柄式全局暂停 `VNPause` + 受它影响的时间源 `VNTime.Delta` / `VNTime.Time` |
+| `Script/VNTutorialDef.cs` | 教程资产：步骤列表（锚点/兜底矩形、洞形状、羽化、圆角、三语标题正文、配图、卡片位置、音效）+ 暗幕浓度、HDR 描边色、`once` / `allowSkip` |
+| `Script/VNTutorialSeen.cs` | 「看过了」的全局 JSON（`vn_tutorial_seen.json`）+ 「显示教程提示」总开关（PlayerPrefs） |
+| `Script/VNTutorialAnchors.cs` | 锚点注册表 `id → RectTransform` + 给 prefab 控件用的 `VNTutorialAnchor` 组件 |
+| `Script/VNTutorialMask.cs` | 暗幕挖洞组件：世界四角换算、每帧跟随、描边呼吸 |
+| `Script/VNTutorialPlayer.cs` | 播放器：覆盖层、卡片（皮肤优先/程序化兜底）、步进、暂停与光标接管 |
+| `Script/VNTutorialSkin.cs` | 卡片皮肤槽位（只 `panelRoot` + `bodyText` 必需） |
+| `Art/Shaders/VNTutorialMask.shader` | 圆角矩形/椭圆挖洞 + 羽化 + HDR 描边，一次最多 4 个洞 |
+| `Editor/VNTutorialSamples.cs` | 菜单：导出羽毛球示例教程并自动登记 |
+
+**修改**
+
+| 文件 | 改了什么 |
+|---|---|
+| `VNBadmintonModule` / `VNQteModule` / `VNQuizModule` / `VNPhotoBoothModule` / `VNInteractionModule` / `VNAiTalkModule` / `VNBattleModule` / `VNShopModule` / `VNResultPopupModule` / `VNSnsView` | `Update()` 首行加 `if (VNPause.IsPaused) return;`（**一律在 ReadInput 之前**），`Time.unscaledDeltaTime` → `VNTime.Delta`、`Time.unscaledTime` → `VNTime.Time` |
+| `VNEventModule` | 加 `tutorialId` 字段；`Launch` 在 `OnLaunch` **之后**调 `VNTutorialPlayer.PlayAuto` |
+| `VNBadmintonCourt` / `VNBadmintonModule` | 暴露记分板/操作提示/球网；登记 6 个教程锚点并在销毁时反注册 |
+| `VNScriptParser` / `VNScriptRunner` | `tutorial` 关键字与分派；`FindTutorial`；`Update` 首行加 `VNPause.IsPaused` 屏蔽全局快捷键；`CleanupActiveEvent` 收教程并 `ReleaseAll` 兜底 |
+| `VNGameConfig` / `VNStage` / `VNSystemUiSkinSet` | 教程库、`tutorial` 字段与自愈创建、`tutorialPrefab` 槽位 |
+| `VNConfigPanel` / `VNConfigPanelSkin` / `VNSystemUiSkinExporter` | 「显示教程提示」开关 + 「重置教程记录」按钮；面板加两行；新增**只重导设置面板**的菜单 |
+| `Editor/VNScenarioSchema` / `VNScenarioDoc` / `VNScenarioEditorWindow` / `VNScenarioLinter` | `tutorial` 命令登记、`TutorialId` 参数源与下拉候选、`tutorial-no-id` / `unknown-tutorial` 两条检查 |
+| `Editor/VNGameConfigEditor` / `VNGameConfigTools` | 教程库落在「舞台」页；目录扫描自动登记 |
+| `Resources/VNLocale/ui.{zh,en,ja}.txt` | 4 条 config 键 + 4 条 tutorial 键 |
+
+### 技术决策与取舍
+
+**① 暂停为什么是句柄式而不是裸计数**
+
+释放路径有五条：正常结束 / ESC 跳过 / `CancelForDebug` / 宿主被 Destroy / 场景切换。
+裸的 Push/Pop 计数漏掉任何一条，症状是**游戏永久卡死**——比 `VNTouchCursor` 漏
+`Dispose()` 导致光标消失还严重。所以句柄绑一个宿主 `Object`，宿主没了句柄自动失效，
+`IsPaused` 每次读都会顺手清掉这类死句柄；`VNScriptRunner.CleanupActiveEvent` 再加一层
+`ReleaseAll()` 兜底。
+
+**② dt 为什么统一到 `VNTime.Delta` 而不是逐模块加标志位**
+
+逐个模块加 `_tutorialOpen` 的话，漏一个模块的症状是「教程弹出来了但球还在飞」，
+而且很难联想到原因。换成统一的时间源，改动是机械的、可 grep 校验的，
+顺带把羽毛球那条 `Mathf.Min(dt, 0.05f)` 防瞬移上限收编成全局保护
+（切窗口回来的巨大 dt 会让弹道/倒计时跳一大截，这个坑不止羽毛球有）。
+
+**③ 早退必须在 `ReadInput()` 之前**
+
+羽毛球确认框的原注释已经写过这个教训：拦晚了，「冻结」期间照样能挥拍起跳。
+所有模块的早退都放 `Update()` 第一行。
+
+**④ 排序为什么是 92，为什么挂主 Canvas**
+
+对话框 40 / 事件层 60 / 过场层 90 之上、全屏转场 100 之下——项目一贯语义是
+任何时候 `transition` 都能盖住一切。挂主 Canvas 而不是自建 Overlay 画布的理由同
+`VNInterludeScreen`：Screen Space - Overlay 永远压在 Screen Space - Camera 之上，
+转场层就再也盖不住它；而且挂主 Canvas 才吃得到 URP 后处理——洞口的 HDR 描边靠 Bloom 发光。
+
+**⑤ 挖洞为什么走 shader 而不是四块 Image 围矩形**
+
+四块图只能做硬边矩形单洞，没有圆角、没有羽化、没法多洞，视觉上一眼就是「工具」
+而不是演出。shader 里洞的坐标是**本图 uv 的 0~1**，`_Holes[i] = (中心x, 中心y, 半宽, 半高)`，
+换分辨率换布局都不用改资产。宽高比校正后的空间里 1 单位 = 图高像素，
+所以 `_Corner` / `_Feather` / `_EdgeWidth` 这些像素参数一律除以高度。
+
+**⑥ 洞的位置为什么每帧从世界四角现算**
+
+不能抄 `anchoredPosition`：立绘挂在 `ZoomRoot` / `TiltRoot` 底下，运镜的缩放旋转会让它
+与屏幕上的实际位置对不上。世界四角天然含了整条父级链的变换。每帧现算的开销是
+4 次 `GetWorldCorners`，可以忽略，换来的是高亮能跟着动的东西走（立绘、飞行中的球、
+还在做弹入补间的面板）。
+
+**⑦ 高亮目标为什么必须显式登记，不能按物体名/路径找**
+
+小游戏的 UI 全是代码程序化生成的（`VNBadmintonCourt` / `VNPhotoBoothUi` /
+`VNQuizModule`），层级和物体名随手就会改。路径寻址改一次布局教程就全废，
+而且**没有任何报错**——只是洞挖到了空气上。改成 `VNTutorialAnchors.Register(id, rect)`
+之后，id 是一份稳定契约。取用时顺手清掉已销毁条目（Unity 的伪 null 在这里是好事），
+所以模块忘了反注册也不会留下野指针。
+
+**⑧ 「看过了」为什么是全局 JSON 而不是 flag**
+
+flag 跟随存档快照走，读旧档就会「忘记」看过教程于是又弹一遍，开新周目更是每篇重看。
+看过教程是玩家的元知识，跟 CG 解锁同类。ESC 跳过也算看过——玩家明确表示不想看，
+下次不该再拦他一次；想重看走设置面板的「重置教程记录」或剧本 `force:on`。
+
+**⑨ 光标**
+
+`VNTouchCursor` 在亲密互动模块里把系统光标藏了（`Cursor.visible = false`）。
+教程弹在它上面时玩家看不见指针也就点不了「下一步」，所以进教程强制显示、
+退出时还原**原值**（不是无脑设 true）。
+
+**⑩ 为什么淡出之后才解除暂停**
+
+推进用的那一下点击 / ESC 在解冻时 `wasPressedThisFrame` 必须已经复位，
+否则同一帧会被下面的模块或 Runner 再吃一次。ESC 尤其要紧——羽毛球把它当认输键。
+淡出至少跨两帧，天然满足这个条件。
+
+**⑪ 教程期间禁止存档**
+
+`VNScriptRunner.Update` 首行加 `VNPause.IsPaused` 屏蔽：不加的话，剧情层弹出的教程
+盖着屏幕，F5 / H / A / S / I / C / G / J 全都还能按，还会存出一个「读档后卡在教程半截」
+的坏档。
+
+### 剧本语法
+
+```
+tutorial 界面入门              # 看过就自动跳过（记录是全局的）
+tutorial 界面入门 force:on     # 强制重看，帮助菜单/作者点名讲解用
+
+event badminton tutorial:羽毛球基础   # 第一次进这个模块时先播（所有事件模块通用）
+```
+
+模块也可以在模板 Inspector 的 `tutorialId` 上填死；剧本行的 `tutorial:` 逐次覆盖它。
+SKIP 快进时整段跳过——教学是给正常速度看的。
+
+### 验证方法
+
+- **生成示例**：Tools → VN Effects → 教程 Tutorials → 导出羽毛球示例教程
+  （生成 `Assets/VNEffects/Tutorials/羽毛球基础.asset` 并自动登记进教程库）
+- **剧情层**：剧本写 `tutorial 羽毛球基础 force:on` → 从选中行播放
+- **模块内**：`event badminton tutorial:羽毛球基础` → 开局前讲解，
+  **球与倒计时应完全冻住**，讲完才开球
+- 设置面板那两项需要跑一次 Tools → VN Effects → UI 皮肤 → 系统主题：导出设置面板
+  （老 prefab 缺这两个槽位不报错，只是面板里没这两项）
+- `dotnet build Assembly-CSharp-Editor.csproj` → 0 Error
+
+### 已知待办
+
+- `VNTutorialMask.shader` 只能在 Unity 里验证编译；万一报错表现是暗幕退化成整屏压暗
+  （写了兜底，不会白屏）
+- 出正式包前给场景里 `VNTutorialPlayer.maskMaterial` 指一份材质资产：
+  只被 `Shader.Find` 引用的 shader 会被打包剥掉（同 `VNScreenShockwave.sourceMaterial` 的老问题）
+- 交互强度目前是「只读演示」。想做「必须真的点对那个按钮才能进下一步」的话，
+  暗幕上挂一个实现 `ICanvasRaycastFilter` 的组件、洞内返回 false 让射线穿过去即可，
+  资产层再加一个「步进条件」字段——架构没有挡路，只是本版没做
+
+---
+
+## 一三三、`event` 命令按模块给参数格：模块专属参数不再是「未知 token」（2026-09-01，分支 `feature/tutorial-system`）
+
+### 需求
+
+剧本编辑器里 `event` 行的模块专属参数（`vs:` / `target:` / `powerstat:` …）全被判成
+`unrecognized token (preserved as-is)`——功能是正常的（原样保留、运行时模块照常从
+`ctx.kwargs` 读得到），但一个 `BadmintonDemo.vn.txt` 就刷出 16 条警告，
+而且参数只能在一长条文本里手打，没有下拉、没有标签。
+
+根因：`VNScenarioSchema` 里 `event` 只登记了一个位置参数 `id`。因为 `event` 是通用入口，
+`vs:` `target:` 这些是**各模块自己定义的**，Schema 层不知道有哪些。
+
+两条死路：
+- 把所有模块的参数塞进一张表 → 每个 `event` 行都画出二十几个格子
+- 一个都不登记 → 就是现状，全是警告
+
+### 文件改动
+
+| 文件 | 改了什么 |
+|---|---|
+| `Editor/VNScenarioSchema.cs` | 变体机制 `Find(keyword, variant)` + `EventVariants` 参数表 + 新参数来源 `AssetId` + `softRef` 标记 |
+| `Editor/VNScenarioDoc.cs` | 解析/生成/校验三处都按模块 id 取变体；换模块时保住上一个模块写过的参数 |
+| `Editor/VNScenarioEditorWindow.cs` | `event` 行两行布局；`AssetId` 的下拉候选与缓存；`RefreshSources` 清缓存 |
+
+### 技术决策与取舍
+
+**① 变体机制**
+
+`VNScenarioSchema.Find("event", 模块id)` = 基础定义 + 该模块专属 kwarg，合并结果按
+模块 id 缓存。表在 `EventVariants`，覆盖内置模块（qte / map / shop / plan / result /
+battle / quiz / badminton / photo / aitalk / interact，随后 wipefog 也加了进来），
+**唯一真相是各模块 `OnLaunch` 里的 `ctx.Kw(...)`**，是逐条对着抄的。
+
+认不出的模块 id（自定义模块、写成 flag 变量的动态 id）退回基础定义，它的 kwarg
+照旧走 `extraTokens` 原样保留——仍会有警告，但不会丢内容。
+
+**② 新参数来源 `AssetId`**
+
+`id:` / `theme:` / `frame:` / `bg:` / `persona:` 这些直接扫对应资产给出下拉候选。
+各资产的 id 字段名**不统一**（`quizId` / `badmintonId` / `themeId` / `id`），
+所以在表里显式写死 `assetType` + `assetIdField`，**不用反射猜**——猜错的表现是
+下拉里一片空白，很难联想到原因。
+
+两个必要的细节：
+- **必须缓存**：`OptionsFor` 每帧都被 OnGUI 调，直接 `AssetDatabase.FindAssets`
+  会把编辑器拖垮。缓存在 `RefreshSources()` 里清（登记新素材后由
+  `VNAssetLibraryEvents` 触发）。
+- 项目里一个该类资产都没有时返回 `null` **退回文本框**：否则玩家面对一个空下拉，
+  连「先把 id 写上、资产稍后再建」都做不到。
+
+**③ `softRef`：候选只是提示，认不出不报错**
+
+`vs:` 接成角色下拉之后，`event badminton vs:学姐` 立刻报了
+`character "学姐" not found`——**这是误报**。羽毛球对手的立绘与名字全部来自
+`id:` 指的那份 `VNBadmintonDef`；`vs:` 在 `ResolveOpponentBody` 里只是「资产没配立绘时
+去角色库碰碰运气」的兜底，写「学姐」这种没登记的称呼是常态。
+
+于是给 `VNParamDef` 加 `softRef`：下拉照给，认不出不报错。只标在 badminton 的 `vs:` 上；
+`aitalk` / `interact` / `photo` 的 `vs:` 保持严格校验——那三个模块是真的要拿舞台上
+那个角色去换表情/拍照，写错就是真错。
+
+**④ 为什么改成两行**
+
+`photo` 有 11 个参数，挤一行每格只剩几十像素。第一行放通用参数（模块 + 教程），
+第二行放模块专属参数，「* 结果行」顺次下移。只在模块 id 认得出来时才多这一行，
+所以自定义模块的行高不变。
+
+### ★ 修复记录：一个会静默改坏剧本的 bug
+
+`badminton` / `quiz` / `shop` / `plan` / `interact` 这几个模块**自己就有一个 `id:` 参数**
+（对手资产 / 题库 / 商店 / 方案 / 互动定义），而 `event` 的位置参数原本也叫 `id`。
+
+两者存储键撞车：
+
+```
+event badminton id:新手
+  ↓ 解析
+values["id"] = "badminton"   ← 位置参数写进去
+values["id"] = "新手"        ← kwarg 覆盖掉它
+  ↓ 保存
+event 新手 id:新手           ← 模块名没了
+```
+
+一存一读就把剧本改坏，而且全程没有任何报错。位置参数的存储键改成 `module`
+（纯内部键，`.vn.txt` 文本格式不变，不用改任何剧本）。
+
+顺带处理了另一个数据丢失点：换模块 id 之后，上一个模块的参数在新变体里不存在了，
+直接不输出 = 玩家写过的东西静默消失。现在照原样带出来，下次载入会当成未知 token
+保留，并在 Issues 里提醒去清理——**宁可留一条警告，也不要悄悄删东西**。
+
+### 验证方法
+
+- 打开 `BadmintonDemo.vn.txt`：3 行 `event badminton` 变成两行，第二行是
+  `对手角色 / 对手资产 / 目标分 / 先发球 / 赛制 / 力量属性 / 速度属性 / 弹跳属性 /
+  我方名 / 成绩前缀` 的格子，**16 个 Warning 归零**
+- 改 `id:` 换成别的模块，第二行参数跟着换；换回来原来写的值还在
+- `dotnet build Assembly-CSharp-Editor.csproj` → 0 Error
+
+### 待办
+
+`Ctrl+E` 命令面板（`VNCommandSearch`）仍用基础定义，插入 `event` 时只会问模块 id
+与 `tutorial:`，不会逐个问模块专属参数——要做的话得在选完模块 id 之后重新取一次变体。

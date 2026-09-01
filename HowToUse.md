@@ -1140,8 +1140,64 @@ event qte time:3 target:12 title:鼓起勇气连打！
 | `interact` | `event interact vs:星野结衣 id:初次抚摸` | 亲密互动：光标变道具摸角色部位，结果 `满足` / `普通` / `拒绝`（见下） |
 | `wipefog` | `event wipefog id:浴室镜面 cg:CG_浴室` | 擦雾：起雾盖住 CG，擦开看清，结果 `完美` / `普通` / `失败`（见下） |
 
+**所有模块通用的参数**：`tutorial:<教程id>` —— 玩家第一次进这个模块时先播一篇新手引导
+（看过就自动跳过，见下一节）。
+
 新玩法（战斗/钓鱼/番长镇日程……）就是照 VNQteModule 的样子再写一个模块类，
 接口/铁律见 `ProjectCodeGuide.md`。
+
+### tutorial — 新手引导 🎓
+
+压暗全屏、只把要讲的那块 UI 抠出来高亮、旁边一张图文卡片，点一下讲下一条。
+**讲解期间整个游戏是冻结的**（包括正在跑的小游戏），ESC 可以跳过整篇。
+
+```
+tutorial 界面入门                    # 看过就自动跳过
+tutorial 界面入门 force:on           # 强制重看
+```
+
+两个触发入口：
+
+| 入口 | 写法 | 什么时候用 |
+|---|---|---|
+| 剧本命令 | `tutorial <教程id> [force:on]` | 主线里教 UI、教系统 |
+| 模块首次自动播 | `event badminton tutorial:羽毛球基础` | 教小游戏怎么玩 |
+
+模块那条也可以在模块模板的 Inspector 上填死 `tutorialId`；剧本行的 `tutorial:` 逐次覆盖它。
+自动播的时机是**模块界面搭好之后、开局之前**——要高亮记分板，记分板得先存在。
+
+**内容全在资产里**（`Assets/VNEffects/Tutorials/`，右键 **Create → VN → Tutorial Def**，
+建完登记进 `VNGameConfig` 的「教程库」）：
+
+| 字段 | 说明 |
+|---|---|
+| 步骤 `anchor` | 要高亮哪块 UI，填锚点 id（模块登记的名字，如 `badminton.scoreboard`） |
+| 步骤 `area` | 锚点留空时的兜底：屏幕归一化矩形；两个都留空 = 不挖洞的纯图文页 |
+| 形状 / 外扩 / 圆角 / 羽化 | 圆角矩形或椭圆，像素单位（1920×1080 基准） |
+| 标题 / 正文 | 中英日三语（英日留空回退中文），正文可换行 |
+| 配图 | 可选，一张 Sprite |
+| 卡片位置 | 自动（躲开洞口）/ 上 / 中 / 下 |
+| `once` | 看过就不再自动播（默认开） |
+| `allowSkip` | 允不允许 ESC 一键跳过整篇（默认开） |
+
+**「看过了」是全局记录**，存 `persistentDataPath/vn_tutorial_seen.json`，和 CG 解锁同类：
+读旧档、开新周目都不会重看。想重看有三条路——设置面板的「重置教程记录」按钮、
+剧本写 `force:on`、或者玩家在设置里直接把「显示教程提示」关掉再也不弹。
+
+> 玩家按 ESC 跳过也算「看过」。他明确表示不想看，下次不该再拦他一次。
+
+**SKIP 快进时整段跳过**——教学是给正常速度看的。
+
+**要教小游戏里的某块 UI，模块得先登记锚点**（羽毛球已经登记了记分板 / 操作提示 /
+球网 / 我方 / 对手 / 球六个）。新模块照着写一行即可：
+
+```csharp
+VNTutorialAnchors.Register("badminton.scoreboard", scoreRect);   // 建完 UI 顺手登记
+VNTutorialAnchors.Unregister("badminton.scoreboard", scoreRect); // 销毁时反注册
+```
+
+现成的示例：Tools → VN Effects → 教程 Tutorials → **导出羽毛球示例教程**，
+会生成一份 5 步的 `羽毛球基础.asset` 并自动登记，可以直接拿来改。
 
 ### 亲密互动：interact 🖐
 
@@ -2517,6 +2573,9 @@ choice + * 文本 [if:条件] [cost:花费] [flag:op] [-> 标签]   选项
 
 ── 玩法 ──
 event <模块> [key:value…] + * 结果 [flag:op] [-> 标签]      小游戏事件
+  所有模块通用：tutorial:<教程id> = 第一次进这个模块时先播新手引导
+tutorial <教程id> [force:on]                     新手引导（暗幕挖洞+图文卡片，讲解期间游戏冻结）
+                                                 看过就自动跳过；force:on 强制重看；ESC 可跳过
 event plan slots:7 pool:… / event plan op:next   周日程排程 / 逐格派发
 event result grade:<fail|normal|good|great> [title:] [sub:] [se:]  结算弹窗
 event quiz id:<题库> [count:] [time:] [pass:] [pick:] [flag:]   限时问答

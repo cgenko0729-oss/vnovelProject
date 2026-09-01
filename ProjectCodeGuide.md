@@ -317,8 +317,15 @@ outcomes（剧本 * 结果行的结果名，AcceptsOutcome() 判断）/ line`。
 
 **模块三大铁律**（违反会破坏存档/调试/快进）：
 1. 只操作自己的 UI 子树和 VNFlags，**不直接改舞台演出**
-2. 计时用 `unscaledTime`、Tween 加 `SetUpdate(true)`（不受快进影响）
+2. 计时走 **`VNTime.Delta` / `VNTime.Time`**、Tween 加 `SetUpdate(true)`（不受快进影响）
 3. 所有 Tween `SetLink`（模块随时可能被销毁）
+
+> **铁律 2 在一三二章改过一次**：原本写的是直接用 `Time.unscaledDeltaTime`。
+> 那样做躲开了快进，但也躲开了**暂停**——`Time.timeScale = 0` 对模块一律无效，
+> 教程弹出来球还在飞。现在统一走 `VNTime.Delta`（暂停时为 0，且带 0.05s 单帧上限），
+> 并且每个模块 `Update()` 第一行必须是 `if (VNPause.IsPaused) return;`
+> ——**要在 `ReadInput()` 之前**，晚了「冻结」期间照样能挥拍起跳。
+> 新写模块请照抄这两条。
 
 > **铁律 1 的唯一破例：`VNAiTalkModule`（一〇六章）。** AI 控制立绘表情就是改舞台，
 > 自绘立绘要把眨眼 / 口型 / 色调匹配 / 出场动画全部重接一遍，代价远大于收益。
@@ -581,6 +588,10 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 | VNInventory.cs | I 键背包 | 左道具列表+右 7 装备格+介绍区；右键菜单走 `ClickRelay`（IPointerClickHandler 区分左右键，Button 只管按压视觉）；皮肤 prefab（`VNSystemUiSkinSet.inventoryPrefab` + VNInventorySkin/RowSkin/SlotSkin 槽位）优先，缺失退回程序化 UI，**两条路径都产出 VNInventorySkin 引用**，下游单一代码路径；装备逻辑全部委托 VNEquipment |
 | VNDialogueSkin.cs / VNChoiceSkin.cs | UI 皮肤槽位声明 | 挂皮肤 prefab 根；VNDialogueBox/VNChoicePanel 实例化后按槽位 Bind()，行为逻辑与装饰节点解耦；全槽位可选（留空=降级）；头像避让声明式（portraitBodyInset/TagShift）；`ui dialogue\|choice <id>` 切换、id 在 VNGameConfig 登记、状态进存档；**程序化默认也走同一条 Bind 路径**（DefaultSkin 子物体），改行为逻辑两边同时生效 |
 | VNUiSkinExporter.cs (Editor) | 皮肤起步模板导出 | 烘焙程序化贴图为 PNG（prefab 无法引用运行时贴图）+ 生成默认/顶部/右列四个 prefab + 自动登记 VNGameConfig；重复执行安全 |
+| VNPause.cs / VNTime.cs（同一文件） | 全局玩法暂停 + 时间源 | 句柄式：`Acquire(owner, reason)` 绑宿主对象，宿主销毁句柄自动失效，`IsPaused` 每次读顺手清死句柄；外加 `VNScriptRunner.CleanupActiveEvent` 里的 `ReleaseAll()` 兜底。**释放路径有五条**（正常结束/ESC/CancelForDebug/被 Destroy/换场景），漏一条 = 游戏永久卡死，所以不能用裸 Push/Pop 计数 |
+| VNTutorialPlayer.cs | 新手引导播放器 | 覆盖层排序 92（事件层 60 与转场 100 之间）、挂主 Canvas（Overlay 画布压不住转场、也吃不到 Bloom）；卡片皮肤优先程序化兜底；进教程强制显示系统光标、退出还原原值；**淡出跨两帧之后才解除暂停**，否则推进那一下点击/ESC 会被下面的模块同帧再吃一次 |
+| VNTutorialMask.cs + VN/TutorialMask.shader | 暗幕挖洞 | 洞坐标是本图 uv 的 0~1，由目标 RectTransform 的**世界四角**每帧换算（不抄 anchoredPosition——运镜的缩放旋转会让它对不上）；最多 4 洞、圆角矩形/椭圆、羽化、HDR 描边呼吸 |
+| VNTutorialDef / VNTutorialSeen / VNTutorialAnchors / VNTutorialSkin | 资产 / 全局记录 / 锚点表 / 皮肤槽位 | 「看过了」走全局 JSON 不走 flag（读旧档不该重看）；锚点**显式登记**不按物体名找（程序化 UI 改布局会静默挖到空气上）；详见 CLAUDE.md 组件表与 WhatAiDo 一三二章 |
 | VNTitleMenu.cs | 开始菜单（标题画面） | 同场景覆盖层 Canvas 500（画廊 600/存读档 900 之下）；Runner.Start 发现它且 showOnStart 时跳过 playOnStart；开始=清 flags 播入口剧本、继续=读最新槽（含快存 0）、读档/鉴赏/设置直接复用现成面板；**ResumeAt 必调 NotifyGameplayStarted 收层**——任何入口开播都不会残留标题；标题文字/背景/BGM 配在 VNGameConfig「标题画面」区 |
 
 ---
@@ -792,6 +803,8 @@ Sprite 自己知道在哪张 texture 的哪个 UV，`GUI.DrawTextureWithTexCoord
 | VNDirectBackgroundTransition.shader | 背景直切转场（新旧背景在材质内交叉，不经全屏遮罩） |
 | VNFogWipe.shader | 擦雾的雾层（RawImage 专用）。雾 = 底图的 9-tap 模糊 + 提亮 + 偏雾色，**不是一层纯白半透明**——剪影透出来玩家才知道往哪擦。`_MaskTex` 是低分辨率 R8 掩码（r=1 已擦净）；`_UVRect` 把 RawImage 烘进顶点的图集 uv 反算回 0~1 局部坐标供掩码与噪声采样，不反算的话 CG 一进图集擦痕就跟着偏。**★ 边界必须用噪声扰动**（内置 `fbm` 现算，免噪声贴图）——掩码直接当 alpha 用会得到光滑圆边，一眼假 |
 
+| VNTutorialMask.shader | 教程暗幕（RawImage 专用）：整屏压暗 + 挖最多 4 个洞（圆角矩形 SDF / 椭圆近似）+ 羽化 + 洞口 HDR 描边。洞用 `_Holes[i] = (中心x, 中心y, 半宽, 半高)` 传 uv 空间坐标，换分辨率换布局都不用改资产；宽高比校正后 1 单位 = 图高像素，所以 `_Corner`/`_Feather`/`_EdgeWidth` 这些像素参数一律除以高度 |
+
 **发光的公式**：HDR 顶点色会被 uGUI 钳到 1，所以发光=**材质属性**里给 >1 的
 HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质别走 Image.color。
 
@@ -879,6 +892,17 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
    `_Brightness` / `_Saturation`（六方共用会互相覆盖，详见 8.1 节）
 
 **容易踩的坑**
+- **`Time.timeScale = 0` 冻不住任何玩法模块**：模块按三铁律②用不受缩放的时间，
+  所以要暂停必须走 `VNPause` + `VNTime.Delta`，并且模块 `Update()` 首行早退
+  （**在读输入之前**）。存档/设置面板那两处的 `timeScale = 0` 之所以看着有效，
+  只是因为它们底下没有实时模块在跑
+- 任何「弹一层东西盖住游戏」的功能，解除暂停都要**等自己的淡出跨过至少一帧**：
+  同一帧解除的话，玩家推进用的那下点击/ESC 会被下面的模块再吃一次
+  （ESC 尤其要紧，羽毛球拿它当认输键）
+- 高亮/定位屏幕上某个 UI，一律取 **`GetWorldCorners` 再换算**，不要抄 `anchoredPosition`
+  ——立绘挂在 ZoomRoot/TiltRoot 底下，运镜的缩放旋转会让后者对不上
+- 编辑器 `OnGUI` 里**不要直接 `AssetDatabase.FindAssets`**：它每帧都会跑，
+  下拉候选一律缓存（`VNScenarioEditorWindow._assetIdCache` 就是为此，`RefreshSources` 里清）
 - kwargs 值不能含空格；`if` 条件串不能含空格
 - 粒子 velocityOverLifetime 三轴曲线模式必须一致
 - 运行时创建带 Awake 配置的组件：先 SetActive(false) 挂好赋值再激活

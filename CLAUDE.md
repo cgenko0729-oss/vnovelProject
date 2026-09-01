@@ -185,6 +185,9 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNFogWipeModule / VNFogWipeDef | 擦雾小游戏（`event wipefog id: cg: time: target: perfect: stat:/rate: flag:`，结果 完美/普通/失败）：整屏起雾盖住 CG，按住左键擦开，雾会重新凝结（边缘往中间吞 + 中心随机冒雾团）。**★ 剧本别在 event 之前先 `cg`**——雾要到 OnLaunch 才铺得出来，先 cg 会让谜底在开始擦之前就揭晓；用 `cg:` 参数交给模块自己铺，进事件第一帧就是盖满雾的状态，要让画面留下继续演就在结果分支里再写 `cg`（同一帧交接不会闪），Lint 的 `wipefog-cg-before-event` 盯着这件事。角色是**被动 CG** 所以**不破模块三铁律**，也因此不进存档。事件层 60 盖住对话框是必然的（雾要铺满），于是模块自己铺一份清晰 CG 打底 + 自绘台词条。结算按**历史峰值**而非结束瞬间（时限到那帧被雾吞一口不该把人从完美打到普通），HUD 进度条上同时画峰值刻度与普通档门槛线。`VNTouchCursor.Dispose()` 四处都调 / 定义资产（雾外观九参 + 笔刷 + 回雾五参 + 三档门槛 + 分阶段台词） |
 | VNFogMask / VNFogScore | 擦雾的两个**纯逻辑层**（无 MonoBehaviour，编辑器调参窗口跑同一份代码）：掩码缓冲 **384×216**（雾本身就是模糊的，不需要高分辨率；256×144 时擦痕边缘能看出方块阶梯，384 配羽化带与噪声就看不出来，**改分辨率必须保持 16:9** 否则笔刷变椭圆）、内部 `float[]` 而非 byte（回雾每帧减 0.0005，byte 会被整数截断吃掉 = 雾根本不回来）、边缘侵蚀走预算权重图。**★ Stamp 一笔之内取 max、笔与笔之间才累加**：直接累加会把羽化带填满让边缘退化成硬边，单纯取 max 又会让 `wipeStrength` 变成永久天花板；记住「这一笔碰到之前的值」两个毛病都没有 / 阶段推进（**只升不降**，否则回雾让清晰度反复穿越阈值时台词播个没完）+ 三档判定 |
 | VNFogSfx / VNFogTextures / VNFogTuneWindow (Editor) | 四个代码合成音效——**擦拭循环音是唯一的速度反馈**（本作刻意不做速度惩罚，画面上看不出擦得快不快），用一段 1 秒滤波白噪改 pitch 而非切多段素材（切段会爆音）/ 四种道具光标的程序化 SDF 贴图 / **调参窗口**（Tools → VN Effects → 预览 Preview → 擦雾调参 Fog Wipe Tuning）：上半按「每秒擦除面积 ≈ 笔刷直径 × 鼠标速度」**算出**预计通关秒数并给手感评语，下半是可拖鼠标试擦的掩码预览。**这个窗口是刚性需求不是加分项**——难度唯一来源是笔刷面积 vs 回雾速度，手感全压在参数上 |
+| VNPause / VNTime | **全局玩法暂停**（教程弹窗等一切「先冻住，玩家看完再继续」）+ 受它影响的时间源。**Time.timeScale = 0 对模块一律无效**——三铁律②规定模块用 `unscaledDeltaTime`（躲 Skip 变速），于是球照飞、倒计时照跑；真正能冻住它们的只有「模块自己早退 + dt 归零」。所以模块 `Update()` 首行统一 `if (VNPause.IsPaused) return;`（**必须在 ReadInput 之前**，晚了照样能挥拍），dt 一律走 `VNTime.Delta`（含 0.05s 单帧上限，收编自羽毛球的防瞬移）。暂停句柄**绑宿主对象**、宿主销毁即失效，外加 Runner 的 `ReleaseAll()` 兜底——释放路径有五条（正常结束/ESC/CancelForDebug/被 Destroy/换场景），漏一条就是**游戏永久卡死** |
+| VNTutorialPlayer / VNTutorialMask / VNTutorialDef | 新手引导（`tutorial <id> [force:on]`；事件模块写 `tutorial:xxx` 或模板 `tutorialId` 可首次自动播）：压暗全屏 + 挖洞高亮 + 图文卡片，点一下下一步、ESC 跳过。覆盖层排序 **92**（事件层 60 与全屏转场 100 之间），挂**主 Canvas** 而非自建 Overlay 画布——Overlay 会永远压在转场之上，且吃不到 Bloom（洞口 HDR 描边靠它发光）。**淡出之后才解除暂停**：推进那一下点击/ESC 的 `wasPressedThisFrame` 必须已复位，否则同一帧被模块再吃一次（ESC 尤其要紧，羽毛球拿它当认输）。进教程强制显示系统光标、退出还原**原值**（互动模块把它藏了，不抢回来玩家点不了「下一步」）/ 挖洞走 `VN/TutorialMask`（圆角矩形/椭圆 + 羽化 + 最多 4 洞），洞的位置每帧从目标的**世界四角**换算，**不抄 anchoredPosition**（ZoomRoot/TiltRoot 的运镜会让它对不上）/ 教程资产（三语文案，登记进 VNGameConfig 教程库） |
+| VNTutorialSeen / VNTutorialAnchors / VNTutorialSkin | 「看过了」的**全局 JSON**（同 CG 解锁语义：读旧档、开新周目都不该重看，所以不能用 flag）+ 设置面板的「显示教程提示」开关；ESC 跳过也算看过 / 高亮目标的注册表 `Register(id, rect)`，**绝不能按物体名或路径找**——小游戏 UI 全是程序化生成的，改一次布局路径寻址就静默挖到空气上且没有任何报错 / 卡片皮肤槽位（只 panelRoot + bodyText 必需，缺失退回程序化卡片；暗幕不走皮肤，它是功能件） |
 | VNAiTalkModule | AI 自由聊天事件模块（event aitalk）。**刻意破一次模块三铁律**——直接驱动舞台立绘换表情，因为自绘立绘要把眨眼/口型/色调匹配/出场动画全部重接一遍；边界收紧为「只碰表情和对话框内容」且正常结束/ESC/CancelForDebug 三条路径都还原原表情。**射线坑**：EventLayer 排序 60 在选项面板 45 之上，模块自绘的一切默认 `raycastTarget=false`，否则吃掉选项点击（唯 ESC 确认框例外）。装机走 Tools → VN Effects → 场景装机 Install To Scene → **AI 自由聊天 AI Talk Module** |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
@@ -232,6 +235,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 立绘痕迹 | `imprint <角色> <痕迹\|clear> [pos:x,y] [size:] [life:] [rot:]`；点一下印一个、随时间褪色消失，不进存档。互动里配「部位×道具」规则 + 反馈 `trigger` 选「只在点击时」即可（不设的话拖一下会印出一串） | 一二八 |
 | 情绪叠加层 | `overlay <角色> <层\|clear> [强度 0~1] [time:]`，层在角色资产 overlays 登记；与表情是加法关系、可多层共存、强度连续变化，状态进存档 | 一二六 |
 | 擦雾 | `event wipefog id:擦雾定义 cg:要擦的CG [time:] [target:普通门槛%] [perfect:完美门槛%] [stat:/rate:] [flag:]`；起雾盖住 CG，按住左键擦开，雾会边缘侵蚀+随机冒团地凝结回来，时限内把清晰度推过门槛，结果 完美/普通/失败。**★ 别在 event 之前先 `cg`**（谜底会提前揭晓，Lint 有检查）。难度是算得出来的：笔刷 180px + 回雾 3%/秒 + 60 秒 ≈ 完美档 55 秒，调参走**擦雾调参 Fog Wipe Tuning** 窗口 | 一三一 |
+| 新手引导 | `tutorial <教程id> [force:on]`，或事件行写 `event <模块> tutorial:<教程id>` 首次自动播；压暗全屏 + 挖洞高亮某块 UI + 图文卡片，点一下讲下一条，ESC 跳过。**讲解期间整个玩法冻结**（走 VNPause，不是 timeScale）。内容在 VNTutorialDef 资产（三语），「看过了」是全局记录不进存档，设置面板可关可重置 | 一三二 |
 | 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
 | 羽毛球对战 | `event badminton vs:角色 id:对手资产 target: first:me\|opponent\|random mode:match\|free`；A/D 移动 + J 击球 + K 扣杀 + ESC 认输（弹确认，退出即判负）；弹道 = 三点定抛物线，**不用 Physics2D**（改纯数学判定，代价是必须子步进）；难度靠 VNBadmintonDef 六参数，轨迹预告 `trackDisplayRate` 是最大杠杆 | 一〇二 |
 | 拍大头照 | `event photo vs:角色 [me:主角] [theme:主题] [mode:match\|free] [frame:边框] [time:秒] [stat:属性 rate:换算率]`；左栏边框/贴纸两个标签页 + 右栏我/对方两列表情格 + 贴纸拖拽缩放旋转右键删 + 限时 + 快门倒数闪白 + 相纸飞入冲分结算；照片存 `persistentDataPath/vn_photos/`（与存档槽分离）。**两套结果名互斥**：写了 theme: = 完美/普通/失败，不写 = 完成 | 一〇三 |
@@ -290,6 +294,16 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
   镜头视角模式铺满画布；遮挡区尺寸实测 `VNStage.dialogue`，量不到才退回默认布局。
   撤销是**窗口内独立栈**（快照 = `GenerateText()` 文本），Ctrl+Z/Ctrl+Y 走 ShortcutManager
   窗口作用域，**不挂 Unity 全局 Undo**；换绑定行清空历史。详见 WhatAiDo 一〇一章。
+- **`event` 行按模块 id 长出参数格**（`VNScenarioSchema.Find(keyword, variant)` + `EventVariants` 表）：
+  `vs:` / `target:` / `powerstat:` 这些是各模块自己定义的，全塞一张表会让每个 event 行画出
+  二十几个格子，一个不登记又全变成「unrecognized token」警告。**表的唯一真相是各模块
+  `OnLaunch` 里的 `ctx.Kw(...)`**，加模块参数时同步补一行。认不出的模块 id 退回基础定义，
+  kwarg 照旧原样保留。`event` 行因此画成**两行**（第一行通用参数、第二行模块专属，
+  「* 结果行」顺次下移）。**位置参数的存储键是 `module` 不是 `id`**——badminton/quiz/shop/
+  plan/interact 自己就有 `id:` 参数，同名会互相覆盖、保存时写出 `event 新手 id:新手`。
+  参数来源 `AssetId` 扫指定资产类型给下拉（id 字段名各资产不统一，表里**显式写死字段名**
+  不用反射猜；候选**必须缓存**，OptionsFor 每帧都被调）；`softRef` = 候选只是提示、
+  认不出不报错（用在 badminton 的 `vs:`，对手全由 `id:` 的资产决定）。详见 WhatAiDo 一三三章。
 - **打字搜索**（`VNCommandSearch.cs`，与分类菜单并存）：行首命令按钮**右键** = 打字换命令
   （左键仍是分类菜单）、底部 `+` 加行、各参数格下拉都换成可搜列表；`Ctrl+E` 开命令面板
   （向导式：选命令 → 逐个问位置参数 → 可选参数菜单循环 → Enter 插入 / Shift+Enter 插上方 /

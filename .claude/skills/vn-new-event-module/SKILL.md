@@ -10,8 +10,14 @@ description: 写新玩法事件模块（小游戏/QTE/地图/战斗/排程类）
 
 ## 模块三铁律（违反会破坏存档/调试/快进）
 1. 只操作自己的 UI 子树和 VNFlags，**不直接改舞台演出**
-2. 计时用 unscaledTime，Tween 加 `SetUpdate(true)`（不受 Skip 快进的全局 timeScale 影响）
+2. 计时用 **`VNTime.Delta` / `VNTime.Time`**，Tween 加 `SetUpdate(true)`
+   （不受 Skip 快进影响，同时**受 `VNPause` 冻结**——教程弹窗要能冻住你的模块）
 3. 所有 Tween `SetLink(gameObject)`（模块随时可能被销毁）
+
+> 铁律 2 原本写的是直接用 `Time.unscaledDeltaTime`（一三二章改）。那样躲开了快进，
+> 也躲开了暂停——`Time.timeScale = 0` 对模块一律无效，教程弹出来球还在飞。
+> 所以还要在 `Update()` **第一行**加 `if (VNPause.IsPaused) return;`，
+> **必须在 ReadInput 之前**，晚了「冻结」期间照样能挥拍起跳。
 
 ## 操作清单
 - [ ] 新建 `class VNXxxModule : VNEventModule`，在 `OnLaunch(ctx)` 搭 UI
@@ -20,6 +26,10 @@ description: 写新玩法事件模块（小游戏/QTE/地图/战斗/排程类）
 - [ ] 场景生成器里建**禁用**的模板物体挂组件，`VNEventRegistry.modules` 登记 id
       （实例化到 EventLayer，Canvas 排序 60：ChoicePanel 45 之上、ScreenTransition 100 之下，
       所以可用全屏转场包裹进出事件）
+- [ ] `Update()` 首行 `if (VNPause.IsPaused) return;`，dt 走 `VNTime.Delta`
+- [ ] 要给模块配新手引导 → 建 VNTutorialDef 资产 + `VNTutorialAnchors.Register(id, rect)`
+      登记可高亮的 UI（**别按物体名找**，程序化 UI 改布局会静默失效），
+      剧本写 `event <id> tutorial:<教程id>` 或在模板 Inspector 填 `tutorialId`
 - [ ] 长流程模块实现 `CancelForDebug()` 清理场外资源
 - [ ] 不想每步进回想 → 用 RecordInBacklog 开关（WhatAiDo 七十一章）
 - [ ] 写演示剧本 `Assets/Scenarios/XxxDemo.vn.txt`：

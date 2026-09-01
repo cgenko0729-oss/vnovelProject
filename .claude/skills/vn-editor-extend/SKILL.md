@@ -97,6 +97,22 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
   等于每帧重建全部候选源。订阅方 `OnEnable` 订阅、**`OnDisable` 必须退订**：
   订阅者是 EditorWindow 实例，窗口关闭与域重载都会重建它，不退订就会攥着
   已销毁窗口的引用，下次广播对着「假 null」调方法。
+- **`event` 的参数按模块 id 变**（一三三章）：加/改模块参数时同步补
+  `VNScenarioSchema.EventVariants` 里对应模块那一行，**唯一真相是模块 `OnLaunch`
+  里的 `ctx.Kw(...)`**。三处取定义都要传变体（`Find("event", row.Get("module"))`）：
+  解析 `ParseCommand` / 生成 `GenerateText` / 校验 `Validate`。
+  两条硬规则：
+  - **event 位置参数的存储键是 `module` 不是 `id`** —— badminton/quiz/shop/plan/interact
+    自己就有 `id:` 参数，同名会互相覆盖并写出 `event 新手 id:新手` 这种坏行
+  - 换模块 id 时上一个模块写过的 kwarg **照原样写回文本**（下次载入变未知 token 并提醒），
+    宁可留一条警告也不要悄悄删玩家写的东西
+- **新参数来源 `AssetId`**：在表里显式写 `assetType` + `assetIdField`（各资产 id 字段名
+  不统一，反射猜错的表现是下拉一片空白）；候选**必须缓存**（`OptionsFor` 每帧被调），
+  在 `RefreshSources()` 里清；扫不到资产时返回 `null` 退回文本框，
+  否则玩家面对空下拉连「先写 id 稍后建资产」都做不到。
+- **`softRef`**：候选只是补全提示、认不出不报错。用于运行时本来就容忍陌生值的参数
+  （如 `event badminton vs:`，对手全由 `id:` 的资产决定）。别滥用——
+  真会写错的引用（aitalk/interact/photo 的 `vs:`）保持严格校验。
 
 ## 权威参考
 - CLAUDE.md「剧本可视化编辑器」节；WhatAiDo.md 三十一/三十二（主体）、
