@@ -167,6 +167,10 @@ namespace VNEffects
                 "这些图不进 CG 鉴赏画廊 —— 它们是演出素材，不是收集品")]
         public List<Sprite> interludeImages = new List<Sprite>();
 
+        [Header("教程库：剧本 tutorial 命令与模块首次自动播引用的 id → 教程资产\n" +
+                "留空 = 生成器扫全项目的 VNTutorialDef 自动登记")]
+        public List<VNTutorialDef> tutorials = new List<VNTutorialDef>();
+
         // ==============================================================
         // 音频
         // ==============================================================

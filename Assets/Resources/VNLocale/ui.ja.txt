@@ -65,6 +65,10 @@ config.displayFullscreen = 画面モード　フルスクリーン
 config.displayWindowed = 画面モード　ウィンドウ
 config.wheelBacklogOn = ホイールで履歴　オン
 config.wheelBacklogOff = ホイールで履歴　オフ
+config.tutorialHintsOn = チュートリアル表示　オン
+config.tutorialHintsOff = チュートリアル表示　オフ
+config.tutorialReset = チュートリアル記録をリセット
+config.tutorialResetDone = チュートリアル記録を消去しました
 config.hint = 設定は自動保存されます　·　Esc か外側クリックで閉じる
 
 # —— 実行時トースト ——
@@ -283,3 +287,9 @@ diary.affection = 好感度 {0}
 interact.end = おわり
 interact.stage = 段階 {0}
 interact.rejected = 拒否 {0} / {1}
+
+# ---- チュートリアル ----
+tutorial.next = ▼ クリックで続行
+tutorial.done = ▼ クリックで開始
+tutorial.skip = ESC でスキップ
+tutorial.progress = {0} / {1}

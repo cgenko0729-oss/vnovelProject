@@ -23,6 +23,7 @@ namespace VNEffects
         GameObject _panel;
         TMP_Text _fullscreenLabel;
         TMP_Text _wheelBacklogLabel;
+        TMP_Text _tutorialHintsLabel;
         bool _open;
         bool _settingsApplied;
 
@@ -164,6 +165,15 @@ namespace VNEffects
             if (skin.wheelBacklogButton != null)
                 BindButton(skin.wheelBacklogButton, ToggleWheelBacklog);
             UpdateWheelBacklogLabel();
+
+            _tutorialHintsLabel = skin.tutorialHintsLabel;
+            if (skin.tutorialHintsButton != null)
+                BindButton(skin.tutorialHintsButton, ToggleTutorialHints);
+            if (skin.tutorialResetButton != null)
+                BindButton(skin.tutorialResetButton, ResetTutorials);
+            if (skin.tutorialResetLabel != null)
+                skin.tutorialResetLabel.text = VNLocale.T("config.tutorialReset");
+            UpdateTutorialHintsLabel();
         }
 
         static void BindSlider(Slider slider, TMP_Text valueText, float min, float max, float value,
@@ -208,6 +218,29 @@ namespace VNEffects
         {
             UpdateFullscreenLabel();
             UpdateWheelBacklogLabel();
+            UpdateTutorialHintsLabel();
+        }
+
+        /// <summary>关掉后自动触发的教程一律不播；剧本 force:on 点名要讲的仍然会播</summary>
+        void ToggleTutorialHints()
+        {
+            VNTutorialSeen.Enabled = !VNTutorialSeen.Enabled;
+            UpdateTutorialHintsLabel();
+        }
+
+        void UpdateTutorialHintsLabel()
+        {
+            if (_tutorialHintsLabel == null) return;
+            _tutorialHintsLabel.text = VNLocale.T(VNTutorialSeen.Enabled
+                ? "config.tutorialHintsOn"
+                : "config.tutorialHintsOff");
+        }
+
+        /// <summary>清空「看过了」的全局记录：所有教程都会重新弹一次</summary>
+        void ResetTutorials()
+        {
+            VNTutorialSeen.ResetAll();
+            VNToast.Show(VNLocale.T("config.tutorialResetDone"));
         }
 
         void ToggleWheelBacklog()

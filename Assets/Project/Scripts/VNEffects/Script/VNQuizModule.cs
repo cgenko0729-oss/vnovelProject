@@ -200,9 +200,10 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;        // 教程讲解中：倒计时与数字键一起冻住
             if (_phase != Phase.Asking) return;
 
-            _timeLeft -= Time.unscaledDeltaTime; // 不受快进 timeScale 影响
+            _timeLeft -= VNTime.Delta;           // 不受快进 timeScale 影响、受 VNPause 冻结
             RefreshTimer();
 
             var kb = Keyboard.current;
@@ -238,11 +239,11 @@ namespace VNEffects
             {
                 // 最后冲刺：条与数字变红 + 数字脉动 + 面板轻抖（全部用 unscaled 时间算，
                 // 不开 Tween，避免每帧堆积补间）
-                float pulse = 1f + 0.12f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 8f));
+                float pulse = 1f + 0.12f * Mathf.Abs(Mathf.Sin(VNTime.Time * 8f));
                 _timerText.transform.localScale = Vector3.one * pulse;
                 _timerText.color = UrgentColor;
                 _timerFillImage.color = UrgentColor;
-                float shake = Mathf.Sin(Time.unscaledTime * 34f) * 2.5f;
+                float shake = Mathf.Sin(VNTime.Time * 34f) * 2.5f;
                 _panel.anchoredPosition = _panelHome + new Vector2(shake, 0f);
             }
             else

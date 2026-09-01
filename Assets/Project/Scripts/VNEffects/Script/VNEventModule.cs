@@ -51,6 +51,10 @@ namespace VNEffects
     /// </summary>
     public abstract class VNEventModule : MonoBehaviour
     {
+        [Header("首次进入本模块时自动播的教程 id（VNGameConfig 教程库里的 VNTutorialDef）\n" +
+                "剧本行写 tutorial:xxx 可以逐次覆盖它；看过一次就不再播（记录是全局的）")]
+        public string tutorialId;
+
         Action<string> _onDone;
         bool _finished;
 
@@ -60,6 +64,12 @@ namespace VNEffects
             _onDone = onDone;
             _finished = false;
             OnLaunch(ctx);
+
+            // 教程必须在 OnLaunch **之后**播：要高亮记分板，记分板得先存在。
+            // 讲解期间 VNPause 冻住全局，模块的 Update 第一行会早退，
+            // 所以这一句之后模块虽然「开着」但一帧都不会跑。
+            string tid = ctx != null ? ctx.Kw("tutorial", tutorialId) : tutorialId;
+            if (!string.IsNullOrEmpty(tid)) VNTutorialPlayer.PlayAuto(tid, this);
         }
 
         /// <summary>子类实现：搭建 UI 并开始交互</summary>

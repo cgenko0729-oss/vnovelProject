@@ -353,7 +353,7 @@ namespace VNEffects
             {
                 if (timeout > 0.01f)
                 {
-                    left -= Time.unscaledDeltaTime;
+                    left -= VNTime.Delta;   // 限时回复：受 VNPause 冻结（教程讲解中不倒计时）
                     RefreshTimer(left, timeout);
                     if (left <= 0f) _replyPick = -1;
                 }

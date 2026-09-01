@@ -447,6 +447,8 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;   // 教程讲解中：数字键快捷一起冻住
+
             // 键盘快捷：1234 对应四个按钮（鼠标党可无视）
             if (_phase != Phase.PlayerTurn) return;
             var kb = Keyboard.current;

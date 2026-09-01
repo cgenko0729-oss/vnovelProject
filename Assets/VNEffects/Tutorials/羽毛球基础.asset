@@ -1,0 +1,142 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb1fd8772e87f124588fc8c58b1f24e8, type: 3}
+  m_Name: "\u7FBD\u6BDB\u7403\u57FA\u7840"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNTutorialDef
+  id: "\u7FBD\u6BDB\u7403\u57FA\u7840"
+  steps:
+  - anchor: 
+    area:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 0
+      height: 0
+    shape: 0
+    padding: 16
+    corner: 22
+    feather: 18
+    title: "\u7FBD\u6BDB\u7403\u5BF9\u6218"
+    titleEn: Badminton
+    titleJa: "\u30D0\u30C9\u30DF\u30F3\u30C8\u30F3"
+    body: "\u5148\u82B1\u5341\u51E0\u79D2\u8BA4\u8BC6\u4E00\u4E0B\u754C\u9762\u548C\u64CD\u4F5C\u3002\n\u8BB2\u89E3\u671F\u95F4\u6BD4\u8D5B\u662F\u6682\u505C\u7684\uFF0C\u968F\u65F6\u6309
+      ESC \u53EF\u4EE5\u8DF3\u8FC7\u3002"
+    bodyEn: 'A quick look at the screen and the controls.
+
+      The match is paused
+      while you read. Press ESC to skip.'
+    bodyJa: "\u753B\u9762\u3068\u64CD\u4F5C\u3092\u3056\u3063\u3068\u78BA\u8A8D\u3057\u307E\u3057\u3087\u3046\u3002\n\u8AAC\u660E\u4E2D\u306F\u8A66\u5408\u304C\u6B62\u307E\u308A\u307E\u3059\u3002ESC
+      \u3067\u30B9\u30AD\u30C3\u30D7\u3067\u304D\u307E\u3059\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 2
+    se: 
+  - anchor: badminton.scoreboard
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 0
+    padding: 14
+    corner: 26
+    feather: 18
+    title: "\u8BB0\u5206\u677F"
+    titleEn: Scoreboard
+    titleJa: "\u30B9\u30B3\u30A2\u30DC\u30FC\u30C9"
+    body: "\u5DE6\u8FB9\u662F\u4F60\u7684\u5206\u6570\uFF0C\u53F3\u8FB9\u662F\u5BF9\u624B\u7684\u3002\n\u4E0B\u9762\u90A3\u884C\u5199\u7740\u8FD9\u4E00\u5C40\u6253\u5230\u51E0\u5206\u7B97\u8D62\u3002"
+    bodyEn: 'Your score on the left, your opponent''s on the right.
+
+      The line
+      below shows the target score for this match.'
+    bodyJa: "\u5DE6\u304C\u3042\u306A\u305F\u3001\u53F3\u304C\u76F8\u624B\u306E\u30B9\u30B3\u30A2\u3067\u3059\u3002\n\u4E0B\u306E\u884C\u306F\u3053\u306E\u8A66\u5408\u306E\u76EE\u6A19\u70B9\u3067\u3059\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 3
+    se: 
+  - anchor: badminton.me
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 1
+    padding: 26
+    corner: 22
+    feather: 18
+    title: "\u79FB\u52A8"
+    titleEn: Move
+    titleJa: "\u79FB\u52D5"
+    body: "A / D\uFF08\u6216 \u2190 / \u2192\uFF09\u5DE6\u53F3\u8DD1\u4F4D\u3002\n\u7AD9\u5230\u7403\u7684\u843D\u70B9\u4E0B\u9762\u624D\u63A5\u5F97\u5230\u3002"
+    bodyEn: "A / D (or \u2190 / \u2192) to move.\nGet under the shuttle's landing
+      spot to reach it."
+    bodyJa: "A / D\uFF08\u307E\u305F\u306F \u2190 / \u2192\uFF09\u3067\u79FB\u52D5\u3002\n\u843D\u4E0B\u5730\u70B9\u306E\u4E0B\u306B\u5165\u308B\u3068\u5C4A\u304D\u307E\u3059\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 1
+    se: 
+  - anchor: badminton.ball
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 1
+    padding: 46
+    corner: 22
+    feather: 18
+    title: "\u51FB\u7403\u4E0E\u6263\u6740"
+    titleEn: Hit and Smash
+    titleJa: "\u6253\u3064\u30FB\u30B9\u30DE\u30C3\u30B7\u30E5"
+    body: "J \u952E\u6325\u62CD\u3002\u5728\u7403\u6700\u9760\u8FD1\u7403\u62CD\u7684\u90A3\u4E00\u77AC\u95F4\u6325\u51FA\u53BB\uFF0C\u5224\u5B9A\u4E3A\u300C\u7CBE\u51C6\u300D\uFF0C\u7403\u66F4\u5FEB\u66F4\u5201\u3002\nK
+      \u952E\u8D77\u8DF3\uFF0C\u5728\u7A7A\u4E2D\u6325\u62CD\u5C31\u662F\u6263\u6740\u3002"
+    bodyEn: "Press J to swing. Swinging at the closest moment counts as a perfect
+      hit \u2014 faster and sharper.\nPress K to jump; swinging mid-air is a smash."
+    bodyJa: "J \u3067\u30B9\u30A4\u30F3\u30B0\u3002\u6700\u63A5\u8FD1\u306E\u77AC\u9593\u306B\u632F\u308B\u3068\u300C\u30D1\u30FC\u30D5\u30A7\u30AF\u30C8\u300D\u306B\u306A\u308A\u3001\u901F\u304F\u92ED\u3044\u7403\u306B\u306A\u308A\u307E\u3059\u3002\nK
+      \u3067\u30B8\u30E3\u30F3\u30D7\u3001\u7A7A\u4E2D\u3067\u306E\u30B9\u30A4\u30F3\u30B0\u304C\u30B9\u30DE\u30C3\u30B7\u30E5\u3067\u3059\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 3
+    se: 
+  - anchor: badminton.hint
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 0
+    padding: 12
+    corner: 14
+    feather: 18
+    title: "\u968F\u65F6\u53EF\u4EE5\u56DE\u770B"
+    titleEn: Controls Reminder
+    titleJa: "\u64CD\u4F5C\u306E\u78BA\u8A8D"
+    body: "\u64CD\u4F5C\u8BF4\u660E\u4E00\u76F4\u7559\u5728\u53F3\u4E0B\u89D2\u3002\n\u4E2D\u9014\u60F3\u9000\u51FA\u6309
+      ESC \u2014\u2014 \u6B63\u5F0F\u6BD4\u8D5B\u91CC\u8BA4\u8F93\u7B97\u8F93\u3002"
+    bodyEn: "The controls stay in the bottom-right corner.\nESC quits \u2014 in a
+      ranked match that counts as a loss."
+    bodyJa: "\u64CD\u4F5C\u8AAC\u660E\u306F\u53F3\u4E0B\u306B\u5E38\u6642\u8868\u793A\u3055\u308C\u307E\u3059\u3002\nESC
+      \u3067\u4E2D\u65AD\u3067\u304D\u307E\u3059\u304C\u3001\u516C\u5F0F\u6226\u3067\u306F\u8CA0\u3051\u6271\u3044\u3067\u3059\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 1
+    se: 
+  dim: 0.74
+  edgeColor: {r: 1.6, g: 1.35, b: 0.75, a: 1}
+  edgeWidth: 3.5
+  edgePulse: 0.45
+  allowSkip: 1
+  once: 1

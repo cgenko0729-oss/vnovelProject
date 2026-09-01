@@ -113,6 +113,8 @@ namespace VNEffects
         public VNSnsView sns;
         [Header("过场层（interlude 命令；留空自动创建，会挂到主 Canvas 下）")]
         public VNInterludeScreen interlude;
+        [Header("教程层（tutorial 命令 / 模块首次自动播；留空自动创建，会挂到主 Canvas 下）")]
+        public VNTutorialPlayer tutorial;
         [Header("液体喷溅（舞台层：空中飞的水珠）")]
         public VNLiquidSplash liquidSplash;
         [Header("镜头水渍（屏幕层：溅在镜头玻璃上挂着往下淌的）")]
@@ -227,6 +229,19 @@ namespace VNEffects
                                    : dialogue != null ? dialogue.transform.parent : null;
                     if (host != null) go.transform.SetParent(host, false);
                     interlude = go.AddComponent<VNInterludeScreen>();
+                }
+            }
+            if (tutorial == null)
+            {
+                tutorial = FindFirstObjectByType<VNTutorialPlayer>(FindObjectsInactive.Include);
+                if (tutorial == null) // 旧场景自愈：自动创建（UI 到第一次播教程时才搭）
+                {
+                    var go = new GameObject("VNTutorialPlayer", typeof(RectTransform));
+                    // 同过场层：必须挂进主 Canvas，否则盖不住事件层、也吃不到 Bloom
+                    Transform host = transition != null ? transition.transform.parent
+                                   : dialogue != null ? dialogue.transform.parent : null;
+                    if (host != null) go.transform.SetParent(host, false);
+                    tutorial = go.AddComponent<VNTutorialPlayer>();
                 }
             }
 

@@ -65,6 +65,7 @@ namespace VNEffects
 
         void Update()
         {
+            if (VNPause.IsPaused) return;   // 教程讲解中：ESC 不该把商店关掉
             var kb = Keyboard.current;
             if (kb != null && kb.escapeKey.wasPressedThisFrame) Leave();
         }

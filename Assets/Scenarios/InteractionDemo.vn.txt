@@ -1,3 +1,4 @@
+label 开始
 # ============================================================
 # InteractionDemo.vn.txt —— 亲密互动小游戏演示
 # 示范：① 光标变道具、点/摸角色部位推进阶段 ② 禁忌部位与拒绝失败
@@ -9,11 +10,13 @@
 # 装机：Tools → VN Effects → 场景装机 Install To Scene → 亲密互动 Interaction Module
 # ============================================================
 
-label 开始
 bg test1
 show 星野结衣 at:center expr:默认 with:StepIn
-星野结衣: 今天……只有我们两个人呢。
+ui dialogue 黑渐变
+event badminton tutorial:羽毛球基础
+星野结衣 inter: 今天……只有我们两个人呢。
 : （试着摸摸看吧。按住左键在她身上移动。）
+interlude 01 time:3
 
 # event 前必须先 show 角色 —— 模块只换表情，不负责让人出场
 event interact vs:星野结衣 id:初次抚摸 zones:on
@@ -49,3 +52,34 @@ label 走得太远
 label 结束
 hide 星野结衣
 : —— 演示结束 ——
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

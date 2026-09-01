@@ -17,8 +17,8 @@ MonoBehaviour:
   - id: "\u5934"
     displayName: "\u5934\u53D1"
     shape: 1
-    center: {x: 0, y: 0.368}
-    size: {x: 0.26, y: 0.23}
+    center: {x: 0.17884187, y: -0.22923005}
+    size: {x: 0.49556577, y: 0.29414433}
     rotation: 0
     priority: 0
     gainScale: 1
@@ -67,7 +67,7 @@ MonoBehaviour:
   - id: "\u80F8"
     displayName: "\u80F8\u53E3"
     shape: 1
-    center: {x: 0.005, y: -0.341}
+    center: {x: -0.00018243771, y: -0.12584846}
     size: {x: 0.225, y: 0.19}
     rotation: 0
     priority: 8
@@ -84,4 +84,89 @@ MonoBehaviour:
     gainScale: 2
     unlockStage: 2
     enabled: 1
-  overrides: []
+  - id: Test
+    displayName: test
+    shape: 1
+    center: {x: -0.20625481, y: -0.19894542}
+    size: {x: 0.2826705, y: 0.3745454}
+    rotation: 0
+    priority: 0
+    gainScale: 1
+    unlockStage: 0
+    enabled: 1
+  overrides:
+  - sprite: {fileID: 21300000, guid: 6fa680597dc856841b173b006dff1d4c, type: 3}
+    expression: 
+    replaceAll: 0
+    zones:
+    - id: "\u5934"
+      displayName: "\u5934\u53D1"
+      shape: 1
+      center: {x: -0.0087624155, y: 0.33743662}
+      size: {x: 0.49556577, y: 0.29414433}
+      rotation: 0
+      priority: 0
+      gainScale: 1
+      unlockStage: 0
+      enabled: 1
+    - id: "\u8138"
+      displayName: "\u8138\u988A"
+      shape: 1
+      center: {x: 0.008, y: 0.153}
+      size: {x: 0.165, y: 0.21}
+      rotation: 0
+      priority: 10
+      gainScale: 1.4
+      unlockStage: 0
+      enabled: 1
+    - id: "\u8033"
+      displayName: "\u8033\u6735"
+      shape: 1
+      center: {x: 0.1, y: 0.2}
+      size: {x: 0.045, y: 0.06}
+      rotation: 0
+      priority: 20
+      gainScale: 1.6
+      unlockStage: 1
+      enabled: 1
+    - id: "\u9888"
+      displayName: "\u8116\u9888"
+      shape: 1
+      center: {x: 0.005, y: -0.056}
+      size: {x: 0.1, y: 0.09}
+      rotation: 0
+      priority: 15
+      gainScale: 1.8
+      unlockStage: 1
+      enabled: 1
+    - id: "\u80A9"
+      displayName: "\u80A9\u8180"
+      shape: 1
+      center: {x: -0.12, y: -0.136}
+      size: {x: 0.12, y: 0.075}
+      rotation: 0
+      priority: 5
+      gainScale: 1
+      unlockStage: 0
+      enabled: 1
+    - id: "\u80F8"
+      displayName: "\u80F8\u53E3"
+      shape: 1
+      center: {x: 0.005, y: -0.341}
+      size: {x: 0.225, y: 0.19}
+      rotation: 0
+      priority: 8
+      gainScale: 2.5
+      unlockStage: 2
+      enabled: 1
+    - id: "\u8170"
+      displayName: "\u8170\u8179"
+      shape: 1
+      center: {x: 0.005, y: -0.468}
+      size: {x: 0.2, y: 0.08}
+      rotation: 0
+      priority: 5
+      gainScale: 2
+      unlockStage: 2
+      enabled: 1
+    removeZoneIds: []

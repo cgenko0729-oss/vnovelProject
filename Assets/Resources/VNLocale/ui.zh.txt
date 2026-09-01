@@ -66,6 +66,10 @@ config.displayFullscreen = 显示模式　全屏
 config.displayWindowed = 显示模式　窗口
 config.wheelBacklogOn = 滚轮打开回想　开
 config.wheelBacklogOff = 滚轮打开回想　关
+config.tutorialHintsOn = 显示教程提示　开
+config.tutorialHintsOff = 显示教程提示　关
+config.tutorialReset = 重置教程记录
+config.tutorialResetDone = 教程记录已清空，之后会重新提示
 config.hint = 设置会自动保存　·　Esc 或点击外部关闭
 
 # —— 运行时提示 ——
@@ -284,3 +288,9 @@ diary.affection = 好感 {0}
 interact.end = 结束
 interact.stage = 阶段 {0}
 interact.rejected = 被拒绝 {0} / {1}
+
+# ---- 教程 ----
+tutorial.next = ▼ 点击继续
+tutorial.done = ▼ 点击开始
+tutorial.skip = ESC 跳过教程
+tutorial.progress = {0} / {1}

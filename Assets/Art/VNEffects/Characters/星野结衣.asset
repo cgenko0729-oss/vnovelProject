@@ -58,6 +58,12 @@ MonoBehaviour:
     tint: {r: 1, g: 0.32, b: 0.38, a: 0.5}
     life: 7
     randomRotation: 14
+  - id: test
+    sprite: {fileID: 21300000, guid: 253db09f9554e4243977ebc71fa090ca, type: 3}
+    baseScale: 0.219
+    tint: {r: 1, g: 0.32, b: 0.38, a: 0.5}
+    life: 7
+    randomRotation: 14
   markAnchor: {x: 0.1, y: 0.45}
   markScale: 1
   markSprites:
