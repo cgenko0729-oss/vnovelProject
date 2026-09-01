@@ -293,3 +293,12 @@ tutorial.next = ▼ クリックで続行
 tutorial.done = ▼ クリックで開始
 tutorial.skip = ESC でスキップ
 tutorial.progress = {0} / {1}
+
+# —— 曇り拭き ——
+fogwipe.clarity = 鮮明度 {0}%
+fogwipe.timer = {0}秒
+fogwipe.hint = 左ボタンを押しながらガラスを拭く
+fogwipe.result = 最高鮮明度 {0}%
+fogwipe.quit = 拭くのをやめる？
+fogwipe.quit.yes = やめる
+fogwipe.quit.no = 続ける

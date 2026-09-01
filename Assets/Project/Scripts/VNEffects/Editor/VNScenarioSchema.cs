@@ -238,6 +238,20 @@ namespace VNEffects.EditorTools
                     Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
                     Kw("title", "标题", VNParamSource.Text, weight: 0.7f),
                 },
+                ["wipefog"] = new[]
+                {
+                    KwAsset("id", "擦雾定义", "VNFogWipeDef", "fogWipeId"),
+                    // cg 留空 = 擦舞台当前显示的那张，所以不是必填
+                    Kw("cg", "要擦的CG", VNParamSource.Cg, weight: 0.8f),
+                    // 软引用：只用来取台词条上的显示名，写没登记的称呼不该报错
+                    Soft(Kw("vs", "角色", VNParamSource.Character, weight: 0.7f)),
+                    Kw("time", "秒", VNParamSource.Number, weight: 0.4f),
+                    Kw("target", "普通门槛%", VNParamSource.Number, weight: 0.5f),
+                    Kw("perfect", "完美门槛%", VNParamSource.Number, weight: 0.5f),
+                    Kw("stat", "加属性", VNParamSource.Flag, weight: 0.6f),
+                    Kw("rate", "换算率", VNParamSource.Number, weight: 0.4f),
+                    Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
+                },
                 ["aitalk"] = new[]
                 {
                     Kw("vs", "角色", VNParamSource.Character, weight: 0.8f),
@@ -629,6 +643,11 @@ namespace VNEffects.EditorTools
                 "     photo 拍大头照（vs:角色 me:主角 theme:主题 frame:边框 bg:背景\n" +
                 "           time:秒 stat:属性 rate:换算率）；写了 theme: 才评分（完美/普通/失败），\n" +
                 "           不写 = 自由拍照只返回「完成」\n" +
+                "     wipefog 擦雾（id:擦雾定义 cg:要擦的CG time:秒 target:普通门槛%\n" +
+                "           perfect:完美门槛% stat:属性 rate:换算率）；结果 完美/普通/失败\n" +
+                "           ★ 用 cg: 指定要擦的图，别在 event 之前先写 cg ——\n" +
+                "             雾要到事件启动才铺得出来，先 cg 会让谜底提前揭晓；\n" +
+                "             想让画面在事件后留下继续演，就在结果分支里再写 cg\n" +
                 "     aitalk AI 自由聊天（vs:角色 persona:人格 turns:轮数 topic:话题 place:场景\n" +
                 "           me:玩家名 stat:属性 rate:换算率 flag:成绩前缀 options:候选回复条数3~6\n" +
                 "           memory:手写往事）；结果 好感提升/普通/冷场/失败\n" +

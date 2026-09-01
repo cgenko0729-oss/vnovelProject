@@ -31,16 +31,26 @@
    | ③ 文档 | 用户说「更新文档」 | 在**同一个功能分支**上补 `WhatAiDo.md` 等文档 → commit → push，PR 自动带上（模板见技能 **vn-doc-update**） |
    | ④ 收尾 | 用户在 GitHub 上合并完并叫我 | `git checkout main` → `git pull`，确认同步；**合并由用户本人做，AI 不执行 merge** |
 
-3. **永远不删除任何分支**——用户靠分支回滚（GitHub 上合并 PR 时**不要勾 Delete branch**）
-4. 分支命名统一 `feature/<英文短名>`（历史上还有 `agent/*` 与更早的 `feature/*`，都保留不动）
-5. 提交信息英文标题、正文中文；尾部加 Co-Authored-By。**只 add 本次功能相关文件**——
+3. **小改动走「直接 main」快速通道**（不开分支、不开 PR）——**但走哪条路由用户拍板**：
+   **每个任务动手前先问用户一句**「这个走 `feature` 分支 + PR，还是当小改动直接在 `main` 上改？」，
+   等回答再动手（用户在需求里已经说了走哪条的，就不用再问）。
+   - 可以走快速通道的范围：**纯文档改动**（`.md`）／**typo、注释、玩家可见文案与本地化词条微调**／
+     **小 bug 修复与参数调值**（单文件、几行、不改架构不动存档格式）／
+     **技能文件（`.claude/skills/`）与素材登记**（进 VNGameConfig 这类配置性改动）
+   - 快速通道的节奏仍是**两段**：我在 `main` 工作区改完 → 报告 → **用户说「推」才**
+     逐文件 `git add` → commit → `git push origin main`。
+     **push 到 main 不可撤回，绝不自作主张推**
+   - 功能 PR 里的第③阶段文档**不走这条**——那是功能分支上的事，仍进同一个 PR
+4. **永远不删除任何分支**——用户靠分支回滚（GitHub 上合并 PR 时**不要勾 Delete branch**）
+5. 分支命名统一 `feature/<英文短名>`（历史上还有 `agent/*` 与更早的 `feature/*`，都保留不动）
+6. 提交信息英文标题、正文中文；尾部加 Co-Authored-By。**只 add 本次功能相关文件**——
    用户 Unity 工作区常年有无关的未提交改动，禁止 `git add -A` / `git add .`
 
 ## 技能索引（.claude/skills/，按需调用）
 
 | 技能 | 什么时候用 |
 |---|---|
-| vn-new-feature | 开始任何新功能/修 bug（切分支 → 实现 → 等确认 → gh 提交开 PR → 收尾） |
+| vn-new-feature | 开始任何新功能/修 bug（先问走分支还是直推 main → 实现 → 等确认 → gh 提交开 PR → 收尾） |
 | vn-doc-update | 用户叫「更新文档」时同步文档（WhatAiDo 章节模板等，写在功能分支上） |
 | vn-new-command | 给剧本 DSL 加新命令（全链路 9 步清单） |
 | vn-new-event-module | 写新玩法事件模块（三铁律、注册、结果契约） |
@@ -172,6 +182,9 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNCharacterOverlay | 立绘情绪叠加层（潮红/汗/泪）：多层共存、强度 0~1 可连续补间，剧本 `overlay <角色> <层\|clear> [强度] [time:]`，层在 VNCharacterDef.overlays 登记，**进存档**。**别做成表情**——「表情 × 潮红三档」是乘法爆炸，每个组合都要一张完整立绘；叠加层是加法。做法同 BlinkOverlay/Mouth：子物体铺满、共用立绘材质实例、不吃射线 |
 | VNCharacterImprints | 立绘痕迹（掌印/口红印/绳痕）：`imprint <角色> <痕迹\|clear> [pos:x,y] [size:] [life:] [rot:]`，pos 是立绘归一化坐标（与部位框/markAnchor 同一套）。三段生命周期＝印上放大回弹（拍上去的力道）→ 缓慢褪色**红→粉** → 淡出自毁；对象池 + 同屏上限 20 超了淘汰最旧；每枚叠随机旋转（否则连点出来一排一模一样很假）。痕迹在 VNCharacterDef.imprints 登记。**不进存档**——它会自己消失，也就没有「读档后该不该还在」的问题；但互动模块四条退出路径都要 ClearImprints()，否则留在脸上的印子读档后会莫名消失。共用立绘材质实例仍能独立控制 alpha，淡出正常 |
 | VNTouchZoneEditorWindow (Editor) | 在立绘上拖框画部位（Tools → VN Effects → 预览 Preview → **部位区域编辑器**）：拖框体=移动、拖右下角=改尺寸；点选用运行时同一个 `Contains`，所以画布上点得中的地方游戏里就摸得到。继承框画灰线、本层实线、禁忌部位红色。撤销是**窗口内独立栈**（同 camseq 窗口，不挂全局 Undo）；改完必须 `InvalidateCache()` |
+| VNFogWipeModule / VNFogWipeDef | 擦雾小游戏（`event wipefog id: cg: time: target: perfect: stat:/rate: flag:`，结果 完美/普通/失败）：整屏起雾盖住 CG，按住左键擦开，雾会重新凝结（边缘往中间吞 + 中心随机冒雾团）。**★ 剧本别在 event 之前先 `cg`**——雾要到 OnLaunch 才铺得出来，先 cg 会让谜底在开始擦之前就揭晓；用 `cg:` 参数交给模块自己铺，进事件第一帧就是盖满雾的状态，要让画面留下继续演就在结果分支里再写 `cg`（同一帧交接不会闪），Lint 的 `wipefog-cg-before-event` 盯着这件事。角色是**被动 CG** 所以**不破模块三铁律**，也因此不进存档。事件层 60 盖住对话框是必然的（雾要铺满），于是模块自己铺一份清晰 CG 打底 + 自绘台词条。结算按**历史峰值**而非结束瞬间（时限到那帧被雾吞一口不该把人从完美打到普通），HUD 进度条上同时画峰值刻度与普通档门槛线。`VNTouchCursor.Dispose()` 四处都调 / 定义资产（雾外观九参 + 笔刷 + 回雾五参 + 三档门槛 + 分阶段台词） |
+| VNFogMask / VNFogScore | 擦雾的两个**纯逻辑层**（无 MonoBehaviour，编辑器调参窗口跑同一份代码）：掩码缓冲 **384×216**（雾本身就是模糊的，不需要高分辨率；256×144 时擦痕边缘能看出方块阶梯，384 配羽化带与噪声就看不出来，**改分辨率必须保持 16:9** 否则笔刷变椭圆）、内部 `float[]` 而非 byte（回雾每帧减 0.0005，byte 会被整数截断吃掉 = 雾根本不回来）、边缘侵蚀走预算权重图。**★ Stamp 一笔之内取 max、笔与笔之间才累加**：直接累加会把羽化带填满让边缘退化成硬边，单纯取 max 又会让 `wipeStrength` 变成永久天花板；记住「这一笔碰到之前的值」两个毛病都没有 / 阶段推进（**只升不降**，否则回雾让清晰度反复穿越阈值时台词播个没完）+ 三档判定 |
+| VNFogSfx / VNFogTextures / VNFogTuneWindow (Editor) | 四个代码合成音效——**擦拭循环音是唯一的速度反馈**（本作刻意不做速度惩罚，画面上看不出擦得快不快），用一段 1 秒滤波白噪改 pitch 而非切多段素材（切段会爆音）/ 四种道具光标的程序化 SDF 贴图 / **调参窗口**（Tools → VN Effects → 预览 Preview → 擦雾调参 Fog Wipe Tuning）：上半按「每秒擦除面积 ≈ 笔刷直径 × 鼠标速度」**算出**预计通关秒数并给手感评语，下半是可拖鼠标试擦的掩码预览。**这个窗口是刚性需求不是加分项**——难度唯一来源是笔刷面积 vs 回雾速度，手感全压在参数上 |
 | VNAiTalkModule | AI 自由聊天事件模块（event aitalk）。**刻意破一次模块三铁律**——直接驱动舞台立绘换表情，因为自绘立绘要把眨眼/口型/色调匹配/出场动画全部重接一遍；边界收紧为「只碰表情和对话框内容」且正常结束/ESC/CancelForDebug 三条路径都还原原表情。**射线坑**：EventLayer 排序 60 在选项面板 45 之上，模块自绘的一切默认 `raycastTarget=false`，否则吃掉选项点击（唯 ESC 确认框例外）。装机走 Tools → VN Effects → 场景装机 Install To Scene → **AI 自由聊天 AI Talk Module** |
 | VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
@@ -218,6 +231,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 亲密互动 | `event interact vs:角色 id:互动定义 [items:道具清单] [time:] [flag:前缀] [zones:on]`；光标变道具，单击/按住拖动摸部位累计兴奋度，跨阶段换表情+台词+漫符+随机语音池，禁忌部位未解禁会被拒绝、累计到上限判失败。部位框走 VNTouchZoneDef 资产（编辑器可视化画） | 一二六 |
 | 立绘痕迹 | `imprint <角色> <痕迹\|clear> [pos:x,y] [size:] [life:] [rot:]`；点一下印一个、随时间褪色消失，不进存档。互动里配「部位×道具」规则 + 反馈 `trigger` 选「只在点击时」即可（不设的话拖一下会印出一串） | 一二八 |
 | 情绪叠加层 | `overlay <角色> <层\|clear> [强度 0~1] [time:]`，层在角色资产 overlays 登记；与表情是加法关系、可多层共存、强度连续变化，状态进存档 | 一二六 |
+| 擦雾 | `event wipefog id:擦雾定义 cg:要擦的CG [time:] [target:普通门槛%] [perfect:完美门槛%] [stat:/rate:] [flag:]`；起雾盖住 CG，按住左键擦开，雾会边缘侵蚀+随机冒团地凝结回来，时限内把清晰度推过门槛，结果 完美/普通/失败。**★ 别在 event 之前先 `cg`**（谜底会提前揭晓，Lint 有检查）。难度是算得出来的：笔刷 180px + 回雾 3%/秒 + 60 秒 ≈ 完美档 55 秒，调参走**擦雾调参 Fog Wipe Tuning** 窗口 | 一三一 |
 | 限时问答 | `event quiz id:题库 count: time: pass: pick:`，题库=VNQuizDef 资产，结果三档 + 成绩 flag | 八十八 |
 | 羽毛球对战 | `event badminton vs:角色 id:对手资产 target: first:me\|opponent\|random mode:match\|free`；A/D 移动 + J 击球 + K 扣杀 + ESC 认输（弹确认，退出即判负）；弹道 = 三点定抛物线，**不用 Physics2D**（改纯数学判定，代价是必须子步进）；难度靠 VNBadmintonDef 六参数，轨迹预告 `trackDisplayRate` 是最大杠杆 | 一〇二 |
 | 拍大头照 | `event photo vs:角色 [me:主角] [theme:主题] [mode:match\|free] [frame:边框] [time:秒] [stat:属性 rate:换算率]`；左栏边框/贴纸两个标签页 + 右栏我/对方两列表情格 + 贴纸拖拽缩放旋转右键删 + 限时 + 快门倒数闪白 + 相纸飞入冲分结算；照片存 `persistentDataPath/vn_photos/`（与存档槽分离）。**两套结果名互斥**：写了 theme: = 完美/普通/失败，不写 = 完成 | 一〇三 |

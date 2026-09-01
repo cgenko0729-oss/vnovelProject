@@ -1,0 +1,92 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ea68251a6f90394891dcc2f6512557d, type: 3}
+  m_Name: "\u6D74\u5BA4\u955C\u9762"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNFogWipeDef
+  fogWipeId: "\u6D74\u5BA4\u955C\u9762"
+  speakerName: 
+  fogColor: {r: 0.93, g: 0.95, b: 0.98, a: 1}
+  fogMix: 0.76
+  fogDensity: 0.92
+  blurAmount: 0.013
+  brightness: 1.3
+  edgeNoise: 0.5
+  noiseScale: 14
+  grain: 0.075
+  falloff: 1
+  brushDiameter: 180
+  brushFeather: 0.35
+  wipeStrength: 1
+  cursorKind: 0
+  cursor:
+    id: wiper
+    displayName: 
+    icon: {fileID: 0}
+    cursorHeight: 190
+    hotspot: {x: 0, y: 0}
+    iconRotation: 0
+    idleAnim: 3
+    idleFrequency: 0.9
+    idleAmplitude: 4
+    pressAnim: 3
+    pressFrequency: 12
+    pressAmplitude: 4
+    tiltWithMotion: 1
+    tiltMax: 18
+    gainScale: 1
+    unlockCondition: 
+  edgeRate: 2
+  blobRate: 1
+  blobIntervalMin: 0.8
+  blobIntervalMax: 1.5
+  blobRadiusMin: 60
+  blobRadiusMax: 110
+  timeLimit: 60
+  targetPerfect: 90
+  targetNormal: 65
+  outcomePerfect: "\u5B8C\u7F8E"
+  outcomeNormal: "\u666E\u901A"
+  outcomeFail: "\u5931\u8D25"
+  flagPrefix: "\u64E6\u96FE"
+  stages:
+  - note: "\u521A\u64E6\u5F00\u4E00\u70B9"
+    threshold: 30
+    lines:
+    - text: "\u2026\u2026\u5582\uFF0C\u4F60\u5728\u5916\u9762\u5E72\u4EC0\u4E48\u5566\u3002"
+      textEn: ...Hey, what are you doing out there?
+      textJa: "\u2026\u2026\u3061\u3087\u3063\u3068\u3001\u305D\u3053\u3067\u4F55\u3057\u3066\u308B\u306E\u3002"
+      voice: 
+    - text: "\u955C\u5B50\u64E6\u5F97\u90A3\u4E48\u8D77\u52B2\uFF0C\u662F\u60F3\u770B\u4EC0\u4E48\uFF1F"
+      textEn: Wiping the mirror so eagerly. What are you hoping to see?
+      textJa: "\u305D\u3093\u306A\u306B\u93E1\u3092\u62ED\u3044\u3066\u3001\u4F55\u304C\u898B\u305F\u3044\u308F\u3051\uFF1F"
+      voice: 
+    reward: []
+  - note: "\u770B\u5F97\u89C1\u8F6E\u5ED3\u4E86"
+    threshold: 60
+    lines:
+    - text: "\u2026\u522B\u3001\u522B\u770B\u8FD9\u8FB9\u5566\u3002"
+      textEn: D-don't look over here...
+      textJa: "\u2026\u3053\u3001\u3053\u3063\u3061\u898B\u306A\u3044\u3067\u3088\u3002"
+      voice: 
+    reward: []
+  - note: "\u5FEB\u64E6\u5E72\u51C0\u4E86"
+    threshold: 88
+    lines:
+    - text: "\u2026\u2026\u770B\u6E05\u695A\u4E86\uFF1F\u7B28\u86CB\u3002"
+      textEn: ...Got a good look? Idiot.
+      textJa: "\u2026\u2026\u3088\u304F\u898B\u3048\u305F\uFF1F\u3070\u304B\u3002"
+      voice: 
+    reward: []
+  wipeLoopSe: {fileID: 0}
+  blobSe: {fileID: 0}
+  clearSe: {fileID: 0}
+  tickSe: {fileID: 0}

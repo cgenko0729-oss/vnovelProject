@@ -209,6 +209,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3ec7e3a806c30dd47a1178c9d6372f9b, type: 2}
   - {fileID: 11400000, guid: 545268dfbe5cf4a4592502f2a7768881, type: 2}
   - {fileID: 11400000, guid: 98759b40365f90241bd0b82b0dfce2a0, type: 2}
+  fogWipes:
+  - {fileID: 11400000, guid: 62d9f9987e12f9f48805291d6d5a8149, type: 2}
   aiPersonas:
   - {fileID: 11400000, guid: 7cd44f387a86f87488b978bc5e9a67f5, type: 2}
   aiProvider: 1

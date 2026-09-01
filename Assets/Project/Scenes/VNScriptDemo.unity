@@ -10178,6 +10178,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 22cb1cb37a468824983c35d4949a1732, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNBattleModule
+  tutorialId: 
   enemyName: "\u9B54\u7269"
   enemyHp: 25
   enemyAtk: 5
@@ -10348,6 +10349,8 @@ MonoBehaviour:
   vnAudio: {fileID: 1111248293}
   eventRegistry: {fileID: 664587819}
   sns: {fileID: 0}
+  interlude: {fileID: 0}
+  tutorial: {fileID: 0}
   liquidSplash: {fileID: 1553815223}
   wetScreen: {fileID: 1717207306}
   expressionCrossfade: 0.25
@@ -15544,6 +15547,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 86ab699064994a942b347e764ace78db, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNInteractionModule
+  tutorialId: 
   interactions:
   - {fileID: 11400000, guid: 89be866c0e306474b8094e1998911e5d, type: 2}
   zoneDefs:
@@ -15714,6 +15718,10 @@ MonoBehaviour:
     template: {fileID: 1078666716}
   - id: interact
     template: {fileID: 505088758}
+  - id: badminton
+    template: {fileID: 1866437042}
+  - id: wipefog
+    template: {fileID: 821828426}
 --- !u!4 &664587820
 Transform:
   m_ObjectHideFlags: 0
@@ -15736,6 +15744,8 @@ Transform:
   - {fileID: 842440489}
   - {fileID: 1078666717}
   - {fileID: 505088759}
+  - {fileID: 1866437043}
+  - {fileID: 821828427}
   m_Father: {fileID: 386602334}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &684890040
@@ -15786,6 +15796,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0914d603341b75c43ac52857a5f3efd8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNPlanModule
+  tutorialId: 
   plans:
   - {fileID: 11400000, guid: 7f8a6d6ef183b554289e701a526150c3, type: 2}
   defaultSlots: 7
@@ -15897,6 +15908,57 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1603896289}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &821828425
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 821828427}
+  - component: {fileID: 821828426}
+  m_Layer: 0
+  m_Name: FogWipeTemplate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &821828426
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 821828425}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13a6b7c4f41781f439c12b0eb14ea715, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNFogWipeModule
+  tutorialId: 
+  fogWipes:
+  - {fileID: 11400000, guid: 62d9f9987e12f9f48805291d6d5a8149, type: 2}
+--- !u!224 &821828427
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 821828425}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 664587820}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &842440487
 GameObject:
   m_ObjectHideFlags: 0
@@ -15926,6 +15988,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dbfe7b7b63cd7794485e48bded269005, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNQuizModule
+  tutorialId: 
   quizzes:
   - {fileID: 11400000, guid: 6771f02b60c0ce148b69582a7d9a30d0, type: 2}
 --- !u!224 &842440489
@@ -16042,6 +16105,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81d40ce662dcdf42730baec1d17e8c86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNQteModule
+  tutorialId: 
   duration: 4
   targetCount: 15
 --- !u!1 &1063208256
@@ -16167,6 +16231,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 893e1112f23fb1049b559d758b039bee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNAiTalkModule
+  tutorialId: 
   personas:
   - {fileID: 11400000, guid: 7cd44f387a86f87488b978bc5e9a67f5, type: 2}
   optionDelay: 0.4
@@ -22263,6 +22328,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 52f9f6fb2bfa2a26a26fe5a473b09b4c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNMapModule
+  tutorialId: 
   mapSprite: {fileID: 0}
   locations:
   - name: "\u6559\u5BA4"
@@ -22384,6 +22450,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ca1084ce82ca5249bfab008b15b4ce4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNResultPopupModule
+  tutorialId: 
   inputDelay: 0.4
   suspenseDuration: 0.9
 --- !u!1 &1766389160
@@ -27394,6 +27461,103 @@ Transform:
   m_Children: []
   m_Father: {fileID: 284677300}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1866437041
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1866437043}
+  - component: {fileID: 1866437042}
+  m_Layer: 0
+  m_Name: BadmintonTemplate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &1866437042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1866437041}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4787e2cf56eea04fb0ae4e35a3155ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNBadmintonModule
+  tutorialId: 
+  defs:
+  - {fileID: 11400000, guid: 3ec7e3a806c30dd47a1178c9d6372f9b, type: 2}
+  - {fileID: 11400000, guid: 545268dfbe5cf4a4592502f2a7768881, type: 2}
+  - {fileID: 11400000, guid: 98759b40365f90241bd0b82b0dfce2a0, type: 2}
+  tuning:
+    groundY: 195
+    ballStartY: 375
+    serveTargetX: 300
+    startStandX: 375
+    netTopY: 450
+    netClearance: 120
+    netMaxY: 880
+    lowSwingY: 488
+    smashNeedY: 600
+    moveMinX: 150
+    moveMaxX: 750
+    outMarginMin: 38
+    outMarginMax: 225
+    apexClamp: 1000
+    perfectDistance: 90
+    behindTolerance: 15
+    heavyTolerance: 120
+    perfectRate: 0.75
+    speedConstant: 1962
+    flySpeedScale: 0.866
+    heavySpeedThreshold: 1350
+    maxFlySpeed: 4000
+    gravityScale: 3
+    pixelsPerUnit: 75
+    fallSpeed: 750
+    playerPower: 1
+    playerMoveSpeed: 8
+    playerJumpHeight: 3
+    opponentPower: 0.6
+    opponentMoveSpeed: 8
+    opponentJumpHeight: 3
+    opponentHitRate: 0.9
+    opponentHeavyRate: 0.2
+    trackDisplayRate: 1
+    trackSpacing: 38
+  targetScore: 5
+  playerBody: {fileID: 0}
+  opponentBody: {fileID: 0}
+  racketSprite: {fileID: 0}
+  armSprite: {fileID: 0}
+  ballSprite: {fileID: 0}
+  backdrop: {fileID: 0}
+  debugAutoPlayer: 0
+--- !u!224 &1866437043
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1866437041}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 664587820}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1876119050
 GameObject:
   m_ObjectHideFlags: 0
@@ -27634,6 +27798,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23fe54a7ccfc2a34e8ce63f703189434, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNShopModule
+  tutorialId: 
   shops:
   - {fileID: 11400000, guid: 33ba0ffc84737484ea03875d4b03575f, type: 2}
 --- !u!1 &2014629184

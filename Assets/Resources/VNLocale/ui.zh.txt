@@ -294,3 +294,12 @@ tutorial.next = ▼ 点击继续
 tutorial.done = ▼ 点击开始
 tutorial.skip = ESC 跳过教程
 tutorial.progress = {0} / {1}
+
+# —— 擦雾 ——
+fogwipe.clarity = 清晰度 {0}%
+fogwipe.timer = {0}s
+fogwipe.hint = 按住左键擦拭玻璃
+fogwipe.result = 最高清晰度 {0}%
+fogwipe.quit = 放弃擦拭？
+fogwipe.quit.yes = 放弃
+fogwipe.quit.no = 继续擦

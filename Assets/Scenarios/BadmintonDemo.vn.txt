@@ -13,7 +13,7 @@
 
 label 热身
 : （先随便打两下找找手感吧。）
-event badminton vs:小雪 id:新手 mode:free
+event badminton tutorial:羽毛球基础 vs:小雪 id:新手 mode:free
 * 结束
 
 : （手感差不多了。）
@@ -88,6 +88,17 @@ jump 收尾
 
 label 收尾
 : （把球拍收进袋子，体育馆的灯一盏盏灭了。）
+
+
+
+
+
+
+
+
+
+
+
 
 
 
