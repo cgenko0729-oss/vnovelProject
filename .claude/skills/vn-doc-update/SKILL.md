@@ -1,12 +1,19 @@
 ---
 name: vn-doc-update
-description: 功能完成后同步项目文档：WhatAiDo.md 章节模板与编号规则、CLAUDE.md 组件表、ProjectCodeGuide、HowToUse、SetUpGuide 分别何时更新。Update project docs after finishing a feature (WhatAiDo chapter, documentation sync).
+description: 用户叫「更新文档」时同步项目文档：写在功能分支上进同一个 PR；WhatAiDo.md 章节模板与编号规则、CLAUDE.md 组件表、ProjectCodeGuide、HowToUse、SetUpGuide 分别何时更新。Update project docs when the user asks (WhatAiDo chapter, documentation sync).
 ---
 
 # 文档同步清单
 
 ## 何时用我
-每批开发完成后、合并回 main 之前。WhatAiDo.md 是**必写项**，其余按改动性质判断。
+**只在用户明确说「更新文档」时**——不是功能一做完就自动写（流程见 [vn-new-feature] 阶段 ③）。
+位置是 PR 已经开好、用户还没合并的那个空档。WhatAiDo.md 是**必写项**，其余按改动性质判断。
+
+## 写在哪、怎么提交
+- [ ] **留在同一个功能分支 `feature/<名>` 上**，别切回 main
+- [ ] 写完逐文件 `git add` → commit（英文标题如 `Document the xxx feature` + 中文正文 +
+      Co-Authored-By）→ `git push`
+- [ ] PR 自动带上这次提交，**不用重开 PR** → 告诉用户 PR 已更新，等他合并
 
 ## WhatAiDo.md 追加章节（必做）
 - 章节编号续接文末最后一章。**先看文件末尾确认编号**——历史上出现过重号
@@ -30,3 +37,5 @@ description: 功能完成后同步项目文档：WhatAiDo.md 章节模板与编�
 ## 提醒
 - 玩家可见文案有变化 → 检查是否要跑本地化 Extract（见 [vn-localize]）。
 - 文档语言：正文中文；commit 标题英文。
+- WhatAiDo 章节标题里的分支名写**本次真实分支**（现行约定 `feature/<名>`，
+  历史章节里的 `agent/*` 不要动）。

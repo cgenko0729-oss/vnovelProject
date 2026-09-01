@@ -303,9 +303,9 @@ VNAiTalkLog.cs        记玩家原文
 | `VNAiTalkLog.cs` (353) | 玩家原文 / F9 version / H2 分析器要读的字段 |
 | `VNAiDiary.cs` / `Panel.cs` | J3 她的日记 / C5 记忆面板可复用面板样式 |
 
-**每次动手前的固定动作**：开 `agent/<名称>` 分支（技能 `vn-new-feature`）→
+**每次动手前的固定动作**：开 `feature/<名称>` 分支（技能 `vn-new-feature`）→
 加命令参数走技能 `vn-new-command` → 新状态进存档走 `vn-save-compat` →
-完成后补 `WhatAiDo.md` 章节（技能 `vn-doc-update`）。
+实现完停下来等用户确认，**用户叫了才提交/开 PR、才补 `WhatAiDo.md` 章节**（技能 `vn-doc-update`）。
 
 ---
 
