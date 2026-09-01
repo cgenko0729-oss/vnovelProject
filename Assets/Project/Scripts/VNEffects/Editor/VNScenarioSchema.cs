@@ -24,6 +24,7 @@ namespace VNEffects.EditorTools
         UiSkinId,    // ui 命令的第二参数：候选跟着同行的 kind 变（见 dependsOn）
         InterludeId, // 过场 id（VNGameConfig 过场库里的 VNInterludeDef 资产）
         TutorialId,  // 教程 id（VNGameConfig 教程库里的 VNTutorialDef 资产）
+        AssetId,     // 任意定义资产的 id（扫 t:<assetType>，取 assetIdField 字段）
     }
 
     /// <summary>一个命令参数的模式定义</summary>
@@ -37,6 +38,20 @@ namespace VNEffects.EditorTools
         public string defaultValue = "";   // 生成时等于默认可省略；位置参数补位用
         public string dependsOn;       // source == Expression 时指向角色参数 id
         public float weight = 1f;      // 横向布局权重
+
+        /// <summary>
+        /// 候选只是补全提示，认不出**不报错**。
+        /// 用于「运行时本来就容忍陌生值」的参数：比如 event badminton 的 vs:，
+        /// 对手长相与名字全由 id: 指的那份 VNBadmintonDef 决定，vs: 只是
+        /// 「def 没配立绘时去角色库碰碰运气」的兜底，写个没登记的称呼完全正常。
+        /// </summary>
+        public bool softRef;
+
+        // source == AssetId 时用：扫哪个 ScriptableObject 类型、id 存在哪个字段。
+        // 字段名各资产不统一（quizId / badmintonId / themeId / id …），所以显式写死，
+        // 不用反射猜——猜错的表现是下拉里一片空白，很难联想到原因。
+        public string assetType;
+        public string assetIdField;
     }
 
     /// <summary>一个剧本命令的模式定义</summary>
@@ -74,6 +89,180 @@ namespace VNEffects.EditorTools
 
         public static VNCommandDef Find(string keyword) =>
             ByKeyword.TryGetValue(keyword, out var d) ? d : null;
+
+        /// <summary>
+        /// 取命令定义。<paramref name="variant"/> 目前只对 <c>event</c> 有意义 —— 传模块 id
+        /// （badminton / photo / quiz …），拿到的定义里就带上那个模块专属的 kwarg。
+        ///
+        /// 【为什么要分变体】
+        /// event 是通用入口，`vs:` `target:` `powerstat:` 这些是各模块自己定义的，
+        /// 全塞进一张表的话每个 event 行都会画出二十几个格子；一个都不写又会让它们
+        /// 全变成「unrecognized token」警告，只能在一长条文本里手打。按模块 id 取
+        /// 变体，两边的毛病都没有。
+        ///
+        /// 认不出的模块 id（自定义模块、写成 flag 变量的动态 id）退回基础定义，
+        /// 它的 kwarg 照旧走 extraTokens 原样保留 —— 只是仍会有警告，不会丢内容。
+        /// </summary>
+        public static VNCommandDef Find(string keyword, string variant)
+        {
+            var baseDef = Find(keyword);
+            if (baseDef == null || keyword != "event" || string.IsNullOrEmpty(variant))
+                return baseDef;
+            if (!EventVariants.TryGetValue(variant, out var extra)) return baseDef;
+
+            if (_eventVariantCache.TryGetValue(variant, out var cached)) return cached;
+
+            var merged = new List<VNParamDef>(baseDef.parameters);
+            merged.AddRange(extra);
+            var def = new VNCommandDef
+            {
+                keyword = baseDef.keyword,
+                category = baseDef.category,
+                hint = baseDef.hint,
+                parameters = merged.ToArray(),
+                blockChoice = baseDef.blockChoice,
+                blockCamseq = baseDef.blockCamseq,
+            };
+            _eventVariantCache[variant] = def;
+            return def;
+        }
+
+        /// <summary>这个模块 id 有没有登记专属参数（编辑器决定要不要多画一行）</summary>
+        public static bool HasEventVariant(string moduleId) =>
+            !string.IsNullOrEmpty(moduleId) && EventVariants.ContainsKey(moduleId);
+
+        /// <summary>基础 event 定义里的参数个数（画行时用来切分「哪些属于模块专属」）</summary>
+        public static int EventBaseParamCount =>
+            ByKeyword.TryGetValue("event", out var d) ? d.parameters.Length : 0;
+
+        /// <summary>全部模块专属 kwarg 的键名集合（换模块时用来保住写过的值，见 VNScenarioDoc）</summary>
+        public static readonly HashSet<string> EventKwargUniverse = new HashSet<string>();
+
+        static readonly Dictionary<string, VNCommandDef> _eventVariantCache =
+            new Dictionary<string, VNCommandDef>();
+
+        /// <summary>
+        /// event &lt;模块 id&gt; → 该模块专属的 kwarg。
+        /// **唯一真相是各模块 OnLaunch 里的 ctx.Kw(...)**，加模块参数时这里同步补一行，
+        /// 编辑器界面就自动长出对应控件、Lint 也不再报未知 token。
+        /// </summary>
+        static readonly Dictionary<string, VNParamDef[]> EventVariants =
+            new Dictionary<string, VNParamDef[]>
+            {
+                ["qte"] = new[]
+                {
+                    Kw("target", "目标", VNParamSource.Number, weight: 0.5f),
+                    Kw("time", "秒", VNParamSource.Number, weight: 0.5f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.8f),
+                },
+                ["map"] = new[]
+                {
+                    Kw("bg", "背景", VNParamSource.Background, weight: 0.8f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.8f),
+                },
+                ["shop"] = new[]
+                {
+                    KwAsset("id", "商店", "VNShopDef", "shopId"),
+                },
+                ["plan"] = new[]
+                {
+                    KwAsset("id", "方案", "VNPlanDef", "planId"),
+                    Kw("op", "操作", VNParamSource.Options, new[] { "next" }, weight: 0.5f),
+                    Kw("pool", "行动池", VNParamSource.Text, weight: 0.8f),
+                    Kw("slots", "格数", VNParamSource.Number, weight: 0.4f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.7f),
+                },
+                ["result"] = new[]
+                {
+                    Kw("grade", "档位", VNParamSource.Options,
+                        new[] { "fail", "normal", "good", "great" }, "normal", weight: 0.6f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.8f),
+                    Kw("sub", "副标题", VNParamSource.Text, weight: 0.8f),
+                    Kw("se", "音效", VNParamSource.AudioSe, weight: 0.6f),
+                },
+                ["battle"] = new[]
+                {
+                    Kw("enemy", "敌人", VNParamSource.Text, weight: 0.7f),
+                    Kw("ehp", "敌HP", VNParamSource.Number, weight: 0.4f),
+                    Kw("eatk", "敌攻", VNParamSource.Number, weight: 0.4f),
+                    Kw("escape", "逃跑%", VNParamSource.Number, weight: 0.4f),
+                    Kw("php", "我HP", VNParamSource.Number, weight: 0.4f),
+                    Kw("patk", "我攻", VNParamSource.Number, weight: 0.4f),
+                    Kw("pdef", "我防", VNParamSource.Number, weight: 0.4f),
+                    // stat 版本优先于上面的固定值：属性名走 flag 候选，同 stat 命令
+                    Kw("phpstat", "HP属性", VNParamSource.Flag, weight: 0.6f),
+                    Kw("patkstat", "攻属性", VNParamSource.Flag, weight: 0.6f),
+                    Kw("pdefstat", "防属性", VNParamSource.Flag, weight: 0.6f),
+                    Kw("pname", "我方名", VNParamSource.Text, weight: 0.6f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.7f),
+                },
+                ["quiz"] = new[]
+                {
+                    KwAsset("id", "题库", "VNQuizDef", "quizId"),
+                    Kw("count", "题数", VNParamSource.Number, weight: 0.4f),
+                    Kw("time", "秒", VNParamSource.Number, weight: 0.4f),
+                    Kw("pass", "及格", VNParamSource.Number, weight: 0.4f),
+                    Kw("pick", "指定题号", VNParamSource.Text, weight: 0.6f),
+                    Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.7f),
+                },
+                ["badminton"] = new[]
+                {
+                    // 软引用：对手的立绘与名字都由 id: 那份资产决定，vs: 只是兜底，
+                    // 写「学姐」这种没登记的称呼是常态，不该报错
+                    Soft(Kw("vs", "对手角色", VNParamSource.Character, weight: 0.8f)),
+                    KwAsset("id", "对手资产", "VNBadmintonDef", "badmintonId"),
+                    Kw("target", "目标分", VNParamSource.Number, weight: 0.4f),
+                    Kw("first", "先发球", VNParamSource.Options,
+                        new[] { "me", "opponent", "random" }, weight: 0.6f),
+                    Kw("mode", "赛制", VNParamSource.Options,
+                        new[] { "match", "free" }, weight: 0.5f),
+                    Kw("powerstat", "力量属性", VNParamSource.Flag, weight: 0.7f),
+                    Kw("speedstat", "速度属性", VNParamSource.Flag, weight: 0.7f),
+                    Kw("jumpstat", "弹跳属性", VNParamSource.Flag, weight: 0.7f),
+                    Kw("pname", "我方名", VNParamSource.Text, weight: 0.6f),
+                    Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
+                },
+                ["photo"] = new[]
+                {
+                    Kw("vs", "对方角色", VNParamSource.Character, weight: 0.8f),
+                    Kw("me", "主角", VNParamSource.Character, weight: 0.8f),
+                    KwAsset("theme", "主题", "VNPhotoThemeDef", "themeId"),
+                    KwAsset("frame", "边框", "VNPhotoFrameDef", "frameId"),
+                    KwAsset("bg", "背景", "VNPhotoBackdropDef", "backdropId"),
+                    Kw("mode", "模式", VNParamSource.Options,
+                        new[] { "match", "free" }, weight: 0.5f),
+                    Kw("time", "秒", VNParamSource.Number, weight: 0.4f),
+                    Kw("stat", "加属性", VNParamSource.Flag, weight: 0.6f),
+                    Kw("rate", "换算率", VNParamSource.Number, weight: 0.4f),
+                    Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.7f),
+                },
+                ["aitalk"] = new[]
+                {
+                    Kw("vs", "角色", VNParamSource.Character, weight: 0.8f),
+                    KwAsset("persona", "人格", "VNAiPersonaDef", "id"),
+                    Kw("turns", "轮数", VNParamSource.Number, weight: 0.4f),
+                    Kw("topic", "话题", VNParamSource.Text, weight: 0.9f),
+                    Kw("place", "场景", VNParamSource.Text, weight: 0.8f),
+                    Kw("me", "玩家名", VNParamSource.Text, weight: 0.6f),
+                    Kw("options", "候选数", VNParamSource.Number, weight: 0.4f),
+                    Kw("stat", "加属性", VNParamSource.Flag, weight: 0.6f),
+                    Kw("rate", "换算率", VNParamSource.Number, weight: 0.4f),
+                    Kw("memory", "手写往事", VNParamSource.Text, weight: 0.9f),
+                    Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
+                },
+                ["interact"] = new[]
+                {
+                    Kw("vs", "角色", VNParamSource.Character, weight: 0.8f),
+                    KwAsset("id", "互动定义", "VNInteractionDef", "id"),
+                    Kw("items", "道具清单", VNParamSource.Text, weight: 0.9f),
+                    Kw("time", "秒", VNParamSource.Number, weight: 0.4f),
+                    Kw("zones", "显示部位框", VNParamSource.Options,
+                        new[] { "on", "off" }, weight: 0.6f),
+                    Kw("flag", "成绩前缀", VNParamSource.Text, weight: 0.6f),
+                },
+            };
 
         public static readonly string[] EaseNames =
         {
@@ -132,6 +321,19 @@ namespace VNEffects.EditorTools
             return p;
         }
 
+        /// <summary>把参数标成「候选只是提示，认不出不报错」（见 VNParamDef.softRef）</summary>
+        static VNParamDef Soft(VNParamDef p) { p.softRef = true; return p; }
+
+        /// <summary>指向某类定义资产 id 的 kwarg（下拉候选 = 项目里该类型资产的 id）</summary>
+        static VNParamDef KwAsset(string id, string label, string assetType, string assetIdField,
+            float weight = 1f)
+        {
+            var p = Kw(id, label, VNParamSource.AssetId, weight: weight);
+            p.assetType = assetType;
+            p.assetIdField = assetIdField;
+            return p;
+        }
+
         static void Add(string keyword, string category, string hint,
             params VNParamDef[] parameters)
         {
@@ -143,6 +345,12 @@ namespace VNEffects.EditorTools
 
         static VNScenarioSchema()
         {
+            // 模块专属 kwarg 的键名总表：换模块 id 时靠它认出「这是别的模块的参数」，
+            // 保住玩家写过的值而不是静默丢掉（见 VNScenarioDoc.GenerateText）
+            foreach (var kv in EventVariants)
+                foreach (var p in kv.Value)
+                    EventKwargUniverse.Add(p.id);
+
             // ---- Scene ----
             Add("bg", "Scene", "bg <id> [transition:Type] [via:black]\n" +
                 "转场默认**直接过渡**：新图从图案缝隙里长出来，不经过中间那片纯色。\n" +
@@ -425,8 +633,16 @@ namespace VNEffects.EditorTools
                 "           me:玩家名 stat:属性 rate:换算率 flag:成绩前缀 options:候选回复条数3~6\n" +
                 "           memory:手写往事）；结果 好感提升/普通/冷场/失败\n" +
                 "           ★ 必须接住「* 失败」，否则玩家断网时会卡在事件里\n" +
-                "           ★ event 前先 show 角色，模块只换表情不负责出场",
-                Pos("id", "id", VNParamSource.EventId));
+                "           ★ event 前先 show 角色，模块只换表情不负责出场\n" +
+                "     模块专属参数（vs: / target: / powerstat: …）按上面这个 id 自动长出来，\n" +
+                "     加新模块参数在 VNScenarioSchema.EventVariants 里补一行\n" +
+                "tutorial: 是所有模块通用的：第一次进这个模块时先播一篇教程（看过就跳过）",
+                // 存储键必须是 module 不能是 id：badminton/quiz/shop/plan/interact
+                // 这些模块自己就有一个 id: 参数（对手资产 / 题库 / 商店…），
+                // 两者同名的话会互相覆盖，写出 `event 新手 id:新手` 这种烂行
+                Pos("module", "模块", VNParamSource.EventId),
+                // 通用参数：VNEventModule 基类实现，与具体模块无关，所以放基础定义里
+                Kw("tutorial", "教程", VNParamSource.TutorialId, weight: 0.7f));
             ByKeyword["event"].blockChoice = true; // 复用 choice 的「* 行」编辑与行号换算
             // ---- SNS 手机聊天 ----
             Add("sns", "SNS", "sns open <char> [id:会话] [title:标题] [me:玩家说话者名] / sns close\n" +

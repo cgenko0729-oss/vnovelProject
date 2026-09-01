@@ -248,6 +248,10 @@ namespace VNEffects.EditorTools
                 return;
             }
 
+            // event 的 kwarg 是各模块自己定义的：先把模块 id（第一个非 key:value 的
+            // token）挑出来，才知道这一行该按哪套参数解析
+            if (row.keyword == "event") def = VNScenarioSchema.Find("event", FirstPositional(tokens));
+
             var positional = new List<VNParamDef>();
             if (def != null) positional.AddRange(def.Positional());
             int posIndex = 0;
@@ -272,6 +276,18 @@ namespace VNEffects.EditorTools
                 else
                     row.extraTokens.Add(tok);
             }
+        }
+
+        /// <summary>命令 token 里第一个位置参数（跳过 key:value）。event 用它认模块 id。</summary>
+        static string FirstPositional(string[] tokens)
+        {
+            for (int t = 1; t < tokens.Length; t++)
+            {
+                int colon = tokens[t].IndexOf(':');
+                if (colon > 0 && colon < tokens[t].Length - 1) continue;
+                return tokens[t];
+            }
+            return null;
         }
 
         static void ParseSay(VNRow row, string body)
@@ -389,7 +405,9 @@ namespace VNEffects.EditorTools
                     }
                     else
                     {
-                        var def = VNScenarioSchema.Find(row.keyword);
+                        var def = row.keyword == "event"
+                            ? VNScenarioSchema.Find("event", row.Get("module"))
+                            : VNScenarioSchema.Find(row.keyword);
                         if (def != null)
                         {
                             // 位置参数：输出到最后一个非空为止，中间空位用默认值补
@@ -411,6 +429,20 @@ namespace VNEffects.EditorTools
                                 string v = row.Get(p.id);
                                 if (!string.IsNullOrEmpty(v))
                                     sb.Append(' ').Append(p.id).Append(':').Append(v);
+                            }
+
+                            // 换了模块 id 之后，上一个模块的参数在本变体里不存在了。
+                            // 直接不输出 = 玩家写过的东西静默消失，所以照原样带出来：
+                            // 下次载入会当成未知 token 保留，并在 Issues 里提醒去清理。
+                            if (row.keyword == "event")
+                            {
+                                foreach (var kv in row.values)
+                                {
+                                    if (def.FindKwarg(kv.Key) != null) continue;
+                                    if (!VNScenarioSchema.EventKwargUniverse.Contains(kv.Key)) continue;
+                                    if (string.IsNullOrEmpty(kv.Value)) continue;
+                                    sb.Append(' ').Append(kv.Key).Append(':').Append(kv.Value);
+                                }
                             }
                         }
                     }
@@ -584,7 +616,9 @@ namespace VNEffects.EditorTools
                     }
                 }
 
-                var def = VNScenarioSchema.Find(r.keyword);
+                var def = r.keyword == "event"
+                    ? VNScenarioSchema.Find("event", r.Get("module"))
+                    : VNScenarioSchema.Find(r.keyword);
                 if (def == null)
                 {
                     Err(i, $"unknown command \"{r.keyword}\"");
@@ -610,7 +644,7 @@ namespace VNEffects.EditorTools
                                 Err(i, $"{r.keyword} {p.label}: \"{v}\" is not a number");
                             break;
                         case VNParamSource.Character:
-                            if (ctx.HasCharacters &&
+                            if (!p.softRef && ctx.HasCharacters &&
                                 System.Array.IndexOf(ctx.characterIds, v) < 0)
                                 Err(i, $"{r.keyword}: character \"{v}\" not found");
                             break;

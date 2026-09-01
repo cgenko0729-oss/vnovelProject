@@ -381,6 +381,7 @@ namespace VNEffects.EditorTools
             var ids = new List<string>();
             _ctx.expressions.Clear();
             _characterPreviews.Clear();
+            _assetIdCache.Clear();   // event 各模块的资产 id 候选，跟着一起重扫
             foreach (var guid in AssetDatabase.FindAssets("t:VNCharacterDef"))
             {
                 var def = AssetDatabase.LoadAssetAtPath<VNCharacterDef>(
@@ -1592,10 +1593,19 @@ namespace VNEffects.EditorTools
         {
             if (IsRowCollapsed(r)) return 0f;
             int lines = 1;
+            if (EventParamLine(r)) lines += 1;   // event 的模块专属参数独占一行
             if (r.options != null) lines += r.options.Count;
             if (r.camLines != null) lines += r.camLines.Count;
             return lines * LineH2 + 6f;
         }
+
+        /// <summary>
+        /// 这一行是不是要多画一行「模块专属参数」——event 且模块 id 认得出来。
+        /// 塞进同一行的话，photo 有 11 个参数，每格只剩几十像素，什么都看不清。
+        /// </summary>
+        static bool EventParamLine(VNRow r) =>
+            r.kind == VNRowKind.Command && r.keyword == "event" &&
+            VNScenarioSchema.HasEventVariant(r.Get("module"));
 
         /// <summary>
         /// 「隐注释/空行」开着时这一行是否折成零高度。
@@ -1846,7 +1856,13 @@ namespace VNEffects.EditorTools
             if (searchKeyword) ShowRowTypeSearch(keywordRect, r);
             x += 132f;
 
-            var def = VNScenarioSchema.Find(r.keyword);
+            // event 的参数集按模块 id 变（badminton 有 vs:/target:，quiz 有 id:/count:…）
+            var def = r.keyword == "event"
+                ? VNScenarioSchema.Find("event", r.Get("module"))
+                : VNScenarioSchema.Find(r.keyword);
+            bool paramLine = EventParamLine(r);
+            int baseCount = paramLine ? VNScenarioSchema.EventBaseParamCount : int.MaxValue;
+
             float asyncW = 26f;
             // 行尾按钮区：choice 的 "+ option" / camseq 的 "🎬 预设▾ + wp"
             float tailW = 0f;
@@ -1855,7 +1871,12 @@ namespace VNEffects.EditorTools
             float avail = line0.xMax - x - asyncW - tailW - 4f;
 
             if (def != null && def.parameters.Length > 0)
-                DrawParams(new Rect(x, line0.y, avail, line0.height), r, def);
+            {
+                // 第一行只放通用参数（模块 id + tutorial），模块专属的挪到第二行
+                DrawParams(new Rect(x, line0.y, avail, line0.height), r, def, 0, baseCount);
+                if (paramLine)
+                    DrawParams(SubLine(fullRect, 1), r, def, baseCount, int.MaxValue);
+            }
             else if (def != null)
                 GUI.Label(new Rect(x, line0.y, avail, line0.height),
                     def.hint, EditorStyles.centeredGreyMiniLabel);
@@ -1866,8 +1887,9 @@ namespace VNEffects.EditorTools
             // ---- choice 选项行 ----
             if (r.options != null)
             {
+                int firstOptionLine = paramLine ? 2 : 1;   // 模块参数行占掉了第 1 行
                 for (int i = 0; i < r.options.Count; i++)
-                    DrawChoiceOption(SubLine(fullRect, 1 + i), r, i);
+                    DrawChoiceOption(SubLine(fullRect, firstOptionLine + i), r, i);
                 // header 右侧的 + option
                 var addRect = new Rect(line0.xMax - asyncW - 78f, line0.y, 74f, line0.height);
                 if (GUI.Button(addRect, "+ option", EditorStyles.miniButton))
@@ -2597,21 +2619,32 @@ namespace VNEffects.EditorTools
 
         // ---- 参数区 ----
 
-        void DrawParams(Rect rect, VNRow r, VNCommandDef def)
+        void DrawParams(Rect rect, VNRow r, VNCommandDef def) =>
+            DrawParams(rect, r, def, 0, int.MaxValue);
+
+        /// <summary>
+        /// 画 [from, to) 区间的参数。event 靠它把「通用参数」与「模块专属参数」
+        /// 分成两行画，其余命令一律整段画完。
+        /// </summary>
+        void DrawParams(Rect rect, VNRow r, VNCommandDef def, int from, int to)
         {
+            int end = Mathf.Min(to, def.parameters.Length);
+            if (from >= end) return;
+
             // 计算总权重与标签宽
             float totalWeight = 0f;
             float labelTotal = 0f;
-            foreach (var p in def.parameters)
+            for (int i = from; i < end; i++)
             {
-                totalWeight += p.weight;
-                labelTotal += LabelWidth(p);
+                totalWeight += def.parameters[i].weight;
+                labelTotal += LabelWidth(def.parameters[i]);
             }
-            float fieldAvail = rect.width - labelTotal - def.parameters.Length * 4f;
+            float fieldAvail = rect.width - labelTotal - (end - from) * 4f;
             float x = rect.x;
 
-            foreach (var p in def.parameters)
+            for (int i = from; i < end; i++)
             {
+                var p = def.parameters[i];
                 float lw = LabelWidth(p);
                 if (lw > 0f)
                 {
@@ -2739,6 +2772,44 @@ namespace VNEffects.EditorTools
             return display;
         }
 
+        /// <summary>
+        /// 某类定义资产的 id 候选（event 各模块的 id: / theme: / persona: 这些）。
+        /// **必须缓存**：OptionsFor 每帧都被调，直接 FindAssets 会把编辑器拖垮。
+        /// 缓存在 RefreshSources 里清（登记新素材后由 VNAssetLibraryEvents 触发）。
+        /// </summary>
+        readonly Dictionary<string, string[]> _assetIdCache = new Dictionary<string, string[]>();
+
+        string[] AssetIdOptions(VNParamDef p)
+        {
+            if (string.IsNullOrEmpty(p.assetType)) return null;
+            string key = p.assetType + "/" + p.assetIdField;
+            if (_assetIdCache.TryGetValue(key, out var cached)) return cached;
+
+            var list = new List<string>();
+            foreach (var guid in AssetDatabase.FindAssets("t:" + p.assetType))
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(
+                    AssetDatabase.GUIDToAssetPath(guid));
+                if (asset == null) continue;
+                string id = null;
+                if (!string.IsNullOrEmpty(p.assetIdField))
+                {
+                    var prop = new SerializedObject(asset).FindProperty(p.assetIdField);
+                    if (prop != null && prop.propertyType == SerializedPropertyType.String)
+                        id = prop.stringValue;
+                }
+                // id 留空按资产文件名认，与运行时各模块的容错一致
+                if (string.IsNullOrEmpty(id)) id = asset.name;
+                if (!list.Contains(id)) list.Add(id);
+            }
+            list.Sort(System.StringComparer.Ordinal);
+            // 一个资产都没有时返回 null 退回文本框：否则玩家面对一个空下拉，
+            // 连「先把 id 写上、资产稍后再建」都做不到
+            var result = list.Count > 0 ? list.ToArray() : null;
+            _assetIdCache[key] = result;
+            return result;
+        }
+
         string[] OptionsFor(VNRow r, VNParamDef p)
         {
             switch (p.source)
@@ -2765,6 +2836,7 @@ namespace VNEffects.EditorTools
                 case VNParamSource.WeatherId: return _ctx.weatherIds;
                 case VNParamSource.InterludeId: return _ctx.interludeIds;
                 case VNParamSource.TutorialId: return _ctx.tutorialIds;
+                case VNParamSource.AssetId: return AssetIdOptions(p);
                 case VNParamSource.UiSkinId: return UiSkinOptions(r.Get(p.dependsOn));
                 case VNParamSource.Label: return LabelAddressOptions();
                 case VNParamSource.Flag: return _flags.ToArray();
