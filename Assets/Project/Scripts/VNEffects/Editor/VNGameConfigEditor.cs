@@ -42,7 +42,7 @@ namespace VNEffects.EditorTools
             new Tab("音频",    "bgmLibrary", "seLibrary", "voiceLibrary", "typingTick",
                                "overrideChannelVolumes", "bgmVolume", "seVolume", "voiceVolume"),
             new Tab("玩法",    "mapSprite", "mapLocations", "stats", "shops", "plans",
-                               "quests", "quizzes", "badmintons", "fogWipes"),
+                               "quests", "trackers", "quizzes", "badmintons", "fogWipes"),
             new Tab("AI",      "aiPersonas", "aiProvider", "aiModel", "aiPricing"),
             new Tab("大头贴",  "photoFrames", "photoStickers", "photoBackdrops", "photoThemes",
                                "photoMeCharacterId"),

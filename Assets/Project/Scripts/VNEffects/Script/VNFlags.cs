@@ -20,6 +20,12 @@ namespace VNEffects
         /// 读档时会连续触发多次，订阅方应做“标脏 + 下帧统一刷新”而不是立即重建。</summary>
         public static event System.Action Changed;
 
+        /// <summary>带 key 的变化事件（统计层 VNTracker 用）。
+        /// 无参的 Changed 拿不到「是哪个 flag 变了」，而统计层靠 diff 字典会漏掉
+        /// 「两场都打 21 分」这种值没变的写入——@次数 与 @累计 就错了。
+        /// 值相同的重复 Set 也会触发：那确实是一次新的写入。</summary>
+        public static event System.Action<string> KeyChanged;
+
         public static IReadOnlyDictionary<string, int> All => _values;
 
         public static int Get(string key) =>
@@ -28,6 +34,7 @@ namespace VNEffects
         public static void Set(string key, int value)
         {
             _values[key] = value;
+            KeyChanged?.Invoke(key);
             Changed?.Invoke();
         }
 

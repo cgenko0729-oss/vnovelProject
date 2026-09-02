@@ -164,6 +164,12 @@ namespace VNEffects.EditorTools
                 {
                     KwAsset("id", "商店", "VNShopDef", "shopId"),
                 },
+                ["questboard"] = new[]
+                {
+                    Kw("tag", "标签", VNParamSource.Text, weight: 0.7f),
+                    Kw("max", "同时接取上限", VNParamSource.Number, weight: 0.5f),
+                    Kw("title", "标题", VNParamSource.Text, weight: 0.7f),
+                },
                 ["plan"] = new[]
                 {
                     KwAsset("id", "方案", "VNPlanDef", "planId"),
@@ -685,10 +691,13 @@ namespace VNEffects.EditorTools
                 Kw("lateflag", "超时flag", VNParamSource.Text, weight: 0.7f));
             ByKeyword["sns"].blockChoice = true; // 复用「* 行」编辑与行号换算
 
-            Add("quest", "Flow", "quest start|stage|done|fail <id> [阶段]\n" +
-                "状态存 flag「任务_<id>」：1..n 进行中 / 100 完成 / -1 失败，J 键看日志",
+            Add("quest", "Flow",
+                "quest start|stage|done|fail|claim|offer|abandon|reset <id> [阶段]\n" +
+                "状态存 flag「任务_<id>」：1..98 进行中 / 100 完成 / -1 失败，J 键看日志\n" +
+                "claim=剧本内强制领取　offer=推上委托板　abandon=放弃　reset=清空全部状态",
                 Pos("op", "", VNParamSource.Options,
-                    new[] { "start", "stage", "done", "fail" }, "start"),
+                    new[] { "start", "stage", "done", "fail",
+                            "claim", "offer", "abandon", "reset" }, "start"),
                 Pos("id", "id", VNParamSource.QuestId),
                 Pos("stage", "阶段", VNParamSource.Number, weight: 0.5f));
 

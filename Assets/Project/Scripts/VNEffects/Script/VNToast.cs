@@ -34,6 +34,7 @@ namespace VNEffects
         static Canvas _canvas;
         static RectTransform _stack;
         static TextMeshProUGUI _mode;
+        static TextMeshProUGUI _badge;
         static readonly List<Card> _cards = new List<Card>();
 
         class Card
@@ -85,6 +86,13 @@ namespace VNEffects
         {
             EnsureCanvas();
             _mode.text = string.IsNullOrEmpty(label) ? "" : label;
+        }
+
+        /// <summary>模式标签下方的常驻角标（任务可领取提示），传 null 或空清除</summary>
+        public static void SetBadge(string label)
+        {
+            EnsureCanvas();
+            _badge.text = string.IsNullOrEmpty(label) ? "" : label;
         }
 
         /// <summary>立刻清空所有卡片（调试重建/剧本中断时可用，不清模式标签）</summary>
@@ -174,6 +182,17 @@ namespace VNEffects
             mr.sizeDelta = new Vector2(300f, 44f);
             _mode.color = new Color(1f, 0.85f, 0.4f, 0.9f);
             _mode.text = "";
+
+            // 任务角标：排在模式标签下面一行，两者互不覆盖
+            // （SetMode 只有一个插槽，AUTO/SKIP 已经占着它）
+            _badge = CreateText(go.transform, 26, TextAlignmentOptions.TopRight);
+            var br = (RectTransform)_badge.transform;
+            br.anchorMin = br.anchorMax = new Vector2(1f, 1f);
+            br.pivot = new Vector2(1f, 1f);
+            br.anchoredPosition = new Vector2(-36f, -66f);
+            br.sizeDelta = new Vector2(340f, 40f);
+            _badge.color = new Color(1f, 0.84f, 0.37f, 0.92f);
+            _badge.text = "";
         }
 
         static Card BuildCard(string message, Sprite icon, Color iconColor, Color accent)

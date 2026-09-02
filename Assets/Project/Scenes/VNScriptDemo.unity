@@ -186,6 +186,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNQuestLog
   quests:
   - {fileID: 11400000, guid: 3ff1279f32fd18946832bf209e25e71b, type: 2}
+  - {fileID: 11400000, guid: 1b9df50ed582922408d907ce83eeecad, type: 2}
+  - {fileID: 11400000, guid: 310e4226702139a46997f3c5586104f4, type: 2}
+  - {fileID: 11400000, guid: 6fb3abeb81901d14ea78b50838430686, type: 2}
+  trackers: []
 --- !u!4 &41359744
 Transform:
   m_ObjectHideFlags: 0
@@ -15722,6 +15726,8 @@ MonoBehaviour:
     template: {fileID: 1866437042}
   - id: wipefog
     template: {fileID: 821828426}
+  - id: questboard
+    template: {fileID: 775668511}
 --- !u!4 &664587820
 Transform:
   m_ObjectHideFlags: 0
@@ -15746,6 +15752,7 @@ Transform:
   - {fileID: 505088759}
   - {fileID: 1866437043}
   - {fileID: 821828427}
+  - {fileID: 775668512}
   m_Father: {fileID: 386602334}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &684890040
@@ -15857,6 +15864,55 @@ MonoBehaviour:
   crtTint: {r: 0.85, g: 0.95, b: 1.1, a: 1}
   defaultFade: 0.8
   sourceMaterial: {fileID: 0}
+--- !u!1 &775668510
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 775668512}
+  - component: {fileID: 775668511}
+  m_Layer: 0
+  m_Name: QuestBoardTemplate
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &775668511
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 775668510}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40b62803ca720da4998abdc8e18ed102, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNQuestBoardModule
+  tutorialId: 
+--- !u!224 &775668512
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 775668510}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 664587820}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &788966334
 GameObject:
   m_ObjectHideFlags: 0

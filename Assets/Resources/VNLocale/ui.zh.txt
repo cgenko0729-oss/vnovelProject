@@ -32,6 +32,27 @@ quest.toastUpdate = 任务更新：{0}
 quest.toastUpdateWith = 任务更新：{0} —— {1}
 quest.toastDone = 任务完成：{0}
 quest.toastFail = 任务失败：{0}
+quest.sectionClaimable = 可领取
+quest.claim = 领 取
+quest.rewards = 报酬
+quest.toastClaimable = 可以领取了：{0}
+quest.toastClaimed = {0} —— 获得 {1}
+quest.toastDoneWith = 任务完成：{0} —— 获得 {1}
+quest.toastFailWith = 任务失败：{0} —— {1}
+quest.toastAbandon = 已放弃任务：{0}
+quest.rewardCg = 解锁 CG「{0}」
+quest.rewardQuest = 新任务「{0}」
+quest.deadline = 剩余 {0} 个月
+quest.repeatCount = 已完成 {0} 次
+quest.board.title = —— 委托板 ——
+quest.board.empty = （现在没有可接的委托）
+quest.board.accept = 接下这份委托
+quest.board.leave = 离开
+quest.board.client = 委托人：{0}
+quest.board.reward = 报酬：{0}
+quest.board.deadline = 期限：{0} 个月
+quest.board.requires = 需先完成：{0}
+quest.badge = 任务 ✦{0}
 
 # —— 养成属性 ——
 stats.title = —— 属性 ——
