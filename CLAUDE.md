@@ -121,6 +121,17 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 - 立绘缩放走「倍率」机制（`DOScaleMultiplier`），别直接改 localScale
 - 粒子 velocityOverLifetime 三轴曲线模式必须一致
 - 运行时创建带 Awake 配置的组件：先 SetActive(false) 挂好赋值再激活
+- **`@` 是 flag 命名的保留字**，任务 / 属性 / 道具 id 一律不得含它（Lint 卡死）——
+  统计层的 `<源>@最高` 与任务的旁路 `任务_<id>@待领` 占用了它。好在 `VNExpression`
+  的标识符是**黑名单式**（除分隔符外任何字符都合法，`@` 不在名单里），所以
+  `羽球_我方得分@最高>=5000` 现在就能求值，**表达式解析器零改动**
+- **限时 / 周期一律基于 `月序`，绝不用日历「月份」**：`time pass` 让月份在 1~12 内
+  循环，11 月接的 3 个月期限任务到期该是次年 2 月，`月份>=14` 永远不成立。
+  `月序` 是引擎在 `time` 命令里维护的单调递增计数（`time set` 只初始化不重置）。
+  也别用 `剩余月数`——那个只有养成模式才会被 `time set … remain:` 设上
+- **读档 / 调试重建期间必须挂起「监听 flag 变化」的系统**（`VNTracker.Suspended`、
+  `VNQuestEngine.Suspended`）：读档是把整张字典逐个 `Set` 回去、每次都触发变化事件，
+  不挂起的话统计累计值会被整份历史再刷一遍，而那些派生值本来就存在档里
 
 ### 组件速查（Assets/Scripts/VNEffects/）
 
@@ -189,7 +200,12 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNTutorialPlayer / VNTutorialMask / VNTutorialDef | 新手引导（`tutorial <id> [force:on]`；事件模块写 `tutorial:xxx` 或模板 `tutorialId` 可首次自动播）：压暗全屏 + 挖洞高亮 + 图文卡片，点一下下一步、ESC 跳过。覆盖层排序 **92**（事件层 60 与全屏转场 100 之间），挂**主 Canvas** 而非自建 Overlay 画布——Overlay 会永远压在转场之上，且吃不到 Bloom（洞口 HDR 描边靠它发光）。**淡出之后才解除暂停**：推进那一下点击/ESC 的 `wasPressedThisFrame` 必须已复位，否则同一帧被模块再吃一次（ESC 尤其要紧，羽毛球拿它当认输）。进教程强制显示系统光标、退出还原**原值**（互动模块把它藏了，不抢回来玩家点不了「下一步」）/ 挖洞走 `VN/TutorialMask`（圆角矩形/椭圆 + 羽化 + 最多 4 洞），洞的位置每帧从目标的**世界四角**换算，**不抄 anchoredPosition**（ZoomRoot/TiltRoot 的运镜会让它对不上）/ 教程资产（三语文案，登记进 VNGameConfig 教程库） |
 | VNTutorialSeen / VNTutorialAnchors / VNTutorialSkin | 「看过了」的**全局 JSON**（同 CG 解锁语义：读旧档、开新周目都不该重看，所以不能用 flag）+ 设置面板的「显示教程提示」开关；ESC 跳过也算看过 / 高亮目标的注册表 `Register(id, rect)`，**绝不能按物体名或路径找**——小游戏 UI 全是程序化生成的，改一次布局路径寻址就静默挖到空气上且没有任何报错 / 卡片皮肤槽位（只 panelRoot + bodyText 必需，缺失退回程序化卡片；暗幕不走皮肤，它是功能件） |
 | VNAiTalkModule | AI 自由聊天事件模块（event aitalk）。**刻意破一次模块三铁律**——直接驱动舞台立绘换表情，因为自绘立绘要把眨眼/口型/色调匹配/出场动画全部重接一遍；边界收紧为「只碰表情和对话框内容」且正常结束/ESC/CancelForDebug 三条路径都还原原表情。**射线坑**：EventLayer 排序 60 在选项面板 45 之上，模块自绘的一切默认 `raycastTarget=false`，否则吃掉选项点击（唯 ESC 确认框例外）。装机走 Tools → VN Effects → 场景装机 Install To Scene → **AI 自由聊天 AI Talk Module** |
-| VNQuestDef / VNQuestLog | 任务定义资产 / quest 命令执行 + J 键任务日志（状态全在 flags） |
+| VNQuestDef / VNQuestLog | 任务定义资产（文案 + 阶段 + 子目标条件 + 奖励 + 限时 + 可重复日常；**旧 `stages` 字段原样保留**，`stageDefs` 为空时回退用它，老资产零改动照常工作只是不自动判定）/ quest 命令执行 + **J 键四栏面板**（可领取置顶·金色·带「领取」按钮 / 进行中带 ☑☐ 子目标与进度条 / 已完成 / 已失败）+ 驱动引擎求值（标脏 + 下一帧一次，同属性 HUD 的做法） |
+| VNQuestEngine | 任务引擎（纯逻辑无 MonoBehaviour，可单测）：条件求值、状态推进、领取发奖、超期、日常冷却重置。状态全落 flag 所以 **VNSaveData 零改动**：`任务_<id>` 阶段号 0/1..98/100/-1、`@待领` 待领取阶段号、`@接取月`、`@完成数`、`@重置月`。**「可领取」刻意不塞进主 flag**（比如写个 99）——主 flag 的语义是阶段号，塞了会让剧本里的 `if 任务_xx==2` 在可领取期间失效、多阶段丢失「是哪个阶段可领」的信息，而 `quest start <id> N` 的阶段号本来就没上限；代价是阶段号收窄到 1..98（100/-1 是保留值，Lint 卡死）。幂等由状态机保证：奖励只在「`@待领` → 领取」这一次跳变里发 |
+| VNTracker | 统计层：按 `VNGameConfig.trackers` 声明把源 flag 派生成 `@最高 @最低 @累计 @次数`。**小游戏写的是「本次成绩」下一场就覆盖**，没有这一层就写不出「单场 5000 分」。靠 `VNFlags.KeyChanged`（新增的带 key 事件）而非 diff 字典——diff 会把「两场都打 21 分」算成一场，`@次数`/`@累计` 就错了。**读档必须 `Suspended`**：读档逐个 Set flag 会触发事件，不挂起则 `@累计` 被整份历史再加一遍（而派生值本来就存在档里）。`@累计` 累的是「每次写入的值本身」（适合成绩类，余额型 flag 累计无意义） |
+| VNQuestReward | 一条奖励的结构 + 发放器，五类：Stat（走 `VNStatsHud.Apply` 带钳制与飘字）/ Item（`道具_<id>`）/ Flag（**剧情解锁走这条**，写 `待触发_xx` 让剧本自己 if 接，绝不打断当前演出）/ Cg（`VNCgUnlocks`）/ Quest（连锁接取，任务链用）。惩罚同结构、数量取负 |
+| VNQuestBoardModule | 委托板事件模块（`event questboard [tag:] [max:] [title:]`，结果 接取/离开）：列「未接取 + 前置完成 + 出现条件满足 + 不在冷却 + 未达次数上限」的任务，与自动接取共用 `CanAccept` 所以不会出现「板上有但接不了」。遵守模块三铁律 |
+| VNQuestBoardInstaller (Editor) | 把委托板**增量装进当前场景**（Tools → VN Effects → 场景装机 Install To Scene → 委托板 Quest Board）：注册模块模板 + 补 VNQuestLog + 铺默认统计声明 + 生成示例任务。**示例任务逐个按 id 判断存不存在**——写成「工程里一个 VNQuestDef 都没有才造」的话，因为早就有「告白大作战」，三个示例永远造不出来（症状：编辑器 id 下拉搜不到、运行时日志只有光秃秃一个标题）；资产造在**既有任务资产所在的目录**（工程整理过，实际是 `Assets/Art/VNEffects/Quests`）；结尾必须 `VNAssetLibraryEvents.RaiseChanged()` 否则下拉候选不重建 |
 | VNStatDef / VNStatsHud | 养成属性定义资产（钳制/样式/等级阈值）/ stat 命令 + 顶栏 HUD + C 键属性面板（数值全在 flags，VNFlags.Changed 事件驱动刷新）；属性变动演出 = HUD 就地（数字滚动+条补间+图标弹跳+`+N` 上飘）+ 左上角 VNToast 卡片 |
 | VNToast | 左上角堆叠提示卡片（多条排队不覆盖，上限 5）+ 右上角 AUTO/SKIP 角标；`Show(msg)` 中性卡、`Show(msg, icon, iconColor, accent, hold)` 带图标色条 |
 | VNShopDef / VNShopModule | 商店定义资产 / 商店事件模块（event shop id:xx，买卖走金钱属性 + 道具_&lt;id&gt; flag） |
@@ -245,7 +261,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | 过场章节卡 | `interlude <过场id> [time:秒]`；内容全在 VNInterludeDef 资产（三语标题+语音池+图池+进出方式），登记进 VNGameConfig「过场库」。顺带把转场改成**默认不过黑**：`bg`/`cg` 写 `via:black` 才回老式 | 一三〇 |
 | 背景无限滚动 | `bgscroll on\|off [speed:] [dir:] [mode:repeat\|mirror] [time:]`，speed = 画布像素/秒，dir 是画面流向（默认 left），mirror 不挑图但看得出对称 | 一一八 |
 | 飘落天气 | `weather <id> [density:] [wind:] [speed:] [size:]`，id = petals/maple/ginkgo/leaves/bamboo（+中文别名）或 Rain/Snow/Fireflies/None；参数资产 VNWeatherDef 登记进 VNGameConfig，调参走 Tools → VN Effects → 预览 Preview → **天气预览 Weather Preview** | 九十二 |
-| 任务 | `quest start\|stage\|done\|fail`，状态=flag `任务_<id>`，J 键日志 | 四十三 |
+| 任务 | `quest start\|stage\|done\|fail\|claim\|offer\|abandon\|reset`，状态=flag `任务_<id>`，J 键四栏日志。**条件自动判定 + 可领取 + 奖励发放**：资产里给阶段配子目标条件（flag 表达式，与 if 同语法），全达成→转「可领取」→玩家点领取才发奖并推进；一条条件都没配的阶段仍靠剧本推进，两种任务共存。另有限时过期（基准是 `月序`）、前置任务链、可重复日常、委托板 `event questboard`。**小游戏成绩要先在 VNGameConfig 登记「统计声明」**派生出 `@最高/@累计/@次数` 才写得出条件 | 四十三、一三四 |
 | CG + 画廊 | `cg <id>`，素材 `Assets/CG/` 文件名=id；解锁走 VNCgUnlocks 全局 JSON；G 键画廊 | 五十六、七十八 |
 | 养成 | `stat`（钳制+飘字）、选项 `if:`/`cost:`、商店、`time` 日程+日历 HUD | 六十三~六十六 |
 | 装备 | I 键背包 7 部位装备栏；VNShopDef.Item 加装备/使用字段；状态全在 flags（装备_/装备实增_/装备效果_），特殊效果由剧本 if 判断生效 | 八十五 |
