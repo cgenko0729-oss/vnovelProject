@@ -203,12 +203,36 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7f8a6d6ef183b554289e701a526150c3, type: 2}
   quests:
   - {fileID: 11400000, guid: 3ff1279f32fd18946832bf209e25e71b, type: 2}
+  - {fileID: 11400000, guid: 1b9df50ed582922408d907ce83eeecad, type: 2}
+  - {fileID: 11400000, guid: 310e4226702139a46997f3c5586104f4, type: 2}
+  - {fileID: 11400000, guid: 6fb3abeb81901d14ea78b50838430686, type: 2}
   quizzes:
   - {fileID: 11400000, guid: 6771f02b60c0ce148b69582a7d9a30d0, type: 2}
   badmintons:
   - {fileID: 11400000, guid: 3ec7e3a806c30dd47a1178c9d6372f9b, type: 2}
   - {fileID: 11400000, guid: 545268dfbe5cf4a4592502f2a7768881, type: 2}
   - {fileID: 11400000, guid: 98759b40365f90241bd0b82b0dfce2a0, type: 2}
+  trackers:
+  - sourceFlag: "\u7FBD\u7403_\u6211\u65B9\u5F97\u5206"
+    trackMax: 1
+    trackMin: 0
+    trackSum: 1
+    trackCount: 1
+  - sourceFlag: "\u7FBD\u7403_\u6700\u957F\u56DE\u5408"
+    trackMax: 1
+    trackMin: 0
+    trackSum: 0
+    trackCount: 0
+  - sourceFlag: "\u7167\u7247_\u5206\u6570"
+    trackMax: 1
+    trackMin: 0
+    trackSum: 0
+    trackCount: 1
+  - sourceFlag: "\u64E6\u96FE_\u6E05\u6670\u5EA6"
+    trackMax: 1
+    trackMin: 0
+    trackSum: 0
+    trackCount: 0
   fogWipes:
   - {fileID: 11400000, guid: 62d9f9987e12f9f48805291d6d5a8149, type: 2}
   aiPersonas:

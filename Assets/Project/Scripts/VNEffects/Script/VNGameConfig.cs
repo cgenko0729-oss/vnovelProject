@@ -210,6 +210,10 @@ namespace VNEffects
         public List<VNQuizDef> quizzes = new List<VNQuizDef>();
         public List<VNBadmintonDef> badmintons = new List<VNBadmintonDef>();
 
+        [Header("统计声明：把小游戏的「本次成绩」flag 派生成 @最高 / @最低 / @累计 / @次数\n" +
+                "任务条件里就能写 羽球_我方得分@最高>=5000（小游戏只写本次成绩，下一场就被覆盖）")]
+        public List<VNTrackerEntry> trackers = new List<VNTrackerEntry>();
+
         [Header("擦雾库（event wipefog id: 引用）")]
         public List<VNFogWipeDef> fogWipes = new List<VNFogWipeDef>();
 

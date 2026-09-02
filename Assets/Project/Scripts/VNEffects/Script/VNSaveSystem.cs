@@ -223,9 +223,24 @@ namespace VNEffects
                 var data = JsonUtility.FromJson<VNSaveData>(
                     File.ReadAllText(PathFor(slot), System.Text.Encoding.UTF8));
 
-                VNFlags.Clear();
-                for (int i = 0; i < data.flagNames.Count && i < data.flagValues.Count; i++)
-                    VNFlags.Set(data.flagNames[i], data.flagValues[i]);
+                // 读档是把整张字典逐个 Set 回去，每一次都会触发 VNFlags 的变化事件。
+                // 不挂起的话：统计层会把读回来的旧成绩当成新成绩，@累计 被整份历史再加一遍
+                // （而派生值本来就存在档里）；任务引擎则会在半截状态上弹「任务完成」。
+                VNTracker.Suspended = true;
+                VNQuestEngine.Suspended = true;
+                try
+                {
+                    VNFlags.Clear();
+                    for (int i = 0; i < data.flagNames.Count && i < data.flagValues.Count; i++)
+                        VNFlags.Set(data.flagNames[i], data.flagValues[i]);
+                }
+                finally
+                {
+                    VNTracker.Suspended = false;
+                    VNQuestEngine.Suspended = false;
+                }
+                // 恢复完成后重算一次可领取标记（不发奖、不弹提示）
+                VNQuestEngine.RecalculateSilently();
 
                 Debug.Log($"[VNSave] 已读取槽位 {slot}（{data.savedAt}）");
                 return data;

@@ -31,6 +31,27 @@ quest.toastUpdate = Quest updated: {0}
 quest.toastUpdateWith = Quest updated: {0} — {1}
 quest.toastDone = Quest completed: {0}
 quest.toastFail = Quest failed: {0}
+quest.sectionClaimable = Ready to Claim
+quest.claim = Claim
+quest.rewards = Reward
+quest.toastClaimable = Ready to claim: {0}
+quest.toastClaimed = {0} — received {1}
+quest.toastDoneWith = Quest completed: {0} — received {1}
+quest.toastFailWith = Quest failed: {0} — {1}
+quest.toastAbandon = Quest abandoned: {0}
+quest.rewardCg = Unlock CG "{0}"
+quest.rewardQuest = New quest "{0}"
+quest.deadline = {0} month(s) left
+quest.repeatCount = Completed {0}x
+quest.board.title = —— Request Board ——
+quest.board.empty = (No requests available right now)
+quest.board.accept = Take this request
+quest.board.leave = Leave
+quest.board.client = From: {0}
+quest.board.reward = Reward: {0}
+quest.board.deadline = Deadline: {0} month(s)
+quest.board.requires = Requires: {0}
+quest.badge = Quests ✦{0}
 
 # —— Stats ——
 stats.title = —— Stats ——

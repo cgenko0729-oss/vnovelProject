@@ -24,6 +24,9 @@
 letterbox off time:1.2
 bg 教室 transition:Eyelid
 bg 教室_黄昏 transition:WhiteFlash
+quest start 球场之王
+event badminton vs:星野结衣 id:新手
+*  flag:羽球
 mood Neutral
 hideHUD
 bg test1
@@ -240,6 +243,8 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+
 
 
 

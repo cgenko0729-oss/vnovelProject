@@ -260,7 +260,22 @@ namespace VNEffects
             }
 
             int actualLine = _commands[start].line;
-            if (rebuildState) RebuildStateBefore(start);
+            if (rebuildState)
+            {
+                // 重放期间挂起统计与任务引擎：重放写的 flag 不是「新成绩」，
+                // 否则从选中行播放一次，@累计 / @次数 就被整段剧本再刷一遍。
+                // 注意重建出来的状态不含玩家历史领取的奖励——领取是玩家行为、不在剧本里，
+                // 无法重放，这是已知限制（见 vn-debug）。
+                VNTracker.Suspended = true;
+                VNQuestEngine.Suspended = true;
+                try { RebuildStateBefore(start); }
+                finally
+                {
+                    VNTracker.Suspended = false;
+                    VNQuestEngine.Suspended = false;
+                }
+                VNQuestEngine.RecalculateSilently();
+            }
             ResumeAt(start);
             Debug.Log($"[VNScript] 调试：从第 {actualLine} 行开始播放" +
                       (rebuildState ? "（已重建前置状态）" : "（直接跳转）"));
@@ -1098,6 +1113,9 @@ namespace VNEffects
                     if (cmd.Kw("remain") != null)
                         VNFlags.Set(VNCalendarHud.RemainFlag,
                             Mathf.Max(0, (int)cmd.KwF("remain", 0f)));
+                    // 「月序」只初始化不重置：中途再 time set 一次不该让限时任务的接取月错位
+                    if (!VNFlags.All.ContainsKey(VNQuestEngine.MonthSerialFlag))
+                        VNFlags.Set(VNQuestEngine.MonthSerialFlag, 0);
                     break;
                 }
 
@@ -1108,6 +1126,11 @@ namespace VNEffects
                     if (month <= 0) month = 1;
                     month = (month - 1 + months) % 12 + 1;
                     VNFlags.Set(VNCalendarHud.MonthFlag, month);
+
+                    // 单调递增的「月序」：任务限时与日常冷却的唯一时间基准。
+                    // 日历「月份」在 1~12 里循环，11 月接的 3 个月期限任务到期该是次年 2 月，
+                    // 拿「月份>=14」去判永远不成立——所以另记一份绝对月计数。
+                    VNFlags.Add(VNQuestEngine.MonthSerialFlag, months);
 
                     if (VNFlags.All.ContainsKey(VNCalendarHud.RemainFlag))
                         VNFlags.Set(VNCalendarHud.RemainFlag,

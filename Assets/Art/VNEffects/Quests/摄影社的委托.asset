@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d10cff1af4362092f9e35d3e3698edff, type: 3}
+  m_Name: "\u6444\u5F71\u793E\u7684\u59D4\u6258"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNQuestDef
+  id: "\u6444\u5F71\u793E\u7684\u59D4\u6258"
+  title: "\u6444\u5F71\u793E\u7684\u59D4\u6258"
+  description: "\u5E2E\u6444\u5F71\u793E\u51D1\u9F50\u8FD9\u671F\u793E\u520A\u7684\u7167\u7247\u3002"
+  icon: {fileID: 0}
+  priority: 0
+  hidden: 0
+  acceptFromBoard: 1
+  acceptAuto: 0
+  unlockCondition: 
+  requires: []
+  boardTag: "\u793E\u56E2"
+  clientCharacterId: "\u6444\u5F71\u793E\u90E8\u957F"
+  stageDefs:
+  - text: "\u62CD\u51FA\u80FD\u4E0A\u793E\u520A\u7684\u7167\u7247"
+    textEn: Take photos worth publishing
+    textJa: "\u90E8\u8A8C\u306B\u8F09\u305B\u3089\u308C\u308B\u5199\u771F\u3092\u64AE\u308B"
+    objectives:
+    - text: "\u62CD\u5230\u4E00\u5F20\u300C\u5B8C\u7F8E\u300D\u8BC4\u4EF7\u7684\u7167\u7247"
+      textEn: Get a Perfect rating once
+      textJa: "\u300C\u30D1\u30FC\u30D5\u30A7\u30AF\u30C8\u300D\u8A55\u4FA1\u30921\u56DE\u53D6\u308B"
+      condition: "\u7167\u7247_\u5206\u6570@\u6700\u9AD8>=90"
+      progressFlag: 
+      progressTarget: 0
+    - text: "\u7D2F\u8BA1\u62CD 5 \u5F20\u7167\u7247"
+      textEn: Take 5 photos in total
+      textJa: "\u5199\u771F\u3092\u5408\u8A085\u679A\u64AE\u308B"
+      condition: "\u7167\u7247_\u5206\u6570@\u6B21\u6570>=5"
+      progressFlag: "\u7167\u7247_\u5206\u6570@\u6B21\u6570"
+      progressTarget: 5
+    rewards:
+    - kind: 0
+      target: "\u91D1\u94B1"
+      amount: 500
+      flagAdd: 0
+      note: 
+      noteEn: 
+      noteJa: 
+    - kind: 4
+      target: "\u6BCF\u6708\u7684\u966A\u7EC3"
+      amount: 1
+      flagAdd: 0
+      note: 
+      noteEn: 
+      noteJa: 
+  stages: []
+  deadlineMonths: 3
+  expireToFail: 1
+  penalties:
+  - kind: 0
+    target: "\u91D1\u94B1"
+    amount: -100
+    flagAdd: 0
+    note: "\u8FDD\u7EA6\u91D1 -100"
+    noteEn: Penalty -100
+    noteJa: "\u9055\u7D04\u91D1 -100"
+  repeatable: 0
+  cooldownMonths: 1
+  maxTimes: 0
+  titleEn: The Photo Club's Request
+  descriptionEn: Help the photo club fill this issue of their magazine.
+  stagesEn: []
+  titleJa: "\u5199\u771F\u90E8\u304B\u3089\u306E\u4F9D\u983C"
+  descriptionJa: "\u5199\u771F\u90E8\u306E\u90E8\u8A8C\u306B\u8F09\u305B\u308B\u5199\u771F\u3092\u96C6\u3081\u3088\u3046\u3002"
+  stagesJa: []
