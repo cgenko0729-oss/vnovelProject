@@ -481,10 +481,102 @@ namespace VNEffects
             return cameraFade;
         }
 
+        // ------------------------------------------------------------------
+        // 手动镜头（偷拍模式：玩家自己缩放/平移，不走补间）
+        // ------------------------------------------------------------------
+
+        bool _manualActive;
+        Vector3 _manualSavedScale;
+        Vector2 _manualSavedPos;
+        VNCamZoomMode _manualSavedMode;
+        float _manualLastZoom = -1f;
+
+        /// <summary>玩家正在手动控制镜头（偷拍模式打开期间）</summary>
+        public bool IsManualActive => _manualActive;
+
+        /// <summary>
+        /// 进入手动镜头：快照当前容器状态、杀掉进行中的运镜补间、切到指定缩放模式。
+        /// 快照的是「此刻」的值——若进来时 camseq 正跑到一半，退出时就还原到那一半，
+        /// 而不是复位到全图（那会让异步运镜「突然跳回去」）。
+        /// </summary>
+        public void BeginManual(VNCamZoomMode mode)
+        {
+            Cache();
+            if (target == null || _manualActive) return;
+            KillTweens();
+            _manualSavedScale = target.localScale;
+            _manualSavedPos = target.anchoredPosition;
+            _manualSavedMode = _mode;
+            _manualLastZoom = -1f;
+            _manualActive = true;
+            SetMode(mode);
+        }
+
+        /// <summary>
+        /// 手动写镜头：look = 看向的画布点（中心为原点），zoom = 倍率。每帧调都行——
+        /// 容器直接赋值零开销；立绘的额外倍率只在 zoom 变化时起一条短补间
+        /// （每帧都起补间会把说话者高亮的补间打断，且白白分配）。
+        /// 偏移钳制与 camseq 同一份公式（<see cref="ComputeOffset"/>）。
+        /// </summary>
+        public void SetManualView(Vector2 look, float zoom)
+        {
+            if (!_manualActive || target == null) return;
+            zoom = Mathf.Max(0.1f, zoom);
+            float cz = ContainerZoomFor(_mode, zoom);
+            target.localScale = Vector3.one * cz;
+            target.anchoredPosition = _mode == VNCamZoomMode.Char
+                ? _basePos : _basePos + OffsetFor(look, cz);
+            if (!Mathf.Approximately(zoom, _manualLastZoom))
+            {
+                _manualLastZoom = zoom;
+                ApplyCharacterZoom(zoom, 0.12f, Ease.OutQuad);
+            }
+        }
+
+        /// <summary>
+        /// 退出手动镜头：容器补间回快照，立绘倍率按快照的模式还原。
+        /// 四条退出路径（正常退出 / ESC / 被发现 / 被销毁）都必须走到这里，
+        /// 否则镜头会永远停在玩家最后推的位置。
+        /// </summary>
+        public void EndManual(float duration = 0.35f)
+        {
+            if (!_manualActive) return;
+            _manualActive = false;
+            if (target == null) return;
+            KillTweens();
+
+            if (_manualSavedMode == VNCamZoomMode.Both)
+            {
+                SetMode(VNCamZoomMode.Both, duration); // 顺手把立绘的运镜倍率还原
+            }
+            else if (_manualSavedMode != VNCamZoomMode.Char)
+            {
+                // Bg / Depth 模式下容器倍率就是逻辑 zoom，按它重算立绘倍率
+                _mode = _manualSavedMode;
+                ApplyCharacterZoom(Mathf.Max(0.1f, _manualSavedScale.x), duration, Ease.InOutSine);
+            }
+            else
+            {
+                _mode = _manualSavedMode; // Char 模式推不回逻辑 zoom，立绘倍率维持现状
+            }
+
+            if (duration <= 0.001f)
+            {
+                target.localScale = _manualSavedScale;
+                target.anchoredPosition = _manualSavedPos;
+                return;
+            }
+            DOTween.Sequence()
+                .Append(target.DOScale(_manualSavedScale, duration).SetEase(Ease.InOutSine))
+                .Join(target.DOAnchorPos(_manualSavedPos, duration).SetEase(Ease.InOutSine))
+                .SetTarget(this).SetLink(gameObject);
+        }
+
         /// <summary>瞬间复位（end:fade 截屏后调用：睁眼即是复位视角）</summary>
         public void SnapReset()
         {
             Cache();
+            _manualActive = false; // 调试重建 / 读档复位时手动镜头一并作废
             if (target == null) return;
             KillTweens();
             target.localScale = Vector3.one;

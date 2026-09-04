@@ -217,6 +217,9 @@ namespace VNEffects
         [Header("擦雾库（event wipefog id: 引用）")]
         public List<VNFogWipeDef> fogWipes = new List<VNFogWipeDef>();
 
+        [Header("秘密偷拍模式参数（一份全局资产；留空用内置默认值，解锁 flag = 秘密相机）")]
+        public VNSecretPhotoDef secretPhoto;
+
         [Header("AI 自由聊天人格（event aitalk persona: 引用）\n" +
                 "留空 = 生成器扫全工程 VNAiPersonaDef 自动登记")]
         public List<VNAiPersonaDef> aiPersonas = new List<VNAiPersonaDef>();

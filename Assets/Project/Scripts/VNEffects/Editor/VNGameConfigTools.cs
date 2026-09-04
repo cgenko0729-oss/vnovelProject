@@ -202,6 +202,12 @@ namespace VNEffects.EditorTools
             report.Add($"过场定义 ×{config.interludes.Count}");
             config.tutorials = FindAll<VNTutorialDef>();
             report.Add($"教程定义 ×{config.tutorials.Count}");
+            if (config.secretPhoto == null) // 单资产：只在空着时补，不覆盖手动指定的
+            {
+                var secret = FindAll<VNSecretPhotoDef>();
+                if (secret.Count > 0) config.secretPhoto = secret[0];
+            }
+            report.Add($"偷拍参数 {(config.secretPhoto != null ? config.secretPhoto.name : "（未登记，用内置默认）")}");
 
             config.chapters = ScanChapters();
             report.Add($"章节剧本 ×{config.chapters.Count}");

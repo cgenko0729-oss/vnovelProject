@@ -37,12 +37,21 @@ namespace VNEffects
         int _viewerIndex;
 
         // ---- 照片页（大头贴拍的照片，与 CG 共用同一套网格与全屏浏览）----
-        enum Page { Cg, Photo }
+        // ---- 私密页（偷拍模式拍的，存储完全独立；解锁后或相册里有照片时才出现）----
+        enum Page { Cg, Photo, Secret }
         Page _page = Page.Cg;
-        readonly List<VNPhotoAlbum.Entry> _photos = new List<VNPhotoAlbum.Entry>();
+
+        /// <summary>照片页 / 私密页共用的一条：两个相册的条目类型不同，这里抹平成文件名 + 说明</summary>
+        struct PhotoItem
+        {
+            public string file;
+            public string caption;
+        }
+        readonly List<PhotoItem> _photos = new List<PhotoItem>();
         int _photoIndex = -1;
-        Button _cgTab, _photoTab;
-        TMP_Text _cgTabText, _photoTabText;
+        Button _cgTab, _photoTab, _secretTab;
+        TMP_Text _cgTabText, _photoTabText, _secretTabText;
+        bool IsPhotoPage => _page != Page.Cg;
         GameObject _deleteButtonRoot, _confirmRoot;
         Vector2 _cgCellSize;
         GridLayoutGroup _gridLayout;
@@ -85,6 +94,11 @@ namespace VNEffects
         {
             if (_open) return;
             Build();
+            // 私密页的出现条件每次打开重算（解锁 flag 会变）；正停在私密页却不该看见时退回 CG 页
+            bool secretVisible = VNSecretPhotoMode.AlbumVisible;
+            if (_secretTab != null) _secretTab.gameObject.SetActive(secretVisible);
+            if (_page == Page.Secret && !secretVisible) _page = Page.Cg;
+            RefreshTabs();
             RebuildGrid();
             _panel.SetActive(true);
             _open = true;
@@ -101,6 +115,7 @@ namespace VNEffects
             _open = false;
             // 相册的纹理与缩略图都在这里放掉——关了界面就没有必要再占内存
             VNPhotoAlbum.ClearCache();
+            VNSecretAlbum.ClearCache();
         }
 
         /// <summary>切到 CG 页 / 照片页</summary>
@@ -119,13 +134,16 @@ namespace VNEffects
         void RefreshTabs()
         {
             if (_cgTab == null || _photoTab == null) return;
-            bool cg = _page == Page.Cg;
-            if (_cgTab.targetGraphic is Image cgImage)
-                cgImage.color = cg ? TabOn : TabOff;
-            if (_photoTab.targetGraphic is Image photoImage)
-                photoImage.color = cg ? TabOff : TabOn;
-            if (_cgTabText != null) _cgTabText.color = cg ? Color.white : TabTextOff;
-            if (_photoTabText != null) _photoTabText.color = cg ? TabTextOff : Color.white;
+            PaintTab(_cgTab, _cgTabText, _page == Page.Cg);
+            PaintTab(_photoTab, _photoTabText, _page == Page.Photo);
+            PaintTab(_secretTab, _secretTabText, _page == Page.Secret);
+        }
+
+        static void PaintTab(Button tab, TMP_Text text, bool on)
+        {
+            if (tab == null) return;
+            if (tab.targetGraphic is Image image) image.color = on ? TabOn : TabOff;
+            if (text != null) text.color = on ? Color.white : TabTextOff;
         }
 
         static readonly Color TabOn = new Color(0.98f, 0.62f, 0.76f, 1f);
@@ -190,7 +208,7 @@ namespace VNEffects
                 Destroy(child.gameObject);
             }
 
-            if (_page == Page.Photo) { RebuildPhotoGrid(); return; }
+            if (IsPhotoPage) { RebuildPhotoGrid(); return; }
 
             // CG 页恢复原本的格子尺寸（照片页会把它改成 4:3）
             if (_gridLayout != null && _cgCellSize != Vector2.zero)
@@ -228,25 +246,72 @@ namespace VNEffects
         // 照片页
         // ==============================================================
 
+        bool Secret => _page == Page.Secret;
+
+        Sprite LoadThumb(string file) =>
+            Secret ? VNSecretAlbum.LoadThumbnail(file) : VNPhotoAlbum.LoadThumbnail(file);
+
+        Sprite LoadFull(string file) =>
+            Secret ? VNSecretAlbum.LoadSprite(file) : VNPhotoAlbum.LoadSprite(file);
+
+        void DeleteFile(string file)
+        {
+            if (Secret) VNSecretAlbum.Delete(file);
+            else VNPhotoAlbum.Delete(file);
+        }
+
+        /// <summary>私密照片的说明：拍摄时间 + 角色 + 缩放 + 背景（拍摄信息来自相册索引）</summary>
+        static string SecretCaption(VNSecretAlbum.Entry e)
+        {
+            string who = string.IsNullOrEmpty(e.character) ? "" : e.character;
+            var cfg = VNGameConfig.Active;
+            if (cfg != null && !string.IsNullOrEmpty(who))
+            {
+                var def = cfg.characters.Find(c => c != null && c.id == who);
+                if (def != null) who = def.LocalizedDisplayName;
+            }
+            var sb = new System.Text.StringBuilder();
+            sb.Append(e.Time.ToString("yyyy/MM/dd HH:mm"));
+            if (!string.IsNullOrEmpty(who)) sb.Append("    ").Append(who);
+            sb.Append("    ").Append(e.Zoom.ToString("0.0")).Append('x');
+            if (!string.IsNullOrEmpty(e.background)) sb.Append("    ").Append(e.background);
+            return sb.ToString();
+        }
+
         void RebuildPhotoGrid()
         {
             _photos.Clear();
-            foreach (var e in VNPhotoAlbum.All) if (e != null) _photos.Add(e);
+            if (Secret)
+            {
+                foreach (var e in VNSecretAlbum.All)
+                    if (e != null) _photos.Add(new PhotoItem { file = e.file, caption = SecretCaption(e) });
+            }
+            else
+            {
+                foreach (var e in VNPhotoAlbum.All)
+                    if (e != null) _photos.Add(new PhotoItem
+                    {
+                        file = e.file,
+                        caption = e.Time.ToString("yyyy/MM/dd HH:mm"),
+                    });
+            }
 
-            // 照片是 4:3，CG 是 16:9——同一套网格，切页时换格子尺寸
+            // 大头贴是 4:3、偷拍是整屏 16:9、CG 是 16:9——同一套网格，切页时换格子尺寸
             if (_gridLayout != null)
             {
                 if (_cgCellSize == Vector2.zero) _cgCellSize = _gridLayout.cellSize;
-                _gridLayout.cellSize = new Vector2(_cgCellSize.x, _cgCellSize.x * 0.75f);
+                _gridLayout.cellSize = Secret ? _cgCellSize
+                    : new Vector2(_cgCellSize.x, _cgCellSize.x * 0.75f);
             }
 
-            _progress.text = VNLocale.T("gallery.photoCount",
-                _photos.Count, VNPhotoAlbum.Capacity);
+            _progress.text = Secret
+                ? VNLocale.T("gallery.secretCount", _photos.Count, VNSecretAlbum.Capacity)
+                : VNLocale.T("gallery.photoCount", _photos.Count, VNPhotoAlbum.Capacity);
 
             if (_photos.Count == 0)
             {
                 var empty = CreateText(_grid, 28, TextAlignmentOptions.Center);
-                empty.text = VNLocale.T("gallery.photoEmpty");
+                empty.text = VNLocale.T(Secret ? "gallery.secretEmpty" : "gallery.photoEmpty");
                 empty.color = new Color(1f, 1f, 1f, 0.55f);
                 var le = empty.gameObject.AddComponent<LayoutElement>();
                 le.preferredWidth = cellWidth * columns;
@@ -268,7 +333,7 @@ namespace VNEffects
             if (cell.countBadge != null) cell.countBadge.gameObject.SetActive(false);
             if (cell.frameGraphic != null) cell.frameGraphic.color = cell.unlockedFrameColor;
 
-            cell.thumbnail.sprite = VNPhotoAlbum.LoadThumbnail(_photos[index].file);
+            cell.thumbnail.sprite = LoadThumb(_photos[index].file);
             cell.thumbnail.color = Color.white;
             cell.thumbnail.preserveAspect = true;
 
@@ -291,7 +356,7 @@ namespace VNEffects
         void ApplyPhotoViewer()
         {
             var entry = _photos[_photoIndex];
-            _viewerImage.sprite = VNPhotoAlbum.LoadSprite(entry.file);
+            _viewerImage.sprite = LoadFull(entry.file);
             _viewerImage.preserveAspect = true;
 
             _viewerImage.DOKill();
@@ -300,8 +365,7 @@ namespace VNEffects
                 .SetLink(_viewerImage.gameObject)
                 .SetUpdate(true);
 
-            _viewerCaption.text =
-                $"{entry.Time:yyyy/MM/dd HH:mm}    ({_photoIndex + 1}/{_photos.Count})";
+            _viewerCaption.text = $"{entry.caption}    ({_photoIndex + 1}/{_photos.Count})";
             if (_deleteButtonRoot != null) _deleteButtonRoot.SetActive(true);
         }
 
@@ -319,7 +383,7 @@ namespace VNEffects
             if (_photoIndex < 0 || _photoIndex >= _photos.Count) return;
 
             string file = _photos[_photoIndex].file;
-            VNPhotoAlbum.Delete(file);
+            DeleteFile(file);
 
             CloseViewer();
             RebuildGrid();
@@ -393,7 +457,7 @@ namespace VNEffects
         void StepViewer(int dir)
         {
             if (!IsViewerOpen) return;
-            if (_page == Page.Photo) { StepPhotoViewer(dir); return; }
+            if (IsPhotoPage) { StepPhotoViewer(dir); return; }
             if (_viewerGroup < 0) return;
             var group = _groups[_viewerGroup];
             if (group.Count <= 1) return;
@@ -476,8 +540,12 @@ namespace VNEffects
                 VNLocale.T("gallery.tab.cg"), out _cgTabText);
             _photoTab = CreateTabButton(panelRect, "TabPhoto", new Vector2(180f, -26f),
                 VNLocale.T("gallery.tab.photo"), out _photoTabText);
+            _secretTab = CreateTabButton(panelRect, "TabSecret", new Vector2(320f, -26f),
+                VNLocale.T("gallery.tab.secret"), out _secretTabText);
             _cgTab.onClick.AddListener(() => SelectPage(Page.Cg));
             _photoTab.onClick.AddListener(() => SelectPage(Page.Photo));
+            _secretTab.onClick.AddListener(() => SelectPage(Page.Secret));
+            _secretTab.gameObject.SetActive(false); // Open() 里按解锁状态决定
             RefreshTabs();
 
             // ---- 全屏里的删除按钮（只在照片页显示）----

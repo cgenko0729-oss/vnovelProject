@@ -66,6 +66,8 @@ namespace VNEffects
         VNCgGallery _cgGallery;
         VNCalendarHud _calendarHud;
         VNTitleMenu _titleMenu;
+        VNSecretPhotoMode _secretPhoto;   // 秘密偷拍模式（右上角图标，解锁后出现）
+        bool _secretPhotoActive;          // 拍照期间对话框/HUD 临时隐藏，不碰 _uiHiddenParts
         Coroutine _saveCaptureCo;
         int _saveCaptureToken;
         float _timeScaleBeforeMenu = 1f;
@@ -160,6 +162,13 @@ namespace VNEffects
             EnsureSaveLoadPanel();
             EnsureQuickToolbar();
             EnsureConfigPanel(); // 启动时应用 PlayerPrefs 中保存的音量、文字速度与显示模式
+            if (_secretPhoto == null)
+            {
+                _secretPhoto = FindFirstObjectByType<VNSecretPhotoMode>();
+                if (_secretPhoto == null) // 没解锁时什么都不显示，常驻无害
+                    _secretPhoto = new GameObject("VNSecretPhotoMode").AddComponent<VNSecretPhotoMode>();
+            }
+            _secretPhoto.Initialize(this, stage);
             _titleMenu = FindFirstObjectByType<VNTitleMenu>();
             if (_titleMenu != null && _titleMenu.showOnStart)
             {
@@ -1069,6 +1078,7 @@ namespace VNEffects
             _waitingAtSay = false;
             _voicePendingForNextSay = false;
             CleanupActiveEvent();
+            _secretPhoto?.ForceClose(); // 读档 / 重播时不能把镜头留在玩家推的位置
             stage?.StopSpeaking();
         }
 
@@ -1771,9 +1781,60 @@ namespace VNEffects
         /// <summary>把当前的隐藏状态写到各 UI 上（事件进行中时养成 HUD 一律不显示）</summary>
         void ApplyUiHidden()
         {
+            // 偷拍模式期间整套界面临时藏起来，但**不写进 _uiHiddenParts**：
+            // 退出时按剧本/玩家原本的隐藏状态还原（hideHUD keep 的段落不能被它弹回 UI）
             if (stage != null && stage.dialogue != null)
-                stage.dialogue.SetInterfaceVisible((_uiHiddenParts & VNUiParts.Dialogue) == 0);
-            ApplyGameplayHudVisible(!_eventActive);
+                stage.dialogue.SetInterfaceVisible(
+                    !_secretPhotoActive && (_uiHiddenParts & VNUiParts.Dialogue) == 0);
+            ApplyGameplayHudVisible(!_eventActive && !_secretPhotoActive);
+        }
+
+        // ------------------------------------------------------------------
+        // 秘密偷拍模式（VNSecretPhotoMode 回调用）
+        // ------------------------------------------------------------------
+
+        public VNStatsHud StatsHud => _statsHud;
+
+        /// <summary>右上角相机图标此刻该不该显示：没有别的面板/事件/标题盖着</summary>
+        public bool IsSecretPhotoIconAllowed()
+        {
+            if (!_running || _eventActive) return false;
+            if (_titleMenu != null && _titleMenu.IsOpen) return false;
+            if (stage != null && stage.IsSnsOpen) return false;
+            if (_uiHidden && !_uiHideLocked) return false; // 右键藏 UI 期间图标也一起藏
+            if (_configPanel != null && _configPanel.IsOpen) return false;
+            if (_saveLoadPanel != null && _saveLoadPanel.IsOpen) return false;
+            if (_backlog != null && _backlog.IsOpen) return false;
+            if (_questLog != null && _questLog.IsOpen) return false;
+            if (_diaryPanel != null && _diaryPanel.IsOpen) return false;
+            if (_statsHud != null && _statsHud.IsOpen) return false;
+            if (_inventory != null && _inventory.IsOpen) return false;
+            if (_cgGallery != null && _cgGallery.IsOpen) return false;
+            return true;
+        }
+
+        /// <summary>能不能进偷拍模式：图标条件 + 停在台词上（与存档同一条规则）+ 没被教程冻住</summary>
+        public bool CanOpenSecretPhoto() =>
+            IsSecretPhotoIconAllowed() && _waitingAtSay && !VNPause.IsPaused;
+
+        /// <summary>偷拍模式进/出：临时隐藏对话框与 HUD，退出按原状态还原</summary>
+        public void SetSecretPhotoActive(bool active)
+        {
+            if (_secretPhotoActive == active) return;
+            _secretPhotoActive = active;
+            ApplyUiHidden();
+        }
+
+        /// <summary>
+        /// 剧本之外插一句话（偷拍被发现时她的反应）：直接写对话框 + 进回想，
+        /// 不走 RunInlineCo——那会嵌套一层 SayCo 把 _waitingAtSay 清掉。
+        /// 玩家点一下就推进原剧本的下一句。
+        /// </summary>
+        public void SayOutOfScript(string speakerId, string text)
+        {
+            if (stage == null || string.IsNullOrEmpty(text)) return;
+            stage.Say(speakerId, null, text);
+            _backlog?.Record(stage.GetDisplayName(speakerId), text);
         }
 
         /// <summary>
@@ -1922,6 +1983,10 @@ namespace VNEffects
             // 不加这一条的话，剧情层弹出的教程盖着屏幕，F5 存档 / H 回想 /
             // A / S / I / C / G / J 还全都能按 —— 存出来的档还会卡在教程半截。
             if (VNPause.IsPaused) return;
+
+            // 偷拍模式打开期间：输入全部归它（ESC / 空格 / 滚轮 / 拖动），
+            // 这里直接 return 也就顺带挡掉了 F5/F9/Q/L 与推进
+            if (_secretPhoto != null && _secretPhoto.IsOpen) return;
 
             // SNS 手机聊天：等玩家挑回复时输入全部交给面板（同 event，顺带挡掉存档）
             bool snsOpen = stage != null && stage.IsSnsOpen;

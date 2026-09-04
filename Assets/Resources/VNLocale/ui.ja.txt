@@ -323,3 +323,23 @@ fogwipe.result = 最高鮮明度 {0}%
 fogwipe.quit = 拭くのをやめる？
 fogwipe.quit.yes = やめる
 fogwipe.quit.no = 続ける
+
+# ---- 隠し撮りモード ----
+secretphoto.cannotNow = 今は撮影できません（セリフで止まっている時だけ）
+secretphoto.noFilm = フィルムがありません（ショップで「フィルム」を購入）
+secretphoto.target.none = 被写体なし · 風景写真
+secretphoto.target = ● {0}
+secretphoto.zoom = {0:0.0}x
+secretphoto.film = フィルム {0}
+secretphoto.alert = 警戒
+secretphoto.exit = 終了 Esc
+secretphoto.hint = ホイール ズーム　ドラッグ 移動　スペース シャッター　Esc 終了
+secretphoto.saved = プライベートアルバムに保存しました
+secretphoto.failed = 撮影に失敗、フィルムを返却しました
+secretphoto.albumFull = プライベートアルバムがいっぱいです（{0}枚）。先に削除してください
+secretphoto.caught.1 = ……何を撮ってるの？
+secretphoto.caught.2 = ねえ、今シャッター音しなかった？
+secretphoto.caught.3 = カメラをしまって。今すぐ。
+gallery.tab.secret = プライベート
+gallery.secretCount = プライベートアルバム {0} / {1}
+gallery.secretEmpty = まだ隠し撮り写真はありません

@@ -155,6 +155,9 @@ namespace VNEffects
         public ActiveCharacter Get(string id) =>
             id != null && _active.TryGetValue(id, out var c) ? c : null;
 
+        /// <summary>全部在场角色（偷拍模式锁定目标用；只读，别在遍历时进出场）</summary>
+        public IEnumerable<ActiveCharacter> ActiveCharacters => _active.Values;
+
         void Awake()
         {
             ApplyGameConfig();

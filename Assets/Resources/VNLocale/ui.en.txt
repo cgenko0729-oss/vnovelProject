@@ -323,3 +323,23 @@ fogwipe.result = Best clarity {0}%
 fogwipe.quit = Give up wiping?
 fogwipe.quit.yes = Give up
 fogwipe.quit.no = Keep wiping
+
+# ---- Secret photo mode ----
+secretphoto.cannotNow = Can't take photos right now (wait for a line of dialogue)
+secretphoto.noFilm = Out of film (buy "Film" at a shop)
+secretphoto.target.none = No subject · scenery shot
+secretphoto.target = ● {0}
+secretphoto.zoom = {0:0.0}x
+secretphoto.film = Film {0}
+secretphoto.alert = Alert
+secretphoto.exit = Exit (Esc)
+secretphoto.hint = Wheel: zoom   Drag: pan   Space: shutter   Esc: exit
+secretphoto.saved = Saved to the private album
+secretphoto.failed = Capture failed, film refunded
+secretphoto.albumFull = Private album is full ({0}), delete some first
+secretphoto.caught.1 = ...What are you taking a picture of?
+secretphoto.caught.2 = Hey, was that a shutter just now?
+secretphoto.caught.3 = Put the camera away. Now.
+gallery.tab.secret = Private
+gallery.secretCount = Private album {0} / {1}
+gallery.secretEmpty = No secret photos yet
