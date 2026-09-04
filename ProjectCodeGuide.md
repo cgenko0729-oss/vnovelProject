@@ -593,6 +593,29 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 - **扩展**：想内建效果 hook（如金钱加倍自动翻倍 stat），在对应结算代码读
   `VNFlags.Get(VNEquipment.EffectFlagName("金钱加倍"))` 即可，别绕过 flags。
 
+### 6.x 秘密偷拍模式（`VNSecretPhoto*`，详见 WhatAiDo 一三五）
+
+| 文件 | 职责 |
+|---|---|
+| `VNSecretPhotoDef` | 参数资产（单份，`VNGameConfig.secretPhoto`）；`Resolve()` 没登记时给 DontSave 默认值 |
+| `VNSecretPhotoRig` | **纯静态数学**：取景框钳制（与 `VNCamera.ComputeOffset` 同构）、框内权重、缩放倍率、察觉涨速、最近目标 |
+| `VNSecretAlbum` | 独立相册（照抄 `VNPhotoAlbum` 结构，条目字段是拍摄信息） |
+| `VNSecretPhotoUi` | 图标 + 取景 HUD；主 Canvas 嵌套排序 70；除按钮外 `raycastTarget=false`；教程锚点 `secretphoto.*` |
+| `VNSecretPhotoMode` | 状态机；Runner 启动时创建，`Instance` 静态 |
+| `Editor/VNSecretPhotoInstaller` | 建资产 + 登记，不动场景 |
+
+- **不是事件模块**（不由 `event` 启动、任何台词处可进），但**直接操控舞台镜头**——
+  同 aitalk / interact 是刻意破铁律；边界：只碰 ZoomRoot（经 `VNCamera.BeginManual/SetManualView/EndManual`）、
+  UI 可见性（`Runner.SetSecretPhotoActive`，临时位不进 `_uiHiddenParts`）、Ken Burns 开关。
+- **四条退出路径**都收口在 `Restore()`：退出键 / ESC / 被发现（`CaughtCo` → `Close(true)`）/
+  `Runner.Stop()` → `ForceClose()`（读档、重播、销毁都经过它）。
+- **状态全在 flag**：`秘密相机`（解锁）/ `道具_胶卷` / `偷拍_警惕_<角色>`；模式瞬态不进存档。
+- **她那句话走 `Runner.SayOutOfScript`**，别用 `RunInlineCo`（嵌套 SayCo 会清掉 `_waitingAtSay`）。
+- **防露边用 `EffectiveOverscan()`**（背景实际尺寸与 `VNCamera.overscan` 取小），
+  手搭场景背景常常没有那 60px。
+- **抓屏**复用 `VNPhotoCapture.Capture`，hide 列表 = 取景 HUD + `VNToast.RootObject` + 主 Canvas 下的 `HintText`。
+- 加参数：改 `VNSecretPhotoDef` 即可，Inspector 自动长出；加察觉规则：只改 `VNSecretPhotoRig` 并保持纯静态。
+
 ---
 
 ## 七、系统 UI
