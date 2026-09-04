@@ -96,6 +96,9 @@ namespace VNEffects
         }
 
         /// <summary>立刻清空所有卡片（调试重建/剧本中断时可用，不清模式标签）</summary>
+        /// <summary>整张提示画布的根物体（偷拍抓屏时要把它藏一帧；还没建过时为 null）</summary>
+        public static GameObject RootObject => _canvas != null ? _canvas.gameObject : null;
+
         public static void ClearAll()
         {
             for (int i = _cards.Count - 1; i >= 0; i--)

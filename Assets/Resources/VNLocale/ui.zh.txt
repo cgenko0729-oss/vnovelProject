@@ -324,3 +324,23 @@ fogwipe.result = 最高清晰度 {0}%
 fogwipe.quit = 放弃擦拭？
 fogwipe.quit.yes = 放弃
 fogwipe.quit.no = 继续擦
+
+# ---- 秘密偷拍模式 ----
+secretphoto.cannotNow = 现在不能拍照（要停在台词上）
+secretphoto.noFilm = 没有胶卷了（商店里买「胶卷」）
+secretphoto.target.none = 没有拍摄对象 · 风景照
+secretphoto.target = ● {0}
+secretphoto.zoom = {0:0.0}x
+secretphoto.film = 胶卷 {0}
+secretphoto.alert = 察觉
+secretphoto.exit = 退出 Esc
+secretphoto.hint = 滚轮 缩放　拖动 平移　空格 快门　Esc 退出
+secretphoto.saved = 已存进私密相册
+secretphoto.failed = 抓图失败，胶卷已退回
+secretphoto.albumFull = 私密相册已满（{0} 张），先删掉一些吧
+secretphoto.caught.1 = ……你在拍什么？
+secretphoto.caught.2 = 喂，刚才那是快门声吧？
+secretphoto.caught.3 = 把相机收起来。现在。
+gallery.tab.secret = 私密
+gallery.secretCount = 私密相册 {0} / {1}
+gallery.secretEmpty = 还没有偷拍到任何照片

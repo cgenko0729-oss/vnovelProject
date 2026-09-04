@@ -9277,3 +9277,98 @@ event 新手 id:新手           ← 模块名没了
 
 「从选中行播放」重建出来的状态**不含玩家历史领取的奖励**——领取是玩家行为、
 不在剧本里，无法重放。要补偿就得把玩家操作也记进重放日志，代价远大于收益。
+
+---
+
+## 一三五、秘密偷拍模式：右上角相机图标 + 自由构图 + 察觉与惩罚 + 私密相册（2026-09-04，分支 `feature/secret-photo-mode`）
+
+### 需求与定位
+
+解锁后右上角出现相机图标，点进去玩家可以**自由缩放/平移舞台**构图，对话框与 HUD 隐藏，
+按底部中央的快门把当前画面存进一本**独立的私密相册**（G 键画廊第三个标签页）。
+定位是「偷拍玩法」而不是截图工具：被拍的角色会**察觉**，镜头对着她越近、停得越久涨得越快，
+满了就被发现——扣好感、警惕永久累积（下次涨得更快）、她说一句、强制退出。
+胶卷是道具，一张一卷，商店买。
+
+四轮问答定下的取舍（都记在这里，以后别再争）：
+
+| 决策 | 结论 |
+|---|---|
+| 运镜 | **只有缩放 + 平移，无旋转**（2D 立绘绕不到侧面，加旋转只会分散注意力） |
+| 画面 | **保持活的**（眨眼/呼吸/天气不停），只停 Ken Burns（它会跟玩家抢构图） |
+| 缩放上限 | **1.6x**，背景只有 1920×1080，再放就糊 |
+| 察觉 | **只升不降的累计量**，不做抬头周期、不做回落；她不在框里就不涨 |
+| 照片 | **不评分**，但拍摄信息照存（角色/表情/背景/缩放/月序），将来做图鉴不用重拍 |
+| 相册 | **完全独立存储**（`vn_secret_photos/`），浏览 UI 复用画廊；无密码，只藏入口 |
+| 胶卷 | 没胶卷不能进模式；被发现那一下按的快门照样扣；商店买 |
+| 数值 | 宽松档：中距离约 20 秒、贴脸约 7 秒；扣 3 好感；警惕每次 +10% |
+
+### 文件改动
+
+新增（`Assets/Project/Scripts/VNEffects/`）：
+
+- `Script/VNSecretPhotoDef.cs`：ScriptableObject 参数（解锁 flag / 胶卷道具 id / 缩放范围 /
+  察觉涨速 / 惩罚 / 被发现台词三语 + 按角色覆盖 / 教程 id / 音效覆盖）。
+  `Resolve()` 没登记资产时给一份 `HideFlags.DontSave` 的默认值，只解锁 flag 也能玩。
+- `Script/VNSecretPhotoRig.cs`：纯逻辑（无 MonoBehaviour）——取景框钳制、她在框内的权重、
+  缩放倍率、察觉涨速、最近目标选择。
+- `Script/VNSecretAlbum.cs`：私密相册，结构照抄 `VNPhotoAlbum`（写盘 / 索引对账 / 12 张 LRU /
+  不驱逐的缩略图缓存 / 上限 200），条目字段换成拍摄信息。
+- `Script/VNSecretPhotoUi.cs`：相机图标 + 手机相机风取景 HUD；嵌套 Canvas 排序 **70**。
+- `Script/VNSecretPhotoMode.cs`：状态机 + 输入 + 察觉 + 快门 + 被发现；Runner 启动时创建。
+- `Editor/VNSecretPhotoInstaller.cs`：装机菜单（建参数资产 / 教程资产「秘密相机」 /
+  示例商店「杂货店」卖胶卷，并登记进 VNGameConfig）。**不动场景**。
+
+修改：
+
+- `VNCamera.cs`：`BeginManual(mode) / SetManualView(look, zoom) / EndManual(duration)`——
+  快照进入时的容器状态与模式、杀掉运镜补间；每帧直接赋值、立绘倍率只在 zoom 变化时起短补间；
+  退出补间回快照。`SnapReset()` 顺带作废手动态。
+- `VNScriptRunner.cs`：创建模式；`Update` 打开期间直接 return（顺带挡掉 F5/F9/Q/L 与推进）；
+  `ApplyUiHidden` 加 `_secretPhotoActive` 临时位；`Stop()` 兜底 `ForceClose()`；
+  新增 `IsSecretPhotoIconAllowed / CanOpenSecretPhoto / SetSecretPhotoActive / SayOutOfScript / StatsHud`。
+- `VNCgGallery.cs`：第三个「私密」标签页；照片页函数改为按页分派到两个相册。
+- `VNStage.cs`：`ActiveCharacters` 枚举。`VNToast.cs`：`RootObject`。
+- `VNGameConfig.cs` / `VNGameConfigEditor.cs` / `VNGameConfigTools.cs`：`secretPhoto` 字段进「玩法」页，
+  目录扫描空着时自动补。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt`：`secretphoto.*` 15 条 + `gallery.tab.secret` 等 3 条。
+
+### 技术决策
+
+- **不是事件模块，是全局面板**：不由剧本 `event` 启动，任何台词处都能进。但它**直接操控舞台镜头**，
+  和 aitalk / interact 一样是刻意破一次模块三铁律；边界收紧为只碰 ZoomRoot、UI 可见性、Ken Burns 开关，
+  四条退出路径（退出键 / ESC / 被发现 / Stop·销毁）都走同一个 `Restore()`。
+- **状态全在 flag，`VNSaveData` 零改动**：解锁 `秘密相机`、胶卷 `道具_胶卷`、警惕 `偷拍_警惕_<角色>`。
+  模式本身瞬态不进存档。
+- **UI 隐藏不写进 `_uiHiddenParts`**：Runner 加一个临时位，退出按剧本/玩家原本的隐藏状态还原——
+  `hideHUD keep` 的沉浸段落不会被拍照弹回 UI。
+- **被发现时她那句话走 `SayOutOfScript`**：直接写对话框 + 进回想，不走 `RunInlineCo`——
+  那会嵌套一层 SayCo 把 `_waitingAtSay` 清掉，接下来一句都存不了档。玩家点一下就推进原剧本。
+- **防露边按背景实际尺寸钳制**：`VNCamera.overscan` 写着 60px，但手搭场景的背景常常正好 1920×1080，
+  信它就会在推近后往边上一拉露出黑边并拍进照片。`EffectiveOverscan()` 取 min(设定, 实际)。
+- **取景 UI 挂主 Canvas 嵌套排序 70**：教程（92）与转场（100）都在主 Canvas，
+  自建 Overlay 画布会永远压在它们之上，教程的暗幕和挖洞盖不住快门键。
+- **抓屏隐藏清单**：取景 HUD + VNToast 整张画布（AUTO/任务角标）+ 演示场景的 `HintText`。
+- **快门按下即扣胶卷**，抓图失败 / 相册已满才退回；被发现那一下也扣（设计）。
+- **画廊「私密」页在解锁或相册非空时出现**：换周目 flag 清零，旧照片不能失联。
+- 快门/图标的圆形用自己生成的硬边抗锯齿贴图——`VNProceduralTextures.SoftCircle` 是发光用的软边渐变，
+  叠在亮画面上几乎看不见（实测踩过）。
+
+### 修复记录
+
+- 首版图标放 (-40,-118) 压在默认主题的右上快捷条上 → 挪到 -240。
+- 「✕」不在 NotoSans CJK 字库里 → 退出按钮文案改成「退出 Esc」。
+
+### 验证
+
+Play Mode 用 `script-execute` 全流程实测：解锁后图标出现 → 点击进入、对话框与 HUD 隐藏 →
+1.6x 拉到画布右上角无黑边 → 快门胶卷 3→2、照片落盘干净（无 HUD/角标/提示文字，带 Bloom）→
+察觉满：红闪 + 情绪动作 + 漫符，好感 10→7、警惕 = 10，强制退出后她在对话框里说
+「把相机收起来。现在。」，镜头与 UI 完整还原 → 画廊「私密」页列出全部照片。编译零错误。
+
+### 已知限制
+
+- 照片分辨率 = 玩家窗口分辨率（走 `ScreenCapture`，封顶 1600），窗口开小就拍得小。
+- 照片是硬盘上的明文 PNG，「私密」只是入口隐藏。
+- 最简版察觉只升不降、照片不评分，数学上「一进去立刻按」是最优解——这是用户看过提醒后选的；
+  想加深度时 `VNSecretPhotoRig` 已留好权重/倍率的位置，照片 metadata 也在。
