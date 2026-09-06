@@ -20,6 +20,8 @@ namespace VNEffects
         Top,
         Center,
         Bottom,
+        /// <summary>自定义：用步骤的 cardPos（归一化、左下原点、**卡片中心**）落位，教程编辑器画布上可直接拖卡片</summary>
+        Custom,
     }
 
     /// <summary>教程的一步：挖哪个洞 + 说什么。</summary>
@@ -60,8 +62,9 @@ namespace VNEffects
         public Sprite image;
         public float imageHeight = 220f;
 
-        [Header("卡片位置")]
+        [Header("卡片位置（Custom 时用 cardPos：归一化、左下原点、卡片中心；(0.5,0.5) = 屏幕正中）")]
         public VNTutorialCardSpot card = VNTutorialCardSpot.Auto;
+        public Vector2 cardPos = new Vector2(0.5f, 0.5f);
 
         [Header("这一步出现时放的音效 id（须在 SE 库登记；留空 = 不放）")]
         public string se;

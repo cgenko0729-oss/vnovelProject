@@ -81,10 +81,14 @@ namespace VNEffects.EditorTools
         bool _listDragging;
 
         // 画布拖框
-        enum DragKind { None, Move, Size, Draw }
+        enum DragKind { None, Move, Size, Draw, Card }
         DragKind _drag;
         Vector2 _dragStartNorm;
         Rect _dragStartArea;
+        Vector2 _dragStartCard;      // Card 拖动起点的 cardPos
+        Rect _lastArt;               // 本帧画布矩形（Inspector 切 Custom 时把当前卡片位置换算成 cardPos）
+        Rect _cardMock;              // 本帧卡片模拟的 GUI 矩形（HandleCanvasInput 拿它做命中）
+        Vector2 _cardHalfNorm;       // 卡片半宽半高（归一化），拖动时钳制用
 
         // Play Mode
         double _lastPreviewSync;
@@ -714,6 +718,7 @@ namespace VNEffects.EditorTools
                 GUI.Label(art, "没有底图：工具栏「底图 ▾」抓 Game 视图或选一张图\n（没有也能排版，只是看不到参照）", style);
             }
 
+            _lastArt = art;
             var step = Current;
             if (step == null)
             {
@@ -821,9 +826,15 @@ namespace VNEffects.EditorTools
                 spot = hole.has
                     ? (hole.norm.center.y > 0.5f ? VNTutorialCardSpot.Bottom : VNTutorialCardSpot.Top)
                     : VNTutorialCardSpot.Center;
-            float cy = art.center.y;
+            float cx = art.center.x, cy = art.center.y;
             if (spot == VNTutorialCardSpot.Top) cy = art.center.y - art.height * 0.28f;
             else if (spot == VNTutorialCardSpot.Bottom) cy = art.center.y + art.height * 0.28f;
+            else if (spot == VNTutorialCardSpot.Custom)
+            {
+                // 与运行时同义：cardPos = 卡片中心、归一化、左下原点
+                cx = art.x + step.cardPos.x * art.width;
+                cy = art.y + (1f - step.cardPos.y) * art.height;
+            }
 
             float w = CardWidth * scale;
             float padX = 38f * scale, padTop = 30f * scale, padBottom = 26f * scale, spacing = 14f * scale;
@@ -848,8 +859,22 @@ namespace VNEffects.EditorTools
             float h = padTop + padBottom + footH + bodyH +
                       (titleH > 0f ? titleH + spacing : 0f) + (imageH > 0f ? imageH + spacing : 0f) + spacing;
 
-            var card = new Rect(art.center.x - w * 0.5f, cy - h * 0.5f, w, h);
+            // 运行时会把卡片钳在屏内（PlaceCard），这里同样钳，所见即所得
+            _cardHalfNorm = new Vector2(w * 0.5f / art.width, h * 0.5f / art.height);
+            cx = Mathf.Clamp(cx, art.x + w * 0.5f, art.xMax - w * 0.5f);
+            cy = Mathf.Clamp(cy, art.y + h * 0.5f, art.yMax - h * 0.5f);
+            var card = new Rect(cx - w * 0.5f, cy - h * 0.5f, w, h);
+            _cardMock = card;
             EditorGUI.DrawRect(card, new Color(0.07f, 0.08f, 0.13f, 0.96f));
+            if (spot == VNTutorialCardSpot.Custom || _drag == DragKind.Card)
+            {
+                // 自定义位置：描一圈提示「这个能拖」
+                Handles.color = new Color(1f, 0.85f, 0.4f, 0.9f);
+                Handles.DrawAAPolyLine(1.5f,
+                    new Vector3(card.x, card.y), new Vector3(card.xMax, card.y),
+                    new Vector3(card.xMax, card.yMax), new Vector3(card.x, card.yMax), new Vector3(card.x, card.y));
+            }
+            EditorGUIUtility.AddCursorRect(card, MouseCursor.MoveArrow);
 
             float y = card.y + padTop;
             if (titleH > 0f)
@@ -901,7 +926,46 @@ namespace VNEffects.EditorTools
             var e = Event.current;
             bool inside = art.Contains(e.mousePosition);
             bool anchorMode = !string.IsNullOrEmpty(step.anchor);
-            if (anchorMode) return;   // 锚点位置由运行时决定，画布上不可拖
+
+            // ---- 卡片拖动：画在最上层所以命中优先；任何落位模式下拖一下就切成 Custom ----
+            if (_showCard && e.type == EventType.MouseDown && e.button == 0 && _cardMock.Contains(e.mousePosition))
+            {
+                Snapshot();
+                _drag = DragKind.Card;
+                _dragStartNorm = GuiToNorm(art, e.mousePosition);
+                if (step.card != VNTutorialCardSpot.Custom)
+                {
+                    // 从当前画出来的位置起拖，卡片不会跳
+                    step.card = VNTutorialCardSpot.Custom;
+                    step.cardPos = GuiToNorm(art, _cardMock.center);
+                }
+                _dragStartCard = step.cardPos;
+                GUI.FocusControl(null);
+                e.Use();
+                return;
+            }
+            if (_drag == DragKind.Card)
+            {
+                if (e.type == EventType.MouseDrag)
+                {
+                    Vector2 delta = GuiToNorm(art, e.mousePosition) - _dragStartNorm;
+                    var p = _dragStartCard + delta;
+                    p.x = Mathf.Clamp(p.x, _cardHalfNorm.x, 1f - _cardHalfNorm.x);
+                    p.y = Mathf.Clamp(p.y, _cardHalfNorm.y, 1f - _cardHalfNorm.y);
+                    step.cardPos = p;
+                    e.Use();
+                    Repaint();
+                }
+                else if (e.type == EventType.MouseUp)
+                {
+                    _drag = DragKind.None;
+                    Save();
+                    e.Use();
+                }
+                return;
+            }
+
+            if (anchorMode) return;   // 锚点位置由运行时决定，画布上不可拖（卡片除外，见上）
 
             switch (e.type)
             {
@@ -1295,13 +1359,24 @@ namespace VNEffects.EditorTools
             float imageH = step.imageHeight;
             if (image != null) imageH = EditorGUILayout.FloatField("配图高度（px）", step.imageHeight);
             var card = (VNTutorialCardSpot)EditorGUILayout.EnumPopup("卡片位置", step.card);
+            Vector2 cardPos = step.cardPos;
+            if (card == VNTutorialCardSpot.Custom)
+            {
+                cardPos = EditorGUILayout.Vector2Field("卡片中心（归一化，左下原点）", step.cardPos);
+                cardPos = new Vector2(Mathf.Clamp01(cardPos.x), Mathf.Clamp01(cardPos.y));
+                EditorGUILayout.HelpBox("画布上直接拖卡片也行（任何落位模式下拖一下就变成 Custom）。" +
+                                        "(0.5,0.5) = 屏幕正中；出屏部分运行时会自动钳回来。", MessageType.None);
+            }
             string se = EditorGUILayout.TextField("音效 id（SE 库）", step.se ?? "");
             if (EditorGUI.EndChangeCheck())
             {
                 Snapshot();
                 step.image = image;
                 step.imageHeight = imageH;
+                if (card == VNTutorialCardSpot.Custom && step.card != VNTutorialCardSpot.Custom)
+                    cardPos = GuiToNorm(_lastArt, _cardMock.center);   // 从当前画出来的位置起步，别跳到正中
                 step.card = card;
+                step.cardPos = cardPos;
                 step.se = se;
                 Save();
             }

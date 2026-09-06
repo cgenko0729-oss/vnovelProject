@@ -466,7 +466,21 @@ namespace VNEffects
                     : VNTutorialCardSpot.Center;
             }
 
+            float width = Mathf.Max(1f, _root.rect.width);
             float height = Mathf.Max(1f, _root.rect.height);
+            if (spot == VNTutorialCardSpot.Custom)
+            {
+                // cardPos 是卡片中心的归一化坐标（左下原点），与洞的矩形同一套语义；
+                // 卡片锚点在 (0.5,0.5)，所以 anchoredPosition 就是「相对屏幕中心」的像素偏移。
+                // 钳一下别让卡片出屏：卡片高度由 ContentSizeFitter 现算，先强制排一次版再量
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_card);
+                float halfW = _card.rect.width * 0.5f, halfH = _card.rect.height * 0.5f;
+                float px = Mathf.Clamp((step.cardPos.x - 0.5f) * width, -width * 0.5f + halfW, width * 0.5f - halfW);
+                float py = Mathf.Clamp((step.cardPos.y - 0.5f) * height, -height * 0.5f + halfH, height * 0.5f - halfH);
+                _card.anchoredPosition = new Vector2(px, py);
+                return;
+            }
+
             float y;
             switch (spot)
             {

@@ -29,7 +29,12 @@ Shader "VN/TutorialMask"
     {
         Tags
         {
-            "Queue" = "Overlay"
+            // ★ 必须是 Transparent，不能照抄 VNScreenTransition / VNShockwave 的 Overlay：
+            // 主 Canvas 是 Screen Space - Camera，相机排序的第一把钥匙是渲染队列、
+            // 之后才是 sortingOrder。标 Overlay(4000) 会让暗幕画在同一嵌套画布里的
+            // 教程卡片（普通 UI，3000）之后 —— 卡片被自己的暗幕罩住、文字发灰。
+            // 暗幕压在对话框 / 事件层之上靠的是嵌套画布的 sortingOrder 92，与队列无关。
+            "Queue" = "Transparent"
             "IgnoreProjector" = "True"
             "RenderType" = "Transparent"
             "PreviewType" = "Plane"
