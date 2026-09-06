@@ -1,0 +1,98 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb1fd8772e87f124588fc8c58b1f24e8, type: 3}
+  m_Name: "\u79D8\u5BC6\u76F8\u673A"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNTutorialDef
+  id: "\u79D8\u5BC6\u76F8\u673A"
+  steps:
+  - anchor: secretphoto.alert
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 0
+    padding: 16
+    corner: 22
+    feather: 18
+    title: "\u5BDF\u89C9\u6761"
+    titleEn: Alert bar
+    titleJa: "\u8B66\u6212\u30B2\u30FC\u30B8"
+    body: "\u955C\u5934\u5BF9\u7740\u5979\u3001\u63A8\u5F97\u8D8A\u8FD1\u3001\u505C\u5F97\u8D8A\u4E45\uFF0C\u5BDF\u89C9\u5EA6\u6DA8\u5F97\u8D8A\u5FEB\u3002\n\u6EE1\u4E86\u5C31\u4F1A\u88AB\u53D1\u73B0\uFF1A\u6263\u597D\u611F\uFF0C\u800C\u4E14\u5979\u4EE5\u540E\u4F1A\u66F4\u8B66\u60D5\u3002\n\u5979\u4E0D\u5728\u53D6\u666F\u6846\u91CC\u65F6\u4E0D\u4F1A\u6DA8\u3002"
+    bodyEn: 'Aiming at her, zooming in and lingering all raise the alert.
+
+      When
+      it fills she catches you: affection drops and she stays more wary.
+
+      It
+      does not rise while she is out of frame.'
+    bodyJa: "\u5F7C\u5973\u306B\u5411\u3051\u308B\u30FB\u5BC4\u308B\u30FB\u9577\u304F\u7559\u307E\u308B\u307B\u3069\u8B66\u6212\u304C\u4E0A\u304C\u308A\u307E\u3059\u3002\n\u6E80\u30BF\u30F3\u306B\u306A\u308B\u3068\u30D0\u30EC\u3066\u597D\u611F\u5EA6\u304C\u4E0B\u304C\u308A\u3001\u4EE5\u5F8C\u3055\u3089\u306B\u8B66\u6212\u3055\u308C\u307E\u3059\u3002\n\u30D5\u30EC\u30FC\u30E0\u5916\u306A\u3089\u4E0A\u304C\u308A\u307E\u305B\u3093\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 3
+    se: 
+  - anchor: secretphoto.shutter
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 0
+    padding: 16
+    corner: 22
+    feather: 18
+    title: "\u5FEB\u95E8"
+    titleEn: Shutter
+    titleJa: "\u30B7\u30E3\u30C3\u30BF\u30FC"
+    body: "\u6EDA\u8F6E\u7F29\u653E\u3001\u62D6\u52A8\u753B\u9762\u5E73\u79FB\uFF0C\u6784\u597D\u56FE\u5C31\u6309\u5FEB\u95E8\uFF08\u6216\u7A7A\u683C\uFF09\u3002\n\u7167\u7247\u4F1A\u5B58\u8FDB\u753B\u5ECA\u7684\u300C\u79C1\u5BC6\u300D\u9875\u3002"
+    bodyEn: 'Wheel to zoom, drag to pan, then press the shutter (or Space).
+
+      Photos
+      go to the Private page of the gallery.'
+    bodyJa: "\u30DB\u30A4\u30FC\u30EB\u3067\u30BA\u30FC\u30E0\u3001\u30C9\u30E9\u30C3\u30B0\u3067\u79FB\u52D5\u3001\u6C7A\u307E\u3063\u305F\u3089\u30B7\u30E3\u30C3\u30BF\u30FC\uFF08\u307E\u305F\u306F\u30B9\u30DA\u30FC\u30B9\uFF09\u3002\n\u5199\u771F\u306F\u30AE\u30E3\u30E9\u30EA\u30FC\u306E\u300C\u30D7\u30E9\u30A4\u30D9\u30FC\u30C8\u300D\u30DA\u30FC\u30B8\u306B\u4FDD\u5B58\u3055\u308C\u307E\u3059\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 1
+    se: 
+  - anchor: secretphoto.film
+    area:
+      serializedVersion: 2
+      x: 0.35
+      y: 0.35
+      width: 0.3
+      height: 0.3
+    shape: 0
+    padding: 16
+    corner: 22
+    feather: 18
+    title: "\u80F6\u5377"
+    titleEn: Film
+    titleJa: "\u30D5\u30A3\u30EB\u30E0"
+    body: "\u6309\u4E00\u6B21\u5FEB\u95E8\u7528\u4E00\u5377\uFF0C\u88AB\u53D1\u73B0\u90A3\u4E00\u4E0B\u4E5F\u7167\u6837\u7528\u6389\u3002\n\u80F6\u5377\u5728\u5546\u5E97\u4E70\u3002Esc
+      \u968F\u65F6\u9000\u51FA\u3002"
+    bodyEn: 'Each shot uses one roll, even the one that gets you caught.
+
+      Buy
+      film at a shop. Esc leaves anytime.'
+    bodyJa: "1\u56DE\u64AE\u308B\u3054\u3068\u306B1\u672C\u6D88\u8CBB\u3002\u30D0\u30EC\u305F\u77AC\u9593\u306E\u30B7\u30E3\u30C3\u30BF\u30FC\u3082\u6D88\u8CBB\u3057\u307E\u3059\u3002\n\u30D5\u30A3\u30EB\u30E0\u306F\u30B7\u30E7\u30C3\u30D7\u3067\u8CFC\u5165\u3002Esc\u3067\u3044\u3064\u3067\u3082\u7D42\u4E86\u3002"
+    image: {fileID: 0}
+    imageHeight: 220
+    card: 3
+    se: 
+  dim: 0.72
+  edgeColor: {r: 1.6, g: 1.35, b: 0.75, a: 1}
+  edgeWidth: 3.5
+  edgePulse: 0.45
+  allowSkip: 1
+  once: 1

@@ -127,6 +127,14 @@ namespace VNEffects
             _scroll = _skin.itemContent.GetComponentInParent<ScrollRect>(true);
             _skin.rowTemplate.gameObject.SetActive(false);
 
+            // 教程锚点（面板 / 道具列表 / 介绍区；装备格在下面的循环里逐个登记）
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorInventory, (RectTransform)_panel.transform);
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorInventoryItems,
+                _scroll != null ? (RectTransform)_scroll.transform : _skin.itemContent);
+            if (_skin.detailText != null)
+                VNTutorialAnchors.Register(VNUiAnchors.AnchorInventoryDetail,
+                    (RectTransform)_skin.detailText.transform);
+
             _skin.titleText.text = VNLocale.T("inventory.title");
             if (_skin.hintText != null) _skin.hintText.text = VNLocale.T("inventory.hint");
             if (_skin.emptyText != null) _skin.emptyText.text = VNLocale.T("inventory.empty");
@@ -146,6 +154,8 @@ namespace VNEffects
                 var slot = (VNEquipSlot)i;
                 var view = _skin.Slot(slot);
                 view.slotLabel.text = VNEquipment.SlotName(slot);
+                VNTutorialAnchors.Register(VNUiAnchors.InventorySlot(slot),
+                    (RectTransform)view.button.transform);
                 var relay = view.button.gameObject.AddComponent<ClickRelay>();
                 relay.onLeft = () => SelectSlot(slot);
                 relay.onRight = pos => ShowSlotMenu(slot, pos);

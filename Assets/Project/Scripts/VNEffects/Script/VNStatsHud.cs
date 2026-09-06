@@ -256,6 +256,7 @@ namespace VNEffects
 
             _hudBar = _hudSkin.hudRoot;
             _hudEntryContainer = _hudSkin.entryContainer;
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorStats, (RectTransform)_hudBar.transform);
             _hudTemplate = _hudSkin.entryTemplate;
             _hudTemplate.gameObject.SetActive(false);
             _hudEntries.Clear();
@@ -282,6 +283,7 @@ namespace VNEffects
                           skin.barRoot != null && skin.barFill != null;
             if (skin.barRoot != null) skin.barRoot.SetActive(hasBar);
             if (hasBar) skin.barFill.color = def.color;
+            VNTutorialAnchors.Register(VNUiAnchors.Stat(def.id), (RectTransform)go.transform);
             return new HudEntry
             {
                 def = def,

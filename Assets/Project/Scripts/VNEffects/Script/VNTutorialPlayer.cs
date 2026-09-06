@@ -54,7 +54,18 @@ namespace VNEffects
         [Header("暗幕材质来源（留空 = 运行时 Shader.Find(\"VN/TutorialMask\")）")]
         public Material maskMaterial;
 
+        // 属性 HUD(580) / 日历(578) / 背包·任务面板(600) 都是 Screen Space - Overlay 画布，
+        // 永远压在主 Canvas 之上——教程层挂主 Canvas 下就永远盖不住它们。
+        // 一步的目标落在 Overlay 画布上时，整层临时搬到这块更高的 Overlay 画布；
+        // 代价是那一步吃不到 Bloom（描边不发光），比挖不到强。低于 Toast(999)。
+        [Header("目标在 Overlay 画布上时临时使用的画布排序（须 > 各面板的 600）")]
+        public int overlaySortingOrder = 950;
+
         static VNTutorialPlayer _instance;
+
+        Transform _mainHost;       // 正常宿主：本物体（主 Canvas 下的嵌套画布）
+        Transform _overlayHost;    // 临时宿主：独立 Overlay 画布，按需创建
+        bool _onOverlay;
 
         RectTransform _root;
         CanvasGroup _group;
@@ -231,6 +242,7 @@ namespace VNEffects
         void Close()
         {
             IsPlaying = false;
+            IsEditorPreview = false;
             if (_group != null) _group.blocksRaycasts = false;
             if (_root != null) _root.gameObject.SetActive(false);
             Cursor.visible = _cursorWasVisible;
@@ -247,14 +259,129 @@ namespace VNEffects
         void OnDestroy()
         {
             VNPause.Release(ref _pause);
+            // 临时 Overlay 画布挂在场景根（嵌在任何 Canvas 下都会变成嵌套画布），
+            // 不随本物体一起销毁，得手动收
+            if (_overlayHost != null) Destroy(_overlayHost.gameObject);
             if (_instance == this) _instance = null;
         }
+
+        // ==================================================================
+        // 宿主切换：主 Canvas 下的嵌套画布 ⇄ 独立 Overlay 画布
+        // ==================================================================
+
+        /// <summary>目标控件是否在 Screen Space - Overlay 画布上（主 Canvas 下的教程层盖不住）</summary>
+        static bool NeedsOverlay(RectTransform target)
+        {
+            if (target == null) return false;
+            var canvas = target.GetComponentInParent<Canvas>();
+            return canvas != null && canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay;
+        }
+
+        void EnsureHost(bool overlay)
+        {
+            // 裸场景自愈路径本来就是 Overlay 画布（_mainHost 不是本物体），无需切换
+            if (_root == null || _mainHost == null || _mainHost != transform) return;
+            if (overlay == _onOverlay) return;
+
+            Transform host;
+            if (overlay)
+            {
+                if (_overlayHost == null)
+                {
+                    var go = new GameObject("VNTutorialOverlayCanvas",
+                        typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+                    go.hideFlags = HideFlags.DontSave;
+                    var canvas = go.GetComponent<Canvas>();
+                    canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                    canvas.sortingOrder = overlaySortingOrder;
+                    // 缩放规则照抄各面板（1920×1080 参考），洞的像素参数才对得上
+                    var scaler = go.GetComponent<CanvasScaler>();
+                    scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                    scaler.referenceResolution = new Vector2(1920f, 1080f);
+                    var mainScaler = GetComponentInParent<CanvasScaler>();
+                    if (mainScaler != null) scaler.matchWidthOrHeight = mainScaler.matchWidthOrHeight;
+                    _overlayHost = go.transform;
+                }
+                host = _overlayHost;
+            }
+            else host = _mainHost;
+
+            _root.SetParent(host, false);
+            Stretch(_root);
+            _onOverlay = overlay;
+        }
+
+        /// <summary>正处于编辑器实时预览（此时 IsPlaying 也为 true，PlayCo 会被拒绝）</summary>
+        public bool IsEditorPreview { get; private set; }
+
+#if UNITY_EDITOR
+        // ==================================================================
+        // 编辑器实时预览（教程编辑器专用；正式流程不走这里）
+        //   停在某一步、改文字立刻刷新；不标「看过」、不吃点击推进、不响应 ESC。
+        //   同样占用 VNPause（否则羽毛球的球照飞），退出时走同一个 Close()。
+        // ==================================================================
+
+        int _previewIndex = -1;
+
+        /// <summary>显示 def 的第 index 步（越界自动钳制）。首次调用会自动开启预览态。</summary>
+        public void EditorPreviewApply(VNTutorialDef def, int index)
+        {
+            if (def == null || def.steps.Count == 0) { EditorPreviewEnd(); return; }
+            if (IsPlaying && !IsEditorPreview) return;   // 正式教程在播，别插队
+
+            if (!IsEditorPreview)
+            {
+                Build();
+                StopAllCoroutines();
+                IsPlaying = true;
+                IsEditorPreview = true;
+                _cancelled = false;
+                _previewIndex = -1;
+                if (_pause == null) _pause = VNPause.Acquire(gameObject, "tutorial-preview");
+                _cursorWasVisible = Cursor.visible;
+                Cursor.visible = true;
+                _root.gameObject.SetActive(true);
+                _group.DOKill();
+                _group.alpha = 1f;
+                _group.blocksRaycasts = true;
+            }
+
+            index = Mathf.Clamp(index, 0, def.steps.Count - 1);
+            var step = def.steps[index];
+            if (step == null) return;
+            // 换步才弹入动画；同一步反复刷新（改字）就原地重画
+            ApplyStep(def, step, index, def.steps.Count, animate: index != _previewIndex);
+            _previewIndex = index;
+        }
+
+        /// <summary>预览态下临时隐藏/显示整层（截 Game 视图当底图时用）</summary>
+        public void EditorPreviewSetVisible(bool visible)
+        {
+            if (!IsEditorPreview || _group == null) return;
+            _group.DOKill();
+            _group.alpha = visible ? 1f : 0f;
+        }
+
+        /// <summary>结束预览：收层、放开暂停，不写「看过」记录</summary>
+        public void EditorPreviewEnd()
+        {
+            if (!IsEditorPreview) return;
+            if (_group != null)
+            {
+                _group.DOKill();
+                _group.alpha = 0f;
+            }
+            _previewIndex = -1;
+            Close();
+        }
+#endif
 
         // ==================================================================
         // 一步的内容与等待
         // ==================================================================
 
-        void ApplyStep(VNTutorialDef def, VNTutorialStep step, int index, int total)
+        void ApplyStep(VNTutorialDef def, VNTutorialStep step, int index, int total,
+            bool animate = true)
         {
             // ---- 洞 ----
             _holes.Clear();
@@ -271,6 +398,8 @@ namespace VNEffects
                 if (step.HasArea)
                     _holes.Add(new VNTutorialMask.Hole { area = step.area, padding = step.padding });
             }
+            // 目标在 Overlay 画布上（HUD / 背包 / 任务面板）→ 整层搬到高排序的 Overlay 画布
+            EnsureHost(NeedsOverlay(target));
             _mask.Apply(def, step, _holes);
 
             // ---- 文字 / 图 ----
@@ -305,7 +434,14 @@ namespace VNEffects
             PlaceCard(step);
 
             // 换页的小弹入：卡片整体轻微下沉后回位，让「翻了一页」看得出来
-            if (_card != null)
+            // （编辑器实时预览改一个字就重放一次会很晃，所以可以关掉）
+            if (_card != null && !animate)
+            {
+                _card.DOKill();
+                _cardGroup.DOKill();
+                _cardGroup.alpha = 1f;
+            }
+            else if (_card != null)
             {
                 _card.DOKill();
                 _cardGroup.DOKill();
@@ -411,6 +547,7 @@ namespace VNEffects
 
             _root = CreateRect("TutorialRoot", parent);
             Stretch(_root);
+            _mainHost = parent;
             _group = _root.gameObject.AddComponent<CanvasGroup>();
             _group.alpha = 0f;
 

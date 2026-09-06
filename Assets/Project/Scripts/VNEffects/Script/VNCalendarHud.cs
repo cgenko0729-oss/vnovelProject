@@ -103,6 +103,7 @@ namespace VNEffects
             rect.pivot = new Vector2(1f, 0f);
             rect.anchoredPosition = new Vector2(-24f, 88f); // 避开对话框右下角
             rect.sizeDelta = new Vector2(196f, 92f);
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorCalendar, rect);
 
             var bg = _root.GetComponent<Image>();
             bg.sprite = VNProceduralTextures.RoundedRectSprite;

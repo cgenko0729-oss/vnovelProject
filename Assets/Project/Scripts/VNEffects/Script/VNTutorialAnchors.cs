@@ -53,6 +53,18 @@ namespace VNEffects
             return rect;
         }
 
+        /// <summary>
+        /// 反查：这个 RectTransform 登记成了哪个 id（没登记返回 null）。
+        /// 教程编辑器的「Ctrl+点选」用它把点中的控件换算回锚点 id。
+        /// </summary>
+        public static string FindId(RectTransform rect)
+        {
+            if (rect == null) return null;
+            foreach (var kv in _map)
+                if (kv.Value == rect) return kv.Key;
+            return null;
+        }
+
         /// <summary>当前登记的全部 id（调试 / 编辑器下拉用）</summary>
         public static IEnumerable<string> Ids
         {

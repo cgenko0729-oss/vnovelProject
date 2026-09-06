@@ -319,6 +319,10 @@ namespace VNEffects
             _animRect = skin.panel != null ? skin.panel : _root;
             _animBasePos = _animRect.anchoredPosition;
 
+            // 教程锚点：换皮肤会重新 Bind，后来者覆盖即可
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorDialogue, _animRect);
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorNameplate, _tagRect);
+
             if (_arrow != null) SetArrowAlpha(0f);
             ApplyPortrait();
             ApplyNameplateStyle();

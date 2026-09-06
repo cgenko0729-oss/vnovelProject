@@ -187,6 +187,9 @@ namespace VNEffects
             ClearEntries();
             _callback = onChosen;
             _group.blocksRaycasts = true;
+            // 教程锚点：皮肤有容器就用容器（默认皮肤的按钮直接挂在面板根上）
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorChoice,
+                _skin != null && _skin.container != null ? _skin.container : (RectTransform)transform);
 
             for (int i = 0; i < options.Length; i++)
             {

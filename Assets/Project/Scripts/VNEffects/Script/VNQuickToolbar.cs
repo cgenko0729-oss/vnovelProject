@@ -69,9 +69,13 @@ namespace VNEffects
 
         void BindCustomSlots()
         {
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorToolbar,
+                _toolbarSkin.root != null ? _toolbarSkin.root : (RectTransform)_root.transform);
             foreach (var slot in _toolbarSkin.Slots)
             {
                 if (slot == null || slot.button == null) continue;
+                VNTutorialAnchors.Register(VNUiAnchors.Toolbar(slot.action),
+                    (RectTransform)slot.button.transform);
                 if (slot.label != null) slot.label.text = LabelFor(slot.action);
                 slot.button.onClick.RemoveAllListeners();
                 slot.button.onClick.AddListener(() => Execute(slot.action));

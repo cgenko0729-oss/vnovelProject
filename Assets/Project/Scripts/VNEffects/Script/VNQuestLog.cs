@@ -285,6 +285,7 @@ namespace VNEffects
             scrollRect.offsetMin = Vector2.zero;
             scrollRect.offsetMax = Vector2.zero;
             scrollGo.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.02f);
+            VNTutorialAnchors.Register(VNUiAnchors.AnchorQuest, scrollRect);
             _scroll = scrollGo.GetComponent<ScrollRect>();
             _scroll.horizontal = false;
             _scroll.scrollSensitivity = 40f;
