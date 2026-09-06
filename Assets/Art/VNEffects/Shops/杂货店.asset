@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37f6c38649e5c2d4cbe4c594ef2f83b1, type: 3}
+  m_Name: "\u6742\u8D27\u5E97"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNShopDef
+  shopId: "\u6742\u8D27\u5E97"
+  shopName: "\u6742\u8D27\u5E97"
+  shopNameEn: General Store
+  shopNameJa: "\u96D1\u8CA8\u5E97"
+  currencyStat: "\u91D1\u94B1"
+  items:
+  - id: "\u80F6\u5377"
+    displayName: "\u80F6\u5377"
+    displayNameEn: Film
+    displayNameJa: "\u30D5\u30A3\u30EB\u30E0"
+    description: "\u79D8\u5BC6\u76F8\u673A\u7528\u7684\u80F6\u5377\uFF0C\u4E00\u5377\u62CD\u4E00\u5F20\u3002"
+    descriptionEn: Film for the secret camera. One roll, one shot.
+    descriptionJa: "\u96A0\u3057\u30AB\u30E1\u30E9\u7528\u306E\u30D5\u30A3\u30EB\u30E0\u30021\u672C\u30671\u679A\u3002"
+    icon: {fileID: 0}
+    price: 200
+    sellPrice: 0
+    maxOwned: 0
+    condition: 
+    equipSlot: 0
+    statBonuses: []
+    passiveEffects: []
+    useOps: []
+    consumeOnUse: 1

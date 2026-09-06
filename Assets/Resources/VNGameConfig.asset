@@ -112,12 +112,17 @@ MonoBehaviour:
   - id: CG_test
     sprite: {fileID: 21300000, guid: 01d81aec1362f044f9e618dfe32de960, type: 3}
     group: 
+  - id: 00test
+    sprite: {fileID: 21300000, guid: 860327eb88f454d4c92afc671aabeb00, type: 3}
+    group: 
   weatherDefs: []
   interludes:
   - {fileID: 11400000, guid: 77fa71f1ab17f6b4b9651e0942a96e06, type: 2}
   interludeImages: []
   tutorials:
   - {fileID: 11400000, guid: f3c30f93986f96a4eb2428e068235d82, type: 2}
+  - {fileID: 11400000, guid: 9bc819902f0a0154396a769fa51e67dd, type: 2}
+  - {fileID: 11400000, guid: 295811b3bd832b04298cb57b00886eda, type: 2}
   bgmLibrary:
   - id: "\u65E5\u5E38"
     clip: {fileID: 8300000, guid: beb5fcb8906346044ae6cf58c8d94067, type: 3}
@@ -199,6 +204,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d15bb2737e32ea04bb5c510b9d6d1e66, type: 2}
   shops:
   - {fileID: 11400000, guid: 33ba0ffc84737484ea03875d4b03575f, type: 2}
+  - {fileID: 11400000, guid: f2daecad54f57b64cbd99477033435fc, type: 2}
   plans:
   - {fileID: 11400000, guid: 7f8a6d6ef183b554289e701a526150c3, type: 2}
   quests:
@@ -235,6 +241,7 @@ MonoBehaviour:
     trackCount: 0
   fogWipes:
   - {fileID: 11400000, guid: 62d9f9987e12f9f48805291d6d5a8149, type: 2}
+  secretPhoto: {fileID: 11400000, guid: e7276acfe531c9440bb7586f330e4dd0, type: 2}
   aiPersonas:
   - {fileID: 11400000, guid: 7cd44f387a86f87488b978bc5e9a67f5, type: 2}
   aiProvider: 1

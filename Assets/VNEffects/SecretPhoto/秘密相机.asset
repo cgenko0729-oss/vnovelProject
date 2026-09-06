@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52a0a82ec36bd0e4285c6a9e4cb0549d, type: 3}
+  m_Name: "\u79D8\u5BC6\u76F8\u673A"
+  m_EditorClassIdentifier: Assembly-CSharp::VNEffects.VNSecretPhotoDef
+  unlockFlag: "\u79D8\u5BC6\u76F8\u673A"
+  filmItemId: "\u80F6\u5377"
+  allowEnterWithoutFilm: 0
+  zoomMin: 1
+  zoomMax: 1.6
+  zoomStep: 0.06
+  panSensitivity: 1
+  zoomMode: 1
+  pauseKenBurns: 1
+  detectBaseRate: 5
+  detectZoomFactorAtMax: 3
+  detectEdgeWeight: 0.35
+  alertFlagPrefix: "\u5077\u62CD_\u8B66\u60D5_"
+  alertGain: 10
+  affectionStat: "\u597D\u611F"
+  affectionPenalty: 3
+  caughtEmote: 0
+  caughtMark: 1
+  caughtLines: []
+  characterOverrides: []
+  tutorialId: "\u79D8\u5BC6\u76F8\u673A"
+  shutterClip: {fileID: 0}
+  caughtClip: {fileID: 0}
