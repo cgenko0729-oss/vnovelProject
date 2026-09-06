@@ -24,16 +24,22 @@
 letterbox off time:1.2
 bg 教室 transition:Eyelid
 bg 教室_黄昏 transition:WhiteFlash
+flag 秘密相机 1
+flag 道具_胶卷 +10
 quest start 球场之王
-event badminton vs:星野结衣 id:新手
-*  flag:羽球
+#! cg 00test transition:NoiseDissolve lying on flowers, {dark kimono}, red and black color scheme, petals, dram s-1160654919_upscale
+#! event badminton vs:星野结衣 id:新手
+#! * flag:羽球
 mood Neutral
 hideHUD
-bg test1
-event badminton tutorial:羽毛球基础
-camseq
-> -1.1,42.6 1.09 0
+#! event badminton tutorial:羽毛球基础
+#! camseq
+#! > -1.1,42.6 1.09 0
 show 星野结衣 at:left expr:默认 with:StepIn
+emote 星野结衣 Tremble
+tutorial test01 force:on
+show 星野结衣 at:center
+fx
 bgscroll on speed:28 dir:left mode:mirror
 fx godrays on
 fx clouds on
@@ -243,6 +249,27 @@ reset effects
 
 # chapter = 彻底换幕（清空调用栈，从目标文件第一行开始）
 chapter 主循环
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
