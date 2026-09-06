@@ -66,6 +66,10 @@ namespace VNEffects
         public VNTutorialCardSpot card = VNTutorialCardSpot.Auto;
         public Vector2 cardPos = new Vector2(0.5f, 0.5f);
 
+        [Header("卡片尺寸覆盖（0 = 用整篇默认）：宽度 px（1920 基准）/ 整体缩放（字号·边距·配图一起变）")]
+        public float cardWidth = 0f;
+        public float cardScale = 0f;
+
         [Header("这一步出现时放的音效 id（须在 SE 库登记；留空 = 不放）")]
         public string se;
 
@@ -127,6 +131,24 @@ namespace VNEffects
 
         [Header("看过一次就不再自动播（剧本 force:on 仍可强制重看）")]
         public bool once = true;
+
+        [Header("卡片默认尺寸：宽度 px（0 = 播放器组件的 cardWidth / 皮肤 prefab 自带宽度）与整体缩放")]
+        public float cardWidth = 0f;
+        public float cardScale = 1f;
+
+        /// <summary>这一步实际用的卡片宽度：步骤覆盖 → 整篇默认 → 0（交给播放器 / 皮肤自己定）</summary>
+        public float ResolveCardWidth(VNTutorialStep step)
+        {
+            if (step != null && step.cardWidth > 0f) return step.cardWidth;
+            return cardWidth > 0f ? cardWidth : 0f;
+        }
+
+        /// <summary>这一步实际用的整体缩放：步骤覆盖 → 整篇默认 → 1</summary>
+        public float ResolveCardScale(VNTutorialStep step)
+        {
+            if (step != null && step.cardScale > 0f) return step.cardScale;
+            return cardScale > 0f ? cardScale : 1f;
+        }
 
         /// <summary>有效步骤数（空步骤——既没文字也没图——不算）</summary>
         public int StepCount

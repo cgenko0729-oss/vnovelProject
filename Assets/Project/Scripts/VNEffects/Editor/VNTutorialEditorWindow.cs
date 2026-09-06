@@ -81,11 +81,14 @@ namespace VNEffects.EditorTools
         bool _listDragging;
 
         // 画布拖框
-        enum DragKind { None, Move, Size, Draw, Card }
+        enum DragKind { None, Move, Size, Draw, Card, CardSize }
         DragKind _drag;
         Vector2 _dragStartNorm;
         Rect _dragStartArea;
         Vector2 _dragStartCard;      // Card 拖动起点的 cardPos
+        float _dragStartCardW;       // CardSize 拖动起点：宽度（已解析，px）
+        float _dragStartCardS;       // CardSize 拖动起点：缩放（已解析）
+        Vector2 _dragStartMouse;     // CardSize 拖动起点鼠标（GUI px）
         Rect _lastArt;               // 本帧画布矩形（Inspector 切 Custom 时把当前卡片位置换算成 cardPos）
         Rect _cardMock;              // 本帧卡片模拟的 GUI 矩形（HandleCanvasInput 拿它做命中）
         Vector2 _cardHalfNorm;       // 卡片半宽半高（归一化），拖动时钳制用
@@ -836,7 +839,12 @@ namespace VNEffects.EditorTools
                 cy = art.y + (1f - step.cardPos.y) * art.height;
             }
 
-            float w = CardWidth * scale;
+            // 尺寸：宽度（步骤覆盖 → 整篇默认 → 780）× 整体缩放，与运行时 ApplyCardSize 同规则；
+            // 之后所有 px 数值都乘 scale（画布缩放 × 卡片缩放），字号边距配图一起变
+            float cardW = _def.ResolveCardWidth(step);
+            if (cardW <= 0f) cardW = CardWidth;
+            scale *= _def.ResolveCardScale(step);
+            float w = cardW * scale;
             float padX = 38f * scale, padTop = 30f * scale, padBottom = 26f * scale, spacing = 14f * scale;
             float inner = w - padX * 2f;
 
@@ -875,6 +883,15 @@ namespace VNEffects.EditorTools
                     new Vector3(card.xMax, card.yMax), new Vector3(card.x, card.yMax), new Vector3(card.x, card.y));
             }
             EditorGUIUtility.AddCursorRect(card, MouseCursor.MoveArrow);
+            // 右下角手柄：拖 = 改宽度，Shift+拖 = 改整体缩放（都写进这一步的覆盖值）
+            var sizeHandle = SizeHandleRect(card);
+            EditorGUI.DrawRect(sizeHandle, new Color(1f, 0.85f, 0.4f, 0.95f));
+            EditorGUIUtility.AddCursorRect(sizeHandle, MouseCursor.ResizeUpLeft);
+            if (_drag == DragKind.CardSize)
+                GUI.Label(new Rect(card.x, card.yMax + 4f, 420f, 16f),
+                    $"宽 {Mathf.RoundToInt(_def.ResolveCardWidth(step) > 0 ? _def.ResolveCardWidth(step) : CardWidth)}px  " +
+                    $"× 缩放 {_def.ResolveCardScale(step):0.00}   （Shift+拖 = 改缩放）",
+                    MiniLabel(new Color(1f, 0.9f, 0.6f)));
 
             float y = card.y + padTop;
             if (titleH > 0f)
@@ -926,6 +943,48 @@ namespace VNEffects.EditorTools
             var e = Event.current;
             bool inside = art.Contains(e.mousePosition);
             bool anchorMode = !string.IsNullOrEmpty(step.anchor);
+
+            // ---- 卡片右下角手柄：拖 = 宽度，Shift+拖 = 整体缩放（写进这一步的覆盖值） ----
+            if (_showCard && e.type == EventType.MouseDown && e.button == 0 && SizeHandleRect(_cardMock).Contains(e.mousePosition))
+            {
+                Snapshot();
+                _drag = DragKind.CardSize;
+                _dragStartMouse = e.mousePosition;
+                _dragStartCardW = _def.ResolveCardWidth(step) > 0f ? _def.ResolveCardWidth(step) : CardWidth;
+                _dragStartCardS = _def.ResolveCardScale(step);
+                GUI.FocusControl(null);
+                e.Use();
+                return;
+            }
+            if (_drag == DragKind.CardSize)
+            {
+                if (e.type == EventType.MouseDrag)
+                {
+                    Vector2 d = e.mousePosition - _dragStartMouse;
+                    float canvasScale = art.width / RefW;   // GUI px → 1920 基准 px
+                    if (e.shift)
+                    {
+                        // 往右下拖 = 放大；每 200 基准 px 改 0.5 倍
+                        float ds = (d.x + d.y) * 0.5f / canvasScale / 200f * 0.5f;
+                        step.cardScale = Mathf.Clamp(_dragStartCardS + ds, 0.5f, 2.5f);
+                    }
+                    else
+                    {
+                        // 手柄在右下角、卡片以中心为锚：鼠标移动 dx 对应宽度变化 2·dx
+                        float dw = d.x * 2f / canvasScale / _def.ResolveCardScale(step);
+                        step.cardWidth = Mathf.Clamp(_dragStartCardW + dw, 320f, 1800f);
+                    }
+                    e.Use();
+                    Repaint();
+                }
+                else if (e.type == EventType.MouseUp)
+                {
+                    _drag = DragKind.None;
+                    Save();
+                    e.Use();
+                }
+                return;
+            }
 
             // ---- 卡片拖动：画在最上层所以命中优先；任何落位模式下拖一下就切成 Custom ----
             if (_showCard && e.type == EventType.MouseDown && e.button == 0 && _cardMock.Contains(e.mousePosition))
@@ -1160,6 +1219,8 @@ namespace VNEffects.EditorTools
             float pulse = EditorGUILayout.Slider("描边呼吸", _def.edgePulse, 0f, 1f);
             bool allowSkip = EditorGUILayout.Toggle("允许 ESC 跳过", _def.allowSkip);
             bool once = EditorGUILayout.Toggle("看过一次就不再播", _def.once);
+            float cardW = EditorGUILayout.FloatField(new GUIContent("卡片默认宽度（px）", "0 = 播放器组件的 cardWidth（780）/ 皮肤 prefab 自带宽度；每步可单独覆盖"), _def.cardWidth);
+            float cardS = EditorGUILayout.Slider(new GUIContent("卡片默认缩放", "字号·边距·配图一起等比变；每步可单独覆盖"), _def.cardScale <= 0f ? 1f : _def.cardScale, 0.5f, 2.5f);
             if (EditorGUI.EndChangeCheck())
             {
                 Snapshot();
@@ -1170,6 +1231,8 @@ namespace VNEffects.EditorTools
                 _def.edgePulse = pulse;
                 _def.allowSkip = allowSkip;
                 _def.once = once;
+                _def.cardWidth = Mathf.Max(0f, cardW);
+                _def.cardScale = cardS;
                 Save();
             }
         }
@@ -1367,6 +1430,10 @@ namespace VNEffects.EditorTools
                 EditorGUILayout.HelpBox("画布上直接拖卡片也行（任何落位模式下拖一下就变成 Custom）。" +
                                         "(0.5,0.5) = 屏幕正中；出屏部分运行时会自动钳回来。", MessageType.None);
             }
+            float stepW = EditorGUILayout.FloatField(new GUIContent("卡片宽度覆盖（px）",
+                $"0 = 用整篇默认（当前 {(_def.ResolveCardWidth(null) > 0f ? _def.ResolveCardWidth(null).ToString("0") : "780")}px）；画布上拖卡片右下角手柄也能改"), step.cardWidth);
+            float stepS = EditorGUILayout.FloatField(new GUIContent("卡片缩放覆盖",
+                $"0 = 用整篇默认（当前 {_def.ResolveCardScale(null):0.00}）；Shift+拖右下角手柄也能改"), step.cardScale);
             string se = EditorGUILayout.TextField("音效 id（SE 库）", step.se ?? "");
             if (EditorGUI.EndChangeCheck())
             {
@@ -1377,6 +1444,8 @@ namespace VNEffects.EditorTools
                     cardPos = GuiToNorm(_lastArt, _cardMock.center);   // 从当前画出来的位置起步，别跳到正中
                 step.card = card;
                 step.cardPos = cardPos;
+                step.cardWidth = Mathf.Max(0f, stepW);
+                step.cardScale = stepS <= 0f ? 0f : Mathf.Clamp(stepS, 0.5f, 2.5f);
                 step.se = se;
                 Save();
             }

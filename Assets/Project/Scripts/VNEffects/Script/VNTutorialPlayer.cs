@@ -431,6 +431,7 @@ namespace VNEffects
                 _skipHint.gameObject.SetActive(def.allowSkip);
             }
 
+            ApplyCardSize(def, step);
             PlaceCard(step);
 
             // 换页的小弹入：卡片整体轻微下沉后回位，让「翻了一页」看得出来
@@ -454,6 +455,20 @@ namespace VNEffects
             }
         }
 
+        /// <summary>
+        /// 卡片尺寸：宽度（步骤覆盖 → 整篇默认 → 组件 cardWidth / 皮肤自带）+ 整体缩放。
+        /// 缩放走 localScale 而不是逐个改字号：字号、内边距、配图、脚注一起等比变，
+        /// 皮肤 prefab 也照样吃得到（它内部布局是什么样都不用管）。高度仍由内容撑，不截字。
+        /// </summary>
+        void ApplyCardSize(VNTutorialDef def, VNTutorialStep step)
+        {
+            if (_card == null) return;
+            float w = def.ResolveCardWidth(step);
+            if (w <= 0f) w = _skin != null ? _skinCardWidth : cardWidth;
+            _card.sizeDelta = new Vector2(w, _card.sizeDelta.y);
+            _card.localScale = Vector3.one * def.ResolveCardScale(step);
+        }
+
         /// <summary>卡片落位：Auto 时躲开洞（洞在上半屏就把卡片放下半屏）</summary>
         void PlaceCard(VNTutorialStep step)
         {
@@ -474,7 +489,8 @@ namespace VNEffects
                 // 卡片锚点在 (0.5,0.5)，所以 anchoredPosition 就是「相对屏幕中心」的像素偏移。
                 // 钳一下别让卡片出屏：卡片高度由 ContentSizeFitter 现算，先强制排一次版再量
                 LayoutRebuilder.ForceRebuildLayoutImmediate(_card);
-                float halfW = _card.rect.width * 0.5f, halfH = _card.rect.height * 0.5f;
+                float cs = _card.localScale.x;   // 整体缩放后的视觉尺寸才是钳制依据
+                float halfW = _card.rect.width * 0.5f * cs, halfH = _card.rect.height * 0.5f * cs;
                 float px = Mathf.Clamp((step.cardPos.x - 0.5f) * width, -width * 0.5f + halfW, width * 0.5f - halfW);
                 float py = Mathf.Clamp((step.cardPos.y - 0.5f) * height, -height * 0.5f + halfH, height * 0.5f - halfH);
                 _card.anchoredPosition = new Vector2(px, py);
@@ -592,9 +608,12 @@ namespace VNEffects
             BuildProceduralCard();
         }
 
+        float _skinCardWidth;   // 皮肤 prefab 自带的卡片宽度（步骤没覆盖时还原用）
+
         void BindSkin(VNTutorialSkin skin)
         {
             _card = skin.panelRoot;
+            _skinCardWidth = _card.sizeDelta.x;
             // 定位由播放器统一驱动（步骤的 card 字段），所以锚点强制居中
             _card.anchorMin = _card.anchorMax = new Vector2(0.5f, 0.5f);
             _card.pivot = new Vector2(0.5f, 0.5f);
