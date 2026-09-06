@@ -140,7 +140,7 @@ Canvas (Screen Space - Camera, planeDistance 10, 1920×1080)
 | VNImageEffectController | 单图特效总控：溶解/扫光/发光/闪白/HSV/波浪/轮廓光/波光/模糊 + 悬浮/呼吸动作。**缩放倍率分两通道相乘**（同调色的 SetGrade 教训）：`_scaleMultiplier` 说话者高亮/出场/手动（`DOScaleMultiplier`）× `_camScaleMultiplier` 运镜（`DOCamScaleMultiplier`，只由 VNCamera 写）——合成一个 float 的话，说话者高亮每句台词都写它，症状是「推完镜头一说话立绘尺寸就跳回去」。两通道共用一条 `_scaleTween`，后写的杀掉前一条（两条 DOScale 打架） |
 | VNEntranceAnimator | 出场预设×10（日常向 crossfade默认/slidein/stepin/walkin + 华丽向 溶解辉光/滑入/弹出/扫光/爆闪/残影冲入）+ 退场×4（fade默认/dissolve/runout/sink）+ StartIdleEffects；方向 `from:`/`to:` 留空按站位推断，`dur:` 给目标秒数，日常向不开周期扫光（进存档） |
 | VNGlowBackdrop / VNFootShadow | 背后光环脉动 / 脚下椭圆影（悬浮联动 + `Impact()` 落地摊开，stepin 用） |
-| VNCharacterEmotes | 情绪动作：惊讶/生气/害羞/沮丧(+Recover)/点头/摇头 |
+| VNCharacterEmotes / VNEmoteCatalog | 情绪动作：惊讶/生气/害羞/沮丧(+Recover)/点头/摇头/颤抖。**加动作只需「写一个 `public Sequence Xxx()` + 打 `[VNEmote("中文", 别名...)]`」**——剧本 `VNStage.Emote` 的分发、编辑器下拉与中文名、Lint 白名单、互动模块别名、秘密偷拍全部从 `VNEmoteCatalog`（反射一次、缓存开放实例委托、按源码声明顺序）取，**任何地方都不再手写动作清单**（同漫符 `CanonicalNames` 的单一真相做法）。方法名 = 剧本英文正名，大小写不敏感 |
 | VNAmbientParticles | 粒子预设×8：尘埃/星光/光斑/花瓣/雨(+溅落)/雪/萤火虫/雾 + PlaySparkleBurst |
 | VNWeatherController | 天气总控（双后端）：飘落类走 VNFoliageSystem，雨/雪/萤火虫走 VNAmbientParticles；`SetWeatherId` 三级解析 id（自定义资产 → 内置叶型别名含中文 → VNWeather 枚举），带调色联动 |
 | VNFoliageSystem / VNWeatherDef / VNFoliageTextures | 落樱/落叶三层景深系统（Alpha 混合实体粒子 + 图集翻转 + **每粒子独立相位横摆** + 自动阵风 + 尺寸↔速度伪透视 + 地面堆积）/ 全部参数的 ScriptableObject（五套内置预设，不建资产也能用）/ 五种叶型的程序化图集（列=12 翻转帧、行=4 形态变体，RGB 存明暗、A 存形状） |

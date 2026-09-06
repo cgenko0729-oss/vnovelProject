@@ -1091,7 +1091,7 @@ namespace VNEffects.EditorTools
 #     FadeSlideUp/ScaleBounce/ShineReveal/FlashBloom/AfterimageDash
 #   hide <角色> [with:fade|dissolve|runout|sink] [to:方向] [dur:秒]
 #     from:/to: 留空 = 按站位推断（站左的从左边进来、往左边离开）
-#   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake>
+#   emote <角色> <Surprise|Angry|Shy|Dejected|Recover|Nod|HeadShake|Tremble>（完整清单见 VNEmoteCatalog）
 #   角色 [表情]: 台词        /  旁白: 台词  /  : 无名牌旁白
 #   wait <秒> | shake <light|medium|heavy> | sakura
 #   camera <pushin|snapzoom|pan|dolly|reset> [参数] [focus:角色]

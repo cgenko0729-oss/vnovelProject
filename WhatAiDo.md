@@ -9372,3 +9372,65 @@ Play Mode 用 `script-execute` 全流程实测：解锁后图标出现 → 点�
 - 照片是硬盘上的明文 PNG，「私密」只是入口隐藏。
 - 最简版察觉只升不降、照片不评分，数学上「一进去立刻按」是最优解——这是用户看过提醒后选的；
   想加深度时 `VNSecretPhotoRig` 已留好权重/倍率的位置，照片 metadata 也在。
+
+
+## 一三六、情绪动作目录：`[VNEmote]` 一处声明，六处登记全部自动（2026-09-06，直接 `main` 快速通道）
+
+### 需求 / 背景
+
+用户加了一个新动作 `Tremble`（害怕颤抖），跟着教程改了 4 个文件仍漏了编辑器中文名那一处，
+于是提出「Lint 报红也能运行」的开关。查证后发现**Lint 本来就不挡播放**（编辑器播放路径与 Runner
+都不调 Linter，`VNStage.Emote` 认不出名字只 LogWarning），真正的痛点是：一个动作要在
+`VNStage` switch / `VNScenarioSchema.EmoteNames` / Linter 白名单 / 编辑器 `EmoteTranslations` /
+`VNInteractionModule.PlayEmote` 中文 switch / `VNSecretPhotoMode` 枚举 switch **六处**手写登记，
+漏一处就是「下拉里没有」或「Lint 一片红」。「忽略报错」按钮解决不了这个，还会把悬空 jump 这类
+真 Error 一起吞掉。用户拍板走方案 C：单一真相。
+
+### 文件改动
+
+新增：
+- `VNEffects/VNEmoteCatalog.cs`：`VNEmoteAttribute(label, params aliases)` + 静态目录
+  `VNEmoteCatalog`（`Names` / `Labels` / `Entries` / `TryGet` / `Contains` / `Invoke` / `NamesJoined`）。
+
+修改：
+- `VNEffects/VNCharacterEmotes.cs`：8 个动作各打一行 `[VNEmote("中文", 别名...)]`
+  （`HeadShake` 带老别名 `shake`、`Tremble` 带 `害怕`）；类注释写明「加动作只需两步」。
+  吸收用户已写好的 `Tremble()`（高频细抖 + 缩 0.96 + 淡蓝滤镜压暗，走 `VNGradeLayer.Emote`）。
+- `Script/VNStage.cs`：`Emote()` 的 switch → `VNEmoteCatalog.TryGet`，未知名字的警告列出全部可用动作。
+- `Editor/VNScenarioSchema.cs`：`EmoteNames = VNEmoteCatalog.Names`。
+- `Editor/VNScenarioLinter.cs`：删掉 `EmoteActions` 手写表，`bad-emote` 改查目录，报错文案动态拼清单。
+- `Editor/VNScenarioEditorWindow.cs`：`EmoteTranslations` 字典 → `VNEmoteCatalog.Labels` 属性。
+- `Script/VNInteractionModule.cs`：`PlayEmote` 的中文 switch → `VNEmoteCatalog.Invoke`。
+- `Script/VNSecretPhotoMode.cs`：4 行枚举 switch → `Invoke(emote.ToString())`（`VNSecretPhotoEmote`
+  是资产字段，枚举本身保留）。
+- `Editor/VNEffectsDemoSetup.cs`：demo 剧本说明行补 Tremble。
+- 文档：CLAUDE.md 组件表、ProjectCodeGuide 8.2、HowToUse emote 节与 Lint 表。
+
+### 技术决策
+
+- **attribute 而不是「静态数组 + switch」**：漫符走的是 `CanonicalNames` 数组 + 枚举，
+  但 emote 每个动作是一个方法，方法名天然就是正名，再抄一份数组就又是两处真相。
+  attribute 让「动作存在」与「动作的中文名/别名」写在同一行、离实现零距离。
+- **反射只做一次，之后走 `Delegate.CreateDelegate` 的开放实例委托**：`emote` 在互动模块里
+  是高频调用（每次摸一下都可能触发），`MethodInfo.Invoke` 的装箱与安全检查没必要付。
+- **按 `MetadataToken` 排序**：`GetMethods()` 不保证顺序，编辑器下拉顺序 = 源码里方法的顺序，
+  想调整下拉顺序就挪方法。
+- **查表大小写不敏感 + 别名**：互动资产里原本就写中文（「摇头」）和小写英文（`shake`），
+  剧本里写正名。三边现在查同一张表，所以剧本 `emote 小雪 害怕` 也合法且 Lint 不报——
+  故意在 Lint 里只认正名会变成两套规则。编辑器下拉仍只列英文正名。
+- **冲突只警告不抛**：`[VNEmote]` 签名不对（有参数 / 不返回 Sequence）或别名撞车时
+  `LogWarning` 并跳过，绝不让一个拼错的 attribute 把 Schema 静态构造炸掉——那会让整个剧本编辑器打不开。
+- **不动 `VNSecretPhotoEmote` 枚举**：它序列化在 `VNSecretPhotoDef` 资产里，改成 string 要迁移资产，
+  收益小；只把执行统一到目录，枚举名 = 方法名即可。
+
+### 验证
+
+`assets-refresh` 编译零错误；`script-execute` 探针：`Names` 顺序 = 源码顺序（…HeadShake|Tremble）、
+`Labels` 八条中文齐全、`shake`→HeadShake、`害怕`→Tremble、`tremble`→Tremble、`Foo` 认不出、
+`VNScenarioSchema.EmoteNames` 与目录一致。
+
+### 后续候选（同一模式，用户待拍板）
+
+`fx` 特效名（Schema 手写 vs `VNStage.Fx` switch，且 Linter 根本不校验 fx）、
+转场/出入场枚举的中文显示名（`[VNLabel]`）、事件模块结果名（Linter `BuiltinOutcomes` 手写表 vs
+模块 `Done("…")` 字面量）、命令与分类中文名并入 `Schema.Add()`。

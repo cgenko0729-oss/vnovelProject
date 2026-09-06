@@ -295,8 +295,8 @@ namespace VNEffects.EditorTools
         /// <summary>出入场方向（留空 = 按站位自动推断）</summary>
         public static readonly string[] Sides = { "left", "right", "top", "bottom" };
 
-        public static readonly string[] EmoteNames =
-            { "Surprise", "Angry", "Shy", "Dejected", "Recover", "Nod", "HeadShake" };
+        /// <summary>情绪动作正名（取自 VNEmoteCatalog，加动作只需在 VNCharacterEmotes 打 [VNEmote]）</summary>
+        public static readonly string[] EmoteNames = VNEmoteCatalog.Names;
 
         /// <summary>漫符名 + clear（正名清单取自组件，保持单一真相）</summary>
         public static readonly string[] MarkNames = BuildMarkNames();

@@ -403,16 +403,9 @@ namespace VNEffects
 
             // 她的反应：情绪动作 + 漫符（都是现成组件，一行调用）
             var emote = _def.CaughtEmoteFor(target.def.id);
-            if (target.emotes != null)
-            {
-                switch (emote)
-                {
-                    case VNSecretPhotoEmote.Surprise: target.emotes.Surprise(); break;
-                    case VNSecretPhotoEmote.Angry: target.emotes.Angry(); break;
-                    case VNSecretPhotoEmote.Shy: target.emotes.Shy(); break;
-                    case VNSecretPhotoEmote.Dejected: target.emotes.Dejected(); break;
-                }
-            }
+            // 枚举名 = VNCharacterEmotes 的方法名，执行统一走目录
+            if (target.emotes != null && emote != VNSecretPhotoEmote.None)
+                VNEmoteCatalog.Invoke(target.emotes, emote.ToString());
             target.marks?.Show(_def.caughtMark, false, null, 1f, 1.6f);
 
             // 惩罚：好感（走属性系统，带钳制与飘字）+ 警惕永久累积

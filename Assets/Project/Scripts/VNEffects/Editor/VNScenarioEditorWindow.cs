@@ -193,13 +193,8 @@ namespace VNEffects.EditorTools
                 { "left", "左" }, { "right", "右" }, { "top", "上" }, { "bottom", "下" },
             };
 
-        static readonly Dictionary<string, string> EmoteTranslations =
-            new Dictionary<string, string>
-            {
-                { "Surprise", "惊讶" }, { "Angry", "生气" }, { "Shy", "害羞" },
-                { "Dejected", "沮丧" }, { "Recover", "恢复" }, { "Nod", "点头" },
-                { "HeadShake", "摇头" },
-            };
+        /// <summary>emote 的中文名取自 VNEmoteCatalog（[VNEmote("中文")] 声明），不手写</summary>
+        static Dictionary<string, string> EmoteTranslations => VNEmoteCatalog.Labels;
 
         static readonly Dictionary<string, string> MarkTranslations =
             new Dictionary<string, string>

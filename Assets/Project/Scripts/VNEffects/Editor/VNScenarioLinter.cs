@@ -43,12 +43,6 @@ namespace VNEffects.EditorTools
     {
         const string ScenariosDir = "Assets/Scenarios";
 
-        // emote 的动作是**英文枚举**，与角色资产里的中文表情名是两回事（易混）
-        static readonly HashSet<string> EmoteActions = new HashSet<string>
-        {
-            "Surprise", "Angry", "Shy", "Dejected", "Recover", "Nod", "HeadShake",
-        };
-
         // liquid 的子命令与液体类型的中文别名（英文名走 VNLiquidType 枚举反射）
         static readonly HashSet<string> LiquidActions = new HashSet<string>
         {
@@ -802,14 +796,17 @@ namespace VNEffects.EditorTools
 
                     case "emote":
                         CheckCharacter(issues, f, c.line, c.Arg(0), reg);
+                        // 动作清单取自 VNEmoteCatalog（唯一真相），正名与别名都认；
+                        // 与角色资产里的中文**表情名**是两回事（易混）
                         string action = c.Arg(1);
                         if (!string.IsNullOrEmpty(action) && !Dynamic(action) &&
-                            !EmoteActions.Contains(action))
+                            !VNEmoteCatalog.Contains(action))
                             Add(issues, VNLintSeverity.Error, "bad-emote", f, c.line,
-                                $"emote 动作「{action}」不是合法枚举",
-                                "emote 用**英文**动作名（Surprise/Angry/Shy/Dejected/Recover/Nod/" +
-                                "HeadShake）；中文的是角色资产里的**表情名**，那是另一回事" +
-                                "（表情写成 `角色 表情: 台词` 或 show 的 expr:）。");
+                                $"emote 动作「{action}」不认识",
+                                $"可用动作：{VNEmoteCatalog.NamesJoined()}；" +
+                                "中文的是角色资产里的**表情名**，那是另一回事" +
+                                "（表情写成 `角色 表情: 台词` 或 show 的 expr:）。" +
+                                "新动作在 VNCharacterEmotes 打 [VNEmote] 即自动登记。");
                         break;
 
                     case "say":

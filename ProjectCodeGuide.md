@@ -689,8 +689,16 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
   `Impact(strength, duration)` = 落地冲击（横向摊开+纵向压扁再缓回），
   由 `stepin` 登场在落地那一帧调用；冲击倍率在 LateUpdate 里乘进 localScale，
   不干扰原有的悬浮/淡入联动。
-- **VNCharacterEmotes**：情绪动作六连（惊讶跳/生气抖/害羞缩/沮丧垂
-  (+Recover)/点头/摇头），剧本 `emote 角色 动作` 直达。
+- **VNCharacterEmotes**：情绪动作（惊讶跳/生气抖/害羞缩/沮丧垂
+  (+Recover)/点头/摇头/颤抖），剧本 `emote 角色 动作` 直达。每个动作是
+  `Begin()`→Sequence→`End(seq)` 三段式：Begin 暂停悬浮/呼吸并从控制器取基准缩放
+  （别自己缓存 1.0，说话者高亮与运镜都在写倍率），End 恢复并 SetLink。
+- **VNEmoteCatalog**：动作清单的**唯一真相**。反射 `VNCharacterEmotes` 上打了
+  `[VNEmote("中文", 别名...)]` 的 `public Sequence Xxx()`（首次访问一次，之后走缓存的
+  `Func<VNCharacterEmotes, Sequence>` 开放实例委托，按 MetadataToken 排 = 源码顺序），
+  `VNStage.Emote` / `VNScenarioSchema.EmoteNames` / Linter `bad-emote` / 编辑器中文名 /
+  `VNInteractionModule.PlayEmote` / `VNSecretPhotoMode` 全部读它。加动作零登记；
+  签名不对或别名撞车只 LogWarning 不抛（别让一个拼错的别名炸掉整个编辑器）。
 - **VNSpeakerHighlight**：说话者亮、其他人压暗（明度+缩放双通道）。
 - **VNToneMatch**：立绘色调匹配背景（采样背景主色做轻度 tint）。
 

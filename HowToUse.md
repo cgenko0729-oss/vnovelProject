@@ -275,6 +275,13 @@ emote 小雪 Surprise
 | `Recover` | 从沮丧恢复 |
 | `Nod` | 点头：两次下沉回弹 |
 | `HeadShake` | 摇头：左右小幅摆动 |
+| `Tremble` | 颤抖：高频细抖+缩小+冷色压暗（害怕） |
+
+- 动作名**大小写不敏感**，也接受各动作的别名（`emote 小雪 害怕` = `Tremble`、`shake` = `HeadShake`）；
+  编辑器下拉与 Lint 报错里列的是英文正名，正名清单以 `VNCharacterEmotes` 里打了
+  `[VNEmote]` 的方法为准（`VNEmoteCatalog` 反射生成，**加动作不用在任何地方登记**）。
+- 别把它和**表情**搞混：表情是角色资产里的中文名（`show 小雪 expr:生气`，换一张图），
+  emote 是对现有立绘做位移/缩放/调色的小动画。
 
 ### overlay — 立绘情绪叠加层（潮红 / 汗 / 泪）
 
@@ -2551,7 +2558,7 @@ chapter 第三章        # 跨文件接续（第三章.vn.txt 放在 Assets/Scen
 | | `missing-return` | 被 call 的子程序存在走不到 `return` 的路径（含"子程序里用 chapter"） |
 | | `params-not-first` | `params` 没紧跟 label |
 | | `call-missing-arg` | call 少传必填参数 |
-| | `bad-emote` | `emote` 写了中文表情名（它要的是英文动作枚举） |
+| | `bad-emote` | `emote` 的动作名认不出（清单取自 `VNEmoteCatalog`，正名与别名都认；写了角色资产里的**表情名**最常见） |
 | | `bad-mark` | `mark` 的符号名不在漫符清单里（会列出可用名） |
 | | `bad-preset` | `show` / `hide` 的 `with:` 预设名拼错（运行时会静默退回默认预设） |
 | | `bad-side` | `from:` / `to:` 不是 left/right/top/bottom |

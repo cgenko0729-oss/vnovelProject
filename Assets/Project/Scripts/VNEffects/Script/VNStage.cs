@@ -409,19 +409,15 @@ namespace VNEffects
                 Debug.LogWarning($"[VNScript] 第 {line} 行：emote 的角色「{id}」不在场上");
                 return null;
             }
-            switch (emoteName)
+            // 动作清单的唯一真相在 VNEmoteCatalog（反射 VNCharacterEmotes 上的 [VNEmote]），
+            // 加动作不用回来改这里
+            if (!VNEmoteCatalog.TryGet(emoteName, out var entry))
             {
-                case "Surprise": return c.emotes.Surprise();
-                case "Angry": return c.emotes.Angry();
-                case "Shy": return c.emotes.Shy();
-                case "Dejected": return c.emotes.Dejected();
-                case "Recover": return c.emotes.Recover();
-                case "Nod": return c.emotes.Nod();
-                case "HeadShake": return c.emotes.HeadShake();
-                default:
-                    Debug.LogWarning($"[VNScript] 第 {line} 行：未知情绪动作「{emoteName}」");
-                    return null;
+                Debug.LogWarning($"[VNScript] 第 {line} 行：未知情绪动作「{emoteName}」" +
+                                 $"（可用：{VNEmoteCatalog.NamesJoined()}）");
+                return null;
             }
+            return entry.invoke(c.emotes);
         }
 
         /// <summary>

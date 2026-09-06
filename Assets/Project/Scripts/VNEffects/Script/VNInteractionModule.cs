@@ -472,19 +472,10 @@ namespace VNEffects
         {
             var e = _char.emotes;
             if (e == null) return;
-            switch (emote)
-            {
-                case "惊讶": case "surprise": e.Surprise(); break;
-                case "生气": case "angry": e.Angry(); break;
-                case "害羞": case "shy": e.Shy(); break;
-                case "沮丧": case "dejected": e.Dejected(); break;
-                case "恢复": case "recover": e.Recover(); break;
-                case "点头": case "nod": e.Nod(); break;
-                case "摇头": case "shake": e.HeadShake(); break;
-                default:
-                    Debug.LogWarning($"[VNInteract] 未知情绪动作「{emote}」");
-                    break;
-            }
+            // 中文/英文别名都由 VNEmoteCatalog 解析（[VNEmote("中文", 别名...)]），这里不再手写 switch
+            if (VNEmoteCatalog.Invoke(e, emote) == null)
+                Debug.LogWarning($"[VNInteract] 未知情绪动作「{emote}」" +
+                                 $"（可用：{VNEmoteCatalog.NamesJoined()}）");
         }
 
         /// <summary>"好感 +2" → VNStatsHud.Apply("好感", "+2")</summary>
