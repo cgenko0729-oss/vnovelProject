@@ -32,7 +32,7 @@ namespace FrameworkSample {
 	[InitializeOnLoad]
 	public static class GameViewFullscreen {
 
-		private const string _MENU_PATH = "Tools/Fullscreen Game View _F1";
+		private const string _MENU_PATH = "Tools/Fullscreen Game View _F2";
 
 		// 再生開始時に自動で全画面化するかどうかのトグルメニュー（末尾スペースはショートカット無しを示す）
 		private const string _ON_PLAY_MENU_PATH = "Tools/Fullscreen Game View On Play ";

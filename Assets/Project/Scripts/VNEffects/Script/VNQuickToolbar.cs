@@ -14,6 +14,7 @@ namespace VNEffects
         VNToolbarActionSlot _skipSlot;
         VNQuickToolbarSkin _toolbarSkin;
         RectTransform _dock;
+        VNEdgeAutoHide _corner;
 
 
         public void Initialize(VNScriptRunner runner)
@@ -24,7 +25,12 @@ namespace VNEffects
             VNLocale.LanguageChanged += OnLanguageChanged;
         }
 
-        void OnDestroy() => VNLocale.LanguageChanged -= OnLanguageChanged;
+        void OnDestroy()
+        {
+            VNLocale.LanguageChanged -= OnLanguageChanged;
+            // 右下角容器挂在主 Canvas 下而不是自己身上，不会跟着一起销毁
+            if (_corner != null) Destroy(_corner.gameObject);
+        }
 
         void OnLanguageChanged()
         {
@@ -152,13 +158,46 @@ namespace VNEffects
             group.alpha = visible ? 1f : 0f;
             group.blocksRaycasts = visible;
             group.interactable = visible;
+            _corner?.SetSuppressed(!visible);
         }
 
         void AttachRoot()
         {
             var rect = (RectTransform)_root.transform;
+            if (EnsureCorner())
+            {
+                // 角落模式无视停靠点（皮肤 toolbarAnchor 不再起作用）。
+                // 尺寸在改锚点之前量：prefab 根若是拉伸锚点，sizeDelta 不等于实际尺寸
+                Vector2 size = rect.rect.size;
+                if (size.x <= 0f || size.y <= 0f) size = rect.sizeDelta;
+                _corner.Attach(rect, rect);
+                var margin = VNGameConfig.Active.toolbarAutoHide.margin;
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(1f, 0f);
+                rect.sizeDelta = size;
+                rect.anchoredPosition = new Vector2(-margin.x, margin.y);
+                _corner.SnapCollapsed();
+                return;
+            }
             Transform parent = _dock != null ? (Transform)_dock : transform;
             rect.SetParent(parent, false);
+        }
+
+        /// <summary>
+        /// 配置为「右下角自动隐藏」时建好角落容器并返回 true。
+        /// 没有 VNGameConfig 或找不到主 Canvas 时退回老的停靠行为。
+        /// </summary>
+        bool EnsureCorner()
+        {
+            if (_corner != null) return true;
+            var cfg = VNGameConfig.Active;
+            if (cfg == null || cfg.toolbarPlacement != VNToolbarPlacement.CornerAutoHide) return false;
+            var ownCanvas = GetComponent<Canvas>();
+            var rootCanvas = ownCanvas != null ? ownCanvas.rootCanvas : GetComponentInParent<Canvas>()?.rootCanvas;
+            if (rootCanvas == null || rootCanvas.transform == transform) return false;
+            int order = ownCanvas != null ? ownCanvas.sortingOrder + 1 : 41;
+            _corner = VNEdgeAutoHide.Create(rootCanvas.transform, "QuickToolbarAutoHide",
+                VNScreenEdge.Bottom, VNHandleAlign.Right, cfg.toolbarAutoHide, order);
+            return true;
         }
 
         void Update()

@@ -44,11 +44,32 @@ MonoBehaviour:
   - id: "\u53F3\u5217"
     prefab: {fileID: 805707084096112339, guid: 774934d146cf8d148b8588f947c23b43, type: 3}
   systemUiSkin: {fileID: 11400000, guid: 244dec5b51cf9d342842c10a590bf8b6, type: 2}
+  toolbarPlacement: 1
+  toolbarAutoHide:
+    revealDuration: 0.25
+    hideDelay: 0.8
+    hideDuration: 0.4
+    margin: {x: 12, y: 10}
+    triggerSize: {x: 240, y: 100}
+    keepPadding: 24
+    peekHold: 2
+  statsHudAutoHide: 1
+  statsHudAutoHideParams:
+    revealDuration: 0.25
+    hideDelay: 0.8
+    hideDuration: 0.4
+    margin: {x: 12, y: 10}
+    triggerSize: {x: 240, y: 100}
+    keepPadding: 24
+    peekHold: 2
   characters:
   - {fileID: 11400000, guid: d6da61221a1ce74439a3baf628fd3164, type: 2}
   - {fileID: 11400000, guid: 8dc2eb3db6749894994730b676ee521a, type: 2}
   - {fileID: 11400000, guid: 7b20d982cc9dc3e4da0a15740ae7ad4d, type: 2}
   - {fileID: 11400000, guid: 85d21fec57553cb4983145ad9f930fbe, type: 2}
+  - {fileID: 11400000, guid: fdaa5d6e0a81460499096a1547361fa1, type: 2}
+  - {fileID: 11400000, guid: f62722797d094c93b1e0fb24d2dced01, type: 2}
+  - {fileID: 11400000, guid: dd191efc82794d25a1254fa54c687325, type: 2}
   backgrounds:
   - id: "\u6559\u5BA4"
     sprite: {fileID: 21300000, guid: a176010961b11324b933533e744a7a12, type: 3}
@@ -118,6 +139,7 @@ MonoBehaviour:
   weatherDefs: []
   interludes:
   - {fileID: 11400000, guid: 77fa71f1ab17f6b4b9651e0942a96e06, type: 2}
+  - {fileID: 11400000, guid: 82c6b2f4c5c37aa4dbf37db0cb2415a9, type: 2}
   interludeImages: []
   tutorials:
   - {fileID: 11400000, guid: f3c30f93986f96a4eb2428e068235d82, type: 2}
@@ -186,6 +208,9 @@ MonoBehaviour:
   - id: "\u7ED3\u8863_L180"
     clip: {fileID: 8300000, guid: 7386d1e742b11d743a9bcea879abe308, type: 3}
     volume: 1
+  - id: GyaruuKoi
+    clip: {fileID: 8300000, guid: 7ef6e32f37af84c47b110ae9ce379134, type: 3}
+    volume: 1
   typingTick: {fileID: 0}
   overrideChannelVolumes: 0
   bgmVolume: 0.75
@@ -248,6 +273,8 @@ MonoBehaviour:
   aiModel: 
   aiPricing: {fileID: 0}
   photoFrames:
+  - {fileID: 11400000, guid: 1bf0e36650848fd46991bb2a22b3d802, type: 2}
+  - {fileID: 11400000, guid: 4904f9d79954758439cac062b8a92d44, type: 2}
   - {fileID: 11400000, guid: e367323284fe56f4b977e1f09582b329, type: 2}
   - {fileID: 11400000, guid: 5dc2122dddeb0354db571f847e53d0eb, type: 2}
   - {fileID: 11400000, guid: c2a497dd7080113408d5ab0dadaf5929, type: 2}

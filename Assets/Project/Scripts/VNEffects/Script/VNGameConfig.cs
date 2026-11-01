@@ -130,6 +130,18 @@ namespace VNEffects
         [Header("系统菜单全局主题（留空 = 标题/设置/CG/回想/工具条/存读档/状态均使用程序化默认 UI）")]
         public VNSystemUiSkinSet systemUiSkin;
 
+        [Header("快捷功能条位置：停靠对话框（老行为，跟皮肤 toolbarAnchor 走）／\n" +
+                "右下角自动隐藏（平时沉在屏幕底下只露一个小把手，鼠标移到右下角才滑出来）")]
+        public VNToolbarPlacement toolbarPlacement = VNToolbarPlacement.CornerAutoHide;
+        [Tooltip("只在「右下角自动隐藏」模式下生效")]
+        public VNEdgeAutoHideParams toolbarAutoHide = new VNEdgeAutoHideParams();
+
+        [Header("顶部属性条自动隐藏：平时藏在屏幕上方只露左上的小把手，鼠标移到把手附近才滑下来；\n" +
+                "HUD 上的属性值变化时会自动滑下来，播完数字滚动 / +N 飘字后再收回")]
+        public bool statsHudAutoHide = true;
+        [Tooltip("只在勾选「顶部属性条自动隐藏」时生效（margin 对属性条无效，位置沿用 prefab）")]
+        public VNEdgeAutoHideParams statsHudAutoHideParams = new VNEdgeAutoHideParams();
+
         /// <summary>按 id 查皮肤 prefab；找不到或 id 为空返回 null</summary>
         public static GameObject FindSkin(List<UiSkinEntry> list, string id)
         {

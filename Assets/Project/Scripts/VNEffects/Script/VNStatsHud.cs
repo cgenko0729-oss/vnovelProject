@@ -18,6 +18,7 @@ namespace VNEffects
         RectTransform _panelContent;
         RectTransform _hudEntryContainer;
         VNStatsHudSkin _hudSkin;
+        VNEdgeAutoHide _autoHide;   // 顶部自动隐藏（VNGameConfig.statsHudAutoHide 关掉时为 null）
         VNStatsHudEntrySkin _hudTemplate;
         VNStatsPanelSkin _panelSkin;
         VNStatsPanelRowSkin _panelTemplate;
@@ -79,6 +80,7 @@ namespace VNEffects
             _panelContent = null;
             _hudEntryContainer = null;
             _hudSkin = null;
+            _autoHide = null; // 挂在 _canvas 下，已随它一起销毁
             _hudTemplate = null;
             _panelSkin = null;
             _panelTemplate = null;
@@ -256,6 +258,13 @@ namespace VNEffects
 
             _hudBar = _hudSkin.hudRoot;
             _hudEntryContainer = _hudSkin.entryContainer;
+            var cfg = VNGameConfig.Active;
+            if (cfg != null && cfg.statsHudAutoHide)
+            {
+                _autoHide = VNEdgeAutoHide.Create(_canvas.transform, "StatsHudAutoHide",
+                    VNScreenEdge.Top, VNHandleAlign.Left, cfg.statsHudAutoHideParams);
+                _autoHide.Attach(_hudSkin.transform, (RectTransform)_hudBar.transform);
+            }
             VNTutorialAnchors.Register(VNUiAnchors.AnchorStats, (RectTransform)_hudBar.transform);
             _hudTemplate = _hudSkin.entryTemplate;
             _hudTemplate.gameObject.SetActive(false);
@@ -298,10 +307,20 @@ namespace VNEffects
         void Update()
         {
             if (!_dirty) return;
+            // 藏着的时候属性变了：先把条叫下来，到位后再播数字滚动 / +N 飘字，
+            // 否则整套演出在屏幕外播完。只看 HUD 条目的值——VNFlags.Changed 是任何 flag 都会触发的
+            if (_autoHide != null && HasPendingHudChange() && _autoHide.HoldForReveal()) return;
             _dirty = false;
             EnsureInitials();
             RefreshHud(true);
             if (_open) RebuildPanelList();
+        }
+
+        bool HasPendingHudChange()
+        {
+            foreach (var e in _hudEntries)
+                if (e.value != null && VNFlags.Get(e.def.id) != e.lastValue) return true;
+            return false;
         }
 
         void RefreshHud(bool animate)

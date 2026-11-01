@@ -89,6 +89,19 @@ namespace VNEffects
 
         public bool IsPlaying { get; private set; }
 
+        /// <summary>
+        /// 当前这一步是否正在高亮 rect 本身或它的子物体。
+        /// 给「平时藏起来」的 UI 用（右下角自动隐藏的快捷功能条）：被讲到时必须强制展开，
+        /// 否则洞挖在屏幕外，玩家看到的是一块空气。
+        /// </summary>
+        public bool IsHighlighting(RectTransform rect)
+        {
+            if (!IsPlaying || rect == null) return false;
+            foreach (var hole in _holes)
+                if (hole.target != null && hole.target.IsChildOf(rect)) return true;
+            return false;
+        }
+
         /// <summary>场景里的播放器；没有就返回 null（VNStage 负责自愈创建）</summary>
         public static VNTutorialPlayer Instance
         {

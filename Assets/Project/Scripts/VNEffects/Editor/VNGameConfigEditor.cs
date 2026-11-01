@@ -36,7 +36,9 @@ namespace VNEffects.EditorTools
         {
             new Tab("剧本",    "entryScript", "chapters"),
             new Tab("标题",    "gameTitle", "gameTitleEn", "gameTitleJa", "titleBackground", "titleBgm"),
-            new Tab("UI 皮肤", "dialogueSkins", "choiceSkins", "systemUiSkin"),
+            new Tab("UI 皮肤", "dialogueSkins", "choiceSkins", "systemUiSkin",
+                               "toolbarPlacement", "toolbarAutoHide",
+                               "statsHudAutoHide", "statsHudAutoHideParams"),
             new Tab("舞台",    "characters", "backgrounds", "cgLibrary", "weatherDefs",
                                "interludes", "interludeImages", "tutorials"),
             new Tab("音频",    "bgmLibrary", "seLibrary", "voiceLibrary", "typingTick",
