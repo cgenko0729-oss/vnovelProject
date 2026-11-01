@@ -33,7 +33,8 @@ MonoBehaviour:
     bodyJa: 
     image: {fileID: 0}
     imageHeight: 0
-    card: 0
+    card: 2
+    cardPos: {x: 0.50769347, y: 0.33245185}
     se: 
   - anchor: 
     area:
@@ -55,6 +56,7 @@ MonoBehaviour:
     image: {fileID: 21300000, guid: f5106dbb48b0b464a8ad865a6ca79a06, type: 3}
     imageHeight: 220
     card: 2
+    cardPos: {x: 0.5, y: 0.5}
     se: 
   dim: 0.72
   edgeColor: {r: 1.6, g: 1.35, b: 0.75, a: 1}
