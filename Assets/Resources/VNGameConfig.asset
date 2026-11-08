@@ -115,27 +115,68 @@ MonoBehaviour:
   - id: "CG_\u521D\u6B21\u5E76\u80A9"
     sprite: {fileID: 21300000, guid: 494c52f379832b843ac1493526dc0977, type: 3}
     group: 
+    fit: 0
   - id: "CG_\u96E8\u4F1E"
     sprite: {fileID: 21300000, guid: e9bd097d1c9ddcf4d89e048dddddee2b, type: 3}
     group: 
+    fit: 0
   - id: "CG_\u70DF\u82B1"
     sprite: {fileID: 21300000, guid: 36bf03b0d09df9646b1e28d7d314e7ec, type: 3}
     group: 
+    fit: 0
   - id: "CG_\u5929\u53F0\u544A\u767D"
     sprite: {fileID: 21300000, guid: 50315aa4dcabfdd4583e67f0905467ab, type: 3}
     group: 
+    fit: 0
   - id: "CG_\u5723\u8BDE"
     sprite: {fileID: 21300000, guid: 36bf03b0d09df9646b1e28d7d314e7ec, type: 3}
     group: 
+    fit: 0
   - id: "CG_\u7ED3\u5C40_\u604B\u4EBA"
     sprite: {fileID: 21300000, guid: 01d81aec1362f044f9e618dfe32de960, type: 3}
     group: 
+    fit: 0
   - id: CG_test
     sprite: {fileID: 21300000, guid: 01d81aec1362f044f9e618dfe32de960, type: 3}
     group: 
-  - id: 00test
+    fit: 0
+  - id: 456
     sprite: {fileID: 21300000, guid: 860327eb88f454d4c92afc671aabeb00, type: 3}
     group: 
+    fit: 0
+  - id: 45
+    sprite: {fileID: 21300000, guid: fddec85a425fbbc44a67d9c3f0965b1a, type: 3}
+    group: 
+    fit: 3
+  - id: 455
+    sprite: {fileID: 21300000, guid: 994621832ea908b4382662bd753f4e3e, type: 3}
+    group: 
+    fit: 2
+  - id: anime style, 1girl, solo focus, figure skating rink, indoor ice arena, pale
+      cyan s-99624030_upscale
+    sprite: {fileID: 21300000, guid: 26b253ef85bd6d04f8d034a30e60fcc5, type: 3}
+    group: 
+    fit: 0
+  - id: 8
+    sprite: {fileID: 21300000, guid: 688b4a97fbdb69142b0af4bfd6a0a342, type: 3}
+    group: 
+    fit: 0
+  - id: 5
+    sprite: {fileID: 21300000, guid: 1d0ea815d1c2630479820e3fe66f9784, type: 3}
+    group: 
+    fit: 0
+  - id: 4
+    sprite: {fileID: 21300000, guid: 955485a5a72733740a3ef1ead6754cde, type: 3}
+    group: 
+    fit: 0
+  - id: 2
+    sprite: {fileID: 21300000, guid: 9c44e2895ab68054f941278235485570, type: 3}
+    group: 
+    fit: 0
+  - id: 1
+    sprite: {fileID: 21300000, guid: e03a2481d7d0e9c46a794b4a699305a4, type: 3}
+    group: 
+    fit: 0
   weatherDefs: []
   interludes:
   - {fileID: 11400000, guid: 77fa71f1ab17f6b4b9651e0942a96e06, type: 2}

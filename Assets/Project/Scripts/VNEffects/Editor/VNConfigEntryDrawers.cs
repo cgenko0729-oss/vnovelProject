@@ -193,6 +193,7 @@ namespace VNEffects.EditorTools
             var idProp = property.FindPropertyRelative("id");
             var spProp = property.FindPropertyRelative("sprite");
             var grProp = property.FindPropertyRelative("group");
+            var fitProp = property.FindPropertyRelative("fit");
             if (idProp == null || spProp == null) { EditorGUI.LabelField(row, "(字段缺失)"); return; }
 
             ThumbSlot(ref row, spProp, typeof(Sprite),
@@ -207,6 +208,13 @@ namespace VNEffects.EditorTools
                 IdField(top, idProp, "剧本 cg 命令引用的 CG id", "（CG id）");
                 Note(sizeRect, VNAssetUi.SpriteSizeText(spProp.objectReferenceValue as Sprite));
 
+                if (fitProp != null)
+                {
+                    var fitRect = VNAssetUi.CutRight(ref bottom, 120f);
+                    EditorGUI.PropertyField(fitRect, fitProp, GUIContent.none);
+                    Overlay(fitRect, null, "显示方式（竖图/方图用）：拉伸=老行为；裁满=等比放大铺满；" +
+                                           "模糊/模糊+暗角/主色渐变=完整显示、两侧补底。剧本 fit: 可覆盖");
+                }
                 if (grProp != null)
                 {
                     var grRect = VNAssetUi.CutRight(ref bottom, 96f);
@@ -219,6 +227,11 @@ namespace VNEffects.EditorTools
             else
             {
                 var line = VNAssetUi.Line(row);
+                if (fitProp != null)
+                {
+                    var fitRect = VNAssetUi.CutRight(ref line, 110f);
+                    EditorGUI.PropertyField(fitRect, fitProp, GUIContent.none);
+                }
                 if (grProp != null)
                 {
                     var grRect = VNAssetUi.CutRight(ref line, 80f);

@@ -42,7 +42,7 @@ description: 加新特效/演出组件（发光、粒子、全屏运动、转场
 
 ## 操作清单
 - [ ] 参考同类组件写（组件分类见 CLAUDE.md「组件速查」表 / ProjectCodeGuide 八）
-- [ ] 要接 `fx` 命令：VNStage 加引用 + [`Fx()`](../../../Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 路由 + `_fxStates` + 快照，**三件套 + 存档一处不能少**
+- [ ] 要接 `fx` 命令：VNStage 加引用 + [`Fx()`](../../../Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 路由 + `_fxStates` + 快照，**三件套 + 存档一处不能少**
       （进存档细节走 [vn-save-compat]）
 - [ ] 整屏运动类：确认挂在哪个容器层（SceneRoot/ZoomRoot/TiltRoot 各司其职，见 SetUpGuide 第 0/3 章），
       不要两种运动挤一层

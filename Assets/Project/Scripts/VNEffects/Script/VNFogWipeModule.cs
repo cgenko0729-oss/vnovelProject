@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -904,32 +905,6 @@ namespace VNEffects
             var rect = (RectTransform)go.transform;
             rect.SetParent(parent, false);
             return rect;
-        }
-
-        static TextMeshProUGUI CreateText(string name, RectTransform parent,
-            int size, Color color, string content)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            var text = go.AddComponent<TextMeshProUGUI>();
-            text.font = VNFont.Asset;
-            text.fontSize = size;
-            text.color = color;
-            text.text = content;
-            text.alignment = TextAlignmentOptions.Center;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.raycastTarget = false;
-            return text;
-        }
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
         }
     }
 }

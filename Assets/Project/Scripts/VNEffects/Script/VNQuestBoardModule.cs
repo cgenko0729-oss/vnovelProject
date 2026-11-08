@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -238,27 +239,10 @@ namespace VNEffects
 
         TextMeshProUGUI CreateText(Transform parent, int size, TextAlignmentOptions anchor)
         {
-            var go = new GameObject("Text",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<TextMeshProUGUI>();
-            t.font = VNFont.Asset;
-            t.fontSize = size;
-            t.alignment = anchor;
-            t.color = new Color(1f, 1f, 1f, 0.94f);
-            t.lineSpacing = 15f;
-            t.raycastTarget = false;   // 事件层排在选项面板之上，文字绝不能吃射线
+            var t = VNUi.CreateText(parent, size, anchor, lineSpacing: 15f);
             t.textWrappingMode = TextWrappingModes.Normal;
             t.overflowMode = TextOverflowModes.Overflow;
             return t;
-        }
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
         }
     }
 }

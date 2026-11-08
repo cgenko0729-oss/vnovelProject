@@ -206,7 +206,7 @@ event aitalk vs:星野结衣 memory:她昨天在走廊上哭过，但没说原�
 | 字段 | 类型 | 驱动什么 | 越界了怎么办 |
 |---|---|---|---|
 | `reply` | 字符串 | 对话框台词（打字机） | 太长只告警，不截断 |
-| `emotion` | **枚举** | `VNStage.Say`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1074`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1074)） 换立绘表情 | 降级到第一个表情 |
+| `emotion` | **枚举** | `VNStage.Say`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1077`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1077)） 换立绘表情 | 降级到第一个表情 |
 | `mark` | **枚举** | [`VNCharacterMarks`](Assets/Project/Scripts/VNEffects/Script/VNCharacterMarks.cs) 弹漫符 | 不出符号 |
 | `affection_delta` | 整数 | 累计好感 → 结果判定 + 属性联动 | **强制 Clamp** |
 | `options[3]` | 数组 | 三个候选回复（含隐藏语气标签） | 不足 3 个补「……」 |
@@ -303,7 +303,7 @@ VNCharacterDef.expressions → ["默认","微笑","害羞","惊讶","生气","�
 > 倾向 flag 的名字跟着 `optionTones` 走——改了语气标签，flag 名也跟着改。
 
 另外 `stat:好感 rate:2` 会把 `好感` 这个 flag 直接 `+= 累计好感 × 2`
-（走 `VNFlags.Add`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:34`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L34)），会触发属性 HUD 的飘字演出）。
+（走 `VNFlags.Add`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:41`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L41)），会触发属性 HUD 的飘字演出）。
 
 用法：
 
@@ -435,7 +435,7 @@ flag 做**细判断**。别指望结果名能表达「她选了三次直球」�
 > **Tools → VN Effects → AI → 花费报表 Cost Report**（按月/日/人格/模型/来源聚合，可导 CSV）。
 >
 > **单价改哪**：[`VNAiPricingDef`](Assets/Project/Scripts/VNEffects/Script/VNAiPricing.cs) 资产（Create → VN → AI Pricing）登记进
-> `VNGameConfig.aiPricing`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:230`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L230)）。不建资产就用内置默认表。
+> `VNGameConfig.aiPricing`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:237`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L237)）。不建资产就用内置默认表。
 > **换了模型一定要确认表里有它**——查不到会按最贵档估算并在日志里标「单价存疑」。
 >
 > **一场 = 轮数 + 1 次请求**：收场总结（写记忆与日记）是一次独立请求，

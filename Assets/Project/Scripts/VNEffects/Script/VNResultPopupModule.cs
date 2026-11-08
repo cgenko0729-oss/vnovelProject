@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -253,18 +254,6 @@ namespace VNEffects
                 star.GetComponent<Image>().DOFade(0f, life * 0.6f).SetDelay(life * 0.4f)
                     .SetUpdate(true).SetLink(gameObject);
             }
-        }
-
-        static RectTransform CreateImage(string name, RectTransform parent,
-            Sprite sprite, Color color)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            var image = go.AddComponent<Image>();
-            image.sprite = sprite;
-            image.color = color;
-            return rect;
         }
 
     }

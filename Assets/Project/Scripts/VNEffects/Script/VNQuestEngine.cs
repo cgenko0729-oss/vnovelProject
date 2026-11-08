@@ -89,9 +89,7 @@ namespace VNEffects
         /// <summary>待领取的阶段号（0 = 没有可领的）</summary>
         public static int PendingOf(string id) => VNFlags.Get(PendingFlag(id));
 
-        public static bool IsClaimable(string id) => PendingOf(id) > 0;
         public static bool IsDone(string id) => StageOf(id) == StageDone;
-        public static bool IsFailed(string id) => StageOf(id) == StageFailed;
 
         /// <summary>进行中（含可领取）</summary>
         public static bool IsActive(string id)

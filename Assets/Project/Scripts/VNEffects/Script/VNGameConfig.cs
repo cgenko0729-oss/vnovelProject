@@ -127,7 +127,7 @@ namespace VNEffects
         [Header("选项面板皮肤库")]
         public List<UiSkinEntry> choiceSkins = new List<UiSkinEntry>();
 
-        [Header("系统菜单全局主题（留空 = 标题/设置/CG/回想/工具条/存读档/状态均使用程序化默认 UI）")]
+        [Header("系统菜单全局主题（必填：标题/设置/CG/回想/工具条/存读档/状态/背包/排程都只走这里的 prefab）")]
         public VNSystemUiSkinSet systemUiSkin;
 
         [Header("快捷功能条位置：停靠对话框（老行为，跟皮肤 toolbarAnchor 走）／\n" +

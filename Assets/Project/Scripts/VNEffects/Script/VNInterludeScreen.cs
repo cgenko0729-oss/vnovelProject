@@ -3,6 +3,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -370,14 +371,6 @@ namespace VNEffects
             return rect;
         }
 
-        static RectTransform CreateRect(string name, Transform parent)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            return rect;
-        }
-
         static TextMeshProUGUI CreateText(string name, Transform parent, int size, Color color)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -390,14 +383,6 @@ namespace VNEffects
             text.textWrappingMode = TextWrappingModes.Normal;
             text.overflowMode = TextOverflowModes.Overflow;
             return text;
-        }
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
         }
     }
 }

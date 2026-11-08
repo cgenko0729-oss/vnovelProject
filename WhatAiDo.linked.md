@@ -529,7 +529,7 @@ SceneRoot(震动·位置 + 心跳·缩放)
 | `SnapZoom(1.12, 0.16s, 焦点, 震动器)` | 急推：惊愕瞬间 | 快速放大，到位瞬间联动轻震 |
 | `Pan(目标点, 0.6)` | 平移：视线引导 | 向目标点反向平移（centering 可调居中程度） |
 | `DollyZoom(1.3, 3s)` | 眩晕镜头：名场面 | 背景放大 + 立绘 `DOScaleMultiplier(1/zoom)` 反向补偿保持大小 → 空间被拉扯 |
-| [`ResetCamera()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L496) | 复位 | 缩放/平移/立绘补偿全还原 |
+| [`ResetCamera()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L588) | 复位 | 缩放/平移/立绘补偿全还原 |
 
 - **焦点补偿**：绕中心放大后平移 `-焦点×(zoom-1)`，让焦点保持在原屏幕位置 →
   视觉上"镜头推向那个点"。立绘的 anchoredPosition 可直接当焦点用。
@@ -890,7 +890,7 @@ Demo.vn.txt（纯文本剧本） → VNScriptParser（解析） → VNScriptComm
 
 **现象**：`show 亚里沙 at:left` / `show 小雪 at:right` 后两人都出现在中央叠在一起。
 **原因**：初始化顺序 bug —— 角色运行时生成于 (0,-60)，[`VNEntranceAnimator.Awake()`](Assets/Project/Scripts/VNEffects/VNEntranceAnimator.cs)
-立刻把该位置缓存为基准位；`VNStage.Show`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:326`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L326)） 随后虽移到了 at: 指定的站位，但
+立刻把该位置缓存为基准位；`VNStage.Show`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:329`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L329)） 随后虽移到了 at: 指定的站位，但
 `PlayEntrance → PrepareHidden` 会把角色**重置回缓存的旧基准位**。
 **修复**：
 1. `VNEntranceAnimator` 新增 `BasePosition` 属性与 `SetBasePosition()`；
@@ -936,7 +936,7 @@ camseq start:cut end:fade endfade:0.8
 | 文件 | 改动 |
 |---|---|
 | [`VNCameraFade.cs`](Assets/Project/Scripts/VNEffects/VNCameraFade.cs)（新增） | 截屏叠化组件：嵌套 Canvas 排序 90（对话框 40 之上、ScreenTransition 100 之下）+ 全屏 RawImage。[`CaptureCo()`](Assets/Project/Scripts/VNEffects/VNCameraFade.cs#L85) 协程等帧末用 `ScreenCapture.CaptureScreenshotIntoRenderTexture` 截屏（URP 下不能手动 `Camera.Render()`）；`FadeOut(秒)` 淡出。D3D 等平台后备缓冲上下颠倒，按 `SystemInfo.graphicsUVStartsAtTop` 用负 uvRect 翻转（Inspector 有 FlipMode 手动开关兜底） |
-| [`VNCamera.cs`](Assets/Project/Scripts/VNEffects/VNCamera.cs) | `Waypoint` 加 `fade` 字段；`PlayPath` 抽出 `BuildSegment(from,to)`（编辑器预览不受影响）；新增协程版 `PlayPathCo(points, startFade, endFade)`——连续普通点仍合成一条 Sequence 保持原缓动手感，fade 点走"截屏→Cut→淡出"；[`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L485) 瞬间复位；`cameraFade` 引用留空时自动在 Canvas 下创建（旧场景不重建也能用） |
+| [`VNCamera.cs`](Assets/Project/Scripts/VNEffects/VNCamera.cs) | `Waypoint` 加 `fade` 字段；`PlayPath` 抽出 `BuildSegment(from,to)`（编辑器预览不受影响）；新增协程版 `PlayPathCo(points, startFade, endFade)`——连续普通点仍合成一条 Sequence 保持原缓动手感，fade 点走"截屏→Cut→淡出"；[`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L576) 瞬间复位；`cameraFade` 引用留空时自动在 Canvas 下创建（旧场景不重建也能用） |
 | [`VNScriptParser.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs) | `VNCamWaypointDef.fade`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs:28`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs#L28)） + 路径点行识别 `xfade:`；`VNScriptCommand.KwF()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs:74`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs#L74)） 浮点 kwargs 助手 |
 | [`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) | `PrecutFor(bgCmd)`：bg 带转场且同步执行时向后看一条命令，若是 `start:cut` 的 camseq 就把首镜头瞬切并入转场盖屏回调，并记录 `_precutDone` 让该 camseq 跳过首点；`CamseqCo` 改调 `PlayPathCo` 并解析 start/end 选项 |
 | [`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) | `SetBackground` 加 `onCovered` 回调参数（转场盖屏瞬间与换图一起执行） |
@@ -1269,7 +1269,7 @@ Unity 自动进入 Play Mode → [`VNScriptRunner`](Assets/Project/Scripts/VNEff
 - 使用 `_doc.GenerateText()`，因此未保存的内存修改也能调试；
 - `VNPlayFromLineBridge` 通过 `SessionState` 跨越 Play Mode/domain reload 传递剧本文本、目标行和
   是否重建状态；请求消费后立即清除，不影响下一次普通 Play；
-- Bridge 等待 `VNScriptRunner.IsInitialized`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:95`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L95)），让默认 `playOnStart` 完成启动后再停止并接管，避免
+- Bridge 等待 `VNScriptRunner.IsInitialized`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:97`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L97)），让默认 `playOnStart` 完成启动后再停止并接管，避免
   默认播放与调试播放互相覆盖；找不到 Runner 会在有限重试后输出明确错误。
 
 运行时实现：
@@ -1281,7 +1281,7 @@ Unity 自动进入 Play Mode → [`VNScriptRunner`](Assets/Project/Scripts/VNEff
 - 汇总结果复用 `VNSaveData + VNStage.RestoreSnapshot(data, instant:true)` 瞬间摆台，台词等待、
   转场动画、一次性 SE 和 voice 不预播；
 - `VNAudio.ResetForDebug()`（[`Assets/Project/Scripts/VNEffects/Script/VNAudio.cs:144`](Assets/Project/Scripts/VNEffects/Script/VNAudio.cs#L144)） 清除默认启动瞬间留下的 BGM/语音/循环 SE/Tween，并恢复初始音量；
-- `VNStage.RestoreSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:899`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L899)） 新增 instant 重载，支持无背景快照时清空旧背景；`VNCamera.SnapReset`（[`Assets/Project/Scripts/VNEffects/VNCamera.cs:485`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L485)）
+- `VNStage.RestoreSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:902`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L902)） 新增 instant 重载，支持无背景快照时清空旧背景；`VNCamera.SnapReset`（[`Assets/Project/Scripts/VNEffects/VNCamera.cs:576`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L576)）
   用于无法可靠推断的动画镜头路径；
 - 前置文本含 choice/jump/if 时按文件顺序重建，并在 Console 警告：工具无法凭目标物理行推断
   玩家此前选择的实际分支。取消勾选“重建前置状态”即可使用纯直接跳转。
@@ -1349,7 +1349,7 @@ Assembly-CSharp 与 Assembly-CSharp-Editor 均为 **0 warning / 0 error**。开�
 - `Ripple`：旧背景在波纹内部透明，波前对旧图进行径向折射并直接露出新背景。
 - `InkBleed`：多墨团与纸纤维噪声逐步挖去旧背景，仅边界染暗，不再形成全屏黑幕。
 
-新增 `VN/DirectBackgroundTransition` Shader；`VNStage.SetBackground`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1129`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1129)） 仅对上述四种 `bg` 转场走
+新增 `VN/DirectBackgroundTransition` Shader；`VNStage.SetBackground`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1132`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1132)） 仅对上述四种 `bg` 转场走
 直接背景路径，独立 `transition` 命令和其他旧转场仍使用原全屏系统。首张背景为空或直接 Shader
 不可用时安全回退到原转场。临时网格、材质、输入阻断层在完成、中断和销毁时统一清理。
 
@@ -1486,7 +1486,7 @@ Sprite；运行时直接短暂替换同一个 `Image.sprite`，因此不需要�
 - 有语音的台词在“打字机仍运行或语音仍播放”期间保持口型，两者都结束后闭嘴；玩家提前显示全文
   但语音未结束时仍继续口型。没有语音时只跟随打字机，文字显示完立即闭嘴。
 - 新台词开始前先关闭所有旧说话者；旁白、切换说话者、角色退场、清空舞台、读档/调试重建、
-  停止剧本和剧本自然结束都会调用 `VNStage.StopSpeaking()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1101`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1101)），保证不会遗留张嘴状态。
+  停止剧本和剧本自然结束都会调用 `VNStage.StopSpeaking()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1104`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1104)），保证不会遗留张嘴状态。
 
 ### 38.4 角色视觉预览与验证
 
@@ -1819,7 +1819,7 @@ quest fail 告白大作战         # = -1  + Toast「任务失败」
 ### 43.3 集成点
 
 - Runner：Start 查找/自建 VNQuestLog；`quest` 命令分发；J 键开关日志（互斥逻辑与
-  回想面板同构，打开期间不推进剧情、Esc 可关）；[`RequestQuestLog()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1676) 公开给工具条。
+  回想面板同构，打开期间不推进剧情、Esc 可关）；[`RequestQuestLog()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1709) 公开给工具条。
 - 调试重建：`case "quest"` 静默重放（silent=true 只写状态不弹 Toast），
   从中间行播放时任务状态正确。
 - 快捷功能条：Log 和 Config 之间新增「任务」按钮，工具条总宽 616→693。
@@ -1978,7 +1978,7 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
     （瞬间拉满 → 保持 → 0.25s 淡出）；全部 Tween `SetLink`。
 - **[`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs)（改）**：新增 `speedLines` 字段 + AutoWire 自动查找；
   `ToggleFxNames` 加入 `"speedlines"`（存档快照/读档恢复/调试重建自动覆盖）；
-  [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 新增 case：`fx speedlines on|off|burst`（burst 不记录开关状态）。
+  [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 新增 case：`fx speedlines on|off|burst`（burst 不记录开关状态）。
 - **[`VNEffectsDemoSetup.cs`](Assets/Project/Scripts/VNEffects/Editor/VNEffectsDemoSetup.cs)（改）**：BuildStageRig 第 8.5 步创建 SpeedLines 物体
   （两个演示场景都有），连线 `stage.speedLines` 与 `demo.speedLines`；
   演示剧本头部语法速查补 `fx speedlines` 说明。
@@ -2019,7 +2019,7 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
     （`autoMemoryLetterbox` 开关，默认开）。自动上的黑边打 `_letterboxAuto` 标记，
     只有自动上的才会在离开 Memory 时自动撤；手动 letterbox/fx 命令会接管（清标记）。
   - 新增 `SetLetterbox(on, height, duration)`：letterbox 命令入口，写 `_fxStates`。
-  - [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 加 case `letterbox`（`fx letterbox on|off` 同样可用，读档恢复走这里）。
+  - [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 加 case `letterbox`（`fx letterbox on|off` 同样可用，读档恢复走这里）。
   - `RestoreSnapshot`：恢复后若「回忆色调 + 黑边」同时成立则视为自动黑边。
 - **[`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)（改）**：
   - Dispatch 的 mood case 改走 `stage.SetMood`（联动入口统一）。
@@ -2119,7 +2119,7 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
     `OnKill` 兜底归零防中断残留；
   - 可选联动 [`VNScreenShake`](Assets/Project/Scripts/VNEffects/VNScreenShake.cs)（strength≥1.2 用 Medium，否则 Light）；
   - `PlayFrom(Transform)` 支持从受击角色位置荡开；全部 Tween `SetLink`。
-- **[`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs)（改）**：`shockwave` 字段 + AutoWire；[`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 新 case：
+- **[`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs)（改）**：`shockwave` 字段 + AutoWire；[`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 新 case：
   `fx shockwave` 标准 / `light` 0.6 / `heavy` 1.4 倍强度；一次性演出不进 `ToggleFxNames`。
 - **[`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)（改）**：调试重建的 fx 汇总跳过一次性演出
   （`shockwave` 与 `speedlines burst`）——顺手修掉旧 bug：从选中行播放时
@@ -2171,7 +2171,7 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   柔紫粉（曝光+0.35、对比-24、品红 tint+14、紫粉 lift/gamma、轻暗角）；
   `CycleNext` 的硬编码 `% 7` 改为按枚举长度取模（修掉加枚举会漏最后一项的隐患）。
 - **[`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs)（改）**：`retroFilter` 字段 + AutoWire；`ToggleFxNames` 加
-  `filmgrain`/`crt`（存档/读档/调试重建零改动支持）；[`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 两个新 case
+  `filmgrain`/`crt`（存档/读档/调试重建零改动支持）；[`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 两个新 case
   （互斥：开一个清另一个的状态，手动控制会接管自动滤镜）；
   `SetMood` 联动重构：Memory→黑边+胶片、Dream→CRT，`_retroAuto` 标记
   确保手动/自动互不干扰；`RestoreSnapshot` 按 mood+fx 组合恢复自动标记。
@@ -2223,7 +2223,7 @@ WhatAiDo 是"历史"文档，CLAUDE.md 是"给 AI 的工作规则"）。
   Image 上，旧场景不重新生成也能生效）；`ToggleFxNames` 加 `kenburns`；
   Fx() 新 case；**默认开启的存档语义**：AutoWire 时把 `_fxStates["kenburns"]`
   种为 true，存档才能正确记录"仍开着"，`fx kenburns off` 后的存档则不含它；
-  [`ResetEffects()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1598) 末尾把 kenburns 重置回默认开（章节重置不该让画面死掉）。
+  [`ResetEffects()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1601) 末尾把 kenburns 重置回默认开（章节重置不该让画面死掉）。
 - **[`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)（改）**：调试重建快照初始种入 `kenburns`；
   `reset effects` 重放时清空 fxOn 后同样补种（与运行时 ResetEffects 一致）；
   顺带补上 reset 重放漏掉的 `autoRetro = false`（上一功能的小疏漏）。
@@ -2511,7 +2511,7 @@ cg off [transition:Type]                            # 关闭，恢复背景/立�
 - **根因**：[`VNScriptRunner.Update`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) 推进前用 `EventSystem.IsPointerOverGameObject()`
   判断"点在 UI 上就不推进"。但本项目**整个画面都是 uGUI**（背景/立绘/对话框
   全是 Canvas 里的 Image，默认 raycastTarget=true），该判断恒为 true → 左键永拦。
-- **修复**：[`IsPointerOverInteractiveUi()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L2114)——`EventSystem.RaycastAll` 命中链向上找
+- **修复**：[`IsPointerOverInteractiveUi()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L2202)——`EventSystem.RaycastAll` 命中链向上找
   `Selectable`（按钮/滑条等）。点在功能条按钮/选项上不推进（原判断想保护的场景），
   点在对话框底板/背景/立绘上照常推进。静态 List 复用避免点击分配。
 - **教训**：全屏皆 UI 的项目里 `IsPointerOverGameObject` 基本不可用，
@@ -2650,7 +2650,7 @@ stat 善恶 50        # 直接设值（飘字「善恶 → 50%」）
 - **[`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)（改）**：`_statsHud` 字段（Start 找不到就自建，
   无定义资产也能工作）；命令分发 `case "stat"`；调试重建（从选中行播放）静默重放
   `case "stat"`（钳制照做不飘字）；C 键开/关属性面板（打开期间不推进剧情，
-  与任务日志同款拦截）；[`RequestStatsPanel()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1696) 给功能条；右键隐藏 UI 时
+  与任务日志同款拦截）；[`RequestStatsPanel()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1729) 给功能条；右键隐藏 UI 时
   HUD 一起藏（SetInterfaceHidden 联动）。
 - **[`Script/VNQuickToolbar.cs`](Assets/Project/Scripts/VNEffects/Script/VNQuickToolbar.cs)（改）**：新增"属性"按钮（859→936 宽）。
 - **`Resources/VNLocale/ui.zh/en/ja.txt`（改）**：`toolbar.stats`、`stats.title/
@@ -2766,7 +2766,7 @@ event shop id:服装店
   从 flags 反查 `道具_*>0` 的条目，文案/图标从登记的 VNShopDef 里找
   （跨商店取第一个命中；未登记道具用 id 当名字照常显示）；语言切换销毁重建。
 - **[`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)（改）**：`_inventory` 字段（找不到自建）；
-  I 键开/关物品栏（打开期间不推进剧情）；[`RequestInventory()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1702)。
+  I 键开/关物品栏（打开期间不推进剧情）；[`RequestInventory()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1735)。
 - **[`Script/VNQuickToolbar.cs`](Assets/Project/Scripts/VNEffects/Script/VNQuickToolbar.cs)（改）**：新增"道具"按钮（936→1013 宽）。
 - **`Resources/VNLocale/ui.zh/en/ja.txt`（改）**：shop.* 十个 key +
   inventory.title/empty + toolbar.inventory ×3 语言。
@@ -3437,7 +3437,7 @@ else → arg
   `DOTween.timeScale` 影响）。
   切语言时整个 Canvas 销毁重建（与 VNInventory 同策略）。
 - **接线**：[`VNScriptRunner`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) 加 `_cgGallery` 字段 + Start 自愈创建 +
-  输入链分支 + [`RequestCgGallery()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1708)；[`VNQuickToolbar`](Assets/Project/Scripts/VNEffects/Script/VNQuickToolbar.cs) 加 `CG` 按钮；
+  输入链分支 + [`RequestCgGallery()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1741)；[`VNQuickToolbar`](Assets/Project/Scripts/VNEffects/Script/VNQuickToolbar.cs) 加 `CG` 按钮；
   生成器建 `VNCgGallery` 物体并连 `stage`，场景提示文字加「G CG鉴赏」。
 - **本地化**：三张 ui 表各加 `gallery.title/empty/locked/progress/hint`
   与 `toolbar.gallery`。
@@ -3552,7 +3552,7 @@ VNEventRegistry/VNMapModule 取并集（有人可能还在用旧的场景内配�
   - Overlay Canvas 排序 **500**：在游戏 UI（Screen Space - Camera）之上、
     画廊 600 / 存读档 900 / 设置 950 之下 → 读档/鉴赏/设置按钮**直接调
     Runner 的现成 Request 接口**，面板自然盖在标题上，零新 UI。
-  - 收起规则只有一条：`VNScriptRunner.ResumeAt`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:1018`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1018)）（新游戏/读档/编辑器
+  - 收起规则只有一条：`VNScriptRunner.ResumeAt`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:1042`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1042)）（新游戏/读档/编辑器
     "从选中行播放"全走它）调 [`NotifyGameplayStarted()`](Assets/Project/Scripts/VNEffects/Script/VNTitleMenu.cs#L64) → 标题层销毁
     （销毁而非隐藏：14 个星光循环 Tween 靠 SetLink 随画布回收，不留后台空转）。
   - 标题期间藏起对话框（`SetInterfaceVisible(false)`，尊重 `_shown` 语义，
@@ -3564,9 +3564,9 @@ VNEventRegistry/VNMapModule 取并集（有人可能还在用旧的场景内配�
     `playOnStart`，改为 `titleMenu.Open()`；否则维持旧行为（老场景零影响）。
   - [`Update()`](Assets/Project/Scripts/VNEffects/Script/VNFogScore.cs#L59)：标题打开期间屏蔽全部游戏快捷键与推进（插在画廊分支之后——
     叠在标题上的面板关闭键由上方各自分支处理，天然可用）。
-  - 新增 [`StartNewGame()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1037)：`VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:36`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L36)） + 从入口剧本 `Play()`
+  - 新增 [`StartNewGame()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1061)：`VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:43`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L43)） + 从入口剧本 `Play()`
     （call 栈由 Play → Prepare 清，无需额外处理）。
-  - [`ResumeAt()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1018) 开头补 `_titleMenu?.NotifyGameplayStarted()`。
+  - [`ResumeAt()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1042) 开头补 `_titleMenu?.NotifyGameplayStarted()`。
 - **[`VNGameConfig.cs`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs)**：新增"标题画面"区——`gameTitle/En/Ja`（按语言取、
   缺省回退中文、全空用 "Visual Novel"）、`titleBackground`（背景 id，留空 =
   背景库第一张）、`titleBgm`（留空 = 不播）。跟随资产的既有覆盖语义，
@@ -4026,7 +4026,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 6. **只有 `keep` 进存档**：一次性符号播完即逝不是持续状态，
    存档快照与调试重建（`RebuildMarkState`）都只处理常驻符号。
    `RebuildShowState` 补了一条：已在场角色重播 `show` 时把常驻符号带过来，
-   与运行时 `VNStage.Show`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:326`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L326)） 不清符号的行为保持一致。
+   与运行时 `VNStage.Show`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:329`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L329)） 不清符号的行为保持一致。
 
 ### 验证方法
 
@@ -4096,7 +4096,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 
 5. **奖励复用 [`VNShopDef.StatOp`](Assets/Project/Scripts/VNEffects/Script/VNShopDef.cs)**：项目里「属性 id + 增量」的条目类型已经存在
    （装备加成 / 道具使用效果都用它），再定义一个同形结构只会让 Inspector 手感不一致。
-   写入统一走 `VNStatsHud.Apply()`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)）（钳制 + 飘字），没有 HUD 时退回 `VNFlags.Add`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:34`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L34)）。
+   写入统一走 `VNStatsHud.Apply()`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)）（钳制 + 飘字），没有 HUD 时退回 `VNFlags.Add`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:41`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L41)）。
 
 6. **及格线放在剧本行**：`pass:` 是关卡难度而不是题库属性——同一套题在序章
    可以宽松、在终章可以严格。默认值 = 题数一半向上取整。
@@ -4383,7 +4383,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   （旧签名保留为重载，Demo 场景不用改）。
 - [`VNFootShadow.cs`](Assets/Project/Scripts/VNEffects/VNFootShadow.cs) —— 新增 `Impact(strength, duration)`：影子横向摊开 + 纵向压扁再缓回，
   供 `stepin` 在落地那一帧调用（LateUpdate 里乘进 localScale，不打断原有的悬浮联动）。
-- [`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) —— [`SideFor()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L305) 方向推断；`Show` / `Hide` 加 `from`/`to` + `duration` 重载；
+- [`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) —— [`SideFor()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L308) 方向推断；`Show` / `Hide` 加 `from`/`to` + `duration` 重载；
   `ActiveCharacter.casualEntrance`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:149`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L149)） 记录是否日常向登场。
 - [`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) —— show/hide 传 `from:` / `to:` / `dur:`；
   `RebuildShowState` 把 `with:` 折算成 `casualEntrance` 一起重建。
@@ -4484,7 +4484,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
 - [`Script/VNSaveSystem.cs`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) —— `weather` 语义改为 id 字符串（旧存档的枚举名照常认得），
   新增四个覆盖参数字段（`weatherDensity/Speed/Size` + `weatherWindSet/Wind`）。
 - [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) —— 天气覆盖参数由 VNStage 统一持有；
-  `SetWeather(id, …)` 命令入口、`ApplyWeather()`、[`WeatherGust()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1440)；
+  `SetWeather(id, …)` 命令入口、`ApplyWeather()`、[`WeatherGust()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1443)；
   CG 暂停恢复由 `_cgSavedWeather`（枚举）改为 `_cgSavedWeatherId`（字符串）。
 - [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) —— `weather` 命令支持 `density:/wind:/speed:/size:`；
   `RebuildStateBefore` 同步重放这四个参数。
@@ -4674,7 +4674,7 @@ UI（颜色/贴图硬编码在代码里），改外观必须改代码，是八�
   `LiquidSplinter` 碎珠、`WaterDrop` 假折射水渍、`DropSpec` HDR 高光、
   `LiquidStreak` 水痕）+ `GenerateRgba` 彩色生成器重载。
 - [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) —— `liquidSplash`/`wetScreen` 两个引用 + AutoWire 自动接线（含
-  两层互连）+ [`Liquid()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1456) 命令入口 + [`ResetLiquid()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1505) + `CaptureLiquid`/`RestoreLiquid`
+  两层互连）+ [`Liquid()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1459) 命令入口 + [`ResetLiquid()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1508) + `CaptureLiquid`/`RestoreLiquid`
   存档三处 + `ResetEffects` 联动。
 - [`Script/VNSaveSystem.cs`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) —— `VNSaveData.LiquidSave` 子结构（spray/click/wet/cover
   四个持续开关及其参数）。
@@ -4999,7 +4999,7 @@ VN/Scenario Editor 里自己改键位）：`F5` 从选中行播放、`F6` 重播
   的"当前文件"都按它算。Bridge 冷启动路径也补了这一步（新增 `AssetKey`
   经 SessionState 传资产路径）。
 - `CurrentScriptName` 属性。
-- 命令级暂停/单步：`IsDebugPaused` / [`SetDebugPaused()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L232) / [`RequestDebugStep()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L239)，
+- 命令级暂停/单步：`IsDebugPaused` / [`SetDebugPaused()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L241) / [`RequestDebugStep()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L248)，
   闸门在 [`Run()`](Assets/Project/Scripts/VNEffects/Editor/VNSoftSkinExporter.cs#L106) 主循环顶部。`Play(string)` 开局时清暂停标记，
   免得编辑器留下的暂停态把正常开局卡死。
 
@@ -5417,7 +5417,7 @@ Lint 表、命令速查卡）、CLAUDE.md 编辑器节。
 没法停，语义还不对称。
 
 **hold 走 DOTween 的 `AppendInterval`，不用 `WaitForSeconds`。** Skip 快进是靠
-`DOTween.timeScale = skipTimeScale` 实现的（`VNScriptRunner.SetSkip`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:1866`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1866)）），
+`DOTween.timeScale = skipTimeScale` 实现的（`VNScriptRunner.SetSkip`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:1950`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1950)）），
 用 `WaitForSeconds` 的话 hold 会变成整条运镜里唯一不加速的卡点。叠化段没法编进
 Sequence（它是截屏协程），所以单独造了个只有 Interval 的 Sequence 来等，
 `SetTarget(this)` 保持和其他镜头补间一致的清理语义。
@@ -5789,7 +5789,7 @@ event photo vs:<她> [me:<我>] [theme:<主题>] [mode:match|free] [frame:<边�
 - **P5：G 键画廊的「照片」标签页 + 删除**（[`VNCgGallery`](Assets/Project/Scripts/VNEffects/Script/VNCgGallery.cs) 加标签切换、
   [`VNCgGallerySkin`](Assets/Project/Scripts/VNEffects/Script/VNCgGallerySkin.cs) 加两个可选槽位）。当前照片能拍能存，但只能去
   `persistentDataPath/vn_photos/` 目录看。
-- 主角立绘：`VNGameConfig.photoMeCharacterId`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:248`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L248)） 现在留空，剧本用 `me:` 临时指定；
+- 主角立绘：`VNGameConfig.photoMeCharacterId`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:255`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L255)） 现在留空，剧本用 `me:` 临时指定；
   用户做好主角角色资产后填进去即可，代码零改动。
 - 三个内置主题的加分表是按现有角色的表情名（害羞/微笑/坏笑/惊讶/生气/沮丧）写的，
   新增角色时记得对一遍表情名。
@@ -6007,7 +6007,7 @@ Play Mode 实跑 `PhotoDemo.vn.txt`：第 19 行（自由拍照）与第 31 行�
 气质与参考图正好相反——参考图全是黑体系 Heavy 字重，靠字重本身撑起分量。
 
 顺带发现一个历史遗留：`VNDialogueBox.nameTagColor`（[`Assets/Project/Scripts/VNEffects/VNDialogueBox.cs:35`](Assets/Project/Scripts/VNEffects/VNDialogueBox.cs#L35)） 的注释写着「角色定义里的 nameColor 优先」，
-但 `VNStage.Say()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1074`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1074)） 只传了名字和文本，**从来没有把 `VNCharacterDef.nameColor`（[`Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs:37`](Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs#L37)） 传给名牌**——
+但 `VNStage.Say()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1077`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1077)） 只传了名字和文本，**从来没有把 `VNCharacterDef.nameColor`（[`Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs:37`](Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs#L37)） 传给名牌**——
 这次一并兑现。
 
 ### 文件改动清单
@@ -6154,7 +6154,7 @@ Play Mode 实跑 `PhotoDemo.vn.txt`：第 19 行（自由拍照）与第 31 行�
 
 **修改**
 
-- [`Script/VNGameConfig.cs`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs)——加 `aiPersonas` 列表 + [`FindAiPersona()`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L233)
+- [`Script/VNGameConfig.cs`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs)——加 `aiPersonas` 列表 + [`FindAiPersona()`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L240)
 - [`Editor/VNGameConfigTools.cs`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs)——Sync Game Config 扫描 `VNAiPersonaDef`
 - [`Editor/VNScenarioSchema.cs`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs)——`event` 提示文案补 aitalk 用法
 - [`Editor/VNScenarioLinter.cs`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs)——四条新规则 + aitalk 结果名表
@@ -6497,7 +6497,7 @@ Play Mode 实测时 AI 自己抛出了**怀孕**剧情。原来的 boundaries �
 - [`Script/VNAiTalkModule.cs`](Assets/Project/Scripts/VNEffects/Script/VNAiTalkModule.cs)——`SummarizeCo()` 收场总结，写记忆与日记
 - [`Script/VNSaveSystem.cs`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs)——`VNSaveData.aiMemories`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:72`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L72)）
 - [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs)——快照存取两处接线（存档三处同步）
-- [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)——D 键 + [`RequestDiary()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1683)，按需创建面板
+- [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)——D 键 + [`RequestDiary()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1716)，按需创建面板
 - `ui.zh/en/ja.txt`——日记本与「记下来」共 7 条
 
 ### 技术决策与取舍
@@ -6891,7 +6891,7 @@ Instantiate(persona) → 内存副本（HideFlags.DontSave）
 
 **③ 从存档导入记忆刻意不走 `VNSaveSystem.Load()`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:218`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L218)）**
 
-那个方法会 `VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:36`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L36)） 再灌入存档里的全部 flag。在编辑器里点一下「导入」
+那个方法会 `VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:43`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L43)） 再灌入存档里的全部 flag。在编辑器里点一下「导入」
 就把工程的 flag 状态冲掉，下次进 Play Mode 行为莫名其妙。改为自己读 JSON，纯读无副作用。
 
 **④ 从日志导入记忆要发一次总结请求（约 $0.001），不做「免费骨架导入」**
@@ -7068,7 +7068,7 @@ Instantiate(persona) → 内存副本（HideFlags.DontSave）
 
 | 层 | 在哪 |
 |---|---|
-| 全局默认 | `VNGameConfig.aiProvider`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:222`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L222)） / `aiModel`（**默认已设为 DeepSeek**）|
+| 全局默认 | `VNGameConfig.aiProvider`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:229`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L229)） / `aiModel`（**默认已设为 DeepSeek**）|
 | 人格资产 | `VNAiPersonaDef.provider`（[`Assets/Project/Scripts/VNEffects/Script/VNAiPersonaDef.cs:112`](Assets/Project/Scripts/VNEffects/Script/VNAiPersonaDef.cs#L112)） / `model`，默认「跟随全局」|
 | 试聊台 | 工具栏两个格子，改的是**草稿**，用于 A/B 对比 |
 
@@ -7514,7 +7514,7 @@ UI Sprite 默认就是关的，开了的话 `frac` 的跳变会让接缝糊掉�
 | `Assets/Art/Shaders/VNImageEffect.shader` | `_ScrollMode`/`_ScrollOffset` 两个属性 + `vnWrapUV`/`vnScrollUV`；模糊 8 抽与轮廓光 2 抽包上 wrap |
 | `VNBackgroundScroll.cs`（新） | 滚动组件：速度缓入缓出、像素/秒→UV 换算、偏移折回 [0,2) 防精度掉光、方向/模式词解析 |
 | `VNImageEffectController.cs` | 加 `HasMaterial`（销毁流程里不能用 `Mat`，那会顺手新建一个） |
-| [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) | `bgScroll` 引用 + 自愈补挂 + [`SetBackgroundScroll()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1195) + 换图归零偏移 + 存档读写 |
+| [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) | `bgScroll` 引用 + 自愈补挂 + [`SetBackgroundScroll()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1198) + 换图归零偏移 + 存档读写 |
 | [`Script/VNScriptParser.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs) | `bgscroll` 关键字 |
 | [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) | 命令派发（含 dir/mode 认不出时的告警）+ 调试重建重放（参数留空 = 沿用，重建也要照这个语义累积）|
 | [`Script/VNSaveSystem.cs`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) | `scrollOn/scrollSpeed/scrollDir/scrollMode` 四个字段 |
@@ -7866,14 +7866,14 @@ meta 存在却不含完整 importer 设置块时它同样返回 true ——
 ### 做了什么
 
 **① 取数源改成与运行时同一套覆盖语义**：`VNGameConfig` 里填了就用它的，留空才回退场景组件
-（与 `VNGameConfig.ApplyList`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:258`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L258)） 的规则一致）。抽了两个小工具：
+（与 `VNGameConfig.ApplyList`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:265`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L265)） 的规则一致）。抽了两个小工具：
 [`LoadGameConfig()`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioEditorWindow.cs#L574)（编辑期直接走 `AssetDatabase`，不用 `VNGameConfig.Active` 的运行时缓存，
 免得受 Play Mode 进出清缓存的时机影响）和 `PickLibrary<T>(fromConfig, fromScene)`。
 覆盖 backgrounds / cgLibrary / bgm / se / voice 五个库。
 
 **② 加「改完自动刷新」**：新增 [`Editor/VNAssetLibraryEvents.cs`](Assets/Project/Scripts/VNEffects/Editor/VNAssetLibraryEvents.cs)，一个静态 `Changed` 事件。
 素材浏览器与 VNGameConfig Inspector 的**所有写入点**统一走
-`Apply()` / [`ApplyAndNotify()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigEditor.cs#L194)——`SerializedObject.ApplyModifiedProperties()`
+`Apply()` / [`ApplyAndNotify()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigEditor.cs#L195)——`SerializedObject.ApplyModifiedProperties()`
 **返回 true 时才广播**，所以只有真改了东西才触发重建，不会每帧空转。
 剧本编辑器在 `OnEnable` 订阅、`OnDisable` 退订，收到就 `RefreshSources() + Repaint()`。
 
@@ -8023,7 +8023,7 @@ Dialogue / Stats / Calendar，Dialogue 含快捷条）与 `VNUiPartsUtil`（toke
 | `Script/VNUiParts.cs`（新） | `VNUiParts` Flags 枚举 + `VNUiPartsUtil`（token / 存档字符串互转，认中文别名） |
 | `Script/VNQuickToolbar.cs` | `SetVisible()`（自带 CanvasGroup，含 overrideSorting 打断 alpha 传播的说明） |
 | `VNDialogueBox.cs` | `SetInterfaceVisible` 联动工具栏 |
-| [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) | `_uiHiddenParts` / `_uiHideLocked`、[`SetUiHidden()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1730)、`ApplyUiHidden()`、`ApplyGameplayHudVisible()`、[`ParseHideHudArgs()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1768)、`RestoreUiHidden()`、Update 锁定分支、存档读写、调试重建 |
+| [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) | `_uiHiddenParts` / `_uiHideLocked`、[`SetUiHidden()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1763)、`ApplyUiHidden()`、`ApplyGameplayHudVisible()`、[`ParseHideHudArgs()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1852)、`RestoreUiHidden()`、Update 锁定分支、存档读写、调试重建 |
 | [`Script/VNSaveSystem.cs`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) | `VNSaveData.uiHidden` |
 | [`Editor/VNScenarioSchema.cs`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs) | hideHUD 三个位置参数格（同一张候选表） |
 | `HowToUse.md` | hideHUD 小节重写 + 速查表 |
@@ -8132,7 +8132,7 @@ SetMode(both) 且当前不是 both → ResetCharacterZoom() 再切
 
 camseq 的镜头状态**根本不进存档**（[`VNSaveData`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) 里一个 cam 字段都没有），
 调试重建也明写「动画路径状态不做推断，回到默认镜头」（[`VNScriptRunner.RebuildStateBefore`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)），
-走的是 [`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L485)。立绘的运镜倍率跟 camseq 同生命周期，在 `SnapReset()` / [`ResetCamera()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L496)
+走的是 [`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L576)。立绘的运镜倍率跟 camseq 同生命周期，在 `SnapReset()` / [`ResetCamera()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L588)
 里一并还原即可，**不用走 vn-save-compat 的三处同步**。持久的只有 `camcut` / `camto`。
 
 ### 参与的立绘：全部在场角色，自动维护
@@ -8266,7 +8266,7 @@ ZoomRoot         scale=(1,1,1)   ← char 模式下本来就该是 1
 
 **修改**
 - [`VNScriptRunner`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) —— 新增 `RunInlineCo(lines)`；`overlay` 的 Dispatch 与静默重放。
-- [`VNStage`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) —— `ActiveCharacter.overlay`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:144`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L144)） 字段、挂载、[`SetOverlay()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L463)、快照存取。
+- [`VNStage`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) —— `ActiveCharacter.overlay`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:144`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L144)） 字段、挂载、[`SetOverlay()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L466)、快照存取。
 - [`VNCharacterDef`](Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs) —— `overlays` 列表。
 - [`VNSaveSystem`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) —— `CharSave.overlays`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:113`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L113)）。
 - [`VNScriptParser`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs) / [`VNScenarioSchema`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs) / [`VNScenarioEditorWindow`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioEditorWindow.cs) / [`VNScenarioLinter`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs)
@@ -8419,7 +8419,7 @@ Runner.Update 里被设置。于是模块内播的阻塞台词**永远等不到�
 
 **修法**：Runner 新增 `public void RequestAdvance()`（语义与 Update 里的手动推进一致：
 还在打字就先补完，打完了才真推进）与 `IsWaitingAtSay`；模块在 `_blocked` 期间自己检测
-Enter / 空格 / 左键（排除自己的 UI），转发到 [`RequestAdvance()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L2101)。
+Enter / 空格 / 左键（排除自己的 UI），转发到 [`RequestAdvance()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L2189)。
 「输入交给模块」的约定不变，只是模块要负责把推进意图转回去。
 
 **为什么没在开发时发现**：一二六章的全部验证都是用反射模拟抚摸跑的，
@@ -8572,9 +8572,9 @@ AI 只负责实现，提交/推送/开 PR/写文档各自等用户点名才做�
 | `Art/Shaders/VNScreenTransition.shader` | 加 `_TexMode` / `_Invert` / `_UVRect` 三个参数，图案里可以填贴图而不是纯色 |
 | [`VNScreenTransition.cs`](Assets/Project/Scripts/VNEffects/VNScreenTransition.cs) | 新增 [`CreatePatternMaterial()`](Assets/Project/Scripts/VNEffects/VNScreenTransition.cs#L143) / [`ConfigurePattern()`](Assets/Project/Scripts/VNEffects/VNScreenTransition.cs#L160) / [`SupportsPatternBackground()`](Assets/Project/Scripts/VNEffects/VNScreenTransition.cs#L187) / [`PlayBackgroundPattern()`](Assets/Project/Scripts/VNEffects/VNScreenTransition.cs#L197) |
 | [`VNProceduralTextures.cs`](Assets/Project/Scripts/VNEffects/VNProceduralTextures.cs) | 加 `LoadingRing` / `LoadingRingSprite`（锐边细环，spinner 用） |
-| [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) | `interlude` 字段 + AutoWire 自愈 + [`ClearStage()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L983) 收起；`SwapStageImage()` 加 `viaBlack` 与图案直接过渡分支；`SetBackground` / `ShowCg` / `HideCg` 透传 |
+| [`Script/VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs) | `interlude` 字段 + AutoWire 自愈 + [`ClearStage()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L986) 收起；`SwapStageImage()` 加 `viaBlack` 与图案直接过渡分支；`SetBackground` / `ShowCg` / `HideCg` 透传 |
 | [`Script/VNScriptParser.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs) | 关键字 `interlude` |
-| [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) | `interlude` 的 Dispatch case + [`FindInterlude()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L966)；`bg` / `cg` 透传 `via:` |
+| [`Script/VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) | `interlude` 的 Dispatch case + [`FindInterlude()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L990)；`bg` / `cg` 透传 `via:` |
 | [`Script/VNGameConfig.cs`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs) | 「过场库」`interludes` + 「全局转场图池」`interludeImages` |
 | [`Editor/VNScenarioSchema.cs`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs) | 新参数来源 `InterludeId`；登记 `interlude`；`bg` / `cg` 加 `via` |
 | [`Editor/VNScenarioEditorWindow.cs`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioEditorWindow.cs) | 中文名「过场」+ 过场 id 下拉候选 |
@@ -8803,7 +8803,7 @@ Lint 的 `wipefog-cg-before-event` 盯着这件事，且只在「先 cg 的那�
 **阶段只升不降。** 清晰度在回雾对抗下会反复穿越阈值，允许回退的话玩家一停手就在
 阈值边界反复横跳，同一句台词播个没完（`VNTouchScore` 的同款教训）。
 
-**CG 解锁要在模块里补一次。** `VNCgUnlocks.Unlock`（[`Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs:48`](Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs#L48)） 本来是 `VNStage.ShowCg`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1234`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1234)） 顺手做的，
+**CG 解锁要在模块里补一次。** `VNCgUnlocks.Unlock`（[`Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs:48`](Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs#L48)） 本来是 `VNStage.ShowCg`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1237`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1237)） 顺手做的，
 推荐写法下剧本不再提前 `cg`，如果结果分支也没写（比如失败分支），这张 CG 就永远不会
 解锁进画廊——玩家明明看过却是灰的。现在模块在结算时补一次，且只在擦到 20% 以上时算
 （一进来就 ESC 放弃不该算看过）。
@@ -9139,3 +9139,236 @@ event 新手 id:新手           ← 模块名没了
 
 `Ctrl+E` 命令面板（[`VNCommandSearch`](Assets/Project/Scripts/VNEffects/Editor/VNCommandSearch.cs)）仍用基础定义，插入 `event` 时只会问模块 id
 与 `tutorial:`，不会逐个问模块专属参数——要做的话得在选完模块 id 之后重新取一次变体。
+
+---
+
+## 一三四、任务系统升级：条件自动判定 + 可领取 + 奖励发放（2026-09-02，分支 `feature/quest-system`）
+
+### 需求 / 背景
+
+原来的任务系统只有两个东西：[`VNQuestDef`](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs)（纯文案资产：标题/描述/阶段文案）和
+[`VNQuestLog`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs)（J 键日志面板 + `quest start|stage|done|fail` 命令），状态存 flag
+`任务_<id>`。**全是手动的**——剧本不写 `quest done` 就永远不会完成，也没有任何奖励机制。
+
+用户要的是：任务能配「羽毛球单场拿 5000 分」「在商店买到特定相机」这类**完成条件**，
+达成后自动判定；奖励也能配——给钱、给非卖品道具、加好感、解锁 CG、触发特殊剧情。
+
+三轮问答确定的方案：
+判定走**半自动**（条件自动达成 → 标记「可领取」→ 玩家在 J 键面板点领取）；
+任务来源**三条都要**（剧本发布 / 委托板接取 / 满足条件自动接取）；
+剧情类奖励**只写 flag**，剧本在日程节点自己 `if` 接，绝不打断当前演出；
+另加限时过期、前置任务链、可重复日常、多子目标带进度条。
+
+### 文件改动清单
+
+**新增（运行时）**
+
+- [`VNTracker.cs`](Assets/Project/Scripts/VNEffects/Script/VNTracker.cs) —— 统计层。按 `VNGameConfig.trackers`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:215`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L215)） 的声明，把源 flag 派生成
+  `@最高 / @最低 / @累计 / @次数`。纯静态、可单测。
+- [`VNQuestEngine.cs`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs) —— 引擎核心。条件求值、状态推进、领取发奖、超期判定、
+  日常冷却重置。不建 UI、不碰舞台，纯逻辑可单测。
+- [`VNQuestReward.cs`](Assets/Project/Scripts/VNEffects/Script/VNQuestReward.cs) —— 一条奖励的数据结构 + 发放器。五类：`Stat`（走
+  `VNStatsHud.Apply`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)），带钳制与 HUD 飘字）/ [`Item`](Assets/Project/Scripts/VNEffects/Script/VNShopDef.cs)（`道具_<id>`）/ `Flag`（任意 flag，
+  剧情解锁走这条）/ `Cg`（[`VNCgUnlocks`](Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs)）/ `Quest`（连锁接取，任务链用）。
+- [`VNQuestBoardModule.cs`](Assets/Project/Scripts/VNEffects/Script/VNQuestBoardModule.cs) —— 委托板事件模块 `event questboard`，结果 `接取` / `离开`。
+
+**新增（编辑器）**
+
+- [`VNQuestBoardInstaller.cs`](Assets/Project/Scripts/VNEffects/Editor/VNQuestBoardInstaller.cs) —— 场景装机菜单
+  **Tools → VN Effects → 场景装机 Install To Scene → 委托板 Quest Board**：
+  注册模块模板、补 `VNQuestLog`、生成三个示例任务、铺一套默认统计声明。
+
+**修改**
+
+- `VNQuestDef.cs` —— 新增 [`Stage`](Assets/Project/Scripts/VNEffects/Editor/VNCommandSearch.cs) / `Objective` 两层结构（阶段文案 + 子目标条件 +
+  进度声明 + 阶段奖励）、接取方式、前置任务、限时、可重复日常、隐藏任务等字段。
+  **旧 `stages: List<string>` 原样保留**：`stageDefs` 为空时回退用它，老资产零改动
+  照常工作，只是不会自动判定。
+- `VNQuestLog.cs` —— 面板从三栏改四栏（**可领取置顶**、金色高亮、带「领取」按钮、
+  子目标 ☑/☐ 逐条显示、带进度条），并负责驱动引擎求值与右上角角标。
+- [`VNFlags.cs`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs) —— 新增带 key 的 `KeyChanged` 事件。
+- [`VNSaveSystem.cs`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) —— 读档期间挂起引擎与统计层，恢复后 [`RecalculateSilently()`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs#L409)。
+- [`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) —— `time` 命令维护「月序」；调试重建期间同样挂起两者。
+- [`VNToast.cs`](Assets/Project/Scripts/VNEffects/Script/VNToast.cs) —— 新增独立角标槽位 [`SetBadge()`](Assets/Project/Scripts/VNEffects/Script/VNToast.cs#L92)。
+- [`VNGameConfig.cs`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs) —— 新增 `trackers` 列表。
+- 编辑器三处：[`VNScenarioSchema`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs)（`quest` 新子命令 + `event questboard` 参数格）、
+  [`VNScenarioLinter`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs)（十条 quest 检查 + `questboard` 结果名）、
+  [`VNGameConfigEditor`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigEditor.cs)（`trackers` 归入玩法页签）。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt` —— 新增 12 条 UI 字符串。
+
+### 技术决策与取舍
+
+**「可领取」不写进主 flag，走旁路 `任务_<id>@待领`**
+
+最初的方案是 `任务_球场之王 = 99`。但主 flag 的语义是**阶段号**，塞 99 进去有三个问题：
+剧本里的 `if 任务_xx==2` 会在可领取期间失效；多阶段任务丢失「是哪个阶段可领」的信息；
+现有 `quest start <id> N` 走 `Mathf.Max(1, stage)` 且没有上限，写个 99 就撞上了。
+改成主 flag 永远只存阶段号，另开 `@待领` 存待领取的阶段号（0 = 无）。
+代价是阶段号合法范围收窄到 `1..98`（100 与 -1 是完成/失败的保留值），由 Lint 卡死。
+
+**限时基准是新增的「月序」，不是日历「月份」**
+
+`time pass` 的实现是「月份 +N 后在 1~12 内循环，剩余月数 -N」，所以 `月份` 是**日历月**
+不是**绝对时间**：11 月接的 3 个月期限任务到期该是次年 2 月，而 `月份>=14` 永远不成立。
+引擎自己维护一个单调递增的 `月序`（`time set` 只初始化不重置，`time pass` 每过一月 +1）。
+没用现成的 `剩余月数`，是因为那个只有养成模式才会被 `time set … remain:` 设上，
+纯剧情章节里恒为 0。
+
+**读档必须挂起统计层与引擎**
+
+读档是把整张 flag 字典逐个 `Set` 回去，每一次都会触发变化事件。不挂起的话，
+读一次档 `@累计` 就被整份历史再加一遍、`@次数` 跟着涨——而派生值本来就存在档里，
+重算纯属破坏。同一个开关顺带保护任务引擎，避免在半截状态上弹「任务完成」Toast。
+调试重建（从选中行播放）走同一条路径。
+
+**统计层靠 `KeyChanged` 而不是 diff 字典**
+
+`VNFlags.Changed`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:21`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L21)） 不带参数，拿不到「是哪个 flag 变了」。原本打算靠缓存上一帧快照做 diff，
+但那会把「两场都打 21 分」算成一场（值没变），`@次数` 与 `@累计` 就错了。
+所以给 `VNFlags` 加了一个带 key 的事件——值相同的重复 `Set` 也会触发，那确实是一次新的写入。
+
+**`@` 成为引擎保留字**
+
+已验证 `@` 不在 [`VNExpression`](Assets/Project/Scripts/VNEffects/Script/VNExpression.cs) 的标识符分隔符黑名单里（那是黑名单式：除分隔符外任何字符
+都合法），所以 `羽球_我方得分@最高>=5000` 现在就能被求值器直接解析，**表达式解析器零改动**。
+代价是任务 / 属性 / 道具 id 从此不得含 `@`，由 Lint 卡死。
+
+**状态全落 flag，`VNSaveData` 零改动**
+
+任务状态、统计派生值、`月序` 全是普通 flag，本来就随 flag 字典整份序列化——
+`vn-save-compat` 那份「三处同步」清单这次一处都不用改。这是把状态压在 flag 上换来的最大红利。
+
+**求值节奏：标脏 + 下一帧一次**
+
+照抄属性 HUD 的做法，一帧最多算一次，且只算「进行中」的任务。几十个任务的量级
+每帧几十次表达式求值毫无压力。幂等由状态机保证：奖励只在「`@待领` → 领取」这一次
+跳变里发放，清 `@待领` 与写下一阶段在同一步完成。
+
+### 修复记录
+
+**装机跑了但示例任务一个都没生成**
+
+[`EnsureSampleQuests()`](Assets/Project/Scripts/VNEffects/Editor/VNQuestBoardInstaller.cs#L160) 里写的守卫是
+`if (AssetDatabase.FindAssets("t:VNQuestDef").Length > 0) return;`——
+「工程里一个任务资产都没有才造示例」。但工程里早就有 `告白大作战`，于是三个示例
+一个都没造出来。症状有两个：剧本编辑器的 `quest` id 下拉搜不到「球场之王」（候选扫的
+就是工程里的资产）；运行时任务日志只有光秃秃一个标题，没有描述与阶段文案（走了
+「未登记任务用 id 当标题」的回退路径）。
+
+改成**逐个按 id 判断存不存在**，缺哪个补哪个，已有的原样保留。顺带两处：
+资产造在**既有任务资产所在的目录**（工程整理过，实际是 `Assets/Art/VNEffects/Quests`，
+而代码里写死的 `Assets/VNEffects/Quests` 是 [`VNEffectsDemoSetup`](Assets/Project/Scripts/VNEffects/Editor/VNEffectsDemoSetup.cs) 的老常量、已与实际不符）；
+装机结尾补上 `VNAssetLibraryEvents.RaiseChanged()`（[`Assets/Project/Scripts/VNEffects/Editor/VNAssetLibraryEvents.cs:26`](Assets/Project/Scripts/VNEffects/Editor/VNAssetLibraryEvents.cs#L26)），让剧本编辑器立刻重建 id 下拉候选，
+不用手点 `Refresh Sources`——这条是 CLAUDE.md 里写明的约定，第一版漏了。
+
+### 验证方法
+
+- **引擎自测 32 项断言全通过**（用 `script-execute` 在编辑器里跑）：统计派生、
+  低分不覆盖最高、值相同也计次、接取→可领取→领取→下一阶段、重复领取不发奖（幂等）、
+  末阶段完成、限时边界（第 2 个月末不过期 / 第 3 个月过期）、失败发惩罚、
+  日常自动接取与跨月重置、挂起期间 `@累计`/`@次数` 不变。
+- **Lint 跑通**，并在既有剧本里抓到一个真实问题：`quest stage 告白大作战 3`，
+  但那个资产只有 2 个阶段（既有数据问题，本次未改动）。
+- **既有资产兼容**：`告白大作战` 读出来 `旧stages=2 / StageCount=2 / 阶段文案正常 /
+  有条件=False`——老资产照常工作、不自动判定，正是预期。
+- Unity 运行时与编辑器程序集编译无错误。
+
+### 已知限制
+
+「从选中行播放」重建出来的状态**不含玩家历史领取的奖励**——领取是玩家行为、
+不在剧本里，无法重放。要补偿就得把玩家操作也记进重放日志，代价远大于收益。
+
+---
+
+## 一三五、秘密偷拍模式：右上角相机图标 + 自由构图 + 察觉与惩罚 + 私密相册（2026-09-04，分支 `feature/secret-photo-mode`）
+
+### 需求与定位
+
+解锁后右上角出现相机图标，点进去玩家可以**自由缩放/平移舞台**构图，对话框与 HUD 隐藏，
+按底部中央的快门把当前画面存进一本**独立的私密相册**（G 键画廊第三个标签页）。
+定位是「偷拍玩法」而不是截图工具：被拍的角色会**察觉**，镜头对着她越近、停得越久涨得越快，
+满了就被发现——扣好感、警惕永久累积（下次涨得更快）、她说一句、强制退出。
+胶卷是道具，一张一卷，商店买。
+
+四轮问答定下的取舍（都记在这里，以后别再争）：
+
+| 决策 | 结论 |
+|---|---|
+| 运镜 | **只有缩放 + 平移，无旋转**（2D 立绘绕不到侧面，加旋转只会分散注意力） |
+| 画面 | **保持活的**（眨眼/呼吸/天气不停），只停 Ken Burns（它会跟玩家抢构图） |
+| 缩放上限 | **1.6x**，背景只有 1920×1080，再放就糊 |
+| 察觉 | **只升不降的累计量**，不做抬头周期、不做回落；她不在框里就不涨 |
+| 照片 | **不评分**，但拍摄信息照存（角色/表情/背景/缩放/月序），将来做图鉴不用重拍 |
+| 相册 | **完全独立存储**（`vn_secret_photos/`），浏览 UI 复用画廊；无密码，只藏入口 |
+| 胶卷 | 没胶卷不能进模式；被发现那一下按的快门照样扣；商店买 |
+| 数值 | 宽松档：中距离约 20 秒、贴脸约 7 秒；扣 3 好感；警惕每次 +10% |
+
+### 文件改动
+
+新增（`Assets/Project/Scripts/VNEffects/`）：
+
+- [`Script/VNSecretPhotoDef.cs`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoDef.cs)：ScriptableObject 参数（解锁 flag / 胶卷道具 id / 缩放范围 /
+  察觉涨速 / 惩罚 / 被发现台词三语 + 按角色覆盖 / 教程 id / 音效覆盖）。
+  `Resolve()` 没登记资产时给一份 `HideFlags.DontSave` 的默认值，只解锁 flag 也能玩。
+- [`Script/VNSecretPhotoRig.cs`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoRig.cs)：纯逻辑（无 MonoBehaviour）——取景框钳制、她在框内的权重、
+  缩放倍率、察觉涨速、最近目标选择。
+- [`Script/VNSecretAlbum.cs`](Assets/Project/Scripts/VNEffects/Script/VNSecretAlbum.cs)：私密相册，结构照抄 [`VNPhotoAlbum`](Assets/Project/Scripts/VNEffects/Script/VNPhotoAlbum.cs)（写盘 / 索引对账 / 12 张 LRU /
+  不驱逐的缩略图缓存 / 上限 200），条目字段换成拍摄信息。
+- [`Script/VNSecretPhotoUi.cs`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoUi.cs)：相机图标 + 手机相机风取景 HUD；嵌套 Canvas 排序 **70**。
+- [`Script/VNSecretPhotoMode.cs`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoMode.cs)：状态机 + 输入 + 察觉 + 快门 + 被发现；Runner 启动时创建。
+- [`Editor/VNSecretPhotoInstaller.cs`](Assets/Project/Scripts/VNEffects/Editor/VNSecretPhotoInstaller.cs)：装机菜单（建参数资产 / 教程资产「秘密相机」 /
+  示例商店「杂货店」卖胶卷，并登记进 VNGameConfig）。**不动场景**。
+
+修改：
+
+- [`VNCamera.cs`](Assets/Project/Scripts/VNEffects/VNCamera.cs)：`BeginManual(mode) / SetManualView(look, zoom) / EndManual(duration)`——
+  快照进入时的容器状态与模式、杀掉运镜补间；每帧直接赋值、立绘倍率只在 zoom 变化时起短补间；
+  退出补间回快照。[`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L576) 顺带作废手动态。
+- [`VNScriptRunner.cs`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs)：创建模式；`Update` 打开期间直接 return（顺带挡掉 F5/F9/Q/L 与推进）；
+  `ApplyUiHidden` 加 `_secretPhotoActive` 临时位；`Stop()` 兜底 `ForceClose()`；
+  新增 `IsSecretPhotoIconAllowed / CanOpenSecretPhoto / SetSecretPhotoActive / SayOutOfScript / StatsHud`。
+- [`VNCgGallery.cs`](Assets/Project/Scripts/VNEffects/Script/VNCgGallery.cs)：第三个「私密」标签页；照片页函数改为按页分派到两个相册。
+- [`VNStage.cs`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs)：`ActiveCharacters` 枚举。[`VNToast.cs`](Assets/Project/Scripts/VNEffects/Script/VNToast.cs)：`RootObject`。
+- [`VNGameConfig.cs`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs) / [`VNGameConfigEditor.cs`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigEditor.cs) / [`VNGameConfigTools.cs`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs)：`secretPhoto` 字段进「玩法」页，
+  目录扫描空着时自动补。
+- `Resources/VNLocale/ui.{zh,en,ja}.txt`：`secretphoto.*` 15 条 + `gallery.tab.secret` 等 3 条。
+
+### 技术决策
+
+- **不是事件模块，是全局面板**：不由剧本 `event` 启动，任何台词处都能进。但它**直接操控舞台镜头**，
+  和 aitalk / interact 一样是刻意破一次模块三铁律；边界收紧为只碰 ZoomRoot、UI 可见性、Ken Burns 开关，
+  四条退出路径（退出键 / ESC / 被发现 / Stop·销毁）都走同一个 `Restore()`。
+- **状态全在 flag，[`VNSaveData`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) 零改动**：解锁 `秘密相机`、胶卷 `道具_胶卷`、警惕 `偷拍_警惕_<角色>`。
+  模式本身瞬态不进存档。
+- **UI 隐藏不写进 `_uiHiddenParts`**：Runner 加一个临时位，退出按剧本/玩家原本的隐藏状态还原——
+  `hideHUD keep` 的沉浸段落不会被拍照弹回 UI。
+- **被发现时她那句话走 `SayOutOfScript`**：直接写对话框 + 进回想，不走 `RunInlineCo`——
+  那会嵌套一层 SayCo 把 `_waitingAtSay` 清掉，接下来一句都存不了档。玩家点一下就推进原剧本。
+- **防露边按背景实际尺寸钳制**：`VNCamera.overscan`（[`Assets/Project/Scripts/VNEffects/VNCamera.cs:201`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L201)） 写着 60px，但手搭场景的背景常常正好 1920×1080，
+  信它就会在推近后往边上一拉露出黑边并拍进照片。`EffectiveOverscan()` 取 min(设定, 实际)。
+- **取景 UI 挂主 Canvas 嵌套排序 70**：教程（92）与转场（100）都在主 Canvas，
+  自建 Overlay 画布会永远压在它们之上，教程的暗幕和挖洞盖不住快门键。
+- **抓屏隐藏清单**：取景 HUD + VNToast 整张画布（AUTO/任务角标）+ 演示场景的 `HintText`。
+- **快门按下即扣胶卷**，抓图失败 / 相册已满才退回；被发现那一下也扣（设计）。
+- **画廊「私密」页在解锁或相册非空时出现**：换周目 flag 清零，旧照片不能失联。
+- 快门/图标的圆形用自己生成的硬边抗锯齿贴图——[`VNProceduralTextures.SoftCircle`](Assets/Project/Scripts/VNEffects/VNProceduralTextures.cs) 是发光用的软边渐变，
+  叠在亮画面上几乎看不见（实测踩过）。
+
+### 修复记录
+
+- 首版图标放 (-40,-118) 压在默认主题的右上快捷条上 → 挪到 -240。
+- 「✕」不在 NotoSans CJK 字库里 → 退出按钮文案改成「退出 Esc」。
+
+### 验证
+
+Play Mode 用 `script-execute` 全流程实测：解锁后图标出现 → 点击进入、对话框与 HUD 隐藏 →
+1.6x 拉到画布右上角无黑边 → 快门胶卷 3→2、照片落盘干净（无 HUD/角标/提示文字，带 Bloom）→
+察觉满：红闪 + 情绪动作 + 漫符，好感 10→7、警惕 = 10，强制退出后她在对话框里说
+「把相机收起来。现在。」，镜头与 UI 完整还原 → 画廊「私密」页列出全部照片。编译零错误。
+
+### 已知限制
+
+- 照片分辨率 = 玩家窗口分辨率（走 `ScreenCapture`，封顶 1600），窗口开小就拍得小。
+- 照片是硬盘上的明文 PNG，「私密」只是入口隐藏。
+- 最简版察觉只升不降、照片不评分，数学上「一进去立刻按」是最优解——这是用户看过提醒后选的；
+  想加深度时 `VNSecretPhotoRig` 已留好权重/倍率的位置，照片 metadata 也在。

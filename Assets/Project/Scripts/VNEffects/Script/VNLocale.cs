@@ -58,9 +58,6 @@ namespace VNEffects
         /// <summary>当前语言代码：zh / en / ja（剧本翻译表文件名后缀也用它）</summary>
         public static string Code => Codes[(int)Language];
 
-        /// <summary>某语言的语言代码</summary>
-        public static string CodeOf(VNLanguage lang) => Codes[(int)lang];
-
         /// <summary>语言的自称显示名（用于语言切换按钮，永远以该语言本身书写）</summary>
         public static string DisplayName(VNLanguage lang)
         {

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -263,17 +264,6 @@ namespace VNEffects
                 var k = Keyboard.current;
                 return k != null && (k.leftShiftKey.isPressed || k.rightShiftKey.isPressed);
             }
-        }
-
-        public void ResetAdjustments()
-        {
-            meOffset = herOffset = Vector2.zero;
-            meScale = herScale = 1f;
-            meRotation = herRotation = 0f;
-            backdropOffset = Vector2.zero;
-            backdropScale = 1f;
-            onChanged?.Invoke();
-            onBackdropChanged?.Invoke();
         }
 
         /// <summary>本地 x 离谁的当前站位更近</summary>
@@ -542,14 +532,6 @@ namespace VNEffects
         }
 
         // ---- 杂项 ----
-
-        public static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
 
         public static RectTransform Rect(Component c) => (RectTransform)c.transform;
 

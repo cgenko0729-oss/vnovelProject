@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -206,12 +207,6 @@ namespace VNEffects
             BindButton(button, () => SetLanguage(language));
             if (VNLocale.Language == language && button.targetGraphic != null)
                 button.targetGraphic.color = activeColor;
-        }
-
-        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
-        {
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(action);
         }
 
         void RefreshValues()

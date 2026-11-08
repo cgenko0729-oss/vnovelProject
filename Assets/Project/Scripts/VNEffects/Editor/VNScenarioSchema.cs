@@ -379,12 +379,16 @@ namespace VNEffects.EditorTools
                 Pos("id", "bg", VNParamSource.Background),
                 Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
                 Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f));
-            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep] [via:black]",
+            Add("cg", "Scene", "cg <id|off> [transition:Type] [chars:keep] [fx:keep] [via:black] [fit:模式]\n" +
+                "fit: 竖图/方图的显示方式，不写 = 跟 VNGameConfig 里该 CG 条目的登记走（默认拉伸）：\n" +
+                "stretch 拉伸（老行为）· cover 等比裁满 · blur 完整显示+两侧模糊底 · " +
+                "blurvig 模糊+暗角 · gradient 两侧主色渐变",
                 Pos("id", "cg", VNParamSource.Cg),
                 Kw("transition", "transition", VNParamSource.Options, EnumNames<VNTransition>()),
                 Kw("chars", "chars", VNParamSource.Options, new[] { "keep" }),
                 Kw("fx", "fx", VNParamSource.Options, new[] { "keep" }),
-                Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f));
+                Kw("via", "via", VNParamSource.Options, new[] { "black" }, weight: 0.5f),
+                Kw("fit", "显示", VNParamSource.Options, VNCgFit.ScriptNames, weight: 0.6f));
             Add("weather", "Scene",
                 "weather <id> [density:] [wind:] [speed:] [size:]\n" +
                 "飘落类：petals/sakura（落樱）· maple（枫叶）· ginkgo（银杏）· " +

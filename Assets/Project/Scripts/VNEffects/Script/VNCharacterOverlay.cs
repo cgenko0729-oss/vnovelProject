@@ -94,8 +94,6 @@ namespace VNEffects
             return true;
         }
 
-        public float GetStrength(string id) => Find(id)?.strength ?? 0f;
-
         public void ClearAll(float duration = 0.3f)
         {
             foreach (var layer in _layers) SetStrength(layer.id, 0f, duration);

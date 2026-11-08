@@ -46,13 +46,6 @@ namespace VNEffects
             _cached = true;
         }
 
-        /// <summary>运行时添加视差层（如前景装饰）</summary>
-        public void AddLayer(RectTransform rect, float strength)
-        {
-            if (rect == null) return;
-            layers.Add(new Layer { rect = rect, strength = strength, basePos = rect.anchoredPosition });
-        }
-
         public void SetEnabled(bool on) => _enabled = on;
 
         public void Toggle() => _enabled = !_enabled;

@@ -55,6 +55,7 @@ namespace VNEffects
         public string cgId;                            // 显示中的 CG（空 = 无，旧存档缺省兼容）
         public bool cgKeepChars;                       // cg 命令的 chars:keep
         public bool cgKeepFx;                          // cg 命令的 fx:keep
+        public string cgFit = "";                      // cg 命令的 fit:（空 = 跟 CG 条目登记走，旧存档兼容）
         public string dialogueSkin;                    // 对话框皮肤 id（空 = 默认，旧存档兼容）
         public string choiceSkin;                      // 选项面板皮肤 id（空 = 默认）
         public string nameplateStyle;                  // 名字样式名（空 = 出厂样式，旧存档兼容）

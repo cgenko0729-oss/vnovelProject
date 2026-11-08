@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -13,7 +14,7 @@ namespace VNEffects
     /// 文案/图标/装备数据从登记的 VNShopDef 商品清单里找（未登记的道具用 id 照常显示）。
     /// 道具行左键选中看介绍，右键弹出 装备/卸下/使用 菜单；装备格右键直接卸下。
     /// 外观支持全局主题 prefab（VNSystemUiSkinSet.inventoryPrefab + VNInventorySkin 槽位），
-    /// 缺失或校验失败时退回程序化默认 UI，参照 VNStatsHud 的皮肤接法。
+    /// 缺失或校验失败时直接抛异常。
     /// </summary>
     public class VNInventory : MonoBehaviour
     {
@@ -100,7 +101,7 @@ namespace VNEffects
         }
 
         // ------------------------------------------------------------------
-        // 构建（皮肤优先，退回程序化默认）
+        // 构建
         // ------------------------------------------------------------------
 
         void Build()
@@ -121,7 +122,8 @@ namespace VNEffects
             var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.inventoryPrefab);
             _skin = VNSystemUiSkinUtility.Instantiate<VNInventorySkin>(
                 skinPrefab, _canvas.transform, "VNInventory");
-            if (_skin == null) _skin = BuildDefault();
+            if (_skin == null)
+                throw new System.InvalidOperationException("Inventory prefab is missing or invalid.");
 
             _panel = _skin.panelRoot;
             _scroll = _skin.itemContent.GetComponentInParent<ScrollRect>(true);
@@ -465,224 +467,6 @@ namespace VNEffects
             }
         }
 
-        // ------------------------------------------------------------------
-        // 程序化默认 UI（皮肤缺失/校验失败时兜底；结构与导出模板一致）
-        // ------------------------------------------------------------------
-
-        VNInventorySkin BuildDefault()
-        {
-            var panelGo = new GameObject("Panel", typeof(RectTransform));
-            var panelRect = (RectTransform)panelGo.transform;
-            panelRect.SetParent(_canvas.transform, false);
-            Stretch(panelRect);
-            var skin = panelGo.AddComponent<VNInventorySkin>();
-            skin.panelRoot = panelGo;
-
-            var dimGo = new GameObject("Dim",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-            var dimRect = (RectTransform)dimGo.transform;
-            dimRect.SetParent(panelRect, false);
-            Stretch(dimRect);
-            var dimImage = dimGo.GetComponent<Image>();
-            dimImage.color = new Color(0f, 0.01f, 0.02f, 0.88f);
-            skin.backgroundCloseButton = dimGo.GetComponent<Button>();
-            skin.backgroundCloseButton.targetGraphic = dimImage;
-
-            skin.titleText = CreateText(panelRect, 34, TextAlignmentOptions.Center);
-            skin.titleText.fontStyle = FontStyles.Bold;
-            SetAnchored(skin.titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(0f, 48f));
-
-            skin.hintText = CreateText(panelRect, 20, TextAlignmentOptions.Center);
-            skin.hintText.color = new Color(1f, 1f, 1f, 0.55f);
-            SetAnchored(skin.hintText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(0.5f, 1f), new Vector2(0f, -76f), new Vector2(0f, 30f));
-
-            // 左：道具列表
-            var scrollGo = new GameObject("Scroll",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(ScrollRect));
-            var scrollRect = (RectTransform)scrollGo.transform;
-            scrollRect.SetParent(panelRect, false);
-            scrollRect.anchorMin = new Vector2(0.05f, 0.16f);
-            scrollRect.anchorMax = new Vector2(0.47f, 0.87f);
-            scrollRect.offsetMin = Vector2.zero;
-            scrollRect.offsetMax = Vector2.zero;
-            scrollGo.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.02f);
-            var scroll = scrollGo.GetComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.scrollSensitivity = 40f;
-
-            var viewportGo = new GameObject("Viewport",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D));
-            var viewportRect = (RectTransform)viewportGo.transform;
-            viewportRect.SetParent(scrollRect, false);
-            Stretch(viewportRect);
-            viewportGo.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.01f);
-
-            var contentGo = new GameObject("Content",
-                typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-            var content = (RectTransform)contentGo.transform;
-            content.SetParent(viewportRect, false);
-            content.anchorMin = new Vector2(0f, 1f);
-            content.anchorMax = new Vector2(1f, 1f);
-            content.pivot = new Vector2(0.5f, 1f);
-            content.anchoredPosition = Vector2.zero;
-            // sizeDelta 默认 (100,100)，横向拉伸下会比视口宽 100px 被 RectMask2D 裁掉，必须清零
-            content.sizeDelta = Vector2.zero;
-            var contentLayout = contentGo.GetComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 10f;
-            contentLayout.childControlHeight = true;
-            contentLayout.childControlWidth = true;
-            contentLayout.childForceExpandHeight = false;
-            contentGo.GetComponent<ContentSizeFitter>().verticalFit =
-                ContentSizeFitter.FitMode.PreferredSize;
-            scroll.viewport = viewportRect;
-            scroll.content = content;
-            skin.itemContent = content;
-
-            skin.emptyText = CreateText(scrollRect, 26, TextAlignmentOptions.Center);
-            skin.emptyText.color = new Color(1f, 1f, 1f, 0.55f);
-            Stretch(skin.emptyText.rectTransform);
-            skin.emptyText.raycastTarget = false;
-
-            skin.rowTemplate = BuildDefaultRow(content);
-
-            // 右：7 格装备栏
-            var slotsGo = new GameObject("Slots",
-                typeof(RectTransform), typeof(VerticalLayoutGroup));
-            var slotsRect = (RectTransform)slotsGo.transform;
-            slotsRect.SetParent(panelRect, false);
-            slotsRect.anchorMin = new Vector2(0.53f, 0.16f);
-            slotsRect.anchorMax = new Vector2(0.95f, 0.87f);
-            slotsRect.offsetMin = Vector2.zero;
-            slotsRect.offsetMax = Vector2.zero;
-            var slotsLayout = slotsGo.GetComponent<VerticalLayoutGroup>();
-            slotsLayout.spacing = 10f;
-            slotsLayout.childControlWidth = true;
-            slotsLayout.childControlHeight = true;
-            slotsLayout.childForceExpandHeight = true;
-
-            skin.headSlot = BuildDefaultSlot(slotsRect);
-            skin.faceSlot = BuildDefaultSlot(slotsRect);
-            skin.upperBodySlot = BuildDefaultSlot(slotsRect);
-            skin.handsSlot = BuildDefaultSlot(slotsRect);
-            skin.lowerBodySlot = BuildDefaultSlot(slotsRect);
-            skin.feetSlot = BuildDefaultSlot(slotsRect);
-            skin.specialSlot = BuildDefaultSlot(slotsRect);
-
-            // 底：介绍区
-            var detailGo = new GameObject("Detail",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            var detailRect = (RectTransform)detailGo.transform;
-            detailRect.SetParent(panelRect, false);
-            detailRect.anchorMin = new Vector2(0.05f, 0.02f);
-            detailRect.anchorMax = new Vector2(0.95f, 0.14f);
-            detailRect.offsetMin = Vector2.zero;
-            detailRect.offsetMax = Vector2.zero;
-            var detailBg = detailGo.GetComponent<Image>();
-            detailBg.sprite = VNProceduralTextures.RoundedRectSprite;
-            detailBg.type = Image.Type.Sliced;
-            detailBg.color = new Color(1f, 1f, 1f, 0.04f);
-            detailBg.raycastTarget = false;
-            skin.detailText = CreateText(detailRect, 22, TextAlignmentOptions.TopLeft);
-            Stretch(skin.detailText.rectTransform);
-            skin.detailText.rectTransform.offsetMin = new Vector2(18f, 10f);
-            skin.detailText.rectTransform.offsetMax = new Vector2(-18f, -10f);
-            skin.detailText.textWrappingMode = TextWrappingModes.Normal;
-
-            return skin;
-        }
-
-        VNInventoryRowSkin BuildDefaultRow(RectTransform parent)
-        {
-            var rowGo = new GameObject("RowTemplate", typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
-            var rowRect = (RectTransform)rowGo.transform;
-            rowRect.SetParent(parent, false);
-            rowGo.GetComponent<LayoutElement>().preferredHeight = 64f;
-            var rowBg = rowGo.GetComponent<Image>();
-            rowBg.sprite = VNProceduralTextures.RoundedRectSprite;
-            rowBg.type = Image.Type.Sliced;
-            rowBg.color = new Color(1f, 1f, 1f, 0.05f);
-            var rowSkin = rowGo.AddComponent<VNInventoryRowSkin>();
-            rowSkin.button = rowGo.GetComponent<Button>();
-            rowSkin.button.targetGraphic = rowBg;
-
-            var iconGo = new GameObject("Icon", typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Image));
-            var iconRect = (RectTransform)iconGo.transform;
-            iconRect.SetParent(rowRect, false);
-            SetAnchored(iconRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(48f, 48f));
-            rowSkin.icon = iconGo.GetComponent<Image>();
-            rowSkin.icon.preserveAspect = true;
-            rowSkin.icon.raycastTarget = false;
-
-            rowSkin.nameText = CreateText(rowRect, 26, TextAlignmentOptions.MidlineLeft);
-            Stretch(rowSkin.nameText.rectTransform);
-            rowSkin.nameText.rectTransform.offsetMin = new Vector2(68f, 0f);
-            rowSkin.nameText.rectTransform.offsetMax = new Vector2(-140f, 0f);
-
-            rowSkin.countText = CreateText(rowRect, 24, TextAlignmentOptions.MidlineRight);
-            rowSkin.countText.color = new Color(1f, 0.82f, 0.5f, 1f);
-            SetAnchored(rowSkin.countText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 1f),
-                new Vector2(1f, 0.5f), new Vector2(-14f, 0f), new Vector2(80f, 0f));
-
-            var markText = CreateText(rowRect, 21, TextAlignmentOptions.Center);
-            markText.text = VNLocale.T("equip.equippedMark");
-            markText.color = new Color(0.56f, 0.88f, 0.56f, 1f);
-            markText.fontStyle = FontStyles.Bold;
-            SetAnchored(markText.rectTransform, new Vector2(1f, 0f), new Vector2(1f, 1f),
-                new Vector2(1f, 0.5f), new Vector2(-96f, 0f), new Vector2(40f, 0f));
-            rowSkin.equippedMark = markText.gameObject;
-
-            return rowSkin;
-        }
-
-        VNInventorySlotSkin BuildDefaultSlot(RectTransform parent)
-        {
-            var slotGo = new GameObject("Slot", typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Image), typeof(Button));
-            var slotRect = (RectTransform)slotGo.transform;
-            slotRect.SetParent(parent, false);
-            var slotBg = slotGo.GetComponent<Image>();
-            slotBg.sprite = VNProceduralTextures.RoundedRectSprite;
-            slotBg.type = Image.Type.Sliced;
-            slotBg.color = new Color(1f, 1f, 1f, 0.05f);
-            var slotSkin = slotGo.AddComponent<VNInventorySlotSkin>();
-            slotSkin.button = slotGo.GetComponent<Button>();
-            slotSkin.button.targetGraphic = slotBg;
-
-            slotSkin.slotLabel = CreateText(slotRect, 24, TextAlignmentOptions.MidlineLeft);
-            slotSkin.slotLabel.color = new Color(0.66f, 0.85f, 1f, 1f);
-            SetAnchored(slotSkin.slotLabel.rectTransform, new Vector2(0f, 0f), new Vector2(0f, 1f),
-                new Vector2(0f, 0.5f), new Vector2(16f, 0f), new Vector2(130f, 0f));
-
-            var iconGo = new GameObject("Icon", typeof(RectTransform),
-                typeof(CanvasRenderer), typeof(Image));
-            var iconRect = (RectTransform)iconGo.transform;
-            iconRect.SetParent(slotRect, false);
-            SetAnchored(iconRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f), new Vector2(152f, 0f), new Vector2(46f, 46f));
-            slotSkin.icon = iconGo.GetComponent<Image>();
-            slotSkin.icon.preserveAspect = true;
-            slotSkin.icon.raycastTarget = false;
-
-            slotSkin.itemNameText = CreateText(slotRect, 25, TextAlignmentOptions.MidlineLeft);
-            Stretch(slotSkin.itemNameText.rectTransform);
-            slotSkin.itemNameText.rectTransform.offsetMin = new Vector2(212f, 0f);
-            slotSkin.itemNameText.rectTransform.offsetMax = new Vector2(-14f, 0f);
-
-            var emptyText = CreateText(slotRect, 23, TextAlignmentOptions.MidlineLeft);
-            emptyText.text = VNLocale.T("equip.emptySlot");
-            emptyText.color = new Color(1f, 1f, 1f, 0.28f);
-            Stretch(emptyText.rectTransform);
-            emptyText.rectTransform.offsetMin = new Vector2(212f, 0f);
-            emptyText.rectTransform.offsetMax = new Vector2(-14f, 0f);
-            slotSkin.emptyMark = emptyText.gameObject;
-
-            return slotSkin;
-        }
 
         TextMeshProUGUI CreateText(Transform parent, int size, TextAlignmentOptions anchor)
         {
@@ -699,22 +483,5 @@ namespace VNEffects
             return t;
         }
 
-        static void SetAnchored(RectTransform rect, Vector2 anchorMin, Vector2 anchorMax,
-            Vector2 pivot, Vector2 anchoredPos, Vector2 sizeDelta)
-        {
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.pivot = pivot;
-            rect.anchoredPosition = anchoredPos;
-            rect.sizeDelta = sizeDelta;
-        }
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
     }
 }

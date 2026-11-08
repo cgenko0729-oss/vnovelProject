@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -999,43 +1000,7 @@ namespace VNEffects
 
         // ---- 程序化 UI 辅助 ----
 
-        static RectTransform CreateImage(string name, RectTransform parent,
-            Sprite sprite, Color color)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            var image = go.AddComponent<Image>();
-            image.sprite = sprite;
-            image.color = color;
-            image.raycastTarget = false;    // 铁律：默认不吃射线，否则会挡住选项/对话推进
-            return rect;
-        }
-
-        static TextMeshProUGUI CreateText(string name, RectTransform parent,
-            int size, Color color, string content)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform)go.transform;
-            rect.SetParent(parent, false);
-            var text = go.AddComponent<TextMeshProUGUI>();
-            text.font = VNFont.Asset;
-            text.fontSize = size;
-            text.color = color;
-            text.text = content;
-            text.alignment = TextAlignmentOptions.Center;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.raycastTarget = false;
-            return text;
-        }
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
+        static RectTransform CreateImage(string name, RectTransform parent, Sprite sprite, Color color) =>
+            VNUi.CreateImage(name, parent, sprite, color, raycast: false);
     }
 }

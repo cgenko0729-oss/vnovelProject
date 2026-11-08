@@ -411,13 +411,13 @@ IEnumerator Run()
 | `call` / `return` | `CallTo(cmd)` / `ReturnFromCall(line, isAsync)` | 瞬发 |
 | `chapter` | `SwitchChapter(name, line)` | 瞬发 |
 | `flag` | `ApplyFlagCommand(cmd, silent:false)` | 瞬发 |
-| `if` | 从**最后一个** `jump` token 往前重组条件串 → `VNFlags.Evaluate()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:66`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L66)） → `JumpTo()` | 瞬发 |
+| `if` | 从**最后一个** `jump` token 往前重组条件串 → `VNFlags.Evaluate()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:73`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L73)） → `JumpTo()` | 瞬发 |
 | `stat` | `_statsHud.Apply(name, valueToken, silent, line)` | 瞬发 |
 | `time` | `ApplyTimeCommand(cmd, silent:false)` | 瞬发 |
 | `choice` | `ChoiceCo()` | 等玩家选 |
 | `event` | `EventCo()` | 等模块返回 |
 | `quest` | `_questLog.Apply(op, id, stage, silent, line)` | 瞬发 |
-| `hideHUD` | [`ParseHideHudArgs()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1768) → `SetUiHidden(parts, hide, lock)` | 瞬发 |
+| `hideHUD` | [`ParseHideHudArgs()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L1852) → `SetUiHidden(parts, hide, lock)` | 瞬发 |
 
 > `if` 的解析很讲究：**从最后一个 `jump` 向前重组条件**，因此独立 `if` 里可以安全使用空格与括号
 > （`if (好感度>=30 && !已告白) jump 告白路线`）。
@@ -555,10 +555,10 @@ speedlines  letterbox  meteor  skycloud  filmgrain  crt  kenburns
 
 非开关型（**不记录状态**）：`shockwave`（一次性水波）、`speedlines burst`、`focus`（跟角色走）。
 
-两组互斥关系写在 [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 里：`filmgrain` ⇄ `crt` 互斥，且手动操作会把 `_retroAuto` 置 false
+两组互斥关系写在 [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 里：`filmgrain` ⇄ `crt` 互斥，且手动操作会把 `_retroAuto` 置 false
 （接管 mood 自动滤镜）；`letterbox` 手动操作把 `_letterboxAuto` 置 false。
 
-[`ResetEffects()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1598)（`reset effects`）把全部 toggle 关掉、天气清空、mood 回 Neutral、液体重置，
+[`ResetEffects()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1601)（`reset effects`）把全部 toggle 关掉、天气清空、mood 回 Neutral、液体重置，
 但 **Ken Burns 是默认开启的常驻氛围**（「永不静止」），重置回默认开而非关。
 
 #### 4.3.3 CG 的三个「保留」开关
@@ -654,7 +654,7 @@ public static bool Evaluate(string cond, int line = 0);
 
 | 方法 | 用途 |
 |---|---|
-| `TryEvaluate(expr, valueResolver, out bool, out error)` | 运行时求值（`VNFlags.Evaluate`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:66`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L66)） 调它） |
+| `TryEvaluate(expr, valueResolver, out bool, out error)` | 运行时求值（`VNFlags.Evaluate`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:73`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L73)） 调它） |
 | `TryValidate(expr, out error)` | Lint / 编辑器语法检查（不需要真值） |
 | `TryCollectIdentifiers(expr, ICollection<string>, out error)` | Lint 收集条件里引用了哪些 flag（查「读了从没写过的 flag」） |
 
@@ -667,7 +667,7 @@ public static bool Evaluate(string cond, int line = 0);
 
 | 前缀 / 名字 | 常量定义处 | 写入者 | 语义 |
 |---|---|---|---|
-| `任务_<id>` | `VNQuestLog.FlagPrefix`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:20`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L20)） | `VNQuestLog.Apply()`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:72`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L72)） | 任务阶段；`StageDone = 100`、`StageFailed = -1` |
+| `任务_<id>` | `VNQuestLog.FlagPrefix`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:23`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L23)） | `VNQuestLog.Apply()`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:144`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L144)） | 任务阶段；`StageDone = 100`、`StageFailed = -1` |
 | `道具_<id>` | `VNShopDef.ItemFlagPrefix`（[`Assets/Project/Scripts/VNEffects/Script/VNShopDef.cs:30`](Assets/Project/Scripts/VNEffects/Script/VNShopDef.cs#L30)） | [`VNShopModule`](Assets/Project/Scripts/VNEffects/Script/VNShopModule.cs) | 持有数量 |
 | `装备_<道具id>` | `VNEquipment.EquipFlagPrefix`（[`Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs:18`](Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs#L18)） | `VNEquipment.Equip()`（[`Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs:48`](Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs#L48)） | 部位编号（[`VNEquipSlot`](Assets/Project/Scripts/VNEffects/Script/VNShopDef.cs)） |
 | `装备实增_<slot>_<statId>` | `VNEquipment.AppliedFlagPrefix`（[`Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs:19`](Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs#L19)） | [`VNEquipment`](Assets/Project/Scripts/VNEffects/Script/VNEquipment.cs) | **实际生效的增量**（卸下时按此扣回，防钳制不对称） |
@@ -683,7 +683,7 @@ public static bool Evaluate(string cond, int line = 0);
 | 属性 id（`金钱`/`行动力`/`好感度_结衣`…） | `VNStatDef.id`（[`Assets/Project/Scripts/VNEffects/Script/VNStatDef.cs:32`](Assets/Project/Scripts/VNEffects/Script/VNStatDef.cs#L32)） | `VNStatsHud.Apply()`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)） | **属性值就是同名 flag**，[`VNStatDef`](Assets/Project/Scripts/VNEffects/Script/VNStatDef.cs) 只提供钳制 / 样式 / 等级 |
 | 任意剧本自定义 | — | `flag` 命令 / `choice` 的 `flag:` | 剧情开关 |
 
-> 这个设计的代价：**flag 名冲突没有编译期保护**。Lint 里的 `CheckLoopGuards` / [`FlagNames()`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs#L1542)
+> 这个设计的代价：**flag 名冲突没有编译期保护**。Lint 里的 `CheckLoopGuards` / [`FlagNames()`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs#L1590)
 > 部分缓解（查「读了从没写过的 flag」），但改前缀仍要全局搜索。
 
 ---
@@ -796,7 +796,7 @@ flowchart TD
 | Ken Burns 默认开启 | `snapshot.fxOn.Add("kenburns")` **先种入再重放** |
 | `bgscroll` 参数留空 = 沿用 | 用 `cmd.kwargs.ContainsKey("speed")` 判断是否覆盖，**不能每条都重置成默认** |
 | `weather` 换天气整组重置 | 与运行时 `SetWeather` 一致：只保留本行显式写了的覆盖参数 |
-| mood Memory → 自动黑边 / 胶片 | 用 `autoLetterbox` / `autoRetro` 布尔重放 `VNStage.SetMood`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1357`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1357)） 的自动联动逻辑 |
+| mood Memory → 自动黑边 / 胶片 | 用 `autoLetterbox` / `autoRetro` 布尔重放 `VNStage.SetMood`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1360`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1360)） 的自动联动逻辑 |
 | `liquid` | 只重放 `spray` / `click` / `wet` / `cover` 四个持续开关；`splash`（一次性）与 `dry`（一次性擦除）不重放 |
 | SNS | `ReplaySnsCommand` / `ReplaySnsSay` / `AddSnsMessage` 把消息列表重建出来 |
 | 立绘位置 | `RebuildShowState` / `RebuildOverlayState` / `RebuildMarkState` / `RebuildMoveState` 分工，站位靠 `DebugSlotX(at)` |
@@ -811,16 +811,16 @@ flowchart TD
 新增任何「跳到某一行时画面应该是什么样」的运行时状态，必须同时改：
 
 1. `VNSaveData` 加字段（并保证缺省值语义正确）；
-2. `VNStage.CaptureSnapshot()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L840)） + `RestoreSnapshot()` 成对；
+2. `VNStage.CaptureSnapshot()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:843`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L843)） + `RestoreSnapshot()` 成对；
 3. [`VNScriptRunner.RebuildStateBefore()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs) 加对应 case。
 
 **刻意不进存档的状态**（各有明确理由）：
 
 | 状态 | 为什么不存 |
 |---|---|
-| 镜头（[`VNCamera`](Assets/Project/Scripts/VNEffects/VNCamera.cs)） | 调试重建走 [`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L485)；镜头位置玩家看不出「读档后该不该保留」 |
+| 镜头（[`VNCamera`](Assets/Project/Scripts/VNEffects/VNCamera.cs)） | 调试重建走 [`SnapReset()`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L576)；镜头位置玩家看不出「读档后该不该保留」 |
 | 立绘痕迹（[`VNCharacterImprints`](Assets/Project/Scripts/VNEffects/Script/VNCharacterImprints.cs)） | 它会自己褪色消失，也就没有「读档后该不该还在」的问题 |
-| 过场章节卡（[`VNInterludeScreen`](Assets/Project/Scripts/VNEffects/Script/VNInterludeScreen.cs)） | 演出中不可存档；但 [`ClearStage()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L983) 必须 [`HideImmediate()`](Assets/Project/Scripts/VNEffects/Script/VNInterludeScreen.cs#L136) |
+| 过场章节卡（[`VNInterludeScreen`](Assets/Project/Scripts/VNEffects/Script/VNInterludeScreen.cs)） | 演出中不可存档；但 [`ClearStage()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L986) 必须 [`HideImmediate()`](Assets/Project/Scripts/VNEffects/Script/VNInterludeScreen.cs#L136) |
 | 背景滚动累计偏移 | 从哪一帧接着滚玩家看不出来 |
 | 空中水珠 / 已溅好的水渍 | 瞬态 |
 | 教程「看过了」 | **全局 JSON**，不是存档态（读旧档不该重看，见第 15 章） |
@@ -1117,7 +1117,7 @@ public string Format(int v);   public float Normalized(int v);
 
 | 方法 | 作用 |
 |---|---|
-| `Apply(name, valueToken, silent, line)` | 解析 `+5` / `-3` / `500`（也支持 `stat 金钱+5` 挤在一个 token 里）→ `Clamp` → `VNFlags.Set`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:28`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L28)） → Toast 卡片 |
+| `Apply(name, valueToken, silent, line)` | 解析 `+5` / `-3` / `500`（也支持 `stat 金钱+5` 挤在一个 token 里）→ `Clamp` → `VNFlags.Set`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:34`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L34)） → Toast 卡片 |
 | [`EnsureInitials()`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L96) | 首次进游戏按 `initialValue` 种入 |
 | `ParseCostOp(costOp, out name, out delta)`（静态） | `金钱-100` → (`金钱`, -100) |
 | `CanAfford(costOp)` | 扣完是否 ≥ `minValue`（无定义则 0）——choice 置灰判据 |
@@ -1219,7 +1219,7 @@ sequenceDiagram
 
 | 文件 | 职责 | 关键点 |
 |---|---|---|
-| [`VNAiProvider`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs) / `VNAiProviders` | 供应商能力登记表 | [`SupportsResponseSchema()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L108) / [`SupportsSafetySettings()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L111) / [`EnvVarFor()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L96) / [`KeyFileFor()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L100) / [`DefaultModelFor()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L89) / [`TryFromModelName()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L124)；全局默认在 `VNGameConfig.aiProvider`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:222`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L222)）（当前 **DeepSeek `deepseek-v4-flash`**） |
+| [`VNAiProvider`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs) / `VNAiProviders` | 供应商能力登记表 | [`SupportsResponseSchema()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L108) / [`SupportsSafetySettings()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L111) / [`EnvVarFor()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L96) / [`KeyFileFor()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L100) / [`DefaultModelFor()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L89) / [`TryFromModelName()`](Assets/Project/Scripts/VNEffects/Script/VNAiProvider.cs#L124)；全局默认在 `VNGameConfig.aiProvider`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:229`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L229)）（当前 **DeepSeek `deepseek-v4-flash`**） |
 | [`VNAiKey`](Assets/Project/Scripts/VNEffects/Script/VNAiKey.cs) | Key 三级回退 | 环境变量 → 仓库外 → 仓库内；**按供应商各一套**分开缓存；`#if UNITY_EDITOR \|\| VN_AI_ALLOW_LOCAL_KEY` 挡住 Build 版本读取；永不打印 |
 | [`VNAiClient`](Assets/Project/Scripts/VNEffects/Script/VNAiClient.cs)（347 行） | **全专案唯一碰 HTTP 的文件** | `Send(req, onDone) : IEnumerator`；失败分 8 类 `VNAiFailure`；429 / 5xx / 网络错误指数退避（`maxRetries = 2`）；协程封装而非 async/await（与 `EventCo` 的轮询等待天然契合） |
 | [`VNAiClientGemini`](Assets/Project/Scripts/VNEffects/Script/VNAiClientGemini.cs) / [`VNAiClientDeepSeek`](Assets/Project/Scripts/VNEffects/Script/VNAiClientDeepSeek.cs) | 只差「拼请求体」和「解响应」 | 纯静态，不碰网络 |
@@ -1305,7 +1305,7 @@ public struct VNAiContext {
 2. **认不出的模型取最贵档并标「单价存疑」**——低估会让人放心用下去，高估最多多留意一眼。
 
 重算历史日志时按**那场对话当时**的 UTC 时间判高峰，同一份日志今天看和明天看必须同一个数字。
-思考 token 按输出价计费。资产走 `Create → VN → AI Pricing` 登记进 `VNGameConfig.aiPricing`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:230`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L230)），
+思考 token 按输出价计费。资产走 `Create → VN → AI Pricing` 登记进 `VNGameConfig.aiPricing`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:237`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L237)），
 不建资产就用内置默认表。
 
 ---
@@ -1335,7 +1335,7 @@ public VNAiPersonaDef FindAiPersona(string personaId);
 
 `ClearCache()` **必须连带清 AI 那两处缓存**——不然在 Inspector 里把供应商从 Gemini 改成 DeepSeek
 之后还会继续发给 Gemini，直到下次域重载；这种「改了没反应」最难查。
-`VNGameConfigTools.HookPlayModeCacheClear()`（[`Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs:305`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L305)） 在每次进出 Play Mode 时调它。
+`VNGameConfigTools.HookPlayModeCacheClear()`（[`Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs:311`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L311)） 在每次进出 Play Mode 时调它。
 
 **什么该放这儿 / 什么不该**（注释原话）：
 
@@ -1488,7 +1488,7 @@ public static VNGrade GetGrade(VNMood mood);
 > **想让某层躲开 mood**：把它移出 `VNMoodGrading` 的目标列表即可；反之新加的图层要染色就得注册进去。
 
 八种情绪：`VNMood` 枚举（含 `Memory` 回忆、`Dream` 梦境）。
-`Memory` 自动上电影黑边 + 胶片滤镜、`Dream` 自动上 CRT（由 `VNStage.autoMemoryLetterbox`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1348`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1348)） /
+`Memory` 自动上电影黑边 + 胶片滤镜、`Dream` 自动上 CRT（由 `VNStage.autoMemoryLetterbox`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1351`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1351)） /
 `autoMoodRetroFilter` 控制，`_letterboxAuto` / `_retroAuto` 记录「是自动开的」以便离开时自动撤）。
 
 ### 12.4 镜头系统 `VNCamera`
@@ -1786,7 +1786,7 @@ BGM 是 A/B 双 source 交叉淡化（`_usingA`）；语音播放时 BGM 自动 
 **一个刻意的反例**：编辑器试聊台的 [`VNAiStudioMemory`](Assets/Project/Scripts/VNEffects/Editor/VNAiStudioMemory.cs) **完全独立于运行时 `VNAiMemory`**——
 编辑器往运行时记忆里写等于造出「读旧档她却记得未来」的幽灵状态。
 从游戏存档槽导入记忆时，它**自己读 JSON，绝不调 `VNSaveSystem.Load()`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:218`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L218)）**——
-那个会 `VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:36`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L36)） 冲掉工程 flag。
+那个会 `VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:43`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L43)） 冲掉工程 flag。
 
 ---
 
@@ -1821,8 +1821,8 @@ flowchart TD
 
 点击喷水模式（`liquid click on`）期间左键归喷水，`Enter` / `Space` 仍推进。
 
-**[`RequestAdvance()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L2101) 的存在理由**：[`Update()`](Assets/Project/Scripts/VNEffects/Script/VNFogScore.cs#L59) 第一行就是 `if (_eventActive) return;`，
-于是模块内部用 [`RunInlineCo()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L291) 播的阻塞台词会死等 `_advance`，玩家点破屏幕也过不去。
+**[`RequestAdvance()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L2189) 的存在理由**：[`Update()`](Assets/Project/Scripts/VNEffects/Script/VNFogScore.cs#L59) 第一行就是 `if (_eventActive) return;`，
+于是模块内部用 [`RunInlineCo()`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L315) 播的阻塞台词会死等 `_advance`，玩家点破屏幕也过不去。
 模块在阻塞期间自己检测推进输入，转发到这个入口（语义一致：还在打字就先补完，打完了才真推进）。
 
 ### 16.2 [`VNPause`](Assets/Project/Scripts/VNEffects/Script/VNPause.cs) / `VNTime`
@@ -2121,7 +2121,7 @@ class Registry { ... }      // 全工程已登记的资产 id 索引
 
 | 工具 | 职责 |
 |---|---|
-| [`VNGameConfigTools`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs) | [`CreateOrSelect()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L32) 建 / 选配置资产；[`ImportFromScene()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L74) 场景绑定回填资产；[`RescanAssetFolders()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L178) 扫目录自动登记定义资产 / 章节（`ScanChapters`）/ CG（`ScanCg` + `EnsureSpriteImport`）；[`HookPlayModeCacheClear()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L305) 进出 Play Mode 清缓存 |
+| [`VNGameConfigTools`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs) | [`CreateOrSelect()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L32) 建 / 选配置资产；[`ImportFromScene()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L74) 场景绑定回填资产；[`RescanAssetFolders()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L178) 扫目录自动登记定义资产 / 章节（`ScanChapters`）/ CG（`ScanCg` + `EnsureSpriteImport`）；[`HookPlayModeCacheClear()`](Assets/Project/Scripts/VNEffects/Editor/VNGameConfigTools.cs#L311) 进出 Play Mode 清缓存 |
 | [`VNLocalizationTools`](Assets/Project/Scripts/VNEffects/Editor/VNLocalizationTools.cs) | [`ExtractAll()`](Assets/Project/Scripts/VNEffects/Editor/VNLocalizationTools.cs#L36) 增量抽取翻译表（已译保留）；`ValidateAll()` 查缺译 |
 | [`VNFontAssetBuilder`](Assets/Project/Scripts/VNEffects/Editor/VNFontAssetBuilder.cs) | [`CreateMenu()`](Assets/Project/Scripts/VNEffects/Editor/VNFontAssetBuilder.cs#L33) 预烘焙 TMP 动态字体资产；[`RebakeChineseFont()`](Assets/Project/Scripts/VNEffects/Editor/VNFontAssetBuilder.cs#L53)；[`RepairFontMaterialReferences()`](Assets/Project/Scripts/VNEffects/Editor/VNFontAssetBuilder.cs#L103)；[`EnsureFontAsset()`](Assets/Project/Scripts/VNEffects/Editor/VNFontAssetBuilder.cs#L80) |
 | [`VNUiSkinExporter`](Assets/Project/Scripts/VNEffects/Editor/VNUiSkinExporter.cs) | 烘焙对话框 / 选项默认皮肤 prefab 并自动登记（默认 + 顶部 + 右列样例） |
@@ -2154,7 +2154,7 @@ class Registry { ... }      // 全工程已登记的资产 id 索引
    加新字段不必重建场景。
 9. **防卡死兜底遍布交互路径**：choice 全隐藏 → 全显示；全付不起 → 全解禁；map 无可用地点 → 直接返回；
    sns reply 同理。
-10. **静默重放（`silent` 参数）**贯穿 `ApplyFlagCommand` / `VNStatsHud.Apply`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)） / `VNQuestLog.Apply`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:72`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L72)） /
+10. **静默重放（`silent` 参数）**贯穿 `ApplyFlagCommand` / `VNStatsHud.Apply`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)） / `VNQuestLog.Apply`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:144`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L144)） /
     `ApplyTimeCommand`——同一实现服务运行时与调试重建，避免两份逻辑漂移。
 11. **运行时创建带 `Awake` 配置的组件**：先 `SetActive(false)` 挂好赋值再激活。
 12. **粒子 `velocityOverLifetime` 三轴曲线模式必须一致**。
@@ -2171,8 +2171,8 @@ class Registry { ... }      // 全工程已登记的资产 id 索引
 
 | # | 位置 | 问题 |
 |---|---|---|
-| 1 | `VNScriptRunner.ApplyFlagCommand`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:842`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L842)） | `flag 名 rand:1-100` 在调试重建时会**重新掷骰**（注释已自认），重建出的分支状态可能与实际游玩不同；`event` 结果同样不重放 |
-| 2 | `VNStage.ShowInstant()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:997`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L997)） line 1020 | 重建 y 坐标用写死的 `-60f + def.positionOffset.y`，与 [`SlotPosition()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L282) 的 `-60f` 魔数耦合；`VNScriptRunner.DebugSlotX()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:825`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L825)） 也复制了同一组站位常数——**同一组数字散在三处** |
+| 1 | `VNScriptRunner.ApplyFlagCommand`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:866`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L866)） | `flag 名 rand:1-100` 在调试重建时会**重新掷骰**（注释已自认），重建出的分支状态可能与实际游玩不同；`event` 结果同样不重放 |
+| 2 | `VNStage.ShowInstant()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1000`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1000)） line 1020 | 重建 y 坐标用写死的 `-60f + def.positionOffset.y`，与 [`SlotPosition()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L285) 的 `-60f` 魔数耦合；`VNScriptRunner.DebugSlotX()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:849`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L849)） 也复制了同一组站位常数——**同一组数字散在三处** |
 | 3 | [`VNQteModule.cs`](Assets/Project/Scripts/VNEffects/Script/VNQteModule.cs) line 3 | 多余的 `using Unity.AppUI.UI;`（未使用） |
 | 4 | `VNSaveSystem.Load()`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:218`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L218)） | 直接在静态方法里改 [`VNFlags`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs)（读档失败时 flag 可能已被清）。目前由调用方 `LoadFrom()` 的顺序保证安全，但 `Load` 兼有副作用值得留意；[`VNAiStudioMemory`](Assets/Project/Scripts/VNEffects/Editor/VNAiStudioMemory.cs) 正因此绕开它自己读 JSON |
 | 5 | `VNEquipment.Equip/Unequip/Use` | 每次调用都 `Object.FindFirstObjectByType<VNStatsHud>()` 做场景查找，背包高频操作时略浪费（有缓存空间） |

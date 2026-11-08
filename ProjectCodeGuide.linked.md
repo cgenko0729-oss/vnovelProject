@@ -65,12 +65,12 @@
 
 以剧本行 `亚里沙 微笑: 今天天气真好。` 为例，跟一遍代码路径：
 
-1. **解析**：`VNScriptRunner.Play()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:191`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L191)） 把整个文件交给 `VNScriptParser.Parse()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs:112`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs#L112)），
+1. **解析**：`VNScriptRunner.Play()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:200`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L200)） 把整个文件交给 `VNScriptParser.Parse()`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs:112`](Assets/Project/Scripts/VNEffects/Script/VNScriptParser.cs#L112)），
    得到 `List<VNScriptCommand>`。这一行首 token 不是关键字 → 走 `ParseSay()`，
    拆出 `speaker=亚里沙, expression=微笑, text=今天天气真好。`
 2. **执行**：主循环 [`Run()`](Assets/Project/Scripts/VNEffects/Editor/VNSoftSkinExporter.cs#L106) 协程逐条取命令进 `Dispatch()` → `case "say"` →
    `SayCo()` 协程。
-3. **上台**：`SayCo` 调 `VNStage.Say()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1074`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1074)）——舞台查 [`VNCharacterDef`](Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs) 找到亚里沙、
+3. **上台**：`SayCo` 调 `VNStage.Say()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1077`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1077)）——舞台查 [`VNCharacterDef`](Assets/Project/Scripts/VNEffects/Script/VNCharacterDef.cs) 找到亚里沙、
    按"微笑"切表情（交叉溶解）、通知 [`VNSpeakerHighlight`](Assets/Project/Scripts/VNEffects/VNSpeakerHighlight.cs) 高亮说话者、
    把名牌颜色/头像/文本交给 [`VNDialogueBox`](Assets/Project/Scripts/VNEffects/VNDialogueBox.cs)。
 4. **打字**：`VNDialogueBox` 内部的 [`VNTypewriterText`](Assets/Project/Scripts/VNEffects/VNTypewriterText.cs) 逐字上浮显示，每个字
@@ -80,8 +80,8 @@
    点击/Enter/Auto 计时；`VNBacklog.Record()`（[`Assets/Project/Scripts/VNEffects/Script/VNBacklog.cs:48`](Assets/Project/Scripts/VNEffects/Script/VNBacklog.cs#L48)） 已把这句记进回想。
 6. **推进**：玩家点击 → `_advance = true` → 主循环取下一条命令。
 
-存档时：`VNStage.CaptureSnapshot()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L840)） 收集背景/天气/色调/BGM/角色站位 +
-`VNFlags.All`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:23`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L23)） + 当前台词索引 → [`VNSaveSystem`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) 写 JSON + PNG 缩略图。
+存档时：`VNStage.CaptureSnapshot()`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:843`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L843)） 收集背景/天气/色调/BGM/角色站位 +
+`VNFlags.All`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:29`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L29)） + 当前台词索引 → [`VNSaveSystem`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) 写 JSON + PNG 缩略图。
 读档时反向 `RestoreSnapshot()` + `ResumeAt(index)`。
 
 ---
@@ -160,7 +160,7 @@
   `RestoreSnapshot(data, instant:true)` 是静默摆台模式
 - **eventRegistry**：事件模块注册表引用（P1 加入）
 
-**维护注意**：给舞台加新的"有开关状态"的效果时，记得 ①[`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 路由
+**维护注意**：给舞台加新的"有开关状态"的效果时，记得 ①[`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 路由
 ②`_fxStates`/`ToggleFxNames` ③快照存取，三处一起，否则存档读回来状态飘。
 
 ### CG 系统（VNStage.ShowCg/HideCg + VNCgUnlocks.cs，`Script/`）
@@ -393,7 +393,7 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
   `RefreshTimer()` 里按 `Time.unscaledTime` **现算，不开 Tween**（每帧新建会堆积）。
   倒计时归零 = 走 `Answer(-1)`，与答错同一条路径（含扣属性）。
 - 属性联动：逐题的 StatOp 复用 [`VNShopDef.StatOp`](Assets/Project/Scripts/VNEffects/Script/VNShopDef.cs)，统一走 `VNStatsHud.Apply`（[`Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs:108`](Assets/Project/Scripts/VNEffects/Script/VNStatsHud.cs#L108)）
-  （钳制+飘字），没有 HUD 时退回 `VNFlags.Add`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:34`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L34)）。模块同样不认识任何具体属性名。
+  （钳制+飘字），没有 HUD 时退回 `VNFlags.Add`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:41`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L41)）。模块同样不认识任何具体属性名。
 - 输入双通道：选项按钮 + 数字键 1~4（`TryAnswer` 会挡掉本题不存在的序号）。
 - 示例题库由生成器 [`EnsureQuizDef()`](Assets/Project/Scripts/VNEffects/Editor/VNEffectsDemoSetup.cs#L937) 造在 `Assets/VNEffects/Quizzes/`；
   示例剧本 `Assets/Scenarios/QuizDemo.vn.txt`（随机抽题/指定题号/成绩 flag 细分）。
@@ -524,7 +524,7 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 - **易漏点**：`VNFogMask.Destroy()`（[`Assets/Project/Scripts/VNEffects/Script/VNFogMask.cs:111`](Assets/Project/Scripts/VNEffects/Script/VNFogMask.cs#L111)） 必须按 `Application.isPlaying` 分路——
   这个类编辑器也在用，`Object.Destroy` 在编辑模式下只打一条 error 什么都不销毁，
   症状是每关一次调参窗口泄漏一张贴图。同理 `VNTouchCursor.Dispose()`（[`Assets/Project/Scripts/VNEffects/Script/VNTouchCursor.cs:217`](Assets/Project/Scripts/VNEffects/Script/VNTouchCursor.cs#L217)） 四处都要调。
-- **CG 解锁**：`VNCgUnlocks.Unlock`（[`Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs:48`](Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs#L48)） 本来是 `VNStage.ShowCg`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1234`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1234)） 顺手做的，推荐写法下剧本不再
+- **CG 解锁**：`VNCgUnlocks.Unlock`（[`Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs:48`](Assets/Project/Scripts/VNEffects/Script/VNCgUnlocks.cs#L48)） 本来是 `VNStage.ShowCg`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1237`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1237)） 顺手做的，推荐写法下剧本不再
   提前 `cg`，所以模块在结算时补一次（擦到 20% 以上才算看过）。
 
 ### VNSnsView.cs / VNSnsMessage.cs —— SNS 手机聊天（九十章）
@@ -550,14 +550,35 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 - **扩展方向**（数据结构已留位）：跨章节永久聊天记录（消息带全局 id + sessionId）、
   群聊（sender 已是任意角色 id）、随时可开的手机（把 Open 挂到按键 + 未读红点）。
 
-### VNQuestDef.cs / VNQuestLog.cs —— 任务系统
+### VNQuest*.cs / VNTracker.cs —— 任务系统（一三四章）
 
-- **状态即 flags**：`任务_<id>` = 0 未接取 / 1..n 进行中 / 100 完成 / -1 失败。
-- [`VNQuestDef`](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs) 资产只管文案（标题/描述/各阶段目标）；**没建资产的任务
-  照常运作**（id 当标题）。
-- [`VNQuestLog`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs)：执行 `quest start|stage|done|fail <id> [阶段]`（写 flag +
-  VNToast），J 键日志面板（进行中/完成/失败三栏，无资产的活动任务兜底显示）。
-- **扩展**：加"任务追踪 HUD"之类，只需读 flags + defs 渲染，不用碰命令。
+**分层**：[`VNQuestEngine`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs)（纯逻辑，可单测）+ [`VNTracker`](Assets/Project/Scripts/VNEffects/Script/VNTracker.cs)（纯逻辑，可单测）+
+[`VNQuestReward`](Assets/Project/Scripts/VNEffects/Script/VNQuestReward.cs)（数据 + 发放器）+ [`VNQuestDef`](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs)（资产）+ [`VNQuestLog`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs)（场景侧 UI 与驱动）
++ [`VNQuestBoardModule`](Assets/Project/Scripts/VNEffects/Script/VNQuestBoardModule.cs)（委托板事件模块）。
+
+- **状态即 flags，所以 [`VNSaveData`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs) 零改动**：
+  `任务_<id>` = 0 未接取 / 1..98 进行中 / 100 完成 / -1 失败；
+  旁路 `任务_<id>@待领`（待领取的阶段号）/ `@接取月` / `@完成数` / `@重置月`。
+- **「可领取」为什么不塞进主 flag**（比如写 99）：主 flag 的语义是阶段号，塞了会让剧本里的
+  `if 任务_xx==2` 在可领取期间失效、多阶段丢失「是哪个阶段可领」的信息，而
+  `quest start <id> N` 的阶段号本来就没上限。代价是阶段号收窄到 1..98，由 Lint 卡死。
+- `VNQuestEngine.Evaluate()`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs:339`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs#L339)） 一次做四件事：自动接取判定 / 阶段条件全达成→转可领取 /
+  超期→失败或放弃 / 日常冷却到月→回未接取。由 `VNQuestLog` 以「标脏 + 下一帧一次」
+  驱动（同属性 HUD），**只算进行中的任务**。
+- **幂等靠状态机**：奖励只在「`@待领` > 0 → 领取」这一次跳变里发放，清 `@待领` 与
+  写下一阶段在同一步完成，重复调用直接被 `pending<=0` 挡回。
+- `VNTracker`：把小游戏的「本次成绩」flag 派生成 `@最高/@最低/@累计/@次数`。
+  **靠 `VNFlags.KeyChanged`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:27`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L27)）（新增的带 key 事件）而非 diff 字典**——diff 会把
+  「两场都打 21 分」算成一场，`@次数`/`@累计` 就错了。
+- **读档与调试重建必须 `Suspended`**（两个类各有一个开关）：读档是逐个 `Set` flag、
+  每次都触发事件，不挂起则 `@累计` 被整份历史再刷一遍，而派生值本来就存在档里。
+  恢复后走 [`RecalculateSilently()`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs#L409) 只更新可领取标记，不发奖不弹提示。
+- **向后兼容**：`VNQuestDef.stageDefs`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs:181`](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs#L181)） 为空时回退用旧的 `stages: List<string>`，
+  老资产照常工作、只是不自动判定（`HasAnyCondition == false`）。
+- **扩展**：加新奖励种类 = `VNQuestRewardKind` 加枚举 + [`Grant()`](Assets/Project/Scripts/VNEffects/Script/VNQuestReward.cs#L85) 加 case +
+  `Describe()` 加文案；加新条件能力**什么都不用做**——条件就是 flag 表达式。
+- **已知限制**：「从选中行播放」重建不含玩家历史领取的奖励（领取是玩家行为、
+  不在剧本里，无法重放）。
 
 ### VNEquipment.cs —— 装备系统（八十五章）
 
@@ -572,6 +593,29 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 - **扩展**：想内建效果 hook（如金钱加倍自动翻倍 stat），在对应结算代码读
   `VNFlags.Get(VNEquipment.EffectFlagName("金钱加倍"))` 即可，别绕过 flags。
 
+### 6.x 秘密偷拍模式（`VNSecretPhoto*`，详见 WhatAiDo 一三五）
+
+| 文件 | 职责 |
+|---|---|
+| [`VNSecretPhotoDef`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoDef.cs) | 参数资产（单份，`VNGameConfig.secretPhoto`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:221`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L221)））；`Resolve()` 没登记时给 DontSave 默认值 |
+| [`VNSecretPhotoRig`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoRig.cs) | **纯静态数学**：取景框钳制（与 `VNCamera.ComputeOffset`（[`Assets/Project/Scripts/VNEffects/VNCamera.cs:223`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L223)） 同构）、框内权重、缩放倍率、察觉涨速、最近目标 |
+| [`VNSecretAlbum`](Assets/Project/Scripts/VNEffects/Script/VNSecretAlbum.cs) | 独立相册（照抄 `VNPhotoAlbum` 结构，条目字段是拍摄信息） |
+| [`VNSecretPhotoUi`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoUi.cs) | 图标 + 取景 HUD；主 Canvas 嵌套排序 70；除按钮外 `raycastTarget=false`；教程锚点 `secretphoto.*` |
+| [`VNSecretPhotoMode`](Assets/Project/Scripts/VNEffects/Script/VNSecretPhotoMode.cs) | 状态机；Runner 启动时创建，`Instance` 静态 |
+| `Editor/VNSecretPhotoInstaller` | 建资产 + 登记，不动场景 |
+
+- **不是事件模块**（不由 `event` 启动、任何台词处可进），但**直接操控舞台镜头**——
+  同 aitalk / interact 是刻意破铁律；边界：只碰 ZoomRoot（经 `VNCamera.BeginManual/SetManualView/EndManual`）、
+  UI 可见性（`Runner.SetSecretPhotoActive`，临时位不进 `_uiHiddenParts`）、Ken Burns 开关。
+- **四条退出路径**都收口在 `Restore()`：退出键 / ESC / 被发现（`CaughtCo` → `Close(true)`）/
+  `Runner.Stop()` → `ForceClose()`（读档、重播、销毁都经过它）。
+- **状态全在 flag**：`秘密相机`（解锁）/ `道具_胶卷` / `偷拍_警惕_<角色>`；模式瞬态不进存档。
+- **她那句话走 `Runner.SayOutOfScript`**，别用 `RunInlineCo`（嵌套 SayCo 会清掉 `_waitingAtSay`）。
+- **防露边用 `EffectiveOverscan()`**（背景实际尺寸与 `VNCamera.overscan`（[`Assets/Project/Scripts/VNEffects/VNCamera.cs:201`](Assets/Project/Scripts/VNEffects/VNCamera.cs#L201)） 取小），
+  手搭场景背景常常没有那 60px。
+- **抓屏**复用 `VNPhotoCapture.Capture`（[`Assets/Project/Scripts/VNEffects/Script/VNPhotoCapture.cs:28`](Assets/Project/Scripts/VNEffects/Script/VNPhotoCapture.cs#L28)），hide 列表 = 取景 HUD + `VNToast.RootObject`（[`Assets/Project/Scripts/VNEffects/Script/VNToast.cs:100`](Assets/Project/Scripts/VNEffects/Script/VNToast.cs#L100)） + 主 Canvas 下的 `HintText`。
+- 加参数：改 `VNSecretPhotoDef` 即可，Inspector 自动长出；加察觉规则：只改 `VNSecretPhotoRig` 并保持纯静态。
+
 ---
 
 ## 七、系统 UI
@@ -584,7 +628,11 @@ UI 全程序化（面板/进度条/计时），是写新模块时**最好的抄�
 | VNQuickToolbar.cs | 对话框右下功能条 | Save/Load/Auto/Skip/Log/任务/Config/隐藏UI；挂在对话框 Canvas 下排序 +1；**加按钮记得改总宽**（现 693） |
 | VNBacklog.cs | H 键回想 | 独立 Overlay Canvas 600；[`Record()`](Assets/Project/Scripts/VNEffects/Script/VNBacklog.cs#L48) 由 SayCo/ChoiceCo/EventCo 调 |
 | VNToast.cs | 左上角堆叠卡片 + 右上角模式角标 | 静态 `Show(msg)` / `Show(msg, icon, iconColor, accent, hold)`；**多条排队不覆盖**（新卡占最上格、旧卡下移，上限 5 张超出提前退场）；卡片宽度跟文字走（`GetPreferredValues`，`preferredWidth` 要等一次布局才有值）；全部 Tween `SetUpdate(true)` 不受 Skip 变速影响；任务/存档/装备/属性变动都走它 |
-| VNQuestLog.cs | J 键任务日志 | 见第六节；UI 结构与 Backlog 同构 |
+| VNQuestLog.cs | J 键任务日志 + 引擎驱动 | 见第六节；UI 结构与 Backlog 同构；四栏（可领取置顶带「领取」按钮 / 进行中带 ☑☐ 子目标与进度条 / 已完成 / 已失败）；`Update` 里「标脏 + 下一帧一次」驱动 `VNQuestEngine.Evaluate()`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs:339`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs#L339)） |
+| VNQuestEngine.cs | 任务引擎（纯逻辑） | 见第六节；条件求值 / 状态推进 / 领取发奖 / 超期 / 日常重置；状态全落 flag 所以 **VNSaveData 零改动**；「可领取」走旁路 `@待领` 不占主 flag |
+| VNTracker.cs | 统计层（纯逻辑） | 见第六节；`@最高/@最低/@累计/@次数`；靠 `VNFlags.KeyChanged`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:27`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L27)） 而非 diff；**读档必须 Suspended** |
+| VNQuestReward.cs | 奖励结构 + 发放器 | Stat/Item/Flag/Cg/Quest 五类；剧情解锁只写 flag 让剧本自己 if 接，绝不打断当前演出 |
+| VNQuestBoardModule.cs | 委托板事件模块 | `event questboard`，结果 接取/离开；与自动接取共用 `CanAccept` 所以不会「板上有但接不了」 |
 | VNInventory.cs | I 键背包 | 左道具列表+右 7 装备格+介绍区；右键菜单走 [`ClickRelay`](Assets/Project/Scripts/VNEffects/Script/VNInventory.cs)（IPointerClickHandler 区分左右键，Button 只管按压视觉）；皮肤 prefab（`VNSystemUiSkinSet.inventoryPrefab`（[`Assets/Project/Scripts/VNEffects/Script/VNSystemUiSkinSet.cs:28`](Assets/Project/Scripts/VNEffects/Script/VNSystemUiSkinSet.cs#L28)） + VNInventorySkin/RowSkin/SlotSkin 槽位）优先，缺失退回程序化 UI，**两条路径都产出 VNInventorySkin 引用**，下游单一代码路径；装备逻辑全部委托 VNEquipment |
 | VNDialogueSkin.cs / VNChoiceSkin.cs | UI 皮肤槽位声明 | 挂皮肤 prefab 根；VNDialogueBox/VNChoicePanel 实例化后按槽位 Bind()，行为逻辑与装饰节点解耦；全槽位可选（留空=降级）；头像避让声明式（portraitBodyInset/TagShift）；`ui dialogue\|choice <id>` 切换、id 在 VNGameConfig 登记、状态进存档；**程序化默认也走同一条 Bind 路径**（DefaultSkin 子物体），改行为逻辑两边同时生效 |
 | VNUiSkinExporter.cs (Editor) | 皮肤起步模板导出 | 烘焙程序化贴图为 PNG（prefab 无法引用运行时贴图）+ 生成默认/顶部/右列四个 prefab + 自动登记 VNGameConfig；重复执行安全 |
@@ -749,7 +797,7 @@ Start/Stop 成对 API、`SetLink` 防泄漏。按类别分组。）
 | VNAiStudioWindow.cs | Tools → VN Effects → AI → **AI Talk Studio** | AI 试聊台主窗口（一一二章）：左改参数 / 中聊天流 / 右 **system prompt 实时预览**。不进 Play Mode 调人格与提示词 |
 | VNAiStudioDraft.cs | （草稿层） | 人格资产的内存副本。**用临时 SO 而不是自建字段**：`SerializedObject` 迭代画＝零 UI 代码就有全部字段，加新字段自动跟上，[`VNAiConversation`](Assets/Project/Scripts/VNEffects/Script/VNAiConversation.cs) 也直接能吃。写回逐属性 `CopyFromSerializedProperty`（**不能用 `CopySerialized`**，它连 `m_Name` 一起抄成「xxx(Clone)」） |
 | VNAiStudioSession.cs | （会话层） | 发请求 / 解析 / 轮次记录 / 重跑 / 分岔。域重载后靠轮次记录 `BuildRequest`+`RecordReply` **重建历史**（那两个方法只是组装与追加，不发请求） |
-| VNAiStudioMemory.cs | （记忆层） | 可命名记忆预设 + 从日志 / 从存档两个导入器。**完全独立于运行时 [`VNAiMemory`](Assets/Project/Scripts/VNEffects/Script/VNAiMemory.cs)**（那是存档态）；读存档**自己读 JSON，绝不调 `VNSaveSystem.Load()`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:218`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L218)）**——那个会 `VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:36`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L36)） |
+| VNAiStudioMemory.cs | （记忆层） | 可命名记忆预设 + 从日志 / 从存档两个导入器。**完全独立于运行时 [`VNAiMemory`](Assets/Project/Scripts/VNEffects/Script/VNAiMemory.cs)**（那是存档态）；读存档**自己读 JSON，绝不调 `VNSaveSystem.Load()`（[`Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs:218`](Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs#L218)）**——那个会 `VNFlags.Clear()`（[`Assets/Project/Scripts/VNEffects/Script/VNFlags.cs:43`](Assets/Project/Scripts/VNEffects/Script/VNFlags.cs#L43)） |
 | VNAiStudioLog.cs | （导出） | 试聊会话按游戏内**同格式**写到 `AiTalkLogs/Editor/`，两边日志可互相对比 |
 | VNAiEditorCoroutine.cs | （基础设施） | Play Mode 外的协程泵，试聊台与自检菜单共用。**坑**：子协程跑完弹栈后父协程的 `Current` 仍指着那个已耗尽的对象，不记 `_started` 会无限重新压栈，表现为「点了没反应也不报错」 |
 | VNAiCostReport.cs | Tools → VN Effects → AI → **Cost Report** | 花费累计报表：扫全部日志 json 聚合。**改成本相关代码时的回归入口**——存储金额与重算金额在同模型下必须相等 |
@@ -846,16 +894,24 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
 
 ### 菜谱四：加一个任务
 
-1. （可选但推荐）Project 右键 → Create → VN → Quest Definition，填 id/标题/
-   各阶段文案，拖进场景 `VNQuestLog.quests`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:23`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L23)）
-2. 剧本：`quest start <id>` → `quest stage <id> 2` → `quest done|fail <id>`
-3. 分支判断：`if 任务_<id>>=2 jump ...`；J 键随时看日志
+1. Project 右键 → Create → VN → Quest Definition，填 id/标题/各阶段文案，
+   登记进 `VNGameConfig.quests`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:209`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L209)）（**别只拖场景组件**——配置进资产是项目铁律）
+2. **纯剧情任务**：阶段不配条件，剧本 `quest start <id>` → `quest stage <id> 2`
+   → `quest done|fail <id>`，与老写法完全一样
+3. **自动判定任务**：给阶段加子目标，条件填 flag 表达式（与 `if` 同语法）+ 阶段奖励。
+   条件涉及小游戏成绩的话，**先去 VNGameConfig 玩法页签登记「统计声明」**派生出
+   `@最高/@累计/@次数`——小游戏只写「本次成绩」，下一场就被覆盖
+4. 想让玩家自己接：勾「出现在委托板」+ 填 `boardTag`，剧本 `event questboard tag:xx`；
+   想自动推送：勾「自动接取」+ 填出现条件
+5. 分支判断：`if 任务_<id>>=2 jump ...`；J 键看四栏日志
+6. 跑一次 Lint（Ctrl+Shift+L）——条件里 flag 拼错会**静默求值为 0**，
+   任务永远不完成且运行时零报错，`quest-unknown-identifier` 就是专防这个的
 
 ### 菜谱五：加一种新特效组件
 
 1. 参考同类组件写（循环效果给 Start/Stop 成对 API；贴图先查
    VNProceduralTextures 有没有现成的）
-2. 要接 `fx` 命令：VNStage 加引用 + [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614) 路由 + `_fxStates` + 快照三件套
+2. 要接 `fx` 命令：VNStage 加引用 + [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617) 路由 + `_fxStates` + 快照三件套
 3. [`VNEffectsDemoSetup`](Assets/Project/Scripts/VNEffects/Editor/VNEffectsDemoSetup.cs) 生成器里创建/连线 → 重建演示场景
 4. Tween 一律 `SetLink(gameObject)`
 
@@ -890,6 +946,13 @@ HDR 颜色 + 场景 Bloom（阈值 1.0）。想让什么东西发光，走材质
    **改完仍要等用户说「推」才 commit + push**。**永不删分支**（详见技能 `vn-new-feature`）
 8. 调色一律走 `VNImageEffectController.SetGrade(通道, …)`，禁止直接写
    `_Brightness` / `_Saturation`（六方共用会互相覆盖，详见 8.1 节）
+9. **`@` 是 flag 命名的保留字**：任务 / 属性 / 道具 id 都不得含它（统计层的
+   `<源>@最高` 与任务的旁路 `任务_<id>@待领` 占用了它），Lint 卡死
+10. **限时 / 周期一律基于 `月序`，绝不用日历「月份」**——后者 `time pass` 时在 1~12
+   内循环，跨年的期限判定永远不成立
+11. **监听 flag 变化的系统必须提供「挂起」开关**（[`VNTracker.Suspended`](Assets/Project/Scripts/VNEffects/Script/VNTracker.cs) /
+   `VNQuestEngine.Suspended`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs:49`](Assets/Project/Scripts/VNEffects/Script/VNQuestEngine.cs#L49)））：读档与调试重建都是逐个 `Set` flag、每次触发变化事件，
+   不挂起就会把读回来的旧值当成新事件处理一遍
 
 **容易踩的坑**
 - **`Time.timeScale = 0` 冻不住任何玩法模块**：模块按三铁律②用不受缩放的时间，

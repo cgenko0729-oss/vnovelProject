@@ -8,7 +8,7 @@ namespace VNEffects
     /// <summary>
     /// 背包界面槽位声明（挂 prefab 根；登记在 VNSystemUiSkinSet.inventoryPrefab）。
     /// 左侧道具列表 + 右侧 7 个装备栏 + 底部介绍区；右键菜单由 VNInventory 程序化弹出。
-    /// 必需槽位缺失时整体退回程序化默认 UI。
+    /// 必需槽位缺失时面板直接报错。
     /// </summary>
     public class VNInventorySkin : VNSystemUiSkinBehaviour
     {

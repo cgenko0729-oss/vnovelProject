@@ -17,7 +17,7 @@ namespace VNEffects
         Focus = 2,
         /// <summary>临时演出：情绪动作沮丧、退场动画压暗</summary>
         Emote = 3,
-        /// <summary>兜底通道：SetHSV / DOBrightness / DOSaturation 等直接调用</summary>
+        /// <summary>兜底通道：SetHSV 等直接调用</summary>
         Manual = 4,
         Count = 5,
     }

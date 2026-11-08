@@ -3,6 +3,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -486,67 +487,18 @@ namespace VNEffects
             var skinPrefab = VNSystemUiSkinUtility.Prefab(s => s.statsPanelPrefab);
             _panelSkin = VNSystemUiSkinUtility.Instantiate<VNStatsPanelSkin>(
                 skinPrefab, _canvas.transform, "VNStatsPanel");
-            if (_panelSkin != null)
-            {
-                _panel = _panelSkin.panelRoot;
-                _panelContent = _panelSkin.content;
-                _panelTemplate = _panelSkin.rowTemplate;
-                _panelTemplate.gameObject.SetActive(false);
-                _panelSkin.titleText.text = VNLocale.T("stats.title");
-                if (_panelSkin.closeButton != null) BindButton(_panelSkin.closeButton, Close);
-                if (_panelSkin.backgroundCloseButton != null)
-                    BindButton(_panelSkin.backgroundCloseButton, Close);
-                _panel.SetActive(false);
-                return;
-            }
+            if (_panelSkin == null)
+                throw new System.InvalidOperationException("Stats panel prefab is missing or invalid.");
 
-            _panel = new GameObject("Panel", typeof(RectTransform));
-            var panelRect = (RectTransform)_panel.transform;
-            panelRect.SetParent(_canvas.transform, false);
-            Stretch(panelRect);
-
-            var dimGo = new GameObject("Dim",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-            var dimRect = (RectTransform)dimGo.transform;
-            dimRect.SetParent(panelRect, false);
-            Stretch(dimRect);
-            dimGo.GetComponent<Image>().color = new Color(0f, 0.01f, 0.02f, 0.86f);
-            dimGo.GetComponent<Button>().onClick.AddListener(Close);
-
-            var title = CreateText(panelRect, 34, TextAlignmentOptions.Center);
-            title.text = VNLocale.T("stats.title");
-            title.fontStyle = FontStyles.Bold;
-            var titleRect = (RectTransform)title.transform;
-            titleRect.anchorMin = new Vector2(0f, 1f);
-            titleRect.anchorMax = new Vector2(1f, 1f);
-            titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.anchoredPosition = new Vector2(0f, -60f);
-            titleRect.sizeDelta = new Vector2(0f, 50f);
-
-            var contentGo = new GameObject("Content",
-                typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-            _panelContent = (RectTransform)contentGo.transform;
-            _panelContent.SetParent(panelRect, false);
-            _panelContent.anchorMin = new Vector2(0.3f, 1f);
-            _panelContent.anchorMax = new Vector2(0.7f, 1f);
-            _panelContent.pivot = new Vector2(0.5f, 1f);
-            _panelContent.anchoredPosition = new Vector2(0f, -150f);
-            _panelContent.sizeDelta = Vector2.zero;
-            var layout = contentGo.GetComponent<VerticalLayoutGroup>();
-            layout.spacing = 20f;
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            contentGo.GetComponent<ContentSizeFitter>().verticalFit =
-                ContentSizeFitter.FitMode.PreferredSize;
-
+            _panel = _panelSkin.panelRoot;
+            _panelContent = _panelSkin.content;
+            _panelTemplate = _panelSkin.rowTemplate;
+            _panelTemplate.gameObject.SetActive(false);
+            _panelSkin.titleText.text = VNLocale.T("stats.title");
+            if (_panelSkin.closeButton != null) BindButton(_panelSkin.closeButton, Close);
+            if (_panelSkin.backgroundCloseButton != null)
+                BindButton(_panelSkin.backgroundCloseButton, Close);
             _panel.SetActive(false);
-        }
-
-        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
-        {
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(action);
         }
 
         void RebuildPanelList()
@@ -555,7 +507,7 @@ namespace VNEffects
             for (int i = _panelContent.childCount - 1; i >= 0; i--)
             {
                 var child = _panelContent.GetChild(i);
-                if (_panelTemplate != null && child == _panelTemplate.transform) continue;
+                if (child == _panelTemplate.transform) continue;
                 Destroy(child.gameObject);
             }
 
@@ -572,69 +524,7 @@ namespace VNEffects
                 if (def == null || string.IsNullOrEmpty(def.id)) continue;
                 int v = VNFlags.Get(def.id);
 
-                if (_panelTemplate != null)
-                {
-                    CreateCustomPanelRow(def, v);
-                    continue;
-                }
-
-                var row = new GameObject(def.id, typeof(RectTransform), typeof(LayoutElement));
-                row.transform.SetParent(_panelContent, false);
-                row.GetComponent<LayoutElement>().preferredHeight = 46f;
-                var rowRect = (RectTransform)row.transform;
-
-                var name = CreateText(rowRect, 27, TextAlignmentOptions.MidlineLeft);
-                name.text = def.DisplayName;
-                name.color = new Color(0.86f, 0.88f, 0.95f, 1f);
-                var nameRect = (RectTransform)name.transform;
-                nameRect.anchorMin = new Vector2(0f, 0f);
-                nameRect.anchorMax = new Vector2(0.3f, 1f);
-                nameRect.offsetMin = Vector2.zero;
-                nameRect.offsetMax = Vector2.zero;
-
-                float n = def.Normalized(v);
-                if (n >= 0f)
-                {
-                    var barBgGo = new GameObject("BarBg", typeof(RectTransform),
-                        typeof(CanvasRenderer), typeof(Image));
-                    var barBgRect = (RectTransform)barBgGo.transform;
-                    barBgRect.SetParent(rowRect, false);
-                    barBgRect.anchorMin = new Vector2(0.32f, 0.32f);
-                    barBgRect.anchorMax = new Vector2(0.74f, 0.68f);
-                    barBgRect.offsetMin = Vector2.zero;
-                    barBgRect.offsetMax = Vector2.zero;
-                    var barBg = barBgGo.GetComponent<Image>();
-                    barBg.sprite = VNProceduralTextures.RoundedRectSprite;
-                    barBg.type = Image.Type.Sliced;
-                    barBg.color = new Color(1f, 1f, 1f, 0.12f);
-                    barBg.raycastTarget = false;
-
-                    var fillGo = new GameObject("Fill", typeof(RectTransform),
-                        typeof(CanvasRenderer), typeof(Image));
-                    var fillRect = (RectTransform)fillGo.transform;
-                    fillRect.SetParent(barBgRect, false);
-                    fillRect.anchorMin = Vector2.zero;
-                    fillRect.anchorMax = new Vector2(Mathf.Max(0.001f, n), 1f);
-                    fillRect.offsetMin = Vector2.zero;
-                    fillRect.offsetMax = Vector2.zero;
-                    var fill = fillGo.GetComponent<Image>();
-                    fill.sprite = VNProceduralTextures.RoundedRectSprite;
-                    fill.type = Image.Type.Sliced;
-                    fill.color = def.color;
-                    fill.raycastTarget = false;
-                }
-
-                var value = CreateText(rowRect, 27, TextAlignmentOptions.MidlineRight);
-                value.fontStyle = FontStyles.Bold;
-                string grade = def.style == VNStatStyle.Grade ? def.GradeOf(v) : "";
-                value.text = string.IsNullOrEmpty(grade)
-                    ? def.Format(v)
-                    : $"{def.Format(v)}  <color=#{ColorUtility.ToHtmlStringRGB(def.color)}>{grade}</color>";
-                var valueRect = (RectTransform)value.transform;
-                valueRect.anchorMin = new Vector2(0.76f, 0f);
-                valueRect.anchorMax = new Vector2(1f, 1f);
-                valueRect.offsetMin = Vector2.zero;
-                valueRect.offsetMax = Vector2.zero;
+                CreateCustomPanelRow(def, v);
             }
         }
 
@@ -668,27 +558,5 @@ namespace VNEffects
 
         // ------------------------------------------------------------------
         // ------------------------------------------------------------------
-
-        TextMeshProUGUI CreateText(Transform parent, int size, TextAlignmentOptions anchor)
-        {
-            var go = new GameObject("Text",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<TextMeshProUGUI>();
-            t.font = VNFont.Asset;
-            t.fontSize = size;
-            t.alignment = anchor;
-            t.color = new Color(1f, 1f, 1f, 0.94f);
-            t.raycastTarget = false;
-            return t;
-        }
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
     }
 }

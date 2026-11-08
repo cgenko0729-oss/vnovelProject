@@ -110,7 +110,7 @@ Assets/Project/Scripts/VNEffects/
 `Resources.Load` 直接取（`VNGameConfig.Active`，同档:48），场景里一个引用字段都不需要。
 
 **覆盖语义只有一条规则**：资产里**填了的**列表覆盖场景组件上的同名列表，**留空的**保持场景原样。
-实现是 `VNGameConfig.ApplyList`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:258`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L258)）（同档:258）：
+实现是 `VNGameConfig.ApplyList`（[`Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:265`](Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs#L265)）（同档:258）：
 
 ```csharp
 // Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs:258
@@ -200,7 +200,7 @@ public string DisplayName
 | ① | `VNGameConfig` 登记 | Assets/Project/Scripts/VNEffects/Script/VNGameConfig.cs | 重建场景后失效 |
 | ② | 剧本编辑器 Schema | Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs | 编辑器画不出参数格，只能手打，且被标为 unrecognized token |
 | ③ | 静态校验器 Lint | Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs | 拼错 id / 结果名会**静默跳过**，没有任何报错 |
-| ④ | 存档 + 调试重建 | Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs、`VNStage.CaptureSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L840)）／`RestoreSnapshot`、`VNScriptRunner.RebuildStateBefore` | 读档后状态丢失；「从选中行播放」画面不对 |
+| ④ | 存档 + 调试重建 | Assets/Project/Scripts/VNEffects/Script/VNSaveSystem.cs、`VNStage.CaptureSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:843`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L843)）／`RestoreSnapshot`、`VNScriptRunner.RebuildStateBefore` | 读档后状态丢失；「从选中行播放」画面不对 |
 
 第 ④ 项只有「持续状态」才需要（详见 §18）。
 一次性演出（`imprint` 痕迹、`emote` 情绪动作、镜头状态）**刻意不进存档**。
@@ -334,7 +334,7 @@ show 新角色 at:center
   （枚举 `VNParamSource`，[Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs:7](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs#L7)），
   扫 `VNCharacterDef` 资产自动出现；表情下拉走 `VNParamSource.Expression`，
   用 `dependsOn`（`VNParamDef.dependsOn`（[`Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs:39`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioSchema.cs#L39)），同档:39）指向同行的角色参数。
-- **不用改存档** —— 在场角色由 `VNStage.CaptureSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L840)）
+- **不用改存档** —— 在场角色由 `VNStage.CaptureSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:843`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L843)）
   （[Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L840)）统一存进 `data.characters`。
 
 ---
@@ -617,7 +617,7 @@ case "yourcmd":
 1. 编译通过
 2. `Ctrl+Shift+L` Lint 全过
 3. 剧本编辑器里那一行画得出参数格（不是一条灰色 raw 文本）
-4. `F5` 从选中行播放（`VNScriptRunner.PlayFromSourceLine`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:212`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L212)），
+4. `F5` 从选中行播放（`VNScriptRunner.PlayFromSourceLine`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:221`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L221)），
    [Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:245](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L245)），看演出对不对
 5. 存档 → 读档 → 状态还在（如果它该进存档）
 
@@ -1335,7 +1335,7 @@ Schema 端 shop 的变体只有一个 `KwAsset("id", "商店", "VNShopDef", "sho
 
 [`VNQuestDef`](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs)（[Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs:14](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs#L14)）**只管显示文案**，
 进行状态全部存 flag `任务_<id>`
-（`VNQuestLog.FlagName`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:55`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L55)），[Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:55](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L55)）。
+（`VNQuestLog.FlagName`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:123`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L123)），[Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:55](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L55)）。
 
 阶段号约定：
 
@@ -1344,9 +1344,9 @@ Schema 端 shop 的变体只有一个 `KwAsset("id", "商店", "VNShopDef", "sho
 | 0 | 未接取 | — |
 | 1..n | 进行中，`stages[阶段-1]` 是当前目标文案 | — |
 | 100 | 完成 | [`VNQuestLog.StageDone`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs)（[Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:18](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L18)） |
-| -1 | 失败 | `VNQuestLog.StageFailed`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:19`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L19)）（同档:19） |
+| -1 | 失败 | `VNQuestLog.StageFailed`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:22`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L22)）（同档:19） |
 
-查询走 `VNQuestLog.StageOf`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:58`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L58)）（同档:58）。
+查询走 `VNQuestLog.StageOf`（[`Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs:126`](Assets/Project/Scripts/VNEffects/Script/VNQuestLog.cs#L126)）（同档:58）。
 **没有定义资产的任务也能正常运作**（注解在 [Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs:11](Assets/Project/Scripts/VNEffects/Script/VNQuestDef.cs#L11)），
 只是日志／Toast 用 id 当标题、无阶段文案。
 
@@ -1455,7 +1455,7 @@ ui dialogue default
 
 **⑥ Lint**
 
-`Registry.dialogueSkins`（[`Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs:128`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs#L128)） / `choiceSkins`
+`Registry.dialogueSkins`（[`Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs:130`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs#L130)） / `choiceSkins`
 （[Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs:100](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs#L100) 的 [`Registry`](Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs) 类内）
 已经在收集，`ui` 命令的 id 会被校验。
 
@@ -1568,7 +1568,7 @@ static readonly string[] ToggleFxNames =
 
 > 📎 参考：[Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1342](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1342)
 
-再到 [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1614)（同档:1614）的 switch 里加一个 case：
+再到 [`Fx()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L1617)（同档:1614）的 switch 里加一个 case：
 
 ```csharp
 // Assets/Project/Scripts/VNEffects/Script/VNStage.cs:1614
@@ -1731,7 +1731,7 @@ Assets/Project/Scripts/VNEffects/Editor/VNScenarioLinter.cs）：
 
 ### 13.4 剧本编辑器的调试能力
 
-- `F5` 从选中行播放（`VNScriptRunner.PlayFromSourceLine`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:212`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L212)），
+- `F5` 从选中行播放（`VNScriptRunner.PlayFromSourceLine`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:221`](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L221)），
   [Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:245](Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L245)）——
   默认勾「重建前置状态」，会走 `RebuildStateBefore`（同档:263 调用）
 - `F6` 重播上次那行 / `F8` 暂停（`SetDebugPaused`，同档:232）/ `F10` 单步
@@ -1945,7 +1945,7 @@ Schema 用 [`VNParamSource.WeatherId`](Assets/Project/Scripts/VNEffects/Editor/V
   —— 它们是演出素材不是收集品
 - 过场层排序 **90**（事件层 60 之上、全屏转场 100 之下），
   也因此**必须挂主 Canvas 下**
-- **不进存档，但 [`ClearStage()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L983) 必须 [`HideImmediate()`](Assets/Project/Scripts/VNEffects/Script/VNInterludeScreen.cs#L136)**
+- **不进存档，但 [`ClearStage()`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L986) 必须 [`HideImmediate()`](Assets/Project/Scripts/VNEffects/Script/VNInterludeScreen.cs#L136)**
 
 ---
 
@@ -2060,7 +2060,7 @@ public class VNSaveData
 嵌套结构照 `LiquidSave`（同档:81）与 `CharSave`（同档:106）的写法。
 需要真正的格式迁移时才动 `saveVersion`（同档:11）。
 
-**② `VNStage.CaptureSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L840)） / `RestoreSnapshot`**
+**② `VNStage.CaptureSnapshot`（[`Assets/Project/Scripts/VNEffects/Script/VNStage.cs:843`](Assets/Project/Scripts/VNEffects/Script/VNStage.cs#L843)） / `RestoreSnapshot`**
 
 ```csharp
 // Assets/Project/Scripts/VNEffects/Script/VNStage.cs:840

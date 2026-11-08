@@ -59,7 +59,7 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
   否则翻译查表和 `chapter` / 跨文件 `jump` 会按旧的当前文件算。
 - **编辑期走冷启动 Bridge**：`SessionState` 传 `_doc.GenerateText()`、目标行、
   rebuild 标志、资产路径后进 Play；未保存文本也能调试；**请求消费后必须清除**。
-  Bridge 必须等 `VNScriptRunner.IsInitialized`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:95`](../../../Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L95)），否则 Runner 的 Start/playOnStart
+  Bridge 必须等 `VNScriptRunner.IsInitialized`（[`Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs:97`](../../../Assets/Project/Scripts/VNEffects/Script/VNScriptRunner.cs#L97)），否则 Runner 的 Start/playOnStart
   会在调试启动后再覆盖一次播放位置。
 - **自动保存有两个例外**：未命名文档（无路径）不弹保存框，直接播内存文本；
   `_externalChanged` 时不写盘，避免静默覆盖别处的改动。
@@ -92,7 +92,7 @@ description: 修改/扩展剧本可视化编辑器（Scenario Editor）时的规
   ——那是运行时缓存，受 Play Mode 进出清缓存的时机影响。
   角色 / 表情 / 任务等来源仍是扫资产。改了来源记得 `Refresh Sources` 重建缓存逻辑仍然成立。
 - **素材库改动要广播** `VNAssetLibraryEvents.RaiseChanged()`（[`Assets/Project/Scripts/VNEffects/Editor/VNAssetLibraryEvents.cs:26`](../../../Assets/Project/Scripts/VNEffects/Editor/VNAssetLibraryEvents.cs#L26)），写入点统一收敛
-  （浏览器 `Apply()` / Inspector [`ApplyAndNotify()`](../../../Assets/Project/Scripts/VNEffects/Editor/VNGameConfigEditor.cs#L194)），且**只在
+  （浏览器 `Apply()` / Inspector [`ApplyAndNotify()`](../../../Assets/Project/Scripts/VNEffects/Editor/VNGameConfigEditor.cs#L195)），且**只在
   `ApplyModifiedProperties()` 返回 true 时发**——OnGUI 每帧都 Apply，无条件广播
   等于每帧重建全部候选源。订阅方 `OnEnable` 订阅、**`OnDisable` 必须退订**：
   订阅者是 EditorWindow 实例，窗口关闭与域重载都会重建它，不退订就会攥着

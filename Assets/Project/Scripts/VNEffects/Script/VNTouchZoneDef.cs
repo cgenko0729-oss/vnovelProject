@@ -222,16 +222,5 @@ namespace VNEffects
             return null;
         }
 
-        /// <summary>按 id 找部位（跨立绘取基准的那份，UI 显示名用）</summary>
-        public VNTouchZone FindById(string zoneId)
-        {
-            if (string.IsNullOrEmpty(zoneId)) return null;
-            foreach (var z in baseZones)
-                if (z != null && z.id == zoneId) return z;
-            foreach (var o in overrides)
-                foreach (var z in o.zones)
-                    if (z != null && z.id == zoneId) return z;
-            return null;
-        }
     }
 }

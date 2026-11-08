@@ -23,7 +23,7 @@ namespace VNEffects
         }
     }
 
-    /// <summary>系统 UI prefab 的统一安全实例化。失败时返回 null，让调用方走默认构建。</summary>
+    /// <summary>系统 UI prefab 的统一安全实例化。失败时返回 null，由调用方决定抛异常还是用自己的程序化卡片。</summary>
     public static class VNSystemUiSkinUtility
     {
         public static T Instantiate<T>(GameObject prefab, Transform parent, string owner)
@@ -34,12 +34,12 @@ namespace VNEffects
             var source = prefab.GetComponent<T>();
             if (source == null)
             {
-                Debug.LogError($"[{owner}] 系统 UI prefab {prefab.name} 缺少 {typeof(T).Name}，已退回默认 UI");
+                Debug.LogError($"[{owner}] 系统 UI prefab {prefab.name} 缺少 {typeof(T).Name}");
                 return null;
             }
             if (!source.IsValid(out string sourceError))
             {
-                Debug.LogError($"[{owner}] 系统 UI prefab {prefab.name} 缺少必需槽位：{sourceError}，已退回默认 UI");
+                Debug.LogError($"[{owner}] 系统 UI prefab {prefab.name} 缺少必需槽位：{sourceError}");
                 return null;
             }
 
@@ -49,7 +49,7 @@ namespace VNEffects
             if (skin != null && skin.IsValid(out _)) return skin;
 
             Object.Destroy(go);
-            Debug.LogError($"[{owner}] 系统 UI prefab {prefab.name} 实例化后校验失败，已退回默认 UI");
+            Debug.LogError($"[{owner}] 系统 UI prefab {prefab.name} 实例化后校验失败");
             return null;
         }
 

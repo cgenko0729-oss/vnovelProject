@@ -500,7 +500,7 @@ namespace VNEffects
             var root = (RectTransform)transform;
             _confirmPanel = VNBadmintonUi.CreateImage("QuitConfirm", root, null,
                 new Color(0f, 0f, 0f, 0.55f));
-            VNBadmintonUi.Stretch(_confirmPanel);
+            VNUi.Stretch(_confirmPanel);
             _confirmPanel.GetComponent<Image>().raycastTarget = true;   // 挡住底下的点击
 
             var box = VNBadmintonUi.CreateImage("Box", _confirmPanel,

@@ -9,7 +9,7 @@ namespace VNEffects
     /// 排程面板（event plan）皮肤槽位声明（挂 prefab 根；登记在
     /// VNSystemUiSkinSet.planPrefab）。左列候选行动、右列日程格均为
     /// 模板克隆制：模板行保持在容器内、导出时 SetActive(false)，
-    /// 运行时按行动数/格数克隆。必需槽位缺失时整体退回程序化默认 UI。
+    /// 运行时按行动数/格数克隆。必需槽位缺失时面板直接报错。
     /// </summary>
     public class VNPlanSkin : VNSystemUiSkinBehaviour
     {

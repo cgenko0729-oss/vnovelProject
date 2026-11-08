@@ -3,6 +3,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -674,26 +675,6 @@ namespace VNEffects
             if (skin.viewerPreviousButton != null) BindButton(skin.viewerPreviousButton, ViewerPrev);
             if (skin.viewerNextButton != null) BindButton(skin.viewerNextButton, ViewerNext);
             _viewer.SetActive(false);
-        }
-
-        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
-        {
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(action);
-        }
-
-        TextMeshProUGUI CreateText(Transform parent, int size, TextAlignmentOptions anchor)
-        {
-            var go = new GameObject("Text",
-                typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<TextMeshProUGUI>();
-            t.font = VNFont.Asset;
-            t.fontSize = size;
-            t.alignment = anchor;
-            t.color = new Color(1f, 1f, 1f, 0.94f);
-            t.raycastTarget = false;
-            return t;
         }
 
     }

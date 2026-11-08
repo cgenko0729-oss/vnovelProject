@@ -84,11 +84,5 @@ namespace VNEffects
             }
         }
 
-        public ActionDef FindByNumber(int number)
-        {
-            foreach (var action in actions)
-                if (action != null && action.number == number) return action;
-            return null;
-        }
     }
 }

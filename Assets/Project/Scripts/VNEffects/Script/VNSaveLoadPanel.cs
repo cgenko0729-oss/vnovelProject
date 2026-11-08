@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -161,12 +162,6 @@ namespace VNEffects
             if (skin.confirmYesLabel != null) skin.confirmYesLabel.text = VNLocale.T("common.confirm");
             if (skin.confirmNoLabel != null) skin.confirmNoLabel.text = VNLocale.T("common.cancel");
             _confirm.SetActive(false);
-        }
-
-        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
-        {
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(action);
         }
 
         void SetMode(bool saveMode)

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -113,12 +114,6 @@ namespace VNEffects
             skin.titleText.text = VNLocale.T("backlog.title");
             if (skin.closeButton != null) BindButton(skin.closeButton, Close);
             if (skin.backgroundCloseButton != null) BindButton(skin.backgroundCloseButton, Close);
-        }
-
-        static void BindButton(Button button, UnityEngine.Events.UnityAction action)
-        {
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(action);
         }
 
         void RebuildList()

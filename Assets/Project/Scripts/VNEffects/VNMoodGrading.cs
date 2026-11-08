@@ -178,14 +178,6 @@ namespace VNEffects
                 GetGrade(_current).Scaled(characterStrength), 0f);
         }
 
-        /// <summary>注销立绘（退场时调用；顺手清掉它的 mood 通道）</summary>
-        public void UnregisterCharacter(VNImageEffectController fx)
-        {
-            if (fx == null) return;
-            characterTargets.Remove(fx);
-            fx.ClearGrade(VNGradeLayer.Mood);
-        }
-
         /// <summary>整批替换立绘目标（VNStage.RefreshRegistries 用）</summary>
         public void SetCharacterTargets(IEnumerable<VNImageEffectController> targets)
         {

@@ -102,28 +102,6 @@ namespace VNEffects
             }
         }
 
-        /// <summary>派生 flag 名（编辑器 Lint 与条件补全用）</summary>
-        public static string DerivedName(string sourceFlag, string suffix) => sourceFlag + suffix;
-
-        /// <summary>某个名字是不是「已声明的源 + 合法后缀」组合</summary>
-        public static bool IsDerivedName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return false;
-            int at = name.LastIndexOf(ReservedChar);
-            if (at <= 0) return false;
-            string src = name.Substring(0, at);
-            string suffix = name.Substring(at);
-            if (!_map.TryGetValue(src, out var e)) return false;
-            switch (suffix)
-            {
-                case SuffixMax: return e.trackMax;
-                case SuffixMin: return e.trackMin;
-                case SuffixSum: return e.trackSum;
-                case SuffixCount: return e.trackCount;
-                default: return false;
-            }
-        }
-
         // ------------------------------------------------------------------
 
         static void OnKeyChanged(string key)

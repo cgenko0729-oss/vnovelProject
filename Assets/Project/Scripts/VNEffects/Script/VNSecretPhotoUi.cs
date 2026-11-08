@@ -6,6 +6,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -516,14 +517,6 @@ namespace VNEffects
         // ==================================================================
         // 小工具
         // ==================================================================
-
-        static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
 
         static void PlaceCorner(RectTransform rect, Vector2 anchor, Vector2 pos, Vector2 size)
         {

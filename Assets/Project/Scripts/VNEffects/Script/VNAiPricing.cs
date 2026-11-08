@@ -220,13 +220,6 @@ namespace VNEffects
             return usd;
         }
 
-        /// <summary>模型名认不出来（成本数字只是猜的）。日志里要标出来。</summary>
-        public static bool IsUnknownModel(string model)
-        {
-            For(model, out bool found);
-            return !found;
-        }
-
         /// <summary>
         /// 给日志/报表显示用的一行，如
         /// 「deepseek-v4-flash $0.22/$0.66 每百万（缓存命中 $0.007；当前非高峰）」

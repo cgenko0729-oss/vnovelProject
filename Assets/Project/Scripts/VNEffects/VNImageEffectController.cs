@@ -144,12 +144,6 @@ namespace VNEffects
                       .SetEase(ease).SetTarget(this).SetLink(gameObject);
         }
 
-        public void SetDissolveStyle(float noiseScale, Color hdrEdgeColor)
-        {
-            Mat.SetFloat(IdDissolveScale, noiseScale);
-            Mat.SetColor(IdDissolveEdgeColor, hdrEdgeColor);
-        }
-
         // ------------------------------------------------------------------
         // 扫光
         // ------------------------------------------------------------------
@@ -244,13 +238,6 @@ namespace VNEffects
             SetGrade(VNGradeLayer.Manual,
                 new VNGrade(Color.white, hueShift, saturation, brightness, 1f), 0f);
 
-        /// <summary>补间亮度（如夜晚变暗、回忆场景降饱和等）</summary>
-        public Tween DOBrightness(float to, float duration) =>
-            DOGradeField(VNGradeLayer.Manual, g => { g.brightness = to; return g; }, duration);
-
-        public Tween DOSaturation(float to, float duration) =>
-            DOGradeField(VNGradeLayer.Manual, g => { g.saturation = to; return g; }, duration);
-
         // ------------------------------------------------------------------
         // 分层调色合并（多来源互不覆盖）
         //
@@ -304,11 +291,6 @@ namespace VNEffects
             return _gradeTween;
         }
 
-        /// <summary>只改某个通道的部分字段，其余字段沿用该通道现值</summary>
-        public Tween DOGradeField(VNGradeLayer layer,
-            System.Func<VNGrade, VNGrade> edit, float duration) =>
-            SetGrade(layer, edit(_gradeLayers[(int)layer]), duration);
-
         /// <summary>把某个通道恢复成无影响</summary>
         public Tween ClearGrade(VNGradeLayer layer, float duration = 0f) =>
             SetGrade(layer, VNGrade.Identity, duration);
@@ -348,8 +330,6 @@ namespace VNEffects
         public Tween DORimAmount(float to, float duration) =>
             Mat.DOFloat(to, IdRimAmount, duration).SetTarget(this).SetLink(gameObject);
 
-        public void ClearRimLight() => Mat.SetFloat(IdRimAmount, 0f);
-
         // ------------------------------------------------------------------
         // 水面波光：海边/湖边场景，画面下半部叠加缓慢滚动的高光波纹
         // ------------------------------------------------------------------
@@ -375,16 +355,11 @@ namespace VNEffects
         public Tween DOShimmerAmount(float to, float duration) =>
             Mat.DOFloat(to, IdShimmerAmount, duration).SetTarget(this).SetLink(gameObject);
 
-        public void ClearWaterShimmer() => Mat.SetFloat(IdShimmerAmount, 0f);
-
         // ------------------------------------------------------------------
         // 微模糊（伪景深：背景虚化让立绘"浮"出来）
         // ------------------------------------------------------------------
 
         static readonly int IdBlurAmount = Shader.PropertyToID("_BlurAmount");
-
-        /// <summary>立即设置模糊半径（uv 单位，0.004~0.008 为宜）</summary>
-        public void SetBlur(float uvRadius) => Mat.SetFloat(IdBlurAmount, uvRadius);
 
         /// <summary>补间模糊半径（虚化渐入渐出）</summary>
         public Tween DOBlur(float to, float duration) =>
@@ -462,9 +437,6 @@ namespace VNEffects
 
         /// <summary>静默重置手动通道倍率（出场动画重播前调用；不动运镜通道）</summary>
         public void ResetScaleMultiplier() => _scaleMultiplier = 1f;
-
-        /// <summary>静默重置运镜通道倍率（镜头复位时调用；不动手动通道）</summary>
-        public void ResetCamScaleMultiplier() => _camScaleMultiplier = 1f;
 
         /// <summary>
         /// 补间缩放倍率（说话者高亮用：说话者 1.03、旁听者 0.97）。

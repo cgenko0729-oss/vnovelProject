@@ -107,16 +107,6 @@ namespace VNEffects
         /// </summary>
         public static bool SupportsResponseSchema(VNAiProvider p) => p == VNAiProvider.Gemini;
 
-        /// <summary>支持按类别放宽内容安全阈值吗？DeepSeek 没有这个参数。</summary>
-        public static bool SupportsSafetySettings(VNAiProvider p) => p == VNAiProvider.Gemini;
-
-        /// <summary>
-        /// 从模型名反推供应商。给日志/报表用——历史日志里只存了模型名，
-        /// 事后算钱要知道是哪家。认不出来时按全局默认算。
-        /// </summary>
-        public static VNAiProvider FromModelName(string model) =>
-            TryFromModelName(model, out VNAiProvider p) ? p : GlobalDefault;
-
         /// <summary>
         /// 能从模型名**确定**是哪家吗？认不出来时返回 false ——
         /// 自建中转/私有部署的模型名可能两个关键字都不含，那种情况不该当成配置错误。

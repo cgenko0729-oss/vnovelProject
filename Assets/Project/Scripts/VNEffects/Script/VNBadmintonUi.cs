@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static VNEffects.VNUi;
 
 namespace VNEffects
 {
@@ -105,14 +106,6 @@ namespace VNEffects
         }
 
         public static RectTransform Rect(Component c) => (RectTransform)c.transform;
-
-        public static void Stretch(RectTransform rect)
-        {
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
 
         /// <summary>把节点锚到「底边中心」——羽球全场统一用这套坐标（与换算表一致）</summary>
         public static RectTransform AnchorBottomCenter(RectTransform rect)
