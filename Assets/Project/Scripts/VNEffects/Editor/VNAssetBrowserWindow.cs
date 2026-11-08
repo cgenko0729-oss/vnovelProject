@@ -100,17 +100,41 @@ namespace VNEffects.EditorTools
         void OnDisable()
         {
             VNAssetUi.StopPreview();        // 关窗口还在放歌就见鬼了
+            if (_saveAt > 0d) SaveNow();    // 关窗口前把还没落盘的改动写掉
         }
 
         /// <summary>
-        /// 写回改动，并在**确实改了东西**时广播给剧本编辑器重建下拉候选。
+        /// 写回改动，并在**确实改了东西**时广播给剧本编辑器重建下拉候选、排程存盘。
         /// 所有写入点统一走这里，别再直接调 _so.ApplyModifiedProperties()，
         /// 否则新登记的素材在剧本编辑器里搜不到。
         /// </summary>
         void Apply()
         {
             if (_so != null && _so.ApplyModifiedProperties())
+            {
                 VNAssetLibraryEvents.RaiseChanged();
+                // 防抖存盘：在详情栏改 id 是每个按键都 Apply 一次，逐键写盘没必要
+                _saveAt = EditorApplication.timeSinceStartup + SaveDelay;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // 存盘：ApplyModifiedProperties 只把资产标脏，不按 Ctrl+S 硬盘上的 .asset
+        // 就不变（git 看不到、崩溃会丢），用户会以为「浏览器没登记进去」。
+        // ------------------------------------------------------------------
+
+        const double SaveDelay = 0.6d;
+        double _saveAt = -1d;
+
+        void Update()
+        {
+            if (_saveAt > 0d && EditorApplication.timeSinceStartup >= _saveAt) SaveNow();
+        }
+
+        void SaveNow()
+        {
+            _saveAt = -1d;
+            if (_config != null) AssetDatabase.SaveAssetIfDirty(_config);
         }
 
         void Acquire()
@@ -691,6 +715,14 @@ namespace VNEffects.EditorTools
             using (new EditorGUI.DisabledScope(asset == null))
                 if (Btn(b1, "在 Project 中定位")) VNAssetUi.Ping(asset);
 
+            var bCfg = VNAssetUi.CutLeft(ref bar, 100f);
+            if (Btn(bCfg, "在 Config 中定位"))
+            {
+                // 只切到这一类所在的分页，不自动搜索（用户选定的行为）
+                VNGameConfigEditor.RevealField(Cats[_cat].field);
+                VNAssetUi.Ping(_config);
+            }
+
             if (Cats[_cat].kind == Kind.Audio)
             {
                 var b2 = VNAssetUi.CutLeft(ref bar, 64f);
@@ -867,8 +899,11 @@ namespace VNEffects.EditorTools
             Apply();
             if (added > 0)
             {
+                SaveNow();                  // 登记是明确动作，不等防抖，立刻落盘
                 _selected = arr.arraySize - 1;
                 Debug.Log("[VN 素材] 登记 " + added + " 条到「" + Cats[_cat].title + "」");
+                ShowNotification(new GUIContent(
+                    "✓ 已登记 " + added + " 条到 VNGameConfig › " + Cats[_cat].title + "\n已存盘"), 2.0d);
             }
             Repaint();
         }

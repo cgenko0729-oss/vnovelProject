@@ -81,6 +81,13 @@ namespace VNEffects.EditorTools
         };
         static readonly Vector2 CanvasHalf = new Vector2(960f, 540f);
         static readonly Vector2 Overscan = new Vector2(60f, 60f);
+        // 拖角 / 滑条 / 捕获镜头 / Ctrl+滚轮共用的 zoom 区间（运行时不限，手填数字框仍可到 10）。
+        // 超过 3 时低分辨率背景会被放糊，用之前先在场景预览里看一眼
+        const float MinZoom = 0.5f, MaxZoom = 7f;
+        // 选中框四角的拖动热区半径（GUI 像素）：判定与光标共用一个数，免得两边对不上
+        const float CornerHotRadius = 18f;
+        // Ctrl+滚轮每一格的缩放倍率
+        const float WheelZoomStep = 1.08f;
 
         // ---- 路径点标识 ----
         // 取景框长得都一样，光看框根本答不出「从哪个开始、到哪个结束」。
@@ -129,6 +136,25 @@ namespace VNEffects.EditorTools
         // ---- 第二批：场景预览 / 画布拖拽 / 预设库 ----
         enum DragMode { None, Center, Corner }
         DragMode _dragMode;
+        // Ctrl+拖动时「抓取点相对取景中心」的偏移（画布坐标）：按相对位移移动，
+        // 框中心不会一按下就跳到鼠标处
+        Vector2 _dragGrab;
+        // 拖动起点（显示中心）：Shift 轴锁定、Δx/Δy 读数都以它为准
+        Vector2 _dragStart;
+        // Shift 轴锁定的方向：0 = 还没定 / 1 = 只动 X / 2 = 只动 Y
+        int _dragAxis;
+        // 本帧吸附上的对齐线（画布坐标），拖动时画虚线提示，松手清掉
+        float? _guideX, _guideY;
+        // 拖动吸附：吸到其他路径点的 X/Y 与画布中线，拖动时按住 Alt 暂停
+        const string SnapPrefKey = "VNCamseq.Snap";
+        bool _snapEnabled = true;
+        // 吸附阈值 / 轴锁定判定距离（GUI 像素：换算成画布单位随画布大小变，手感才一致）
+        const float SnapPx = 6f, AxisLockPx = 4f;
+        // 方向键微调步长（画布单位），按住 Shift 用大步
+        const float NudgeStep = 1f, NudgeStepBig = 10f;
+        // 选中 / 拖动路径点时，进度条（连带场景预览）跳到「镜头刚到达该点」的时刻
+        const string ScrubFollowPrefKey = "VNCamseq.ScrubFollow";
+        bool _scrubFollow = true;
 
         // 场景预览的还原信息全部 [SerializeField]：不然脚本一重编译（域重载）
         // 就丢了原始位置/原背景，ZoomRoot 与背景会永久停在预览态还原不回去。
@@ -221,6 +247,11 @@ namespace VNEffects.EditorTools
         // 底部「文本与说明」折叠（生成文本 / 解析文本 / 使用说明三块合一）
         const string TextFoldPrefKey = "VNCamseq.TextFold";
         bool _textFold;
+        // 拖动 / 缩放时取景框不超出画面：运行时允许框溢出 Overscan（背景四周的出血边），
+        // 但那一圈在多数背景上是放大后的边缘像素，画布上看就是「框拖出去了」，
+        // 开着它到边就自动停住，不用一点点微调
+        const string KeepInsidePrefKey = "VNCamseq.KeepInside";
+        bool _keepInside = true;
 
         public const string LibraryPath = "Assets/VNEffects/CamseqPresets.asset";
 

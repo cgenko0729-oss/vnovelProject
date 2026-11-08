@@ -17,8 +17,78 @@ namespace VNEffects.EditorTools
         // GUI
         // ==================================================================
 
+        /// <summary>
+        /// Ctrl+C 复制选中路径点（全部参数一模一样），Ctrl+V 贴到选中点后面并选中副本。
+        /// 走 IMGUI 的 Copy/Paste 命令（Edit 菜单发给有焦点的窗口），而不是 Shortcut——
+        /// Shortcut 会连文本框里的 Ctrl+C 一起抢走。**正在编辑文本框时整段让路**，
+        /// 否则在 X/Y 格里选中数字想复制，复制走的却是整个路径点
+        /// </summary>
+        void HandleCopyPaste()
+        {
+            var e = Event.current;
+            if (e.type != EventType.ValidateCommand && e.type != EventType.ExecuteCommand) return;
+            if (EditorGUIUtility.editingTextField) return;
+
+            bool hasSelection = _list != null && _list.index >= 0 && _list.index < _points.Count;
+            if (e.commandName == "Copy" && hasSelection)
+            {
+                if (e.type == EventType.ExecuteCommand)
+                {
+                    s_copiedPoint = CloneWaypoint(_points[_list.index]);
+                    ShowNotification(new GUIContent($"已复制路径点 {_list.index + 1}"));
+                }
+                e.Use();
+            }
+            else if (e.commandName == "Paste" && s_copiedPoint != null)
+            {
+                if (e.type == EventType.ExecuteCommand)
+                {
+                    // 每次贴都重新 Clone：贴两次得到的是两个独立的点，不是同一个引用
+                    int at = hasSelection ? _list.index + 1 : _points.Count;
+                    _points.Insert(at, CloneWaypoint(s_copiedPoint));
+                    _list.index = at;
+                    ShowNotification(new GUIContent($"已粘贴为路径点 {at + 1}"));
+                    Repaint();
+                }
+                e.Use();
+            }
+        }
+
+        // 路径点剪贴板：static 让同时开着的多个镜头窗口之间也能互相粘贴。
+        // 不进 systemCopyBuffer——那是玩家文本剪贴板，被一个路径点覆盖掉会很莫名其妙
+        static Waypoint s_copiedPoint;
+
+        /// <summary>▶ 预览 / ■ 停止：从当前进度条位置播；已经播到尾就从头来</summary>
+        void TogglePlay()
+        {
+            _playing = !_playing;
+            if (_playing)
+            {
+                if (_scrub >= TotalDuration() - 0.001f) _scrub = 0f;
+                _lastUpdateTime = EditorApplication.timeSinceStartup;
+            }
+            Repaint();
+        }
+
+        /// <summary>
+        /// 空格 = 播放 / 停止。放在 OnGUI 最前面先吃掉：IMGUI 里空格也会「按下」
+        /// 有键盘焦点的按钮 / 开关，不抢先的话会顺手点了刚才那个按钮。
+        /// 正在编辑文本框（数字格、文本区）时让路，否则打不出空格
+        /// </summary>
+        void HandlePlayKey()
+        {
+            var e = Event.current;
+            if (e.type != EventType.KeyDown || e.keyCode != KeyCode.Space) return;
+            if (EditorGUIUtility.editingTextField) return;
+            if (e.control || e.alt || e.command) return;   // 组合键留给别人
+            TogglePlay();
+            e.Use();
+        }
+
         void OnGUI()
         {
+            HandlePlayKey();
+            HandleCopyPaste();
             SyncLink();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
@@ -170,16 +240,10 @@ namespace VNEffects.EditorTools
         {
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                if (GUILayout.Button(_playing ? "■ 停止" : "▶ 预览",
+                if (GUILayout.Button(new GUIContent(_playing ? "■ 停止" : "▶ 预览",
+                            "播放 / 停止预览（空格）"),
                         EditorStyles.toolbarButton, GUILayout.Width(64f)))
-                {
-                    _playing = !_playing;
-                    if (_playing)
-                    {
-                        if (_scrub >= TotalDuration() - 0.001f) _scrub = 0f;
-                        _lastUpdateTime = EditorApplication.timeSinceStartup;
-                    }
-                }
+                    TogglePlay();
 
                 using (new EditorGUI.DisabledScope(!CanUndo))
                     if (GUILayout.Button(new GUIContent("↶", "撤销（Ctrl+Z，只作用于本窗口）"),
@@ -343,15 +407,15 @@ namespace VNEffects.EditorTools
             }
             else
             {
-                // 滑条只覆盖常用区间 0.5~3，数字框不设这个上限（运行时本来就不限）。
+                // 滑条只覆盖常用区间 MinZoom~MaxZoom，数字框不设这个上限（运行时本来就不限）。
                 // 但 HorizontalSlider 会把传进去的值 clamp 后原样返回，直接写回就会
-                // 把手敲的 4 拉回 3 —— 所以只在真的拖动了滑条时才采纳它的值。
+                // 把手敲的超限值拉回上限 —— 所以只在真的拖动了滑条时才采纳它的值。
                 if (sliderW >= 40f)
                 {
                     EditorGUI.BeginChangeCheck();
                     float dragged = GUI.HorizontalSlider(
                         new Rect(zoomSlider.x, zoomSlider.y + 4f, zoomSlider.width, zoomSlider.height),
-                        Mathf.Clamp(w.zoom, 0.5f, 3f), 0.5f, 3f);
+                        Mathf.Clamp(w.zoom, MinZoom, MaxZoom), MinZoom, MaxZoom);
                     if (EditorGUI.EndChangeCheck()) w.zoom = dragged;
                 }
                 w.zoom = Mathf.Clamp(EditorGUI.FloatField(zoomField, w.zoom), 0.1f, 10f);
@@ -437,7 +501,7 @@ namespace VNEffects.EditorTools
                         EditorGUI.BeginChangeCheck();
                         float dragged = EditorGUILayout.Slider(
                             new GUIContent("zoom", "取景倍率：1 = 全图，越大越推近"),
-                            Mathf.Clamp(_wp.zoom, 0.5f, 3f), 0.5f, 3f);
+                            Mathf.Clamp(_wp.zoom, MinZoom, MaxZoom), MinZoom, MaxZoom);
                         if (EditorGUI.EndChangeCheck()) _wp.zoom = dragged;
                     }
 

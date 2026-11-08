@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -87,6 +87,9 @@ namespace VNEffects.EditorTools
             new List<SpritePreviewItem>();
         readonly List<SpritePreviewItem> _cgPreviews =
             new List<SpritePreviewItem>();
+        // CG 条目登记的显示方式（镜头编排底图要按它合成，否则竖图被拉伸铺满）
+        readonly Dictionary<string, VNCgFitMode> _cgFits =
+            new Dictionary<string, VNCgFitMode>();
         readonly List<CharacterPreviewItem> _characterPreviews =
             new List<CharacterPreviewItem>();
         List<VNIssue> _issues = new List<VNIssue>();

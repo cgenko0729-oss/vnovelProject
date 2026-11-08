@@ -205,6 +205,36 @@ namespace VNEffects.EditorTools
             });
         }
 
+        /// <summary>
+        /// 镜头「刚到达」第 index 个点的时刻 = 该点移动 / 叠化段的结束时间（不含它的 hold）。
+        /// 这一刻缓动已走到 1，画面恰好就是该点的取景。找不到返回 -1
+        /// </summary>
+        float ArrivalTime(int index)
+        {
+            float t = 0f;
+            foreach (var s in BuildSegments())
+            {
+                t += Mathf.Max(0f, s.duration);
+                if (s.pointIndex == index && !s.isHold && s.kind != SegKind.EndFade) return t;
+            }
+            return -1f;
+        }
+
+        /// <summary>
+        /// 进度条跳到该点（开关 _scrubFollow）。场景预览每帧按 _scrub 摆镜头，
+        /// 所以只改 _scrub 就够，Game 视图会在下一次 Update 跟上。
+        /// 正在播放时选中 = 要开始改它了，停掉播放，不然播放头下一帧又跑走
+        /// </summary>
+        void JumpScrubToPoint(int index)
+        {
+            if (!_scrubFollow || index < 0 || index >= _points.Count) return;
+            float t = ArrivalTime(index);
+            if (t < 0f) return;
+            _playing = false;
+            _scrub = t;
+            Repaint();
+        }
+
         float TotalDuration()
         {
             float t = 0f;

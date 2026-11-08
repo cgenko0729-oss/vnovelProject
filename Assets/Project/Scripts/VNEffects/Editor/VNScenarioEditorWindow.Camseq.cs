@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -361,7 +361,7 @@ namespace VNEffects.EditorTools
                 bgId = state.bg,
                 cgId = state.cg,
                 backdrop = state.cg != null
-                    ? SpriteFor(_cgPreviews, state.cg)
+                    ? CgBackdrop(state.cg, state.cgFit)
                     : state.bg != null ? SpriteFor(_backgroundPreviews, state.bg) : null,
             };
             // CG 盖着且没 keepChars 时立绘本来就看不见，别画上去误导取景
@@ -377,6 +377,27 @@ namespace VNEffects.EditorTools
                     });
                 }
             return true;
+        }
+
+        /// <summary>
+        /// CG 底图按与运行时 <c>VNStage.ShowCg</c> 同一套规则合成：剧本行的 fit: 优先，
+        /// 没写（或写错）就跟素材登记的 fit。不合成的话竖图/方图在镜头编排里被拉伸铺满，
+        /// 取景框位置和游戏里对不上。
+        /// </summary>
+        Sprite CgBackdrop(string cgId, string scriptFit)
+        {
+            var raw = SpriteFor(_cgPreviews, cgId);
+            if (raw == null) return null;
+            if (!VNCgFit.TryParse(scriptFit, out var mode) &&
+                !_cgFits.TryGetValue(cgId, out mode))
+                mode = VNCgFitMode.Stretch;
+
+            var stage = FindFirstObjectByType<VNStage>();
+            var size = stage != null && stage.backgroundImage != null
+                ? stage.backgroundImage.rectTransform.rect.size
+                : new Vector2(1920f, 1080f);
+            return VNCgFit.Resolve(raw, mode, size,
+                stage != null && stage.backgroundImage != null ? stage.backgroundImage.sprite : null);
         }
 
         /// <summary>读出某一行的完整 camseq 文本</summary>
@@ -982,6 +1003,7 @@ namespace VNEffects.EditorTools
             public string bg;
             public string cg;
             public bool cgKeepChars;
+            public string cgFit;   // 剧本行上的 fit:（空 = 跟素材登记）
             public readonly List<StageChar> chars = new List<StageChar>();
         }
 
@@ -1009,6 +1031,7 @@ namespace VNEffects.EditorTools
 
             string bg = null, cg = null;
             bool cgKeepChars = false;
+            string cgFit = null;
             var chars = new List<StageChar>();
 
             foreach (var r in _doc.rows)
@@ -1023,11 +1046,12 @@ namespace VNEffects.EditorTools
                         case "cg":
                         {
                             string id = r.Get("id");
-                            if (id == "off") { cg = null; cgKeepChars = false; }
+                            if (id == "off") { cg = null; cgKeepChars = false; cgFit = null; }
                             else if (!string.IsNullOrEmpty(id))
                             {
                                 cg = id;
                                 cgKeepChars = r.Get("chars") == "keep";
+                                cgFit = r.Get("fit");
                             }
                             break;
                         }
@@ -1043,7 +1067,7 @@ namespace VNEffects.EditorTools
                 }
 
                 var state = new RowStageState
-                    { bg = bg, cg = cg, cgKeepChars = cgKeepChars };
+                    { bg = bg, cg = cg, cgKeepChars = cgKeepChars, cgFit = cgFit };
                 state.chars.AddRange(chars);
                 _stageStates.Add(state);
             }

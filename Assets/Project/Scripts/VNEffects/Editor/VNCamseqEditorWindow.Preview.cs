@@ -188,7 +188,7 @@ namespace VNEffects.EditorTools
             {
                 type = PointType.Coords,
                 coords = Round(point),
-                zoom = Mathf.Clamp(zoom, 0.5f, 3f),
+                zoom = Mathf.Clamp(zoom, MinZoom, MaxZoom),
                 duration = 0.8f,
             });
             _list.index = _points.Count - 1;

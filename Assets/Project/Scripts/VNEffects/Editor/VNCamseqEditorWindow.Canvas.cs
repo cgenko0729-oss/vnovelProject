@@ -174,6 +174,7 @@ namespace VNEffects.EditorTools
                     FrameGuiRect(rect, -gs.offset / gs.zoom, CanvasHalf / gs.zoom), rect);
             }
 
+            DrawDragGuides(rect);
             HandleCanvasInput(rect);
         }
 
@@ -415,9 +416,12 @@ namespace VNEffects.EditorTools
         {
             var e = Event.current;
 
-            // 光标是「现在能不能移动」的唯一提示，所以 Ctrl 一按下就得立刻换形状
+            // 光标是「现在能不能移动」的唯一提示，所以 Ctrl 一按下就得立刻换形状；
+            // Shift / Alt 会改变拖动中的锁轴与吸附，按下松开也要立刻重算一帧
             if ((e.type == EventType.KeyDown || e.type == EventType.KeyUp) &&
-                (e.keyCode == KeyCode.LeftControl || e.keyCode == KeyCode.RightControl))
+                (e.keyCode == KeyCode.LeftControl || e.keyCode == KeyCode.RightControl ||
+                 e.keyCode == KeyCode.LeftShift || e.keyCode == KeyCode.RightShift ||
+                 e.keyCode == KeyCode.LeftAlt || e.keyCode == KeyCode.RightAlt))
                 Repaint();
 
             DrawCanvasCursors(rect, e.control);
@@ -425,11 +429,52 @@ namespace VNEffects.EditorTools
             if (e.type == EventType.MouseUp)
             {
                 _dragMode = DragMode.None;
+                _guideX = _guideY = null;
                 return;
             }
             if (!rect.Contains(e.mousePosition)) return;
 
             bool hasSelection = _list.index >= 0 && _list.index < _points.Count;
+
+            // 方向键微调：鼠标停在画布上时才接管（不然右栏列表的 ↑↓ 换选中会失灵），
+            // 正在编辑文本框时让路。纯直线移动，拖完用它收尾不会有手抖
+            if (e.type == EventType.KeyDown && hasSelection && !EditorGUIUtility.editingTextField &&
+                _points[_list.index].type != PointType.Stay && _zoomMode != VNCamZoomMode.Char)
+            {
+                Vector2 dir = e.keyCode == KeyCode.UpArrow ? Vector2.up
+                            : e.keyCode == KeyCode.DownArrow ? Vector2.down
+                            : e.keyCode == KeyCode.LeftArrow ? Vector2.left
+                            : e.keyCode == KeyCode.RightArrow ? Vector2.right
+                            : Vector2.zero;
+                if (dir != Vector2.zero)
+                {
+                    var w = _points[_list.index];
+                    var st = TargetState(w);
+                    var center = -st.offset / st.zoom;     // 锚点/角色点从当前显示位置起步
+                    w.type = PointType.Coords;
+                    w.coords = Round(center + dir * (e.shift ? NudgeStepBig : NudgeStep));
+                    var clamped = TargetState(w);
+                    w.coords = Round(-clamped.offset / clamped.zoom);
+                    KeepFrameInside(w);
+                    e.Use();
+                    Repaint();
+                    return;
+                }
+            }
+
+            // Ctrl+滚轮：以框中心为基准缩放**选中框**。拖动中途也能滚，
+            // 鼠标和 Ctrl 都不用松开就能一边移动一边调大小。往上滚 = 推近（zoom 变大）
+            if (e.type == EventType.ScrollWheel && e.control && hasSelection &&
+                _points[_list.index].type != PointType.Stay)
+            {
+                var w = _points[_list.index];
+                float step = e.delta.y < 0f ? WheelZoomStep : 1f / WheelZoomStep;
+                w.zoom = Mathf.Clamp(Mathf.Round(w.zoom * step * 100f) / 100f, MinZoom, MaxZoom);
+                KeepFrameInside(w);   // 拉远时框变大，可能顶出画面
+                e.Use();
+                Repaint();
+                return;
+            }
 
             if (e.type == EventType.MouseDown && e.button == 0)
             {
@@ -442,12 +487,13 @@ namespace VNEffects.EditorTools
                     if (!_badgeRects[i].Contains(e.mousePosition)) continue;
                     _list.index = i;
                     _dragMode = DragMode.None;   // 牌子只用来选，拖动仍走取景框
+                    JumpScrubToPoint(i);
                     e.Use();
                     Repaint();
                     return;
                 }
 
-                // 1) 选中路径点的取景框四角（GUI 12px 内）→ 拖角改 zoom
+                // 1) 选中路径点的取景框四角（GUI CornerHotRadius 内）→ 拖角改 zoom
                 if (hasSelection && _points[_list.index].type != PointType.Stay)
                 {
                     var st = TargetState(_list.index);
@@ -458,16 +504,38 @@ namespace VNEffects.EditorTools
                     {
                         var cornerGui = CanvasToGui(rect,
                             center + new Vector2(half.x * cx, half.y * cy));
-                        if (Vector2.Distance(cornerGui, e.mousePosition) < 12f)
+                        if (Vector2.Distance(cornerGui, e.mousePosition) < CornerHotRadius)
                         {
                             _dragMode = DragMode.Corner;
+                            JumpScrubToPoint(_list.index);
                             e.Use();
                             return;
                         }
                     }
                 }
 
-                // 2) 任意取景中心 60 画布单位内 → 选中该点并可拖动
+                // 2) Ctrl 按住：框内任意处都能抓起来拖。**当前选中的框优先**（防误拖）；
+                //    鼠标不在选中框内时，重叠处取最小的那个（zoom 最大、最具体）
+                if (e.control)
+                {
+                    int grab = FrameAt(rect, e.mousePosition);
+                    if (grab >= 0)
+                    {
+                        _list.index = grab;
+                        _dragMode = DragMode.Center;
+                        var gs = TargetState(grab);
+                        _dragStart = -gs.offset / gs.zoom;
+                        _dragGrab = click - _dragStart;
+                        _dragAxis = 0;
+                        _guideX = _guideY = null;
+                        JumpScrubToPoint(grab);
+                        e.Use();
+                        Repaint();
+                        return;
+                    }
+                }
+
+                // 3) 任意取景中心 60 画布单位内 → 只选中（移动走上面的 Ctrl+拖）
                 int nearest = -1;
                 float best = 60f;
                 for (int i = 0; i < _points.Count; i++)
@@ -480,10 +548,11 @@ namespace VNEffects.EditorTools
                 if (nearest >= 0)
                 {
                     _list.index = nearest;
+                    JumpScrubToPoint(nearest);
                     // 误触保护：裸拖只选中，**Ctrl + 拖**才移动点位。
                     // 画布上最常做的事是「选中某个点看它的取景」，而按在框上稍微一晃
                     // 就把调好的位置推走了 —— 代价太不对等，所以移动要多按一个键
-                    _dragMode = e.control ? DragMode.Center : DragMode.None;
+                    _dragMode = DragMode.None;
                 }
                 // 空白处点击不再有任何效果 —— 以前是「点一下就把选中点瞬移过去」，
                 // 连拖都不用拖，误伤率最高的一条。移动点位现在只有 Ctrl+拖这一条路
@@ -507,16 +576,118 @@ namespace VNEffects.EditorTools
                         Mathf.Max(20f, Mathf.Abs(mouse.x - center.x)),
                         Mathf.Max(12f, Mathf.Abs(mouse.y - center.y)));
                     float zoom = Mathf.Max(CanvasHalf.x / half.x, CanvasHalf.y / half.y);
-                    w.zoom = Mathf.Clamp(zoom, 0.5f, 3f);
+                    w.zoom = Mathf.Clamp(zoom, MinZoom, MaxZoom);
+                    KeepFrameInside(w);
                 }
                 else if (_dragMode == DragMode.Center)
                 {
                     w.type = PointType.Coords;
-                    w.coords = Round(GuiToCanvas(rect, e.mousePosition));
+                    var raw = GuiToCanvas(rect, e.mousePosition) - _dragGrab;
+                    float unitsPerPx = CanvasHalf.x * 2f / Mathf.Max(1f, rect.width);
+
+                    // Shift 轴锁定：拖出 AxisLockPx 后按主方向定轴，另一轴钉死在起点；
+                    // 中途松开 Shift 立即恢复自由拖动，再按下重新判定
+                    if (e.shift)
+                    {
+                        var d = raw - _dragStart;
+                        if (_dragAxis == 0 &&
+                            Mathf.Max(Mathf.Abs(d.x), Mathf.Abs(d.y)) > AxisLockPx * unitsPerPx)
+                            _dragAxis = Mathf.Abs(d.x) >= Mathf.Abs(d.y) ? 1 : 2;
+                        if (_dragAxis == 1) raw.y = _dragStart.y;
+                        else if (_dragAxis == 2) raw.x = _dragStart.x;
+                        else raw = _dragStart;    // 还没定轴前先不动，免得一开始就带出斜向抖动
+                    }
+                    else _dragAxis = 0;
+
+                    // 吸附：只吸没被锁住的那根轴（被锁的轴本来就等于起点）
+                    _guideX = _guideY = null;
+                    if (_snapEnabled && !e.alt)
+                    {
+                        float th = SnapPx * unitsPerPx;
+                        if (_dragAxis != 2) raw.x = SnapAxis(raw.x, true, th, out _guideX);
+                        if (_dragAxis != 1) raw.y = SnapAxis(raw.y, false, th, out _guideY);
+                    }
+                    w.coords = raw;
+                    // 写回「防露边钳制后真正显示的中心」：不钳的话拖出可动范围时框停住了，
+                    // 坐标却继续往外跑，存下来的数字和画面对不上，往回拖还要先空走一段
+                    var clamped = TargetState(w);
+                    w.coords = Round(-clamped.offset / clamped.zoom);
+                    KeepFrameInside(w);
+                    // 被画面边缘 / 防露边推开了的话，那条对齐线已经不成立，别再画
+                    if (_guideX.HasValue && Mathf.Abs(w.coords.x - _guideX.Value) > 0.5f) _guideX = null;
+                    if (_guideY.HasValue && Mathf.Abs(w.coords.y - _guideY.Value) > 0.5f) _guideY = null;
                 }
+                // 拖动中也一直钉住：别处（▶ 播放、刻度条）挪走了播放头，一拖又回来
+                JumpScrubToPoint(_list.index);
                 e.Use();
                 Repaint();
             }
+        }
+
+        /// <summary>
+        /// 单轴吸附：候选 = 画布中线 0 + 其他非 stay 路径点的显示中心。取阈值内最近的那个，
+        /// 吸上了把对齐线位置带出去（画虚线用），没吸上返回原值
+        /// </summary>
+        float SnapAxis(float value, bool isX, float threshold, out float? guide)
+        {
+            float? found = null;
+            float best = threshold;
+            float result = value;
+            void Try(float c)
+            {
+                float d = Mathf.Abs(value - c);
+                if (d <= best) { best = d; result = c; found = c; }
+            }
+            Try(0f);
+            for (int i = 0; i < _points.Count; i++)
+            {
+                if (i == _list.index || _points[i].type == PointType.Stay) continue;
+                var st = TargetState(i);
+                var c = -st.offset / st.zoom;
+                Try(Mathf.Round(isX ? c.x : c.y));
+            }
+            guide = found;
+            return result;
+        }
+
+        /// <summary>
+        /// 拖动中的视觉辅助：吸附上的对齐线（青色，贯穿画布）+ 选中框旁的 Δx/Δy 读数。
+        /// 读数是相对**按下那一刻**的位移，想竖直上拖时一眼看出 Δx 是不是 0
+        /// </summary>
+        void DrawDragGuides(Rect rect)
+        {
+            if (Event.current.type != EventType.Repaint || _dragMode != DragMode.Center) return;
+            if (_list.index < 0 || _list.index >= _points.Count) return;
+
+            var lineColor = new Color(0.3f, 0.95f, 1f, 0.9f);
+            if (_guideX.HasValue)
+            {
+                float gx = CanvasToGui(rect, new Vector2(_guideX.Value, 0f)).x;
+                for (float y = rect.y; y < rect.yMax; y += 8f)
+                    EditorGUI.DrawRect(new Rect(gx, y, 1f, Mathf.Min(4f, rect.yMax - y)), lineColor);
+            }
+            if (_guideY.HasValue)
+            {
+                float gy = CanvasToGui(rect, new Vector2(0f, _guideY.Value)).y;
+                for (float x = rect.x; x < rect.xMax; x += 8f)
+                    EditorGUI.DrawRect(new Rect(x, gy, Mathf.Min(4f, rect.xMax - x), 1f), lineColor);
+            }
+
+            var st = TargetState(_list.index);
+            var center = -st.offset / st.zoom;
+            var delta = Round(center - _dragStart);
+            string lockTag = _dragAxis == 1 ? "  锁 X 向" : _dragAxis == 2 ? "  锁 Y 向" : "";
+            var frame = FrameGuiRect(rect, center, CanvasHalf / st.zoom);
+            var label = new GUIContent($"Δx {delta.x:+0;-0;0}  Δy {delta.y:+0;-0;0}{lockTag}");
+            var style = EditorStyles.whiteMiniLabel;
+            var size = style.CalcSize(label);
+            // 默认贴在框的右下角外侧，出画布就往里收
+            var pos = new Vector2(frame.xMax + 4f, frame.yMax - size.y);
+            pos.x = Mathf.Clamp(pos.x, rect.x + 2f, rect.xMax - size.x - 2f);
+            pos.y = Mathf.Clamp(pos.y, rect.y + 2f, rect.yMax - size.y - 2f);
+            EditorGUI.DrawRect(new Rect(pos.x - 3f, pos.y, size.x + 6f, size.y),
+                new Color(0f, 0f, 0f, 0.65f));
+            GUI.Label(new Rect(pos.x, pos.y, size.x, size.y), label, style);
         }
 
         /// <summary>
@@ -527,7 +698,16 @@ namespace VNEffects.EditorTools
         /// </summary>
         void DrawCanvasCursors(Rect rect, bool ctrl)
         {
-            if (ctrl) EditorGUIUtility.AddCursorRect(rect, MouseCursor.MoveArrow);
+            // 只在「真的抓得起来」的地方给移动箭头：以前整块画布都是箭头，
+            // 看起来哪里都能拖，其实只有框中心一小圈能拖
+            if (ctrl)
+                for (int i = 0; i < _points.Count; i++)
+                {
+                    if (_points[i].type == PointType.Stay) continue;
+                    var hot = RectIntersect(FrameRectOf(rect, i), rect);
+                    if (hot.width >= 2f && hot.height >= 2f)
+                        EditorGUIUtility.AddCursorRect(hot, MouseCursor.MoveArrow);
+                }
 
             int sel = _list != null ? _list.index : -1;
             if (sel < 0 || sel >= _points.Count || _points[sel].type == PointType.Stay) return;
@@ -539,11 +719,66 @@ namespace VNEffects.EditorTools
             for (int cy = -1; cy <= 1; cy += 2)
             {
                 var g = CanvasToGui(rect, center + new Vector2(half.x * cx, half.y * cy));
-                var hot = RectIntersect(new Rect(g.x - 10f, g.y - 10f, 20f, 20f), rect);
+                var hot = RectIntersect(new Rect(g.x - CornerHotRadius, g.y - CornerHotRadius,
+                    CornerHotRadius * 2f, CornerHotRadius * 2f), rect);
                 if (hot.width < 2f || hot.height < 2f) continue;   // 角在画布外，别乱设光标
                 EditorGUIUtility.AddCursorRect(hot,
                     cx * cy > 0 ? MouseCursor.ResizeUpRight : MouseCursor.ResizeUpLeft);
             }
+        }
+
+        /// <summary>
+        /// 「拖动时取景框不超出画面」开关：把 Coords 点的取景中心钳在
+        /// <c>±(半屏 − 半屏/zoom)</c> 内，框到边就停。只管 Coords——锚点 / 角色点
+        /// 改它就得把类型偷换成坐标，用户没拖它就不该变；mode:char 镜头不平移也不用管
+        /// </summary>
+        void KeepFrameInside(Waypoint w)
+        {
+            if (!_keepInside || w.type != PointType.Coords || _zoomMode == VNCamZoomMode.Char) return;
+            var st = TargetState(w);
+            var center = -st.offset / st.zoom;
+            var limit = Vector2.Max(Vector2.zero, CanvasHalf - CanvasHalf / st.zoom);
+            // 先取整再按向下取整的上限钳：先钳后取整会被四舍五入顶出去半个单位
+            limit = new Vector2(Mathf.Floor(limit.x), Mathf.Floor(limit.y));
+            center = Round(center);
+            w.coords = new Vector2(
+                Mathf.Clamp(center.x, -limit.x, limit.x),
+                Mathf.Clamp(center.y, -limit.y, limit.y));
+        }
+
+        /// <summary>第 i 个路径点的取景框在 GUI 里的矩形（已按防露边钳制，与画出来的框一致）</summary>
+        Rect FrameRectOf(Rect rect, int i)
+        {
+            var st = TargetState(i);
+            return FrameGuiRect(rect, -st.offset / st.zoom, CanvasHalf / st.zoom);
+        }
+
+        /// <summary>
+        /// 鼠标所在的取景框：鼠标在当前选中框内就取选中框；否则多个框重叠时取面积最小的；
+        /// stay 点没有自己的框，跳过。都不在里面返回 -1
+        /// </summary>
+        int FrameAt(Rect rect, Vector2 mouse)
+        {
+            // 当前选中的框只要包含鼠标就**无条件优先**：用户先点选、再 Ctrl+拖，
+            // 拖的必须是他刚选中的那个，否则重叠处会误拖到别的点
+            int sel = _list != null ? _list.index : -1;
+            if (sel >= 0 && sel < _points.Count && _points[sel].type != PointType.Stay &&
+                FrameRectOf(rect, sel).Contains(mouse))
+                return sel;
+
+            int best = -1;
+            float bestArea = float.MaxValue;
+            for (int i = 0; i < _points.Count; i++)
+            {
+                if (_points[i].type == PointType.Stay) continue;
+                var f = FrameRectOf(rect, i);
+                if (!f.Contains(mouse)) continue;
+                float area = f.width * f.height;
+                bool better = area < bestArea - 0.5f ||
+                              (Mathf.Abs(area - bestArea) <= 0.5f && i == _list.index);
+                if (best < 0 || better) { best = i; bestArea = area; }
+            }
+            return best;
         }
 
         static Rect RectIntersect(Rect a, Rect b)

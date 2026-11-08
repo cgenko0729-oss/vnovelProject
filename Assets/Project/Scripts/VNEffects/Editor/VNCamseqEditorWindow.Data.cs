@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using DG.Tweening;
@@ -332,6 +332,25 @@ namespace VNEffects.EditorTools
                 _showPortraits = !_showPortraits;
                 Repaint();
             });
+            menu.AddItem(new GUIContent("拖动时取景框不超出画面"), _keepInside, () =>
+            {
+                _keepInside = !_keepInside;
+                EditorPrefs.SetBool(KeepInsidePrefKey, _keepInside);
+                Repaint();
+            });
+            menu.AddItem(new GUIContent("拖动时吸附对齐（其他点 / 中线，按住 Alt 暂停）"), _snapEnabled, () =>
+            {
+                _snapEnabled = !_snapEnabled;
+                EditorPrefs.SetBool(SnapPrefKey, _snapEnabled);
+                Repaint();
+            });
+            menu.AddItem(new GUIContent("选中 / 拖动点时进度条跳到该点"), _scrubFollow, () =>
+            {
+                _scrubFollow = !_scrubFollow;
+                EditorPrefs.SetBool(ScrubFollowPrefKey, _scrubFollow);
+                if (_scrubFollow && _list != null) JumpScrubToPoint(_list.index);
+                Repaint();
+            });
             menu.DropDown(rect);
         }
 
@@ -349,8 +368,12 @@ namespace VNEffects.EditorTools
                     return null;
                 }
                 int version = _linkedEditor.DocVersion;
+                // 合成出来的 CG 底图住在 VNCgFit 的小缓存里，被淘汰后引用会变成「已销毁」，
+                // 这时重新推算一次（缓存命中就是查表，没命中才重新合成）
+                bool backdropDestroyed = _rowStage != null &&
+                    !ReferenceEquals(_rowStage.backdrop, null) && _rowStage.backdrop == null;
                 if (_rowStage == null || _rowStageRow != _linkedRow ||
-                    _rowStageVersion != version)
+                    _rowStageVersion != version || backdropDestroyed)
                 {
                     _linkedEditor.TryGetRowStage(_linkedRow, out _rowStage);
                     _rowStageRow = _linkedRow;
@@ -374,6 +397,9 @@ namespace VNEffects.EditorTools
                 elementHeightCallback = _ => EditorGUIUtility.singleLineHeight + 6f,
                 drawElementCallback = DrawElement,
                 onAddCallback = l => _points.Add(new Waypoint()),
+                // 列表点选也联动进度条；时间轴段块点选**不走这里**（直接写 _list.index），
+                // 那边播放头归刻度条管，点段块只选中不动播放头
+                onSelectCallback = l => JumpScrubToPoint(l.index),
             };
             _lastUpdateTime = EditorApplication.timeSinceStartup;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
@@ -384,6 +410,9 @@ namespace VNEffects.EditorTools
             _canvasHeight = EditorPrefs.GetFloat(CanvasHeightPrefKey, 0f);
             _leftColumnWidth = EditorPrefs.GetFloat(ColumnWidthPrefKey, 0f);
             _textFold = EditorPrefs.GetBool(TextFoldPrefKey, false);
+            _keepInside = EditorPrefs.GetBool(KeepInsidePrefKey, true);
+            _snapEnabled = EditorPrefs.GetBool(SnapPrefKey, true);
+            _scrubFollow = EditorPrefs.GetBool(ScrubFollowPrefKey, true);
             // 域重载后 _undoBaseline 是序列化带回来的，别覆盖掉；只有全新窗口才初始化
             if (string.IsNullOrEmpty(_undoBaseline)) _undoBaseline = GenerateText();
 

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
@@ -49,6 +49,7 @@ namespace VNEffects.EditorTools
 
             _backgroundPreviews.Clear();
             _cgPreviews.Clear();
+            _cgFits.Clear();
 
             var bgSrc = PickLibrary(config != null ? config.backgrounds : null,
                                     stage != null ? stage.backgrounds : null);
@@ -75,6 +76,7 @@ namespace VNEffects.EditorTools
                     if (c == null || string.IsNullOrEmpty(c.id)) continue;
                     cgs.Add(c.id);
                     _cgPreviews.Add(new SpritePreviewItem(c.id, c.sprite));
+                    _cgFits[c.id] = c.fit;
                 }
                 _ctx.cgIds = cgs.ToArray();
             }

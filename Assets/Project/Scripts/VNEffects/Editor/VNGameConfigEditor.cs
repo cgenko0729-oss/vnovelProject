@@ -62,10 +62,31 @@ namespace VNEffects.EditorTools
         readonly Dictionary<string, string> _queries = new Dictionary<string, string>();
         readonly Dictionary<string, int> _pages = new Dictionary<string, int>();
 
+        /// <summary>外部请求切到的页签（-1 = 无）。静态是因为 Inspector 可能早已开着同一个 Editor 实例。</summary>
+        static int s_pendingTab = -1;
+
         void OnEnable()
         {
             _tab = Mathf.Clamp(EditorPrefs.GetInt(TabPrefKey, 0), 0, Tabs.Length);
             CollectOrphans();
+        }
+
+        /// <summary>
+        /// 让 VNGameConfig 的 Inspector 切到「含有该字段」的那一页（素材浏览器的「在 Config 中定位」用）。
+        /// 只负责切页，选中资产由调用方做。字段没登记到任何页签时什么都不做。
+        /// </summary>
+        public static void RevealField(string field)
+        {
+            for (int i = 0; i < Tabs.Length; i++)
+            {
+                if (System.Array.IndexOf(Tabs[i].fields, field) < 0) continue;
+                // 写 EditorPrefs：选中后新建的 Editor 在 OnEnable 里读它；
+                // 设 s_pendingTab：已经开着的 Editor 在下一次 OnInspectorGUI 里吃掉它
+                EditorPrefs.SetInt(TabPrefKey, i);
+                s_pendingTab = i;
+                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+                return;
+            }
         }
 
         /// <summary>扫一遍序列化字段，找出页签没登记的那些。</summary>
@@ -93,6 +114,8 @@ namespace VNEffects.EditorTools
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+
+            if (s_pendingTab >= 0) { _tab = s_pendingTab; s_pendingTab = -1; GUI.FocusControl(null); }
 
             DrawToolbar();
             EditorGUILayout.Space(2);
